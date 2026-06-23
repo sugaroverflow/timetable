@@ -53,12 +53,13 @@ export default async function SettingsPage({
           name: string;
           description: string | null;
           privacy: string;
+          customDomain: string | null;
           viewerRoles: string[];
           settings: string;
         }
       | null;
   }>(
-    `query($idOrSlug: String!) { timetable(idOrSlug: $idOrSlug) { id name description privacy viewerRoles settings } }`,
+    `query($idOrSlug: String!) { timetable(idOrSlug: $idOrSlug) { id name description privacy customDomain viewerRoles settings } }`,
     { idOrSlug: slug },
   );
   if (!first.timetable) notFound();
@@ -88,6 +89,7 @@ export default async function SettingsPage({
           name={first.timetable.name}
           description={first.timetable.description}
           privacy={first.timetable.privacy}
+          customDomain={first.timetable.customDomain}
         />
         <SettingsForm slug={slug} current={settings} />
       </div>

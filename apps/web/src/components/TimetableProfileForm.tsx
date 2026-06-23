@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 
 import { clientGql } from "@/lib/clientGraphql";
 
-const MUTATION = `mutation($s: String!, $name: String, $desc: String, $privacy: String) {
-  updateTimetableProfile(idOrSlug: $s, name: $name, description: $desc, privacy: $privacy) { id }
+const MUTATION = `mutation($s: String!, $name: String, $desc: String, $privacy: String, $cd: String) {
+  updateTimetableProfile(idOrSlug: $s, name: $name, description: $desc, privacy: $privacy, customDomain: $cd) { id }
 }`;
 
 export function TimetableProfileForm({
@@ -14,16 +14,19 @@ export function TimetableProfileForm({
   name: initialName,
   description: initialDescription,
   privacy: initialPrivacy,
+  customDomain: initialCustomDomain,
 }: {
   slug: string;
   name: string;
   description: string | null;
   privacy: string;
+  customDomain: string | null;
 }) {
   const router = useRouter();
   const [name, setName] = useState(initialName);
   const [description, setDescription] = useState(initialDescription ?? "");
   const [privacy, setPrivacy] = useState(initialPrivacy);
+  const [customDomain, setCustomDomain] = useState(initialCustomDomain ?? "");
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
 
@@ -31,7 +34,13 @@ export function TimetableProfileForm({
     e.preventDefault();
     setSaved(false);
     try {
-      await clientGql(MUTATION, { s: slug, name, desc: description, privacy });
+      await clientGql(MUTATION, {
+        s: slug,
+        name,
+        desc: description,
+        privacy,
+        cd: customDomain,
+      });
       setSaved(true);
       startTransition(() => router.refresh());
     } catch (err) {
@@ -69,6 +78,15 @@ export function TimetableProfileForm({
           <option value="public">Public — anyone can read</option>
           <option value="deactivated">Deactivated — admins only</option>
         </select>
+      </div>
+      <div className="field">
+        <label htmlFor="tt-domain">Custom domain</label>
+        <input
+          id="tt-domain"
+          value={customDomain}
+          onChange={(e) => setCustomDomain(e.target.value)}
+          placeholder="timetable.2026.newspeak.house"
+        />
       </div>
       <button className="btn btn-primary" type="submit" disabled={pending}>
         {pending ? "Saving…" : saved ? "Saved" : "Save"}

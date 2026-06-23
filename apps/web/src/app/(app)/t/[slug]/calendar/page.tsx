@@ -1,5 +1,6 @@
 import { isAdmin, isElector, isHost, type Role } from "@timetable/shared";
 
+import { env } from "@/env";
 import { AudienceFilter } from "@/components/AudienceFilter";
 import { SlotAdminForm } from "@/components/SlotAdminForm";
 import { SlotCard, type CalendarPerms } from "@/components/SlotCard";
@@ -11,6 +12,7 @@ type Data = {
   timetable: { viewerRoles: string[] } | null;
   calendar: CalendarSlot[];
   topicFeed: TopicOption[];
+  myIcsToken: string | null;
 };
 
 const QUERY = `
@@ -23,6 +25,7 @@ const QUERY = `
       perUser { userId name state }
     }
     topicFeed(idOrSlug: $s) { id title }
+    myIcsToken
   }
 `;
 
@@ -48,18 +51,28 @@ export default async function CalendarPage({
     canAdmin: isAdmin(roles),
   };
 
+  const icsUrl =
+    `${env.apiUrl}/api/timetables/${slug}/calendar.ics` +
+    (data.myIcsToken ? `?token=${data.myIcsToken}` : "");
+
   return (
     <div className="stack">
-      {perms.canSeeHostOnly ? (
-        <div className="toolbar">
-          <label>Audience</label>
-          <AudienceFilter
-            value={audience ?? "all"}
-            isHost={isHost(roles)}
-            topics={data.topicFeed}
-          />
-        </div>
-      ) : null}
+      <div className="toolbar">
+        {perms.canSeeHostOnly ? (
+          <>
+            <label>Audience</label>
+            <AudienceFilter
+              value={audience ?? "all"}
+              isHost={isHost(roles)}
+              topics={data.topicFeed}
+            />
+          </>
+        ) : null}
+        <span className="spacer" />
+        <a className="btn btn-ghost" href={icsUrl}>
+          Subscribe (ICS)
+        </a>
+      </div>
 
       {perms.canAdmin ? <SlotAdminForm slug={slug} /> : null}
       {perms.canSetAvailability ? <WeekdayPatternControl slug={slug} /> : null}

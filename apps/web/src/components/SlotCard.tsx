@@ -67,6 +67,18 @@ export function SlotCard({
               {t.title}
             </span>
           ))}
+          {slot.topics.length > 1 ? (
+            <span
+              className="pill"
+              style={{
+                background: "var(--yellow-soft, #fdf2dc)",
+                color: "#a9700f",
+                borderColor: "transparent",
+              }}
+            >
+              ⚠ conflict: {slot.topics.length} topics
+            </span>
+          ) : null}
         </div>
       ) : null}
 

@@ -101,6 +101,9 @@ export default async function TimetableLayout({
           Overview
         </NavLink>
         <NavLink href={`${base}/feed`}>Topic feed</NavLink>
+        {(isHost(roles) || isAdmin(roles)) && (
+          <NavLink href={`${base}/dashboard`}>Dashboard</NavLink>
+        )}
         {isHost(roles) && <NavLink href={`${base}/topics`}>My topics</NavLink>}
         {(isElector(roles) || isHost(roles) || isAdmin(roles)) && (
           <NavLink href={`${base}/calendar`}>Availability</NavLink>
