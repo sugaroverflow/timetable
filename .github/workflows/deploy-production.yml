@@ -1,13 +1,9 @@
-# Deploy to DigitalOcean App Platform after CI passes on main, or manually.
-# Requires repository secrets — see README § Deployment → GitHub Actions.
+# Deploy production (new app timetable @ timetable.love). Manual only.
+# Secrets: GitHub Environment "production" — see README § Environments.
 
-name: Deploy
+name: Deploy Production
 
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -15,17 +11,13 @@ permissions:
 
 jobs:
   deploy:
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
-      - name: Deploy to App Platform
+      - name: Deploy production to App Platform
         uses: digitalocean/app_action/deploy@v2
         env:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
@@ -34,7 +26,6 @@ jobs:
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
           app_spec_location: .do/app.yaml
-          # Timetable DO project (not the default "raindrop" project). Set in repo secrets.
           project_id: ${{ secrets.DIGITALOCEAN_PROJECT_ID }}
           print_build_logs: true
           print_deploy_logs: true
