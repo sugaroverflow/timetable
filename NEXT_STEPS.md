@@ -18,54 +18,43 @@ remaining **Phase 4** work.
 
 ## Cleanup before Phase 4 (audit findings)
 
-From an automated review (Bugbot) of the working tree. Address these before
-adding Phase 4 surface area.
+From an automated review (Bugbot) of the working tree. **All items below were
+addressed** in commit `fix: address pre-Phase-4 audit findings`.
 
 ### High
 
-- [ ] **Archived hearts can be resurrected by toggling.**
-  `packages/core/src/hearts.ts` — `toggleHeart` matches existing rows without
-  considering `archivedAt`, so after `archiveTopicHearts` an elector can delete
-  the archived row and re-insert an active one (and the plain insert risks a
-  unique-constraint error if the existence check is changed naively). Fix:
-  treat only active (`archivedAt IS NULL`) rows as "hearted", and use
-  `onConflictDoUpdate` to reactivate cleanly. Decide policy: re-hearting after a
-  reset is allowed (new vote) but must not silently delete the archive record.
+- [x] **Archived hearts can be resurrected by toggling.**
+  `packages/core/src/hearts.ts` — `toggleHeart` now treats only active
+  (`archivedAt IS NULL`) rows as "hearted" and reactivates an archived row via
+  `onConflictDoUpdate` (no silent loss / unique-constraint crash). Policy:
+  re-hearting after a reset is a fresh vote.
 
-- [ ] **Calendar omits default-yellow electors.**
-  `packages/core/src/calendar.ts` — `buildCalendar` only aggregates electors
-  who have an availability row, but the spec/schema default is **yellow**.
-  Audience electors with no row should count as yellow in `counts` and appear in
-  `perUser`.
+- [x] **Calendar omits default-yellow electors.**
+  `buildCalendar` now counts every audience elector, defaulting those without a
+  saved row to **yellow** in `counts` and `perUser`.
 
 ### Medium
 
-- [ ] **`hearted_topic` audience can leak across timetables.**
-  `getAudienceElectorIds` doesn't verify the topic belongs to the current
-  timetable. Join `topics` and filter `timetableId`.
+- [x] **`hearted_topic` audience could leak across timetables.**
+  `getAudienceElectorIds` now joins `topics` and filters by `timetableId`.
 
-- [ ] **Slot tagging accepts foreign topics.**
-  `tagSlotTopic` doesn't check that the topic's `timetableId` matches the slot's.
-  Validate before inserting (reject cross-timetable tags).
+- [x] **Slot tagging accepted foreign topics.**
+  `tagSlotTopic` now rejects topics whose `timetableId` differs from the slot's.
 
-- [ ] **Pending invites aren't claimed for returning users.**
-  `apps/api/src/auth/clerk.ts` only claims invites when creating a new local
-  user. Invites created after a user's first sign-in are never claimed. Run
-  `claimInvitesForUser` on each authenticated context build (cheap, idempotent),
-  or on `myTimetables`. Optionally re-sync Clerk email/name.
+- [x] **Pending invites weren't claimed for returning users.**
+  `myTimetables` now runs `claimInvitesForUser` for the signed-in user.
+  (Clerk email re-sync on each visit is still a possible enhancement.)
 
-- [ ] **Comments allowed on unpublished topics.**
-  `addComment` checks membership but not topic status. Require `published` for
-  public comments; allow host-only comments for hosts/admins on any status.
+- [x] **Comments were allowed on unpublished topics.**
+  `addComment` now requires a `published` topic for public comments; host-only
+  comments remain available to hosts/admins on any status.
 
-- [ ] **`submitTopic` has no lifecycle guard.**
-  A direct call can move a `published` topic back to `submitted`. Only allow
-  submit from `draft`/`unpublished`.
+- [x] **`submitTopic` had no lifecycle guard.**
+  Submitting is now allowed only from `draft`/`unpublished`.
 
 ### Structural / hygiene (lower priority)
 
-- [ ] `apps/web/next-env.d.ts` is tracked; Next regenerates it — consider
-  gitignoring.
+- [x] `apps/web/next-env.d.ts` untracked + gitignored (Next regenerates it).
 - [ ] N+1 reads worth revisiting at scale: `ManagedTopic.hostName`/`feedback`
   resolvers (per-topic lookups) and `buildFeed` (loads all timetable hearts per
   request). Consider dataloaders or a cached/materialized weighted score.
