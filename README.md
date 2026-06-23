@@ -5,6 +5,10 @@ with hearts, sharing availability, and moderating a schedule.
 
 A [Newspeak House](https://www.newspeak.house/) x [Sparkle Bureaucracy](https://www.sparklebureaucracy.org/) production.
 
+![Timetable topic feed showing proposed sessions, hearts, and comments](docs/assets/readme/topics-view.png)
+
+![Timetable availability view showing timeslots, availability totals, and voting controls](docs/assets/readme/availability-view.png)
+
 ## Contents
 
 - [What it does](#what-it-does)
