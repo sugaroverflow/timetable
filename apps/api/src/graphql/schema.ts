@@ -14,9 +14,12 @@ import {
   deleteSlot,
   getAudienceElectorIds,
   getCommentById,
+  getDashboard,
   getLatestHostOnlyComment,
+  getOrCreateIcsToken,
   getReadableTimetable,
   getSlotById,
+  getTimetableByDomain,
   getTopicById,
   getUserById,
   getUserNotificationSettings,
@@ -49,6 +52,7 @@ import {
   type Audience,
   type CalendarSlot,
   type CommentNode,
+  type DashboardData,
   type FeedTopic,
   type WeightedHeartEntry,
 } from "@timetable/core";
@@ -739,7 +743,7 @@ builder.mutationType({
       },
     }),
 
-    /** Admin: update timetable name, description, and visibility. */
+    /** Admin: update timetable name, description, visibility, custom domain. */
     updateTimetableProfile: t.field({
       type: TimetableType,
       args: {
@@ -747,6 +751,7 @@ builder.mutationType({
         name: t.arg.string({ required: false }),
         description: t.arg.string({ required: false }),
         privacy: t.arg.string({ required: false }),
+        customDomain: t.arg.string({ required: false }),
       },
       resolve: async (_p, args, ctx) => {
         const user = await requireUser(ctx);
@@ -771,6 +776,10 @@ builder.mutationType({
           name: args.name ?? undefined,
           description: args.description ?? undefined,
           privacy,
+          customDomain:
+            args.customDomain != null
+              ? args.customDomain.trim()
+              : undefined,
         });
         if (!updated) notFound("Timetable not found");
         return { ...updated, viewerRoles: readable.roles as string[] };
@@ -1182,6 +1191,141 @@ builder.mutationFields((t) => ({
       if (!isAdmin(viewer.roles)) forbidden("Admins only");
       await untagSlotTopic(slot.id, args.topicId);
       return true;
+    },
+  }),
+}));
+
+// ---------------------------------------------------------------------------
+// Phase 4 — dashboard analytics, ICS token, custom-domain lookup
+// ---------------------------------------------------------------------------
+
+const TopicCountsType = builder
+  .objectRef<DashboardData["topicCounts"]>("TopicCounts")
+  .implement({
+    fields: (t) => ({
+      draft: t.exposeInt("draft"),
+      submitted: t.exposeInt("submitted"),
+      published: t.exposeInt("published"),
+      unpublished: t.exposeInt("unpublished"),
+      archived: t.exposeInt("archived"),
+    }),
+  });
+
+const TopicLeaderboardEntryType = builder
+  .objectRef<DashboardData["topicLeaderboard"][number]>("TopicLeaderboardEntry")
+  .implement({
+    fields: (t) => ({
+      id: t.exposeID("id"),
+      title: t.exposeString("title"),
+      hostName: t.exposeString("hostName", { nullable: true }),
+      weightedScore: t.exposeFloat("weightedScore"),
+      heartCount: t.exposeInt("heartCount"),
+    }),
+  });
+
+const HostLeaderboardEntryType = builder
+  .objectRef<DashboardData["hostLeaderboard"][number]>("HostLeaderboardEntry")
+  .implement({
+    fields: (t) => ({
+      hostId: t.exposeID("hostId"),
+      hostName: t.exposeString("hostName", { nullable: true }),
+      weightedScore: t.exposeFloat("weightedScore"),
+    }),
+  });
+
+const UnallocatedTopicType = builder
+  .objectRef<DashboardData["unallocatedTopics"][number]>("UnallocatedTopic")
+  .implement({
+    fields: (t) => ({
+      id: t.exposeID("id"),
+      title: t.exposeString("title"),
+    }),
+  });
+
+const ConflictSlotType = builder
+  .objectRef<DashboardData["conflicts"][number]>("ConflictSlot")
+  .implement({
+    fields: (t) => ({
+      slotId: t.exposeID("slotId"),
+      location: t.exposeString("location"),
+      startsAt: t.string({ resolve: (c) => c.startsAt.toISOString() }),
+      topics: t.field({ type: [SlotTagType], resolve: (c) => c.topics }),
+    }),
+  });
+
+const DashboardType = builder
+  .objectRef<DashboardData>("Dashboard")
+  .implement({
+    fields: (t) => ({
+      totalHearts: t.exposeInt("totalHearts"),
+      electorCount: t.exposeInt("electorCount"),
+      hostCount: t.exposeInt("hostCount"),
+      slotCount: t.exposeInt("slotCount"),
+      topicCounts: t.field({
+        type: TopicCountsType,
+        resolve: (d) => d.topicCounts,
+      }),
+      topicLeaderboard: t.field({
+        type: [TopicLeaderboardEntryType],
+        resolve: (d) => d.topicLeaderboard,
+      }),
+      hostLeaderboard: t.field({
+        type: [HostLeaderboardEntryType],
+        resolve: (d) => d.hostLeaderboard,
+      }),
+      unallocatedTopics: t.field({
+        type: [UnallocatedTopicType],
+        resolve: (d) => d.unallocatedTopics,
+      }),
+      conflicts: t.field({
+        type: [ConflictSlotType],
+        resolve: (d) => d.conflicts,
+      }),
+    }),
+  });
+
+builder.queryFields((t) => ({
+  /** Dashboard analytics for a timetable (host/admin only). */
+  dashboard: t.field({
+    type: DashboardType,
+    nullable: true,
+    args: { idOrSlug: t.arg.string({ required: true }) },
+    resolve: async (_p, args, ctx) => {
+      const readable = await getReadableTimetable(
+        ctx.user?.id ?? null,
+        args.idOrSlug,
+      );
+      if (!readable) return null;
+      const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
+      if (!canSeeHostOnly(viewer)) return null;
+      return getDashboard(readable.timetable.id);
+    },
+  }),
+
+  /** The current user's ICS subscription token (created on first use). */
+  myIcsToken: t.field({
+    type: "String",
+    nullable: true,
+    resolve: async (_p, _a, ctx) => {
+      const user = await requireUser(ctx);
+      return getOrCreateIcsToken(user.id);
+    },
+  }),
+
+  /** Resolve a timetable by custom domain (for hostname routing). */
+  timetableByDomain: t.field({
+    type: TimetableType,
+    nullable: true,
+    args: { host: t.arg.string({ required: true }) },
+    resolve: async (_p, args, ctx) => {
+      const timetable = await getTimetableByDomain(args.host);
+      if (!timetable) return null;
+      const readable = await getReadableTimetable(
+        ctx.user?.id ?? null,
+        timetable.id,
+      );
+      if (!readable) return null;
+      return { ...readable.timetable, viewerRoles: readable.roles as string[] };
     },
   }),
 }));

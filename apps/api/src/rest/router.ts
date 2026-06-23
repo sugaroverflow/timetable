@@ -1,10 +1,17 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
 
 import {
+  computeUserDigest,
   createTimetable,
   getMembershipById,
+  getReadableTimetable,
+  getSlotsForIcs,
   getTimetableById,
+  getUserByIcsToken,
   inviteEmails,
+  isDigestEmpty,
+  listDigestRecipients,
+  markDigestSent,
   setMemberRoles,
 } from "@timetable/core";
 import {
@@ -16,6 +23,8 @@ import {
 } from "@timetable/shared";
 
 import { buildContext } from "../context";
+import { renderDigest, sendEmail } from "../email";
+import { buildIcs } from "../ics";
 
 export const restRouter: Router = Router();
 
@@ -145,6 +154,81 @@ restRouter.patch(
 
     const updated = await setMemberRoles(membership.id, roles);
     res.json(updated);
+  }),
+);
+
+/**
+ * POST /api/jobs/digests
+ * Cron-triggered. Computes and sends per-user email digests. Protected by the
+ * `x-cron-secret` header matching the CRON_SECRET env var.
+ */
+restRouter.post(
+  "/jobs/digests",
+  h(async (req, res) => {
+    const secret = process.env.CRON_SECRET;
+    if (!secret) {
+      res
+        .status(503)
+        .json({ error: "Digests not configured (CRON_SECRET unset)" });
+      return;
+    }
+    if (req.headers["x-cron-secret"] !== secret) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    const now = new Date();
+    const dayMs = 24 * 60 * 60 * 1000;
+    const recipients = await listDigestRecipients();
+    let sent = 0;
+
+    for (const recipient of recipients) {
+      const since = recipient.lastDigestAt ?? new Date(now.getTime() - dayMs);
+      const digest = await computeUserDigest(recipient, since);
+      if (!isDigestEmpty(digest) && digest.email) {
+        const { subject, html } = renderDigest(digest);
+        await sendEmail({ to: digest.email, subject, html });
+        sent += 1;
+      }
+      await markDigestSent(recipient.id, now);
+    }
+
+    res.json({ processed: recipients.length, sent });
+  }),
+);
+
+/**
+ * GET /api/timetables/:idOrSlug/calendar.ics
+ * ICS feed of the timetable's slots. Public timetables need no auth; private
+ * ones require ?token=<user.icsToken> from a member.
+ */
+restRouter.get(
+  "/timetables/:idOrSlug/calendar.ics",
+  h(async (req, res) => {
+    const idOrSlug = req.params.idOrSlug as string;
+    const token =
+      typeof req.query.token === "string" ? req.query.token : undefined;
+
+    let userId: string | null = null;
+    if (token) {
+      const user = await getUserByIcsToken(token);
+      userId = user?.id ?? null;
+    }
+
+    const readable = await getReadableTimetable(userId, idOrSlug);
+    if (!readable) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+
+    const slots = await getSlotsForIcs(readable.timetable.id);
+    const ics = buildIcs(readable.timetable.name, slots);
+    res.setHeader("Content-Type", "text/calendar; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${readable.timetable.slug}.ics"`,
+    );
+    res.send(ics);
   }),
 );
 
