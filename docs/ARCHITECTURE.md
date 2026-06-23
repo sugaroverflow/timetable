@@ -134,6 +134,9 @@ Main queries include:
 - `timetableRouteByDomain`
 - `timetableByDomain`
 
+The `dashboard` query accepts optional host and elector-activity filters for
+host/admin planning views.
+
 Main mutations cover:
 
 - topic creation, editing, submission, moderation, unpublishing

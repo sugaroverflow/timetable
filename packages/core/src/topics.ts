@@ -371,7 +371,9 @@ export async function buildFeed(
   });
 
   const offset = Math.max(0, opts.offset ?? 0);
-  const limit = Math.max(1, Math.min(opts.limit ?? feed.length, 50));
+  if (opts.limit === undefined) return feed.slice(offset);
+
+  const limit = Math.max(1, Math.min(opts.limit, 50));
   return feed.slice(offset, offset + limit);
 }
 

@@ -408,6 +408,32 @@ textarea {
   padding: 6px 9px;
 }
 
+.table-wrap {
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.data-table th,
+.data-table td {
+  padding: 9px 10px;
+  border-top: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+.data-table th {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.data-table td:not(:first-child),
+.data-table th:not(:first-child) {
+  white-space: nowrap;
+}
+
 /* Heart button */
 .heart-btn {
   display: inline-flex;

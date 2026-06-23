@@ -68,7 +68,7 @@ Admin surfaces include:
 - timetable profile and privacy
 - custom domain field
 - custom role labels, theme colors, and cover image URL
-- dashboard analytics
+- dashboard analytics, including host-scoped elector activity
 
 Custom role labels and theme colors are rendered in the timetable shell and main
 feed fallbacks. Some lower-level UI copy still uses generic role names.

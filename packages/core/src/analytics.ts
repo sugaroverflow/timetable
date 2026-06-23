@@ -1,15 +1,30 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 
 import {
+  availability,
+  comments,
   db,
+  hearts,
   slotTopics,
   timeslots,
   timetableMemberships,
   topics,
+  users,
   type TopicStatus,
 } from "@timetable/db";
 
 import { buildFeed } from "./topics";
+
+export const ELECTOR_ACTIVITY_FILTERS = [
+  "all",
+  "active",
+  "quiet",
+  "no_hearts",
+  "no_comments",
+  "no_availability",
+] as const;
+
+export type ElectorActivityFilter = (typeof ELECTOR_ACTIVITY_FILTERS)[number];
 
 export type DashboardData = {
   topicCounts: Record<TopicStatus, number>;
@@ -29,6 +44,14 @@ export type DashboardData = {
     hostName: string | null;
     weightedScore: number;
   }[];
+  electorActivity: {
+    electorId: string;
+    electorName: string | null;
+    heartCount: number;
+    commentCount: number;
+    availabilityCount: number;
+    latestActivityAt: Date | null;
+  }[];
   unallocatedTopics: { id: string; title: string }[];
   conflicts: {
     slotId: string;
@@ -38,7 +61,42 @@ export type DashboardData = {
   }[];
 };
 
-export async function getDashboard(timetableId: string): Promise<DashboardData> {
+type Stat = { count: number; latestAt: Date | null };
+
+function latestDate(...dates: (Date | null | undefined)[]): Date | null {
+  let latest: Date | null = null;
+  for (const date of dates) {
+    if (!date) continue;
+    if (!latest || date.getTime() > latest.getTime()) latest = date;
+  }
+  return latest;
+}
+
+function matchesActivityFilter(
+  row: DashboardData["electorActivity"][number],
+  filter: ElectorActivityFilter,
+): boolean {
+  const total = row.heartCount + row.commentCount + row.availabilityCount;
+  switch (filter) {
+    case "active":
+      return total > 0;
+    case "quiet":
+      return total === 0;
+    case "no_hearts":
+      return row.heartCount === 0;
+    case "no_comments":
+      return row.commentCount === 0;
+    case "no_availability":
+      return row.availabilityCount === 0;
+    case "all":
+      return true;
+  }
+}
+
+export async function getDashboard(
+  timetableId: string,
+  opts: { hostId?: string; electorActivity?: ElectorActivityFilter } = {},
+): Promise<DashboardData> {
   const emptyCounts: Record<TopicStatus, number> = {
     draft: 0,
     submitted: 0,
@@ -47,18 +105,27 @@ export async function getDashboard(timetableId: string): Promise<DashboardData> 
     archived: 0,
   };
 
+  const topicStatusConds = [eq(topics.timetableId, timetableId)];
+  if (opts.hostId) topicStatusConds.push(eq(topics.hostId, opts.hostId));
+
   const statusRows = await db
     .select({ status: topics.status, n: sql<number>`count(*)::int` })
     .from(topics)
-    .where(eq(topics.timetableId, timetableId))
+    .where(and(...topicStatusConds))
     .groupBy(topics.status);
   const topicCounts = { ...emptyCounts };
   for (const r of statusRows) topicCounts[r.status] = r.n;
 
   const memberRows = await db
-    .select({ roles: timetableMemberships.roles })
+    .select({
+      userId: timetableMemberships.userId,
+      roles: timetableMemberships.roles,
+      name: users.name,
+    })
     .from(timetableMemberships)
+    .innerJoin(users, eq(users.id, timetableMemberships.userId))
     .where(eq(timetableMemberships.timetableId, timetableId));
+  const electorRows = memberRows.filter((m) => m.roles.includes("elector"));
   const electorCount = memberRows.filter((m) =>
     m.roles.includes("elector"),
   ).length;
@@ -70,7 +137,10 @@ export async function getDashboard(timetableId: string): Promise<DashboardData> 
     .where(eq(timeslots.timetableId, timetableId));
 
   // Weighted feed gives published topics with scores + host names.
-  const feed = await buildFeed(timetableId, null, { sort: "hearts" });
+  const feed = await buildFeed(timetableId, null, {
+    hostId: opts.hostId,
+    sort: "hearts",
+  });
   const totalHearts = feed.reduce((sum, t) => sum + t.heartCount, 0);
 
   const topicLeaderboard = feed.slice(0, 10).map((t) => ({
@@ -98,12 +168,114 @@ export async function getDashboard(timetableId: string): Promise<DashboardData> 
     (a, b) => b.weightedScore - a.weightedScore,
   );
 
+  const activityTopicConds = [
+    eq(topics.timetableId, timetableId),
+    eq(topics.status, "published" as const),
+  ];
+  if (opts.hostId) activityTopicConds.push(eq(topics.hostId, opts.hostId));
+
+  const heartRows = await db
+    .select({
+      electorId: hearts.userId,
+      count: sql<number>`count(*)::int`,
+      latestAt: sql<Date | null>`max(${hearts.createdAt})`,
+    })
+    .from(hearts)
+    .innerJoin(topics, eq(topics.id, hearts.topicId))
+    .where(and(...activityTopicConds, isNull(hearts.archivedAt)))
+    .groupBy(hearts.userId);
+
+  const commentRows = await db
+    .select({
+      electorId: comments.authorId,
+      count: sql<number>`count(*)::int`,
+      latestAt: sql<Date | null>`max(${comments.createdAt})`,
+    })
+    .from(comments)
+    .innerJoin(topics, eq(topics.id, comments.topicId))
+    .where(
+      and(
+        ...activityTopicConds,
+        eq(comments.visibility, "public" as const),
+        isNull(comments.hiddenAt),
+      ),
+    )
+    .groupBy(comments.authorId);
+
+  const availabilityRows = await db
+    .select({
+      electorId: availability.userId,
+      count: sql<number>`count(*)::int`,
+      latestAt: sql<Date | null>`max(${availability.updatedAt})`,
+    })
+    .from(availability)
+    .innerJoin(timeslots, eq(timeslots.id, availability.slotId))
+    .where(eq(timeslots.timetableId, timetableId))
+    .groupBy(availability.userId);
+
+  const heartsByElector = new Map<string, Stat>();
+  for (const row of heartRows) {
+    heartsByElector.set(row.electorId, {
+      count: row.count,
+      latestAt: row.latestAt,
+    });
+  }
+
+  const commentsByElector = new Map<string, Stat>();
+  for (const row of commentRows) {
+    commentsByElector.set(row.electorId, {
+      count: row.count,
+      latestAt: row.latestAt,
+    });
+  }
+
+  const availabilityByElector = new Map<string, Stat>();
+  for (const row of availabilityRows) {
+    availabilityByElector.set(row.electorId, {
+      count: row.count,
+      latestAt: row.latestAt,
+    });
+  }
+
+  const activityFilter = opts.electorActivity ?? "all";
+  const electorActivity = electorRows
+    .map((elector) => {
+      const heartStat = heartsByElector.get(elector.userId);
+      const commentStat = commentsByElector.get(elector.userId);
+      const availabilityStat = availabilityByElector.get(elector.userId);
+      return {
+        electorId: elector.userId,
+        electorName: elector.name,
+        heartCount: heartStat?.count ?? 0,
+        commentCount: commentStat?.count ?? 0,
+        availabilityCount: availabilityStat?.count ?? 0,
+        latestActivityAt: latestDate(
+          heartStat?.latestAt,
+          commentStat?.latestAt,
+          availabilityStat?.latestAt,
+        ),
+      };
+    })
+    .filter((row) => matchesActivityFilter(row, activityFilter))
+    .sort((a, b) => {
+      const at = a.latestActivityAt?.getTime() ?? 0;
+      const bt = b.latestActivityAt?.getTime() ?? 0;
+      if (bt !== at) return bt - at;
+      const aTotal = a.heartCount + a.commentCount + a.availabilityCount;
+      const bTotal = b.heartCount + b.commentCount + b.availabilityCount;
+      if (bTotal !== aTotal) return bTotal - aTotal;
+      return (a.electorName ?? a.electorId).localeCompare(
+        b.electorName ?? b.electorId,
+      );
+    });
+
   // Tagged topic ids (this timetable) -> unallocated = published not tagged.
   const tagRows = await db
     .select({
       slotId: slotTopics.slotId,
       topicId: slotTopics.topicId,
       title: topics.title,
+      hostId: topics.hostId,
       startsAt: timeslots.startsAt,
       location: timeslots.location,
     })
@@ -124,7 +296,7 @@ export async function getDashboard(timetableId: string): Promise<DashboardData> 
       slotId: string;
       startsAt: Date;
       location: string;
-      topics: { id: string; title: string }[];
+      topics: { id: string; title: string; hostId: string }[];
     }
   >();
   for (const r of tagRows) {
@@ -135,12 +307,21 @@ export async function getDashboard(timetableId: string): Promise<DashboardData> 
         location: r.location,
         topics: [],
       };
-    entry.topics.push({ id: r.topicId, title: r.title });
+    entry.topics.push({ id: r.topicId, title: r.title, hostId: r.hostId });
     bySlot.set(r.slotId, entry);
   }
-  const conflicts = Array.from(bySlot.values()).filter(
-    (s) => s.topics.length > 1,
-  );
+  const conflicts = Array.from(bySlot.values())
+    .filter(
+      (s) =>
+        s.topics.length > 1 &&
+        (!opts.hostId || s.topics.some((topic) => topic.hostId === opts.hostId)),
+    )
+    .map((slot) => ({
+      slotId: slot.slotId,
+      startsAt: slot.startsAt,
+      location: slot.location,
+      topics: slot.topics.map((topic) => ({ id: topic.id, title: topic.title })),
+    }));
 
   return {
     topicCounts,
@@ -150,6 +331,7 @@ export async function getDashboard(timetableId: string): Promise<DashboardData> 
     slotCount,
     topicLeaderboard,
     hostLeaderboard,
+    electorActivity,
     unallocatedTopics,
     conflicts,
   };
