@@ -24,6 +24,7 @@ import {
 
 import { buildContext } from "../context";
 import { renderDigest, sendEmail } from "../email";
+import { getRequestId, logRequestError } from "../http/request-log";
 import { buildIcs } from "../ics";
 
 export const restRouter: Router = Router();
@@ -234,8 +235,10 @@ restRouter.get(
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 restRouter.use(
-  (err: unknown, _req: Request, res: Response, _next: NextFunction) => {
-    console.error("[api] REST error:", err);
-    res.status(500).json({ error: "Internal server error" });
+  (err: unknown, req: Request, res: Response, _next: NextFunction) => {
+    logRequestError(req, err, { component: "rest" });
+    res
+      .status(500)
+      .json({ error: "Internal server error", requestId: getRequestId(req) });
   },
 );

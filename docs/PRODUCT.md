@@ -95,8 +95,9 @@ Users can opt into digest sections:
 - replies to their comments
 - activity on their hosted topics
 
-The digest computation and REST job endpoint exist. Production delivery still
-requires Resend configuration and a scheduled caller.
+Email digests are the first supported notification channel. The digest
+computation, REST job endpoint, scheduled GitHub Actions caller, and Resend env
+plumbing exist; production delivery still requires a verified sender identity.
 
 Calendar sync is one-way ICS export through:
 

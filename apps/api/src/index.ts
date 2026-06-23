@@ -6,9 +6,9 @@ import { createYoga } from "graphql-yoga";
 
 import { buildContext } from "./context";
 import { env } from "./env";
-import { useDepthLimit } from "./graphql/depth-limit";
+import { useOperationLimits } from "./graphql/depth-limit";
 import { rateLimit } from "./http/rate-limit";
-import { requestLog } from "./http/request-log";
+import { requestLog, structuredLogger } from "./http/request-log";
 import { schema } from "./graphql/schema";
 import { restRouter } from "./rest/router";
 
@@ -37,7 +37,13 @@ const yoga = createYoga({
   // CORS is handled by the express middleware above.
   cors: false,
   graphiql: !env.isProd,
-  plugins: [useDepthLimit(env.graphqlMaxDepth)],
+  logging: structuredLogger("graphql"),
+  plugins: [
+    useOperationLimits({
+      maxDepth: env.graphqlMaxDepth,
+      maxCost: env.graphqlMaxCost,
+    }),
+  ],
   context: ({ request }) =>
     buildContext({
       authHeader: request.headers.get("authorization"),

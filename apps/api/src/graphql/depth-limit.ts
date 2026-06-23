@@ -107,6 +107,89 @@ export function maxDepthRule(maxDepth: number) {
   };
 }
 
+function costForSelectionSet(
+  selectionSet: SelectionSetNode,
+  fragments: Map<string, FragmentDefinitionNode>,
+  visitedFragments: Set<string>,
+): number {
+  let cost = 0;
+
+  for (const selection of selectionSet.selections) {
+    cost += costForSelection(selection, fragments, visitedFragments);
+  }
+
+  return cost;
+}
+
+function costForSelection(
+  selection: SelectionNode,
+  fragments: Map<string, FragmentDefinitionNode>,
+  visitedFragments: Set<string>,
+): number {
+  if (selection.kind === Kind.FIELD) {
+    if (selection.name.value.startsWith("__")) return 0;
+    return (
+      1 +
+      (selection.selectionSet
+        ? costForSelectionSet(selection.selectionSet, fragments, visitedFragments)
+        : 0)
+    );
+  }
+
+  if (selection.kind === Kind.INLINE_FRAGMENT) {
+    return costForSelectionSet(
+      selection.selectionSet,
+      fragments,
+      visitedFragments,
+    );
+  }
+
+  const fragmentName = selection.name.value;
+  if (visitedFragments.has(fragmentName)) return 0;
+  const fragment = fragments.get(fragmentName);
+  if (!fragment) return 0;
+
+  visitedFragments.add(fragmentName);
+  const cost = costForSelectionSet(
+    fragment.selectionSet,
+    fragments,
+    visitedFragments,
+  );
+  visitedFragments.delete(fragmentName);
+  return cost;
+}
+
+export function maxCostRule(maxCost: number) {
+  return function MaxCostRule(context: ValidationContext): ASTVisitor {
+    const fragments = fragmentsByName(context.getDocument());
+    return {
+      OperationDefinition(node) {
+        const cost = costForSelectionSet(node.selectionSet, fragments, new Set());
+        if (cost > maxCost) {
+          context.reportError(
+            new GraphQLError(
+              `GraphQL operation cost ${cost} exceeds maximum cost ${maxCost}`,
+              { nodes: [node] },
+            ),
+          );
+        }
+      },
+    };
+  };
+}
+
+export function useOperationLimits(opts: {
+  maxDepth: number;
+  maxCost: number;
+}): Plugin {
+  return {
+    onValidate({ addValidationRule }) {
+      addValidationRule(maxDepthRule(opts.maxDepth));
+      addValidationRule(maxCostRule(opts.maxCost));
+    },
+  };
+}
+
 export function useDepthLimit(maxDepth: number): Plugin {
   return {
     onValidate({ addValidationRule }) {

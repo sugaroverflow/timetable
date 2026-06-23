@@ -46,9 +46,11 @@ services:
       - { key: DATABASE_SSL, value: "require", scope: RUN_TIME }
       - { key: WEB_ORIGIN, value: "${APP_URL}", scope: RUN_TIME }
       - { key: TRUST_PROXY_HOPS, value: "1", scope: RUN_TIME }
+      - { key: GRAPHQL_MAX_COST, value: "500", scope: RUN_TIME }
       - { key: CLERK_SECRET_KEY, value: "${CLERK_SECRET_KEY}", scope: RUN_TIME, type: SECRET }
       - { key: CRON_SECRET, value: "${CRON_SECRET}", scope: RUN_TIME, type: SECRET }
-      # Optional digests: RESEND_API_KEY, EMAIL_FROM
+      - { key: RESEND_API_KEY, value: "${RESEND_API_KEY}", scope: RUN_TIME, type: SECRET }
+      - { key: EMAIL_FROM, value: "${EMAIL_FROM}", scope: RUN_TIME }
       # Optional image uploads to Spaces (S3). Without these the /api/uploads
       # endpoint returns 503; set them in the console to enable uploads.
       # Optionally also set SPACES_PUBLIC_BASE_URL for a CDN/custom domain.

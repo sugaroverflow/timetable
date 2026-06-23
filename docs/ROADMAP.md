@@ -35,11 +35,11 @@ Suggested smoke test:
 
 ## P0 Hardening Before Real Users
 
-- Add GraphQL cost limits beyond the current depth limit.
+- Tune GraphQL depth/cost limits as the schema and public traffic grow.
 - Replace process-local API rate limiting with infrastructure-aware limits.
 - Expand fail-fast environment validation beyond the current production checks.
 - Continue auditing timetable `deactivated` privacy on new mutations.
-- Add structured error reporting beyond current JSON request logs.
+- Route structured request/error logs into hosted error reporting or log drains.
 - Add integration tests around permission boundaries.
 
 ## Product Gaps
@@ -50,15 +50,16 @@ Suggested smoke test:
 - Host dashboard filter by elector activity is not implemented.
 - Custom-domain hostname routing is implemented in the web proxy; production
   DNS/Clerk domain setup still has to be configured per environment.
-- Multi-channel notifications are not started.
+- Email digest is the first notification channel; additional channels such as
+  Slack or push are not started.
 - Calendar sync is one-way ICS only.
 - Profile images and cover images can be edited as URLs; binary uploads and
   object-storage-backed media handling are not committed.
 
 ## Operational Gaps
 
-- Digest delivery needs a scheduled caller and Resend configuration in hosted
-  environments.
+- Digest delivery has a scheduled GitHub Actions caller and reserved Resend
+  hosted env vars; production still needs verified sender configuration.
 - Object storage variables exist in deployment specs, but binary upload code is
   not committed.
 - DigitalOcean provisioning cannot be proven from the repo alone.
