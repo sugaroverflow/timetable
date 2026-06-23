@@ -16,9 +16,11 @@ export type FeedPerms = {
 export function TopicCard({
   topic,
   perms,
+  hostLabel = "Host",
 }: {
   topic: FeedTopic;
   perms: FeedPerms;
+  hostLabel?: string;
 }) {
   return (
     <article className="card stack">
@@ -31,7 +33,7 @@ export function TopicCard({
           <div>
             <h3 className="topic-title">{topic.title}</h3>
             <div className="faint" style={{ fontSize: 12 }}>
-              by {topic.hostName ?? "Host"}
+              by {topic.hostName ?? hostLabel}
             </div>
           </div>
         </div>
@@ -53,6 +55,14 @@ export function TopicCard({
         className="topic-body"
         dangerouslySetInnerHTML={{ __html: topic.bodyHtml }}
       />
+
+      {topic.coverImageUrl ? (
+        <div
+          className="topic-cover"
+          style={{ backgroundImage: `url(${topic.coverImageUrl})` }}
+          aria-label={`${topic.title} cover image`}
+        />
+      ) : null}
 
       {topic.weightedScore != null && topic.weightedBreakdown ? (
         <div className="host-panel">

@@ -13,11 +13,12 @@ type Data = {
     name: string | null;
     bio: string | null;
     email: string | null;
+    image: string | null;
     notificationSettings: string;
   } | null;
 };
 
-const QUERY = `query { me { name bio email notificationSettings } }`;
+const QUERY = `query { me { name bio email image notificationSettings } }`;
 
 export default async function ProfilePage() {
   const { userId } = await auth();
@@ -40,7 +41,7 @@ export default async function ProfilePage() {
         <p>{data.me.email}</p>
       </div>
       <div className="grid grid-2">
-        <ProfileForm name={data.me.name} bio={data.me.bio} />
+        <ProfileForm name={data.me.name} bio={data.me.bio} image={data.me.image} />
         <DigestSettingsForm current={digest} />
       </div>
     </main>

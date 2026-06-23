@@ -19,6 +19,7 @@ import {
   getOrCreateIcsToken,
   getReadableTimetable,
   getSlotById,
+  getTimetableById,
   getTimetableByDomain,
   getTopicById,
   getUserById,
@@ -84,6 +85,7 @@ import { renderMarkdown } from "../markdown";
 // ---------------------------------------------------------------------------
 
 type GqlTimetable = Timetable & { viewerRoles: string[] };
+type GqlTimetableRoute = Pick<Timetable, "id" | "slug" | "privacy">;
 type GqlMembership = { id: string; roles: string[]; timetable: GqlTimetable };
 type GqlMember = {
   membershipId: string;
@@ -160,6 +162,16 @@ const TimetableType = builder.objectRef<GqlTimetable>("Timetable").implement({
     createdAt: t.string({ resolve: (tt) => tt.createdAt.toISOString() }),
   }),
 });
+
+const TimetableRouteType = builder
+  .objectRef<GqlTimetableRoute>("TimetableRoute")
+  .implement({
+    fields: (t) => ({
+      id: t.exposeID("id"),
+      slug: t.exposeString("slug"),
+      privacy: t.exposeString("privacy"),
+    }),
+  });
 
 const MembershipType = builder.objectRef<GqlMembership>("Membership").implement({
   fields: (t) => ({
@@ -269,6 +281,7 @@ const ManagedTopicType = builder.objectRef<Topic>("ManagedTopic").implement({
       nullable: true,
       resolve: (tp) => getLatestHostOnlyComment(tp.id),
     }),
+    coverImageUrl: t.exposeString("coverImageUrl", { nullable: true }),
   }),
 });
 
@@ -366,6 +379,8 @@ builder.queryType({
         idOrSlug: t.arg.string({ required: true }),
         hostId: t.arg.string({ required: false }),
         sort: t.arg.string({ required: false }),
+        limit: t.arg.int({ required: false }),
+        offset: t.arg.int({ required: false }),
       },
       resolve: async (_p, args, ctx) => {
         const readable = await getReadableTimetable(
@@ -380,7 +395,12 @@ builder.queryType({
         const feed = await buildFeed(
           readable.timetable.id,
           ctx.user?.id ?? null,
-          { hostId: args.hostId ?? undefined, sort },
+          {
+            hostId: args.hostId ?? undefined,
+            sort,
+            limit: args.limit ?? undefined,
+            offset: args.offset ?? undefined,
+          },
         );
         return feed.map((tp) => ({
           ...tp,
@@ -447,6 +467,22 @@ builder.queryType({
         return listTimetableHosts(readable.timetable.id);
       },
     }),
+
+    /** Public hostname routing lookup. Returns only route-safe fields. */
+    timetableRouteByDomain: t.field({
+      type: TimetableRouteType,
+      nullable: true,
+      args: { host: t.arg.string({ required: true }) },
+      resolve: async (_p, args) => {
+        const timetable = await getTimetableByDomain(args.host);
+        if (!timetable) return null;
+        return {
+          id: timetable.id,
+          slug: timetable.slug,
+          privacy: timetable.privacy,
+        };
+      },
+    }),
   }),
 });
 
@@ -458,6 +494,10 @@ async function loadTopicAndViewer(ctx: ApiContext, topicId: string) {
   const topic = await getTopicById(topicId);
   if (!topic) notFound("Topic not found");
   const viewer = await ctx.getViewer(topic.timetableId);
+  const timetable = await getTimetableById(topic.timetableId);
+  if (timetable?.privacy === "deactivated" && !canModerate(viewer)) {
+    forbidden("Timetable is deactivated");
+  }
   return { topic, viewer };
 }
 
@@ -469,6 +509,7 @@ builder.mutationType({
         idOrSlug: t.arg.string({ required: true }),
         title: t.arg.string({ required: true }),
         bodyMd: t.arg.string({ required: false }),
+        coverImageUrl: t.arg.string({ required: false }),
       },
       resolve: async (_p, args, ctx) => {
         const user = await requireUser(ctx);
@@ -479,6 +520,8 @@ builder.mutationType({
         return createTopic(readable.timetable.id, user.id, {
           title: args.title,
           bodyMd: args.bodyMd ?? "",
+          coverImageUrl:
+            args.coverImageUrl != null ? args.coverImageUrl.trim() : undefined,
         });
       },
     }),
@@ -489,6 +532,7 @@ builder.mutationType({
         topicId: t.arg.string({ required: true }),
         title: t.arg.string({ required: false }),
         bodyMd: t.arg.string({ required: false }),
+        coverImageUrl: t.arg.string({ required: false }),
       },
       resolve: async (_p, args, ctx) => {
         const user = await requireUser(ctx);
@@ -498,6 +542,10 @@ builder.mutationType({
         const updated = await updateTopic(topic.id, {
           title: args.title ?? undefined,
           bodyMd: args.bodyMd ?? undefined,
+          coverImageUrl:
+            args.coverImageUrl != null
+              ? args.coverImageUrl.trim() || null
+              : undefined,
         });
         if (!updated) notFound("Topic not found");
         return updated;
@@ -693,12 +741,14 @@ builder.mutationType({
       args: {
         name: t.arg.string({ required: false }),
         bio: t.arg.string({ required: false }),
+        image: t.arg.string({ required: false }),
       },
       resolve: async (_p, args, ctx) => {
         const user = await requireUser(ctx);
         const updated = await updateUserProfile(user.id, {
           name: args.name ?? undefined,
           bio: args.bio ?? undefined,
+          image: args.image != null ? args.image.trim() || null : undefined,
         });
         if (!updated) notFound("User not found");
         return {
@@ -809,6 +859,7 @@ builder.mutationType({
         roleLabelElector: t.arg.string({ required: false }),
         themePrimary: t.arg.string({ required: false }),
         themeSecondary: t.arg.string({ required: false }),
+        coverImageUrl: t.arg.string({ required: false }),
       },
       resolve: async (_p, args, ctx) => {
         const user = await requireUser(ctx);
@@ -849,6 +900,10 @@ builder.mutationType({
               ? { secondary: args.themeSecondary }
               : {}),
           };
+        }
+
+        if (args.coverImageUrl != null) {
+          patch.coverImageUrl = args.coverImageUrl.trim() || null;
         }
 
         const updated = await updateTimetableSettings(
@@ -942,6 +997,10 @@ async function loadSlotAndViewer(ctx: ApiContext, slotId: string) {
   const slot = await getSlotById(slotId);
   if (!slot) notFound("Timeslot not found");
   const viewer = await ctx.getViewer(slot.timetableId);
+  const timetable = await getTimetableById(slot.timetableId);
+  if (timetable?.privacy === "deactivated" && !canModerate(viewer)) {
+    forbidden("Timetable is deactivated");
+  }
   return { slot, viewer };
 }
 

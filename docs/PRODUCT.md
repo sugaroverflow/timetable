@@ -67,11 +67,15 @@ Admin surfaces include:
 - member and role management
 - timetable profile and privacy
 - custom domain field
-- custom role labels and theme colors
+- custom role labels, theme colors, and cover image URL
 - dashboard analytics
 
-Custom role labels and theme colors are currently stored, but not fully rendered
-throughout the UI.
+Custom role labels and theme colors are rendered in the timetable shell and main
+feed fallbacks. Some lower-level UI copy still uses generic role names.
+
+Profile images, topic covers, and timetable covers can currently be edited as
+image URLs. Binary uploads and object-storage-backed media handling are not part
+of the tracked app yet.
 
 ## Privacy
 
@@ -101,3 +105,7 @@ GET /api/timetables/:idOrSlug/calendar.ics
 ```
 
 Private timetables require a per-user ICS token.
+
+Custom domains are stored on timetables and resolved by the web proxy so a
+configured hostname can route to the matching timetable. DNS and Clerk domain
+configuration remain environment setup tasks.

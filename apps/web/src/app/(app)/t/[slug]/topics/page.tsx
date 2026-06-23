@@ -14,7 +14,7 @@ const QUERY = `
   query HostDashboard($s: String!) {
     timetable(idOrSlug: $s) { viewerRoles }
     hostDashboard(idOrSlug: $s) {
-      id title status bodyMd updatedAt feedback
+      id title status bodyMd coverImageUrl updatedAt feedback
     }
   }
 `;

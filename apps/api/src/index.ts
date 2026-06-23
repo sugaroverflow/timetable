@@ -6,10 +6,15 @@ import { createYoga } from "graphql-yoga";
 
 import { buildContext } from "./context";
 import { env } from "./env";
+import { useDepthLimit } from "./graphql/depth-limit";
+import { rateLimit } from "./http/rate-limit";
+import { requestLog } from "./http/request-log";
 import { schema } from "./graphql/schema";
 import { restRouter } from "./rest/router";
 
 const app = express();
+
+app.use(requestLog);
 
 app.use(
   cors({
@@ -19,12 +24,18 @@ app.use(
   }),
 );
 
+const limiter = rateLimit({
+  windowMs: env.rateLimitWindowMs,
+  max: env.rateLimitMax,
+});
+
 const yoga = createYoga({
   schema,
   graphqlEndpoint: "/graphql",
   // CORS is handled by the express middleware above.
   cors: false,
   graphiql: !env.isProd,
+  plugins: [useDepthLimit(env.graphqlMaxDepth)],
   context: ({ request }) =>
     buildContext({
       authHeader: request.headers.get("authorization"),
@@ -32,9 +43,9 @@ const yoga = createYoga({
     }),
 });
 
-app.use(yoga.graphqlEndpoint, yoga);
+app.use(yoga.graphqlEndpoint, limiter, yoga);
 
-app.use("/api", express.json(), restRouter);
+app.use("/api", limiter, express.json(), restRouter);
 
 app.get("/health", (_req, res) => {
   res.json({ ok: true });

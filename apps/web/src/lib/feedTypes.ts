@@ -25,6 +25,7 @@ export type FeedTopic = {
   hostImage: string | null;
   title: string;
   bodyHtml: string;
+  coverImageUrl: string | null;
   status: string;
   heartCount: number;
   weightedScore: number | null;
@@ -42,6 +43,7 @@ export type ManagedTopic = {
   status: string;
   bodyMd: string;
   bodyHtml: string;
+  coverImageUrl: string | null;
   updatedAt: string;
   hostName: string | null;
   feedback: string | null;
