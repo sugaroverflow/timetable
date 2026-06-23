@@ -676,11 +676,13 @@ builder.mutationType({
         const user = await requireUser(ctx);
         const parent = await getCommentById(args.commentId);
         if (!parent) notFound("Comment not found");
-        const { viewer } = await loadTopicAndViewer(ctx, parent.topicId);
+        const { topic, viewer } = await loadTopicAndViewer(ctx, parent.topicId);
         if (parent.visibility === "host_only") {
           if (!canSeeHostOnly(viewer)) forbidden("Hosts/admins only");
         } else if (!canComment(viewer)) {
           forbidden("Members only");
+        } else if (topic.status !== "published") {
+          forbidden("This topic isn't open for comments yet");
         }
         const body = args.body.trim();
         if (!body) throw new GraphQLError("Reply cannot be empty");

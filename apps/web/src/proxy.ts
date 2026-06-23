@@ -6,6 +6,7 @@ import { NextResponse, type NextRequest } from "next/server";
 // (public timetables stay readable while anonymous).
 type RouteLookup = {
   data?: { timetableRouteByDomain?: { slug: string } | null };
+  errors?: { message?: string }[];
 };
 
 const ROUTE_QUERY = `
@@ -60,6 +61,7 @@ async function lookupDomainSlug(host: string): Promise<string | null> {
   if (cached && cached.expiresAt > now) return cached.slug;
 
   const graphqlUrl =
+    process.env.GRAPHQL_ROUTE_URL ??
     process.env.NEXT_PUBLIC_GRAPHQL_URL ?? "http://localhost:4000/graphql";
 
   try {
@@ -68,12 +70,27 @@ async function lookupDomainSlug(host: string): Promise<string | null> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query: ROUTE_QUERY, variables: { host } }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.warn(
+        `[web] custom domain lookup failed for ${host}: GraphQL returned ${res.status}`,
+      );
+      return null;
+    }
     const json = (await res.json()) as RouteLookup;
+    if (json.errors?.length) {
+      console.warn(
+        `[web] custom domain lookup failed for ${host}: ${json.errors
+          .map((error) => error.message)
+          .filter(Boolean)
+          .join("; ")}`,
+      );
+      return null;
+    }
     const slug = json.data?.timetableRouteByDomain?.slug ?? null;
     if (slug) routeCache.set(host, { slug, expiresAt: now + 60_000 });
     return slug;
-  } catch {
+  } catch (error) {
+    console.warn(`[web] custom domain lookup failed for ${host}`, error);
     return null;
   }
 }

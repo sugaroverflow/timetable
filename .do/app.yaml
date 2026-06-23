@@ -45,6 +45,7 @@ services:
       - { key: DATABASE_URL, value: "${timetable-db.DATABASE_URL}", scope: RUN_TIME }
       - { key: DATABASE_SSL, value: "require", scope: RUN_TIME }
       - { key: WEB_ORIGIN, value: "${APP_URL}", scope: RUN_TIME }
+      - { key: TRUST_PROXY_HOPS, value: "1", scope: RUN_TIME }
       - { key: CLERK_SECRET_KEY, value: "${CLERK_SECRET_KEY}", scope: RUN_TIME, type: SECRET }
       - { key: CRON_SECRET, value: "${CRON_SECRET}", scope: RUN_TIME, type: SECRET }
       # Optional digests: RESEND_API_KEY, EMAIL_FROM
@@ -69,6 +70,7 @@ services:
     envs:
       - { key: NEXT_PUBLIC_API_URL, value: "${APP_URL}", scope: RUN_AND_BUILD_TIME }
       - { key: NEXT_PUBLIC_GRAPHQL_URL, value: "${APP_URL}/graphql", scope: RUN_AND_BUILD_TIME }
+      - { key: GRAPHQL_ROUTE_URL, value: "${APP_URL}/graphql", scope: RUN_AND_BUILD_TIME }
       - { key: NEXT_PUBLIC_CLERK_SIGN_IN_URL, value: "/sign-in", scope: RUN_AND_BUILD_TIME }
       - { key: NEXT_PUBLIC_CLERK_SIGN_UP_URL, value: "/sign-up", scope: RUN_AND_BUILD_TIME }
       - { key: NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL, value: "/timetables", scope: RUN_AND_BUILD_TIME }

@@ -13,10 +13,7 @@ export function rateLimit(opts: {
 
   return (req, res, next) => {
     const now = Date.now();
-    const forwarded = req.headers["x-forwarded-for"];
-    const forwardedIp =
-      typeof forwarded === "string" ? forwarded.split(",")[0]?.trim() : null;
-    const key = forwardedIp || req.ip || req.socket.remoteAddress || "unknown";
+    const key = req.ip || req.socket.remoteAddress || "unknown";
     const current = buckets.get(key);
 
     if (!current || current.resetAt <= now) {
