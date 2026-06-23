@@ -1,20 +1,9 @@
 # Timetable
 
 Collaborative timetables — a multi-tenant web app for proposing topics, voting
-with hearts, sharing availability, and moderating a schedule. Produced by
-Sparkle Bureaucracy.
+with hearts, sharing availability, and moderating a schedule.
 
-The original single-file prototype lives in [timetable.html](timetable.html) and
-is kept as a **design reference only**; this application replaces it. The product
-spec is in [Specifications.md](Specifications.md).
-
-> **Status:** Phases 0–3 from the backend implementation plan are implemented in
-> code; Phase 4 is **partially** implemented (dashboard analytics, conflict
-> alerts, digest job code, and ICS export exist, but multi-channel notifications,
-> custom-domain routing, and production job scheduling still need work). The app
-> is ready for **first integrated testing** once Postgres, Clerk, and env vars
-> are configured locally or on DigitalOcean. Authoritative plan:
-> [`.cursor/plans/timetable_backend_plan_5ea00e75.plan.md`](.cursor/plans/timetable_backend_plan_5ea00e75.plan.md).
+A [Newspeak House](https://www.newspeak.house/) x [Sparkle Bureaucracy](https://www.sparklebureaucracy.org/) production.
 
 ## Contents
 
@@ -22,7 +11,7 @@ spec is in [Specifications.md](Specifications.md).
 - [Current status & phase checklist](#current-status--phase-checklist)
 - [Architecture](#architecture)
 - [How production works](#how-production-works)
-- [Environments (local, staging, production)](#environments-local-staging-production)
+- [Environments (local, dev, production)](#environments-local-dev-production)
 - [Getting started (local dev)](#getting-started-local-dev)
 - [Environment variables](#environment-variables)
 - [Scripts](#scripts)
@@ -335,13 +324,13 @@ sequence:
 
 1. **CI** (`.github/workflows/ci.yml`) — builds, typechecks, lints, tests, and
    runs migrations against a throwaway Postgres service. This validates the code.
-2. **Deploy Staging** (`.github/workflows/deploy-staging.yml`) — runs after CI on
-   `main`; deploys `dev.timetable.love` via `.do/app.staging.yaml`.
+2. **Deploy Dev** (`.github/workflows/deploy-dev.yml`) — runs after CI on
+   `main`; deploys `dev.timetable.love` via `.do/app.dev.yaml`.
 3. **Deploy Production** (`.github/workflows/deploy-production.yml`) — **manual
    only**; deploys `timetable.love` via `.do/app.yaml`.
 
-Check **GitHub → Actions → Deploy Staging** or **Deploy Production**. A green
-staging run means the staging app built successfully.
+Check **GitHub → Actions → Deploy Dev** or **Deploy Production**. A green
+dev deploy run means `timetable-dev` built successfully.
 
 **Clerk dashboard setup depends on which keys you use.** With **test keys**
 (`pk_test_` / `sk_test_`, what GitHub Actions injects today), Clerk's development
@@ -437,57 +426,25 @@ can use the `+clerk_test` suffix with OTP code `424242`.
 Optional post-deploy env vars (`SPACES_*`, `RESEND_API_KEY`) are set in the
 DigitalOcean console, not GitHub, unless you extend the deploy workflow.
 
-### First deploy checklist
-
-1. GitHub repository secrets are set (see [Deployment → GitHub Actions](#github-actions-recommended)).
-2. Merge to `main` → **CI** green → **Deploy** green.
-3. Copy the `*.ondigitalocean.app` URL from the Deploy run or DO console.
-4. **Clerk:** with test keys, try sign-in immediately (no dashboard URL step).
-   If auth fails, see [Clerk setup](#1-clerk) below. For production on your own
-   domain, use a Production instance + **Configure → Domains**.
-5. Smoke test:
-   - `curl https://<url>/health` → `{"ok":true}`
-   - Sign in, create a timetable, publish a topic.
-
-### If Deploy failed
-
-Open the failed **Deploy** run log. Common causes:
-
-- **YAML parse error in `.do/app.yaml`** — the deploy action substitutes
-  `${VAR}` across the *entire* file (including comments) before parsing. Never
-  put `${…}` in comments; only in `value:` fields that should be filled.
-- **DO token missing scopes** — needs `app:create` / `app:update` and
-  `database:create` / `database:update` on first deploy.
-- **Clerk sign-in fails after deploy** — with test keys, check browser console
-  and that GitHub secrets match your Clerk **Development** API keys. For a custom
-  domain, create a Production instance and configure **Domains** (not Allowed
-  Subdomains).
-
-Re-run from **Actions → Deploy Staging** or **Deploy Production** after fixing.
-
----
-
-## Environments (local, staging, production)
+## Environments
 
 Timetable uses **two hosted environments** on separate App Platform apps, plus
-local dev on your machine. Staging and production have **different URLs,
+local dev on your machine. Dev and production have **different URLs,
 databases, and Clerk keys** so feature testing never touches real user data.
 
 ### Recommended layout (two DO apps)
 
-| | **Staging** | **Production** |
+| | **Dev** | **Production** |
 | --- | --- | --- |
 | **URL** | `https://dev.timetable.love` | `https://timetable.love` |
-| **DO app name** | `timetable-dev` (**existing**) | `timetable` (**new**) |
-| **App spec** | [`.do/app.staging.yaml`](.do/app.staging.yaml) | [`.do/app.yaml`](.do/app.yaml) |
-| **Postgres** | `timetable-db` (existing cluster) | `timetable-db-prod` (new cluster) |
+| **DO app name** | `timetable-dev` | `timetable` |
+| **App spec** | [`.do/app.dev.yaml`](.do/app.dev.yaml) | [`.do/app.yaml`](.do/app.yaml) |
+| **Postgres** | `timetable-db` | `timetable-db-prod` |
 | **Clerk** | **Development** (`pk_test_` / `sk_test_`) | **Production** (`pk_live_` / `sk_live_`) |
-| **Deploy** | Auto on push to `main` (CI → Deploy Staging) | **Manual** (Actions → Deploy Production) |
-| **GitHub Environment** | `staging` | `production` |
+| **Deploy** | Auto on push to `main` (CI → **Deploy Dev**) | **Manual** (Actions → **Deploy Production**) |
+| **GitHub Environment** | `timetable-dev` | `production` |
+| **Spaces bucket** | `timetable-dev` (recommended) | `timetable` |
 | **Purpose** | Test features, invite internal testers | Real pilot / public users |
-
-**Yes — you need two DigitalOcean apps** for this split. One app cannot run
-different Clerk keys or databases per hostname.
 
 Local dev stays on `localhost` with Docker Postgres and Clerk Development keys
 in `.env` files — it does not use either hosted app.
@@ -506,15 +463,15 @@ flowchart TB
     LApi --> LClerk
   end
 
-  subgraph staging [Dev — dev.timetable.love]
+  subgraph devHosted [Dev — dev.timetable.love]
     SApp[DO app: timetable-dev]
     SURL[dev.timetable.love]
-    SDB[(timetable-db existing)]
+    SDB[(timetable-db)]
     SClerk[Clerk Development pk_test]
-    GHS[GitHub Environment staging]
+    GHS[GitHub Environment timetable-dev]
     SApp --> SURL
     SApp --> SDB
-    GHS -->|deploy-staging.yml| SApp
+    GHS -->|deploy-dev.yml| SApp
     SApp --> SClerk
   end
 
@@ -531,17 +488,18 @@ flowchart TB
   end
 
   subgraph shared [Shared in Timetable DO project]
-    Spaces[Spaces: timetable uploads]
+    SpacesDev[Spaces: timetable-dev]
+    SpacesProd[Spaces: timetable]
     GHRepo[GitHub sugaroverflow/timetable]
   end
 
   GHRepo --> SApp
   GHRepo --> PApp
-  SApp -.optional.-> Spaces
-  PApp -.optional.-> Spaces
+  SApp -.optional.-> SpacesDev
+  PApp -.optional.-> SpacesProd
 ```
 
-**Clerk note:** use **Development** keys only on staging (`dev.timetable.love`).
+**Clerk note:** use **Development** keys only on dev (`dev.timetable.love`).
 Use **Production** keys only on `timetable.love`. Do not point both URLs at the
 same Clerk instance/keys — user accounts and sessions would collide.
 
@@ -552,130 +510,14 @@ auth infrastructure, not the same CNAME as the app.
 
 ### Environment map
 
-| | **Local** | **Staging** | **Production** |
+| | **Local** | **Dev** | **Production** |
 | --- | --- | --- | --- |
 | **URL** | `http://localhost:3000` | `https://dev.timetable.love` | `https://timetable.love` |
-| **DO app** | — | `timetable-dev` | `timetable` (new) |
+| **DO app** | — | `timetable-dev` | `timetable` |
 | **Database** | Docker (`npm run db:up`) | `timetable-db` | `timetable-db-prod` |
-| **Clerk keys** | `.env` / `.env.local` | GitHub **staging** env | GitHub **production** env |
+| **Clerk keys** | `.env` / `.env.local` | GitHub **`timetable-dev`** env | GitHub **`production`** env |
 | **Deploy trigger** | `npm run dev` | Push to `main` | Manual workflow |
 | **Test sign-in** | `+clerk_test` / OTP `424242` | Same (dev keys) | Real users + prod OAuth |
-
-### What exists today (migration)
-
-| Piece | Status | Next step |
-| --- | --- | --- |
-| DO app `timetable-dev` | ✅ `timetable-3mxat.ondigitalocean.app` | Add `dev.timetable.love`; deploy via **Deploy Staging** |
-| `timetable-db` | ✅ Attached to `timetable-dev` | Dev database (keep) |
-| Spaces `timetable` | ✅ In Timetable project | Wire `SPACES_*` on **both** apps' API services |
-| `timetable` production app | ❌ Not created yet | **Deploy Production** |
-| `timetable-db-prod` | ❌ Not created yet | Created on first production deploy |
-| `dev.timetable.love` DNS | ❌ | CNAME → **timetable-dev** |
-| `timetable.love` app DNS | ❌ | CNAME → **timetable** (new app) |
-| Clerk Production DNS | ⏳ | Finish in Clerk dashboard |
-
-### Runbook: two apps, two databases, shared Spaces
-
-Target layout (aligned with [DO multi-environment best practices](https://www.digitalocean.com/community/conceptual-articles/best-practices-app-platform-multi-environment)):
-
-```
-dev.timetable.love  →  app timetable-dev  →  timetable-db        →  Clerk dev (pk_test)
-timetable.love      →  app timetable      →  timetable-db-prod   →  Clerk prod (pk_live)
-both API services   →  same Spaces bucket "timetable" (shared uploads)
-```
-
-#### Step 0 — Merge deploy config to `main`
-
-Ensure `main` includes:
-
-- `.do/app.staging.yaml` (app `timetable-dev`)
-- `.do/app.yaml` (app `timetable`, DB `timetable-db-prod`)
-- `.github/workflows/deploy-staging.yml` and `deploy-production.yml`
-
-#### Step 1 — GitHub secrets
-
-**Repository secrets** (Settings → Secrets → Actions):
-
-| Secret | Value |
-| --- | --- |
-| `DIGITALOCEAN_ACCESS_TOKEN` | DO API token with app + database scopes (or Full Access) |
-| `DIGITALOCEAN_PROJECT_ID` | `92d03cf7-d787-4fa8-9526-561d1ac7b956` (Timetable project) |
-
-**Environment `staging`** (dev app — auto-deploy on push to `main`):
-
-| Secret | Value |
-| --- | --- |
-| `CLERK_SECRET_KEY` | `sk_test_…` |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | `pk_test_…` |
-| `CRON_SECRET` | Dev cron secret |
-
-**Environment `production`** (live app — manual deploy only; add required reviewers optional):
-
-| Secret | Value |
-| --- | --- |
-| `CLERK_SECRET_KEY` | `sk_live_…` |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | `pk_live_…` |
-| `CRON_SECRET` | Prod cron secret (different from dev) |
-
-Remove duplicate `CLERK_*` / `CRON_SECRET` from **repository** secrets if you moved them into environments.
-
-#### Step 2 — Dev app (`timetable-dev`)
-
-You already have app **`timetable-dev`** and database **`timetable-db`**.
-
-1. **Actions → Deploy Staging → Run workflow** (or push to `main` after CI).
-   - Updates `timetable-dev` from `.do/app.staging.yaml`
-   - Does **not** create a second dev app
-2. **Networking** → add **`dev.timetable.love`** → create DNS CNAME at your registrar (DO shows the target).
-3. Smoke test: `curl https://dev.timetable.love/health` and sign-in with `pk_test` / `+clerk_test` OTP `424242`.
-
-#### Step 3 — Shared Spaces (both apps)
-
-Use the existing Space **`timetable`** in the Timetable project for **both** apps.
-
-1. DO → **API** → **Spaces Keys** → create or reuse keys with read/write on that Space.
-2. Note: endpoint (e.g. `https://lon1.digitaloceanspaces.com`), region (`lon1`), bucket name (`timetable`).
-3. On **each** app → component **`api`** → **Environment variables**, set the **same** values:
-
-| Variable | Example |
-| --- | --- |
-| `SPACES_ENDPOINT` | `https://lon1.digitaloceanspaces.com` |
-| `SPACES_REGION` | `lon1` |
-| `SPACES_BUCKET` | `timetable` |
-| `SPACES_KEY` | (Spaces access key) |
-| `SPACES_SECRET` | (Spaces secret, encrypt) |
-
-Optional: `SPACES_PUBLIC_BASE_URL` if you front the Space with a CDN/custom domain.
-
-Dev and prod uploads land in the **same bucket**; only enable when you are ready to test uploads. Without these vars, `/api/uploads` returns 503 and external image URLs still work.
-
-#### Step 4 — Production app (`timetable`) + new database
-
-1. Finish **Clerk Production** DNS for `timetable.love` (Clerk dashboard → Domains).
-2. **Actions → Deploy Production → Run workflow** (manual).
-   - Creates **new** app `timetable` and **new** cluster `timetable-db-prod`
-   - Runs migrations on the empty prod database
-   - Injects **production** Clerk keys from the `production` environment
-3. App `timetable` → **Networking** → add **`timetable.love`** (+ `www` if needed) → DNS at registrar.
-4. Repeat **Step 3** Spaces vars on production app's **`api`** component (same bucket).
-5. Smoke test on `https://timetable.love` with a real Clerk prod sign-in.
-
-#### Step 5 — Day-to-day
-
-| Action | Result |
-| --- | --- |
-| Push/merge to `main` | CI → **Deploy Staging** → `dev.timetable.love` |
-| **Deploy Production** (manual) | Same commit → `timetable.love` |
-| Local `npm run dev` | Docker Postgres + `.env` dev keys (unchanged) |
-
-Production is never auto-deployed on push — only dev/staging is.
-
-#### Step 6 — Clean up (optional)
-
-- Delete **`monkfish-app`** in the raindrop project if it still exists.
-- Retire `timetable-3mxat.ondigitalocean.app` for testers once `dev.timetable.love` works.
-
-### Setup checklist (summary)
 
 ## Getting started (local dev)
 
@@ -770,8 +612,8 @@ server-side Clerk calls use it too).
 | `npm run db:studio` | Open Drizzle Studio |
 | `npm run db:up` / `npm run db:down` | Start/stop local Postgres (Docker) |
 
-Production deploy: push to `main` auto-deploys **staging**; run **Deploy Production**
-manually for `timetable.love`. See [Environments](#environments-local-staging-production).
+Production deploy: push to `main` auto-deploys **dev**; run **Deploy Production**
+manually for `timetable.love`. See [Environments](#environments-local-dev-production).
 
 ---
 
@@ -806,7 +648,7 @@ your team org and assign it to your project.
 
 | Workflow | Trigger | Spec | Target |
 | --- | --- | --- | --- |
-| [deploy-staging.yml](.github/workflows/deploy-staging.yml) | CI passes on `main` | `.do/app.staging.yaml` | `dev.timetable.love` |
+| [deploy-dev.yml](.github/workflows/deploy-dev.yml) | CI passes on `main` | `.do/app.dev.yaml` | `dev.timetable.love` |
 | [deploy-production.yml](.github/workflows/deploy-production.yml) | Manual only | `.do/app.yaml` | `timetable.love` |
 
 Both use [DigitalOcean's deploy action](https://github.com/digitalocean/app_action)
@@ -819,12 +661,12 @@ and the **Timetable** DO project (`DIGITALOCEAN_PROJECT_ID`).
 | `DIGITALOCEAN_ACCESS_TOKEN` | DO API token (see [scopes](#if-deploy-failed)) |
 | `DIGITALOCEAN_PROJECT_ID` | Timetable project ID |
 
-**Per-environment secrets** — create GitHub Environments `staging` and
-`production` (see [Setup checklist](#setup-checklist)):
+**Per-environment secrets** — create GitHub Environments `timetable-dev` and
+`production` (see [Runbook](#runbook-two-apps-two-databases-split-spaces)):
 
 | Environment | Clerk keys | Deployed to |
 | --- | --- | --- |
-| `staging` | `pk_test_` / `sk_test_` | `dev.timetable.love` |
+| `timetable-dev` | `pk_test_` / `sk_test_` | `dev.timetable.love` |
 | `production` | `pk_live_` / `sk_live_` | `timetable.love` |
 
 Each environment also needs its own `CRON_SECRET`.
