@@ -2,9 +2,11 @@
 # One app: web + api services (shared domain) + a pre-deploy migration job,
 # bound to a managed Postgres cluster.
 #
-# Primary deploy path: GitHub Actions (`.github/workflows/deploy.yml`) applies
-# this spec on every successful CI run on `main`. Secret placeholders below
-# (${CLERK_SECRET_KEY}, etc.) are filled from repository secrets at deploy time.
+# Primary deploy path: GitHub Actions (.github/workflows/deploy.yml) applies
+# this spec on every successful CI run on main. Secret env placeholders in the
+# spec (CLERK_SECRET_KEY, CRON_SECRET, etc.) are filled from GitHub Actions
+# repository secrets at deploy time. Do not use ${…} syntax in comments here —
+# the deploy action substitutes env vars across the whole file before parsing.
 #
 # Manual fallback: import in the DO console or `doctl apps create --spec .do/app.yaml`
 # Update:  doctl apps update <app-id> --spec .do/app.yaml
@@ -89,9 +91,7 @@ jobs:
       - { key: DATABASE_SSL, value: "require", scope: RUN_TIME }
 
 databases:
-  # Attaches the managed PG cluster you create first. Name the cluster
-  # "timetable-db" so ${timetable-db.DATABASE_URL} resolves. (db_name/db_user
-  # default to defaultdb/doadmin on a fresh managed cluster.)
+  # Name the cluster timetable-db so the DATABASE_URL binding below resolves.
   - name: timetable-db
     engine: PG
     version: "16"

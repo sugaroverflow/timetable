@@ -21,6 +21,7 @@ spec is in [Specifications.md](Specifications.md).
 - [What it does](#what-it-does)
 - [Current status & phase checklist](#current-status--phase-checklist)
 - [Architecture](#architecture)
+- [How production works](#how-production-works)
 - [Getting started (local dev)](#getting-started-local-dev)
 - [Environment variables](#environment-variables)
 - [Scripts](#scripts)
@@ -321,6 +322,135 @@ There are no Auth.js tables and no webhook is required for normal operation.
 
 ---
 
+## How production works
+
+This section describes what happens after you merge to `main` and how Clerk,
+GitHub Actions, and DigitalOcean fit together.
+
+### Are we deployed?
+
+**CI passing on `main` does not mean the app is live.** Two workflows run in
+sequence:
+
+1. **CI** (`.github/workflows/ci.yml`) — builds, typechecks, lints, tests, and
+   runs migrations against a throwaway Postgres service. This validates the code.
+2. **Deploy** (`.github/workflows/deploy.yml`) — runs only after CI succeeds. It
+   calls the DigitalOcean API with [`.do/app.yaml`](.do/app.yaml) and your
+   repository secrets to create or update the App Platform app.
+
+Check **GitHub → Actions → Deploy**. A green run means DigitalOcean accepted the
+spec and kicked off a build. The app URL appears in the run logs and in the
+[DigitalOcean Apps console](https://cloud.digitalocean.com/apps).
+
+**Clerk is not configured automatically.** The deploy injects your Clerk keys
+into the running app, but you must add the deployed `https://….ondigitalocean.app`
+URL to **Clerk → Configure → Domains → Allowed origins** before sign-in works in
+production.
+
+### End-to-end flow
+
+```mermaid
+flowchart LR
+  dev[Developer pushes to main]
+  ci[GitHub Actions: CI]
+  deploy[GitHub Actions: Deploy]
+  do[DigitalOcean App Platform]
+  pg[(Managed PostgreSQL)]
+  clerk[Clerk]
+  user[Browser]
+
+  dev --> ci
+  ci -->|passes| deploy
+  deploy -->|applies app spec + secrets| do
+  do --> pg
+  user -->|HTTPS same origin| do
+  user <-->|sign-in / session JWT| clerk
+  do -->|verify JWT| clerk
+```
+
+### What DigitalOcean runs
+
+One App Platform app named `timetable` (see [`.do/app.yaml`](.do/app.yaml)) with
+a **single public URL**. Ingress sends traffic by path:
+
+| Path | Service | Role |
+| --- | --- | --- |
+| `/` (everything else) | **web** | Next.js UI |
+| `/api/*` | **api** | Express REST |
+| `/graphql` | **api** | GraphQL Yoga |
+| `/health` | **api** | Health check |
+
+Before each deploy, a **PRE_DEPLOY migrate** job runs `npm run db:migrate`
+against the managed Postgres cluster (`timetable-db`, provisioned by the spec on
+first deploy).
+
+Builds clone this public GitHub repo on DigitalOcean's builders (`deploy_on_push`
+is off — GitHub Actions decides *when* to deploy, not GitHub webhooks to DO).
+
+### How Clerk fits in
+
+Clerk handles **authentication**; Timetable stores **authorization and data** in
+its own Postgres database.
+
+| Piece | Where it lives | Purpose |
+| --- | --- | --- |
+| Sign-in / sign-up UI | Clerk (embedded in Next.js via `@clerk/nextjs`) | Users authenticate with email code, Google, Microsoft, etc. |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | **web** service (build + runtime) | Client-side Clerk SDK |
+| `CLERK_SECRET_KEY` | **web** + **api** services | Server-side Clerk SDK; API verifies session JWTs on GraphQL/REST |
+| Local `user` row | Postgres | Created/linked on first API call using the Clerk user id |
+
+Typical request path:
+
+1. User opens `https://<app>.ondigitalocean.app` and clicks sign in.
+2. Clerk completes auth and sets a session cookie / token in the browser.
+3. Next.js server components and client calls send the Clerk session token to
+   `/graphql` or `/api/*` on the **same origin** (no CORS complexity in prod).
+4. The API verifies the token with `@clerk/backend`, loads the local user +
+   timetable memberships, and enforces role-based permissions.
+
+Clerk redirect paths are set in the app spec (`/sign-in`, `/sign-up`, `/timetables`).
+
+For user testing, **test keys** (`pk_test_` / `sk_test_`) are fine. Test emails
+can use the `+clerk_test` suffix with OTP code `424242`.
+
+### Where secrets live
+
+| Secret | Stored in | Used for |
+| --- | --- | --- |
+| `DIGITALOCEAN_ACCESS_TOKEN` | GitHub Actions secrets | Deploy workflow only — calls DO API |
+| `CLERK_SECRET_KEY` | GitHub Actions → injected into DO app env | Web + API at runtime |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | GitHub Actions → injected into DO app env | Web build + runtime (inlined into client bundle) |
+| `CRON_SECRET` | GitHub Actions → injected into API env | Protects `POST /api/jobs/digests` (optional until you schedule digests) |
+| `DATABASE_URL` | Auto — DO binds managed Postgres | API, web (indirect), migrate job |
+
+Optional post-deploy env vars (`SPACES_*`, `RESEND_API_KEY`) are set in the
+DigitalOcean console, not GitHub, unless you extend the deploy workflow.
+
+### First deploy checklist
+
+1. GitHub repository secrets are set (see [Deployment → GitHub Actions](#github-actions-recommended)).
+2. Merge to `main` → **CI** green → **Deploy** green.
+3. Copy the `*.ondigitalocean.app` URL from the Deploy run or DO console.
+4. **Clerk → Allowed origins** — add `https://<that-url>`.
+5. Smoke test:
+   - `curl https://<url>/health` → `{"ok":true}`
+   - Sign in, create a timetable, publish a topic.
+
+### If Deploy failed
+
+Open the failed **Deploy** run log. Common causes:
+
+- **YAML parse error in `.do/app.yaml`** — the deploy action substitutes
+  `${VAR}` across the *entire* file (including comments) before parsing. Never
+  put `${…}` in comments; only in `value:` fields that should be filled.
+- **DO token missing scopes** — needs `app:create` / `app:update` and
+  `database:create` on first deploy.
+- **Clerk sign-in fails after deploy** — allowed origins not updated yet.
+
+Re-run deploy from **Actions → Deploy → Run workflow** after fixing the issue.
+
+---
+
 ## Getting started (local dev)
 
 ### Prerequisites
@@ -419,6 +549,9 @@ Production deploy: push to `main` (CI → Deploy workflow) or run **Actions → 
 ---
 
 ## Deployment (Clerk + DigitalOcean)
+
+See [How production works](#how-production-works) for the full picture (CI vs
+Deploy, Clerk auth flow, ingress routing, and the post-deploy checklist).
 
 Target: DigitalOcean **App Platform** for web + API, **Managed PostgreSQL** for
 the database, and (optionally) **Spaces** for uploads. Provision everything under
