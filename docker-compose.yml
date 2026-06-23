@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: timetable-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: timetable
+      POSTGRES_PASSWORD: timetable
+      POSTGRES_DB: timetable
+    ports:
+      - "5432:5432"
+    volumes:
+      - timetable-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U timetable -d timetable"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  timetable-pg-data:

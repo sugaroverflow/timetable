@@ -1,0 +1,1358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Timetable — collaborative scheduling</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#eceef3;
+  --card:#ffffff;
+  --ink:#1b2330;
+  --muted:#69727f;
+  --faint:#9aa2af;
+  --line:#e3e7ef;
+  --line-strong:#d3d9e4;
+  --primary:#2f54eb;          /* live-editable in Settings */
+  --primary-ink:#ffffff;
+  --primary-soft:#eaeefe;
+  --heart:#ec4d6b;
+  --green:#2f9e44; --green-soft:#e8f6ec;
+  --yellow:#f3a712; --yellow-soft:#fdf2dc;
+  --red:#e23b3b; --red-soft:#fbe9e9;
+  --host-wash:#f4f1fc; --host-line:#ddd4f5; --host-ink:#5a44b8;
+  --admin-bg:#262c3a; --admin-card:#2f3647; --admin-line:#3d465a; --admin-ink:#cdd4e2;
+  --radius:14px; --radius-sm:9px;
+  --shadow:0 1px 2px rgba(20,30,50,.05), 0 2px 8px rgba(20,30,50,.05);
+  --shadow-pop:0 8px 28px rgba(20,30,50,.16);
+  --sans:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  --serif:'Fraunces',Georgia,serif;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--ink); font-family:var(--sans);
+  font-size:15px; line-height:1.5; -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit; cursor:pointer; border:none; background:none; color:inherit}
+input,textarea,select{font-family:inherit; font-size:14px; color:var(--ink)}
+a{color:var(--primary); text-decoration:none}
+:focus-visible{outline:2px solid var(--primary); outline-offset:2px; border-radius:6px}
+
+/* ---------- Topbar ---------- */
+.topbar{
+  position:sticky; top:0; z-index:40; background:rgba(255,255,255,.92);
+  backdrop-filter:saturate(140%) blur(8px);
+  border-bottom:1px solid var(--line);
+  display:flex; align-items:center; gap:18px; padding:0 20px; height:60px;
+}
+.brand{display:flex; align-items:center; gap:11px; min-width:0}
+.brand-mark{
+  width:34px; height:34px; border-radius:9px; flex:none;
+  background:linear-gradient(135deg,var(--primary),#5b7bff);
+  display:grid; place-items:center; color:#fff; font-weight:700; font-size:17px;
+}
+.brand-name{font-weight:700; font-size:16px; letter-spacing:-.01em; white-space:nowrap}
+.brand-domain{font-family:var(--mono); font-size:11px; color:var(--faint); white-space:nowrap}
+.topbar-spacer{flex:1}
+.privacy-pill{
+  display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600;
+  padding:5px 10px; border-radius:999px; border:1px solid var(--line-strong); color:var(--muted);
+}
+.privacy-pill .dot{width:7px; height:7px; border-radius:50%; background:var(--green)}
+
+/* perspective switch */
+.persp{display:flex; flex-direction:column; align-items:flex-end; gap:3px}
+.persp-label{font-size:10.5px; letter-spacing:.04em; text-transform:uppercase; color:var(--faint); font-weight:600}
+.seg{display:inline-flex; background:#eef0f5; border-radius:9px; padding:3px; gap:2px; border:1px solid var(--line)}
+.seg button{padding:5px 12px; border-radius:7px; font-size:13px; font-weight:600; color:var(--muted)}
+.seg button.on{background:var(--card); color:var(--ink); box-shadow:0 1px 2px rgba(0,0,0,.08)}
+
+/* ---------- Layout ---------- */
+.layout{display:flex; max-width:1180px; margin:0 auto; padding:0 16px; gap:22px; align-items:flex-start}
+.sidebar{position:sticky; top:76px; width:210px; flex:none; padding-top:18px}
+.nav{display:flex; flex-direction:column; gap:3px}
+.nav button{
+  display:flex; align-items:center; gap:11px; width:100%; text-align:left;
+  padding:9px 12px; border-radius:10px; font-weight:600; font-size:14.5px; color:var(--muted);
+}
+.nav button:hover{background:#e4e7ef}
+.nav button.on{background:var(--primary-soft); color:var(--primary)}
+.nav .ic{width:18px; text-align:center; font-size:16px}
+.nav-note{margin-top:18px; padding:11px 12px; border:1px dashed var(--line-strong); border-radius:10px; font-size:11.5px; color:var(--faint); line-height:1.45}
+
+.content{flex:1; min-width:0; padding:18px 0 80px; max-width:680px}
+.screen{display:none}
+.screen.on{display:block}
+
+/* ---------- Generic bits ---------- */
+.page-head{margin:2px 0 14px}
+.page-head h1{font-family:var(--serif); font-weight:600; font-size:25px; letter-spacing:-.01em; margin:0}
+.page-head p{margin:5px 0 0; color:var(--muted); font-size:13.5px}
+
+.avatar{
+  width:38px; height:38px; border-radius:50%; flex:none; color:#fff; font-weight:600;
+  display:grid; place-items:center; font-size:14px; letter-spacing:.01em;
+}
+.avatar.sm{width:28px; height:28px; font-size:11px}
+.avatar.xs{width:22px; height:22px; font-size:9.5px}
+
+.badge{
+  display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:600;
+  padding:3px 8px; border-radius:999px; line-height:1.4; white-space:nowrap;
+}
+.badge .d{width:6px;height:6px;border-radius:50%}
+.b-public{background:#eef2f7; color:#5a6678}
+.b-host{background:var(--host-wash); color:var(--host-ink); border:1px solid var(--host-line)}
+.b-admin{background:#fdeef0; color:#b23a4c; border:1px solid #f6d2d8}
+.b-draft{background:#f1f0ee; color:#7a756c}
+.b-submitted{background:#fff4e0; color:#a9700f}
+.b-published{background:var(--green-soft); color:#207a32}
+.b-unpublished{background:#eef0f5; color:#7d8694}
+
+.btn{display:inline-flex; align-items:center; gap:7px; padding:8px 14px; border-radius:9px; font-weight:600; font-size:13.5px; border:1px solid var(--line-strong); background:var(--card); color:var(--ink)}
+.btn:hover{background:#f6f7fa}
+.btn-primary{background:var(--primary); color:var(--primary-ink); border-color:transparent}
+.btn-primary:hover{filter:brightness(1.05)}
+.btn-sm{padding:6px 11px; font-size:12.5px}
+.btn-ghost{border-color:transparent; background:transparent; color:var(--muted)}
+.btn-ghost:hover{background:#e7eaf1}
+
+/* ---------- Feed: filter bar ---------- */
+.filterbar{
+  display:flex; flex-wrap:wrap; align-items:center; gap:10px; background:var(--card);
+  border:1px solid var(--line); border-radius:var(--radius); padding:11px 13px; box-shadow:var(--shadow);
+  margin-bottom:14px;
+}
+.fb-group{display:flex; align-items:center; gap:7px; font-size:13px; color:var(--muted)}
+.select{
+  appearance:none; padding:7px 30px 7px 11px; border:1px solid var(--line-strong); border-radius:8px;
+  background:var(--card) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M2 4l4 4 4-4' stroke='%2369727f' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>") no-repeat right 10px center;
+  font-weight:600; font-size:13px;
+}
+.fb-spacer{flex:1}
+
+/* ---------- Cards ---------- */
+.card{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); margin-bottom:16px; overflow:hidden}
+.card-body{padding:16px 18px}
+.topic-head{display:flex; align-items:flex-start; gap:11px}
+.topic-meta{flex:1; min-width:0}
+.topic-by{display:flex; align-items:center; gap:7px; flex-wrap:wrap}
+.topic-author{font-weight:600; font-size:13.5px}
+.topic-sub{color:var(--faint); font-size:12px}
+.dot-sep{color:var(--faint)}
+.topic-title{font-family:var(--serif); font-weight:600; font-size:22px; line-height:1.2; letter-spacing:-.01em; margin:11px 0 7px}
+.topic-text{color:#3a4350; font-size:14.5px; margin:0}
+.topic-img{margin:13px 0 2px; border-radius:10px; height:180px; background:linear-gradient(135deg,#dfe5f5,#eef1f7); display:grid; place-items:center; color:var(--faint); font-size:13px; border:1px solid var(--line)}
+
+.card-actions{display:flex; align-items:center; gap:6px; padding:8px 12px; border-top:1px solid var(--line)}
+.act{display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:9px; font-weight:600; font-size:13.5px; color:var(--muted)}
+.act:hover{background:#f1f3f7}
+.act .ic{font-size:16px; line-height:1}
+.act.hearted{color:var(--heart)}
+.act.hearted .ic{transform:scale(1.06)}
+.heart-pop{animation:pop .32s ease}
+@keyframes pop{0%{transform:scale(1)}45%{transform:scale(1.32)}100%{transform:scale(1)}}
+
+/* comments */
+.comments{padding:4px 16px 14px; border-top:1px solid var(--line); background:#fbfcfe}
+.comment{display:flex; gap:10px; padding:10px 0}
+.comment + .comment{border-top:1px solid #eef1f6}
+.c-body{flex:1; min-width:0}
+.c-bubble{background:#eef1f6; border-radius:13px; padding:8px 12px; display:inline-block; max-width:100%}
+.c-name{font-weight:600; font-size:13px}
+.c-text{font-size:14px; margin-top:1px}
+.c-meta{display:flex; gap:14px; margin:5px 0 0 2px; font-size:12px; color:var(--faint); font-weight:600}
+.c-meta button:hover{color:var(--ink)}
+.replies{margin:8px 0 0 14px; padding-left:14px; border-left:2px solid #eef1f6}
+.composer{display:flex; gap:10px; padding:10px 0 2px; align-items:flex-start}
+.composer textarea{
+  flex:1; resize:none; border:1px solid var(--line-strong); border-radius:18px; padding:9px 14px;
+  min-height:38px; line-height:1.4; background:var(--card);
+}
+.composer textarea:focus{outline:none; border-color:var(--primary)}
+
+/* private host panel */
+.host-panel{background:var(--host-wash); border-top:1px solid var(--host-line)}
+.host-panel-head{display:flex; align-items:center; gap:9px; padding:11px 16px 4px; color:var(--host-ink); font-weight:700; font-size:13px}
+.host-panel-head .lock{font-size:13px}
+.host-panel-sub{padding:0 16px; color:#8278b8; font-size:11.5px; margin:-2px 0 8px}
+.hp-section{padding:6px 16px 14px}
+.coverage{display:flex; align-items:center; gap:14px; padding:10px 13px; background:#fff; border:1px solid var(--host-line); border-radius:10px}
+.cov-num{font-family:var(--serif); font-weight:600; font-size:26px; color:var(--host-ink); line-height:1}
+.cov-meta{font-size:12px; color:#6c6597}
+.cov-bar{flex:1; height:8px; border-radius:99px; background:#e7e1f7; overflow:hidden; min-width:60px}
+.cov-fill{height:100%; background:linear-gradient(90deg,var(--host-ink),#8a73e0); border-radius:99px}
+.voters{margin-top:11px; display:flex; flex-direction:column; gap:7px}
+.voter{display:flex; align-items:center; gap:9px; font-size:13px}
+.voter .vname{flex:1; min-width:0; font-weight:500}
+.weight{font-family:var(--mono); font-size:12px; color:var(--host-ink); font-weight:600; background:#efeafb; padding:2px 7px; border-radius:6px}
+.vbar{width:74px; height:6px; border-radius:99px; background:#e7e1f7; overflow:hidden}
+.vbar i{display:block; height:100%; background:var(--host-ink)}
+.host-chat{margin-top:6px}
+.hc{display:flex; gap:9px; padding:7px 0}
+.hc .hc-bubble{background:#fff; border:1px solid var(--host-line); border-radius:11px; padding:7px 11px; font-size:13.5px}
+.hc .hc-name{font-weight:600; font-size:12.5px; color:var(--host-ink)}
+
+/* host topic manager */
+.manager{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); margin-bottom:18px; overflow:hidden}
+.manager-head{display:flex; align-items:center; justify-content:space-between; padding:13px 16px; border-bottom:1px solid var(--line)}
+.manager-head h2{font-size:14.5px; margin:0; font-weight:700}
+.mrow{display:flex; align-items:center; gap:11px; padding:12px 16px}
+.mrow + .mrow{border-top:1px solid var(--line)}
+.mrow .mtitle{flex:1; min-width:0; font-weight:600; font-size:14px}
+.mrow .mfeedback{font-size:12px; color:#a9700f; margin-top:2px; font-weight:500}
+.mrow .mfeedback b{color:var(--ink)}
+
+/* ---------- Calendar ---------- */
+.cal-tools{display:flex; flex-wrap:wrap; gap:10px; align-items:center; background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:11px 13px; box-shadow:var(--shadow); margin-bottom:14px}
+.legend{display:flex; gap:13px; align-items:center; font-size:12px; color:var(--muted); margin-bottom:14px; flex-wrap:wrap}
+.legend span{display:inline-flex; align-items:center; gap:6px}
+.legend i{width:11px; height:11px; border-radius:3px; display:inline-block}
+.i-g{background:var(--green)} .i-y{background:var(--yellow)} .i-r{background:var(--red)}
+
+.slot{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); margin-bottom:14px; overflow:hidden}
+.slot-main{display:flex; gap:14px; padding:15px 17px; align-items:flex-start}
+.slot-date{flex:none; width:58px; text-align:center; border:1px solid var(--line); border-radius:10px; padding:7px 0; background:#fbfcfe}
+.slot-date .d-wd{font-size:11px; font-weight:700; color:var(--red); text-transform:uppercase; letter-spacing:.03em}
+.slot-date .d-day{font-family:var(--serif); font-size:23px; font-weight:600; line-height:1}
+.slot-date .d-mo{font-size:11px; color:var(--muted); text-transform:uppercase}
+.slot-info{flex:1; min-width:0}
+.slot-when{display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:13px; color:var(--muted); font-weight:500}
+.slot-loc{display:inline-flex; align-items:center; gap:5px; font-weight:600; color:var(--ink)}
+.slot-topics{display:flex; gap:6px; flex-wrap:wrap; margin-top:8px}
+.chip{font-size:11.5px; font-weight:600; padding:3px 9px; border-radius:999px; background:var(--primary-soft); color:var(--primary)}
+.chip.yoga{background:#eafaf0; color:#1f8f43}
+
+.strip-wrap{margin-top:11px}
+.strip{height:12px; border-radius:99px; overflow:hidden; display:flex; background:#eef1f6}
+.strip i{height:100%}
+.strip .s-g{background:var(--green)} .strip .s-y{background:var(--yellow)} .strip .s-r{background:var(--red)}
+.strip-meta{display:flex; gap:14px; margin-top:6px; font-size:12px; color:var(--muted); font-weight:600}
+.strip-meta b{color:var(--ink)}
+
+.myavail{display:flex; align-items:center; gap:9px; margin-top:13px; padding-top:13px; border-top:1px dashed var(--line)}
+.myavail .lab{font-size:12.5px; color:var(--muted); font-weight:600; margin-right:2px}
+.avseg{display:inline-flex; border:1px solid var(--line-strong); border-radius:9px; overflow:hidden}
+.avseg button{padding:6px 14px; font-size:13px; font-weight:600; color:var(--muted); border-right:1px solid var(--line-strong)}
+.avseg button:last-child{border-right:none}
+.avseg button.on-g{background:var(--green-soft); color:#1f7a32}
+.avseg button.on-y{background:var(--yellow-soft); color:#a9700f}
+.avseg button.on-r{background:var(--red-soft); color:#b23131}
+
+.slot-expand{display:flex; align-items:center; gap:6px; padding:9px 17px; border-top:1px solid var(--line); font-size:13px; font-weight:600; color:var(--muted)}
+.slot-expand:hover{background:#f6f7fa}
+.disc{padding:4px 17px 16px; border-top:1px solid var(--line); background:#fbfcfe}
+.disc-people{display:flex; flex-direction:column; gap:6px; margin:10px 0 14px}
+.disc-person{display:flex; align-items:center; gap:9px; font-size:13px}
+.disc-person .dp-dot{width:9px;height:9px;border-radius:50%}
+.disc-person .dp-name{flex:1; font-weight:500}
+
+/* pattern tool */
+.pattern{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:15px 17px; margin-bottom:16px}
+.pattern h3{margin:0 0 4px; font-size:14px; font-weight:700}
+.pattern p{margin:0 0 11px; font-size:12.5px; color:var(--muted)}
+.daypick{display:flex; gap:6px; flex-wrap:wrap}
+.daypick button{padding:7px 12px; border-radius:8px; border:1px solid var(--line-strong); font-weight:600; font-size:13px; color:var(--muted); background:var(--card); display:flex; flex-direction:column; align-items:center; gap:3px}
+.daypick button .pd{font-size:15px}
+.daypick button.pg{border-color:var(--green); background:var(--green-soft)}
+.daypick button.py{border-color:var(--yellow); background:var(--yellow-soft)}
+.daypick button.pr{border-color:var(--red); background:var(--red-soft)}
+
+/* ---------- Moderation (backstage) ---------- */
+#screen-moderation .page-head h1, #screen-timeline .page-head h1{color:var(--ink)}
+.backstage{background:#f1f2f6; border:1px solid var(--line-strong); border-radius:var(--radius); padding:13px 15px; margin-bottom:16px; font-size:13px; color:var(--muted); display:flex; gap:10px; align-items:center}
+.backstage .ic{font-size:17px}
+.mod-card{background:var(--card); border:1px solid var(--line-strong); border-radius:var(--radius); box-shadow:var(--shadow); margin-bottom:16px; overflow:hidden}
+.mod-card-body{padding:15px 17px}
+.mod-actions{display:flex; flex-wrap:wrap; gap:7px; padding:11px 14px; border-top:1px solid var(--line); background:#f7f8fb}
+.mod-feedback{margin-top:12px; padding:10px 13px; background:#fff7e8; border:1px solid #f3e0b8; border-radius:10px; font-size:13px}
+.mod-feedback .mf-head{font-weight:700; color:#a9700f; font-size:12px; margin-bottom:3px; display:flex; align-items:center; gap:6px}
+
+/* timeline */
+.timeline{position:relative; margin-left:8px; padding-left:22px; border-left:2px solid var(--line-strong)}
+.tl-item{position:relative; padding:0 0 18px}
+.tl-item::before{content:""; position:absolute; left:-29px; top:3px; width:12px; height:12px; border-radius:50%; background:var(--card); border:2.5px solid var(--primary)}
+.tl-item.act-pub::before{border-color:var(--green)}
+.tl-item.act-hide::before{border-color:var(--red)}
+.tl-when{font-family:var(--mono); font-size:11px; color:var(--faint)}
+.tl-text{font-size:14px; margin-top:2px}
+.tl-text b{font-weight:600}
+.tl-note{margin-top:6px; padding:8px 11px; background:#f6f7fa; border:1px solid var(--line); border-radius:9px; font-size:13px; color:#3a4350}
+.tl-note .tn-by{font-weight:600; font-size:12px; color:var(--muted)}
+
+/* ---------- Settings ---------- */
+.panel{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); margin-bottom:18px; overflow:hidden}
+.panel-head{padding:14px 18px; border-bottom:1px solid var(--line)}
+.panel-head h2{margin:0; font-size:15px; font-weight:700}
+.panel-head p{margin:3px 0 0; font-size:12.5px; color:var(--muted)}
+.panel-body{padding:16px 18px}
+.field{margin-bottom:15px}
+.field:last-child{margin-bottom:0}
+.field label{display:block; font-weight:600; font-size:13px; margin-bottom:6px}
+.field .hint{font-weight:400; color:var(--faint); font-size:12px}
+.input,.textarea{width:100%; padding:9px 12px; border:1px solid var(--line-strong); border-radius:9px; background:var(--card)}
+.textarea{resize:vertical; min-height:74px; line-height:1.5}
+.input:focus,.textarea:focus{outline:none; border-color:var(--primary)}
+.domain-row{display:flex; align-items:center; border:1px solid var(--line-strong); border-radius:9px; overflow:hidden}
+.domain-row input{border:none; flex:1; padding:9px 12px}
+.domain-row input:focus{outline:none}
+.domain-row .suffix{padding:9px 12px; background:#f1f3f7; color:var(--muted); font-family:var(--mono); font-size:12.5px; border-left:1px solid var(--line)}
+
+.privacy-opts{display:flex; flex-direction:column; gap:9px}
+.popt{display:flex; gap:11px; padding:12px 13px; border:1px solid var(--line-strong); border-radius:11px; cursor:pointer; align-items:flex-start}
+.popt.sel{border-color:var(--primary); background:var(--primary-soft)}
+.popt .pradio{width:18px; height:18px; border-radius:50%; border:2px solid var(--line-strong); margin-top:1px; flex:none; display:grid; place-items:center}
+.popt.sel .pradio{border-color:var(--primary)}
+.popt.sel .pradio::after{content:""; width:9px; height:9px; border-radius:50%; background:var(--primary)}
+.popt .ptitle{font-weight:600; font-size:14px}
+.popt .pdesc{font-size:12.5px; color:var(--muted); margin-top:1px}
+
+.color-row{display:flex; gap:22px; flex-wrap:wrap}
+.color-pick{display:flex; align-items:center; gap:11px}
+.color-pick label{margin:0}
+.swatch{position:relative; width:42px; height:42px; border-radius:10px; border:1px solid var(--line-strong); overflow:hidden}
+.swatch input{position:absolute; inset:-6px; width:150%; height:150%; border:none; padding:0; cursor:pointer}
+
+.role-table{width:100%; border-collapse:collapse; font-size:13.5px}
+.role-table th{text-align:left; font-size:11.5px; text-transform:uppercase; letter-spacing:.03em; color:var(--faint); padding:0 8px 8px; font-weight:700}
+.role-table th.cen, .role-table td.cen{text-align:center}
+.role-table td{padding:9px 8px; border-top:1px solid var(--line)}
+.role-table .ru{display:flex; align-items:center; gap:9px}
+.role-table .ru .rn{font-weight:600}
+.role-table .ru .re{font-size:11.5px; color:var(--faint); font-family:var(--mono)}
+.chk{width:19px; height:19px; border-radius:6px; border:1.5px solid var(--line-strong); display:inline-grid; place-items:center; cursor:pointer; background:var(--card)}
+.chk.on{background:var(--primary); border-color:var(--primary)}
+.chk.on::after{content:"✓"; color:#fff; font-size:12px; font-weight:700}
+
+.renames{display:grid; grid-template-columns:1fr 1fr; gap:13px}
+.rename .ra{font-size:11.5px; color:var(--faint); font-weight:600; margin-bottom:4px; text-transform:uppercase; letter-spacing:.03em}
+.preview-roles{margin-top:13px; padding:11px 13px; background:#f6f7fa; border:1px solid var(--line); border-radius:10px; font-size:13px; color:var(--muted)}
+.preview-roles b{color:var(--ink); font-weight:600}
+
+.toggle-row{display:flex; align-items:center; justify-content:space-between; padding:11px 0}
+.toggle-row + .toggle-row{border-top:1px solid var(--line)}
+.toggle-row .tl-lab{font-weight:600; font-size:14px}
+.toggle-row .tl-sub{font-size:12px; color:var(--muted)}
+.switch{width:42px; height:24px; border-radius:99px; background:var(--line-strong); position:relative; flex:none; transition:background .15s}
+.switch.on{background:var(--primary)}
+.switch::after{content:""; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:#fff; transition:left .15s; box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.switch.on::after{left:21px}
+.settings-foot{display:flex; gap:10px; justify-content:flex-end}
+
+/* cover image picker */
+.cover{height:120px; border-radius:11px; background:linear-gradient(120deg,var(--primary),#7b93ff); display:grid; place-items:center; color:#fff; font-weight:600; font-size:13px; margin-bottom:6px; position:relative; overflow:hidden}
+.cover .cover-btn{position:absolute; bottom:10px; right:10px}
+
+/* toast */
+.toast-wrap{position:fixed; bottom:24px; left:50%; transform:translateX(-50%); z-index:80; display:flex; flex-direction:column; gap:8px; align-items:center}
+.toast{background:#1b2330; color:#fff; padding:11px 18px; border-radius:11px; font-size:13.5px; font-weight:500; box-shadow:var(--shadow-pop); display:flex; align-items:center; gap:9px; animation:rise .25s ease}
+.toast .tk{color:#7ee0a0}
+@keyframes rise{from{opacity:0; transform:translateY(8px)}to{opacity:1; transform:translateY(0)}}
+
+.empty{text-align:center; padding:46px 20px; color:var(--muted)}
+.empty .ee{font-size:30px; margin-bottom:8px}
+.empty h3{margin:0 0 4px; font-size:16px; color:var(--ink); font-weight:600}
+
+/* ---------- Responsive ---------- */
+@media (max-width:860px){
+  .layout{padding:0 10px; gap:0}
+  .sidebar{position:sticky; top:60px; width:auto; flex:none; padding:0; z-index:30; background:var(--bg); width:100%}
+  .nav{flex-direction:row; overflow-x:auto; gap:6px; padding:10px 4px; -webkit-overflow-scrolling:touch}
+  .nav button{flex:none; padding:8px 13px}
+  .nav button span.lab{white-space:nowrap}
+  .nav-note{display:none}
+  .content{max-width:none; padding-top:8px}
+  .brand-domain{display:none}
+  .persp-label{display:none}
+}
+@media (max-width:560px){
+  .topbar{gap:10px; padding:0 12px}
+  .renames{grid-template-columns:1fr}
+  .seg button{padding:5px 9px; font-size:12px}
+  .topic-title{font-size:20px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none !important; transition:none !important}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark">T</div>
+    <div style="min-width:0">
+      <div class="brand-name" id="brand-name">Newspeak House 2026</div>
+      <div class="brand-domain">timetable.2026.newspeak.house</div>
+    </div>
+  </div>
+  <div class="topbar-spacer"></div>
+  <div class="privacy-pill" id="privacy-pill"><span class="dot"></span> Public</div>
+  <div class="persp">
+    <span class="persp-label">Viewing as</span>
+    <div class="seg" id="role-switch">
+      <button data-role="elector" class="on">Elector</button>
+      <button data-role="host">Host</button>
+      <button data-role="admin">Admin</button>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <nav class="nav" id="nav"></nav>
+    <div class="nav-note">
+      <b>Prototype.</b> Switch the perspective above to see the same timetable as an elector, host, or admin. Data is illustrative and resets on reload.
+    </div>
+  </aside>
+
+  <main class="content">
+    <section class="screen" id="screen-feed"></section>
+    <section class="screen" id="screen-calendar"></section>
+    <section class="screen" id="screen-moderation"></section>
+    <section class="screen" id="screen-timeline"></section>
+    <section class="screen" id="screen-settings"></section>
+  </main>
+</div>
+
+<div class="toast-wrap" id="toasts"></div>
+
+<script>
+"use strict";
+
+/* =========================================================
+   DATA
+   ========================================================= */
+const AV = { G:'green', Y:'yellow', R:'red' };
+
+const users = {
+  fatima: { name:'Fatima Khalid', color:'#7048e8', roles:['elector'] },
+  nick:   { name:'Nick Adeyemi',  color:'#e8590c', roles:['elector'] },
+  emily:  { name:'Emily Tran',    color:'#1098ad', roles:['elector'] },
+  tuna:   { name:'Tuna Yilmaz',   color:'#2f9e44', roles:['elector'] },
+  alex:   { name:'Alexandra Roy', color:'#c2255c', roles:['elector'] },
+  hannah: { name:'Hannah Webb',   color:'#3b5bdb', roles:['host'] },
+  six:    { name:'Six Marlowe',   color:'#0c8599', roles:['host','elector'] },
+  ed:     { name:'Ed Sharpe',     color:'#495057', roles:['admin'] },
+};
+const TOTAL_ELECTORS = 18; // named electors stand in for a larger fellowship
+
+const topics = [
+  {
+    id:'crypto', title:'Cryptocurrencies', hostId:'hannah', status:'published',
+    body:'A working session on what blockchains actually are, where the technology has genuinely changed things, and where it has mostly produced noise. No prior knowledge assumed.',
+    image:false,
+    hearts:['nick','emily','tuna','fatima'],
+    comments:[
+      { id:'c1', authorId:'fatima', text:'This looks awesome — count me in.', replies:[
+        { id:'c1r1', authorId:'nick', text:'Same, though I am a sceptic.' }
+      ]},
+      { id:'c2', authorId:'nick', text:'Not sure this is the best use of a slot, honestly.', replies:[] },
+      { id:'c3', authorId:'alex', text:'I know a fair bit about this and can help.', replies:[] },
+    ],
+    hostComments:[
+      { authorId:'hannah', text:'I would like help finding a good hands-on demo.' },
+      { authorId:'ed', text:'Let us chat about it before you book a room.' },
+    ],
+    adminComments:[],
+  },
+  {
+    id:'campaigning', title:'Campaigning', hostId:'six', status:'published',
+    body:'Looking at a handful of historical campaigns and asking what they can tell us about organising with technology today.',
+    image:false,
+    hearts:['fatima'],
+    comments:[
+      { id:'c4', authorId:'fatima', text:'This looks awesome.', replies:[] },
+      { id:'c5', authorId:'emily', text:'Can you explain a bit more about what this covers?', replies:[
+        { id:'c5r1', authorId:'six', text:'We will look at a few historical campaigns and what they tell us about tech.' }
+      ]},
+    ],
+    hostComments:[],
+    adminComments:[],
+  },
+  {
+    id:'mutualaid', title:'Mutual aid networks', hostId:'hannah', status:'published',
+    body:'How do groups coordinate care and resources without a central authority? A look at the tooling — and the human practices the tooling tends to forget.',
+    image:true,
+    hearts:['emily','alex','fatima'],
+    comments:[
+      { id:'c6', authorId:'alex', text:'Been waiting for someone to run this.', replies:[] },
+    ],
+    hostComments:[
+      { authorId:'hannah', text:'Happy to co-host if another faculty member is keen.' },
+    ],
+    adminComments:[],
+  },
+  {
+    id:'osgov', title:'Open-source governance', hostId:'six', status:'published',
+    body:'Who actually decides what goes into the software we all depend on? Maintainers, foundations, funders — and what happens when they disagree.',
+    image:false,
+    hearts:['nick','fatima'],
+    comments:[],
+    hostComments:[],
+    adminComments:[],
+  },
+  {
+    id:'digid', title:'Digital identity', hostId:'hannah', status:'published',
+    body:'From login buttons to national ID schemes: what we gain, what we hand over, and who gets left out.',
+    image:false,
+    hearts:['tuna','six'],
+    comments:[],
+    hostComments:[],
+    adminComments:[],
+  },
+  {
+    id:'yoga', title:'Introduction to yoga', hostId:'six', status:'submitted',
+    body:'A gentle 45-minute session for absolute beginners. Bring whatever you have; mats optional.',
+    image:false,
+    hearts:[],
+    comments:[],
+    hostComments:[],
+    adminComments:[
+      { authorId:'ed', text:'Love it. Could you add one line on what attendees will leave knowing? Then I will publish.' },
+    ],
+  },
+  {
+    id:'privacy', title:'Privacy and surveillance', hostId:'hannah', status:'submitted',
+    body:'A primer on the surveillance built into everyday tools, and the small, practical changes that meaningfully reduce your exposure.',
+    image:false,
+    hearts:[],
+    comments:[],
+    hostComments:[],
+    adminComments:[],
+  },
+  {
+    id:'qv', title:'Quadratic voting 101', hostId:'hannah', status:'draft',
+    body:'Draft — still figuring out how to explain the maths without a whiteboard.',
+    image:false,
+    hearts:[],
+    comments:[],
+    hostComments:[],
+    adminComments:[],
+  },
+];
+
+const slots = [
+  {
+    id:'s1', wd:'Mon', day:3, mo:'Oct', start:'10:00', end:'12:00', loc:'Classroom',
+    topics:[{id:'crypto',label:'Cryptocurrencies'},{id:'yoga',label:'Yoga',yoga:true}],
+    avail:{ fatima:AV.G, nick:AV.G, emily:AV.Y, tuna:AV.G, alex:AV.R, six:AV.Y, hannah:AV.G },
+    disc:[
+      { authorId:'hannah', text:'I would like to book this for the crypto session.' },
+      { authorId:'six', text:'I also wanted to run something here — happy to take next week instead.' },
+      { authorId:'hannah', text:'Thanks Six, that works.' },
+      { authorId:'ed', admin:true, text:'Six, which topic for your session? I will make an event page.' },
+      { authorId:'six', text:'Introduction to yoga.' },
+      { authorId:'ed', admin:true, text:'Done — event page is up: luma.com/np-yoga-0310. Tagging this slot with the yoga topic.' },
+    ],
+  },
+  {
+    id:'s2', wd:'Tue', day:4, mo:'Oct', start:'14:00', end:'16:00', loc:'Hall',
+    topics:[],
+    avail:{ fatima:AV.Y, nick:AV.G, emily:AV.G, tuna:AV.Y, alex:AV.Y, six:AV.G, hannah:AV.R },
+    disc:[
+      { authorId:'six', text:'I want to run something totally unstructured here — no fixed topic.' },
+      { authorId:'ed', admin:true, text:'Fine by me. Keep it under two hours.' },
+    ],
+  },
+  {
+    id:'s3', wd:'Wed', day:5, mo:'Oct', start:'10:00', end:'11:30', loc:'Lounge',
+    topics:[{id:'mutualaid',label:'Mutual aid networks'}],
+    avail:{ fatima:AV.G, nick:AV.Y, emily:AV.G, tuna:AV.R, alex:AV.G, six:AV.Y, hannah:AV.Y },
+    disc:[],
+  },
+  {
+    id:'s4', wd:'Thu', day:6, mo:'Oct', start:'16:00', end:'18:00', loc:'Classroom',
+    topics:[{id:'osgov',label:'Open-source governance'}],
+    avail:{ fatima:AV.Y, nick:AV.G, emily:AV.Y, tuna:AV.G, alex:AV.Y, six:AV.G, hannah:AV.G },
+    disc:[],
+  },
+  {
+    id:'s5', wd:'Fri', day:7, mo:'Oct', start:'13:00', end:'15:00', loc:'Terrace',
+    topics:[],
+    avail:{ fatima:AV.G, nick:AV.G, emily:AV.G, tuna:AV.Y, alex:AV.R, six:AV.G, hannah:AV.Y },
+    disc:[
+      { authorId:'six', text:'Is the terrace free? I want to nap in the sun.' },
+      { authorId:'ed', admin:true, text:'Sorry Six, it is booked.' },
+    ],
+  },
+];
+
+let timeline = [
+  { when:'3 Oct, 09:14', act:'submit', text:'<b>Hannah</b> submitted <b>Cryptocurrencies</b> to the queue.' },
+  { when:'3 Oct, 11:02', act:'pub', text:'<b>Ed</b> published <b>Cryptocurrencies</b>.' },
+  { when:'4 Oct, 16:40', act:'submit', text:'<b>Six</b> submitted <b>Introduction to yoga</b>.', note:{ by:'Ed', text:'Asked Six for a one-line learning outcome before publishing.' } },
+  { when:'5 Oct, 08:20', act:'hide', text:'<b>Ed</b> hid a comment on <b>Cryptocurrencies</b>.', note:{ by:'Ed', text:'Off-topic and a bit heated. Messaged the author.' } },
+];
+
+/* =========================================================
+   STATE
+   ========================================================= */
+const STATE = {
+  role:'elector',
+  screen:'feed',
+  roleLabels:{ admin:'Admin', host:'Host', elector:'Elector' },
+  filterHost:'all',
+  sortBy:'hearts',
+  calAudience:'all',
+  calLoc:'all',
+  privacy:'public',
+  expandedSlots:new Set(),
+  expandedHostPanels:new Set(),
+};
+const viewerByRole = { elector:'fatima', host:'hannah', admin:'ed' };
+const viewer = () => viewerByRole[STATE.role];
+
+const navByRole = {
+  elector:[ ['feed','Topic feed','◇'], ['calendar','Availability','▦'] ],
+  host:[ ['feed','Topic feed','◇'], ['calendar','Availability','▦'] ],
+  admin:[ ['feed','Topic feed','◇'], ['calendar','Availability','▦'], ['moderation','Moderation queue','⚑'], ['timeline','Activity log','≣'], ['settings','Settings','⚙'] ],
+};
+
+/* =========================================================
+   HELPERS
+   ========================================================= */
+const $ = (s, r=document) => r.querySelector(s);
+const initials = n => n.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+const u = id => users[id];
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function avatar(id, cls=''){ const x=u(id); return `<span class="avatar ${cls}" style="background:${x.color}" title="${esc(x.name)}">${initials(x.name)}</span>`; }
+const RL = k => STATE.roleLabels[k]; // role label
+
+// vote weights: each elector's heart = 1 / (number of PUBLISHED topics they hearted)
+function heartCount(electorId){
+  return topics.filter(t => t.status==='published' && t.hearts.includes(electorId)).length;
+}
+function weight(electorId){ const n=heartCount(electorId); return n>0 ? 1/n : 0; }
+function topicWeighted(t){ return t.hearts.reduce((s,e)=>s+weight(e),0); }
+
+function publishedTopics(){
+  let list = topics.filter(t => t.status==='published');
+  if (STATE.filterHost!=='all') list = list.filter(t => t.hostId===STATE.filterHost);
+  if (STATE.sortBy==='hearts') list.sort((a,b)=>topicWeighted(b)-topicWeighted(a));
+  if (STATE.sortBy==='comments') list.sort((a,b)=>countComments(b)-countComments(a));
+  if (STATE.sortBy==='published') list = list; // seed order ~ publish order
+  return list;
+}
+function countComments(t){ return t.comments.reduce((s,c)=>s+1+c.replies.length,0); }
+
+function toast(msg){
+  const wrap=$('#toasts'); const el=document.createElement('div'); el.className='toast';
+  el.innerHTML=`<span class="tk">✓</span> ${esc(msg)}`; wrap.appendChild(el);
+  setTimeout(()=>{ el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(()=>el.remove(),320); }, 2200);
+}
+
+/* =========================================================
+   RENDER: FEED
+   ========================================================= */
+function topicCard(t, opts){
+  const isHostView = opts.host;
+  const hearted = t.hearts.includes(viewer());
+  const w = topicWeighted(t);
+  const statusBadge = (isHostView && t.status!=='published')
+    ? `<span class="badge b-${t.status}">${cap(t.status)}</span>` : '';
+
+  const img = t.image ? `<div class="topic-img">cover image</div>` : '';
+
+  // public comments
+  const commentsHtml = `
+    <div class="comments">
+      ${t.comments.map(c => comment(c, t.id)).join('')}
+      <div class="composer">
+        ${avatar(viewer(),'sm')}
+        <textarea data-c-input="${t.id}" rows="1" placeholder="Write a comment…"></textarea>
+        <button class="btn btn-primary btn-sm" data-action="comment" data-topic="${t.id}">Comment</button>
+      </div>
+    </div>`;
+
+  // private host panel
+  let hostPanel = '';
+  if (isHostView){
+    const open = STATE.expandedHostPanels.has(t.id);
+    const cov = (w/TOTAL_ELECTORS);
+    const voters = t.hearts.map(e => `
+      <div class="voter">
+        ${avatar(e,'xs')}
+        <span class="vname">${esc(u(e).name)}</span>
+        <span class="vbar"><i style="width:${(weight(e)*100).toFixed(0)}%"></i></span>
+        <span class="weight">1/${heartCount(e)}</span>
+      </div>`).join('') || `<div class="cov-meta">No hearts yet.</div>`;
+    const hostChat = t.hostComments.length ? `
+      <div class="hp-section">
+        <div class="host-panel-head" style="padding-left:0">Host-only thread</div>
+        <div class="host-chat">
+          ${t.hostComments.map(hc => `
+            <div class="hc">${avatar(hc.authorId,'xs')}
+              <div><div class="hc-name">${esc(u(hc.authorId).name)}${hc.authorId==='ed'?' · admin':''}</div>
+              <div class="hc-bubble">${esc(hc.text)}</div></div></div>`).join('')}
+        </div>
+      </div>` : '';
+    hostPanel = `
+      <div class="host-panel">
+        <div class="host-panel-head"><span class="lock">🔒</span> ${RL('host')} insight <span class="badge b-host" style="margin-left:4px">${RL('host')}-only</span></div>
+        <div class="host-panel-sub">Vote breakdown and the host thread are hidden from electors.</div>
+        <button class="slot-expand" style="border-top:none; padding-left:16px" data-action="toggle-host" data-topic="${t.id}">
+          ${open?'▾ Hide breakdown':'▸ Show vote breakdown'}
+        </button>
+        ${open ? `
+          <div class="hp-section">
+            <div class="coverage">
+              <span class="cov-num">${w.toFixed(2)}</span>
+              <div style="flex:1">
+                <div class="cov-meta" style="margin-bottom:6px">weighted votes · ${t.hearts.length} of ${TOTAL_ELECTORS} electors hearted this</div>
+                <div class="cov-bar"><div class="cov-fill" style="width:${Math.min(100,cov*100*4).toFixed(0)}%"></div></div>
+              </div>
+            </div>
+            <div class="voters">${voters}</div>
+          </div>
+          ${hostChat}
+        ` : ''}
+      </div>`;
+  }
+
+  return `
+    <article class="card">
+      <div class="card-body">
+        <div class="topic-head">
+          ${avatar(t.hostId)}
+          <div class="topic-meta">
+            <div class="topic-by">
+              <span class="topic-author">${esc(u(t.hostId).name)}</span>
+              <span class="topic-sub">${RL('host')}</span>
+              <span class="dot-sep">·</span>
+              <span class="topic-sub">published</span>
+              ${statusBadge}
+            </div>
+          </div>
+        </div>
+        <h2 class="topic-title">${esc(t.title)}</h2>
+        <p class="topic-text">${esc(t.body)}</p>
+        ${img}
+      </div>
+      <div class="card-actions">
+        <button class="act ${hearted?'hearted':''}" data-action="heart" data-topic="${t.id}">
+          <span class="ic">${hearted?'❤':'♡'}</span> ${t.hearts.length||''} <span style="font-weight:600">Heart</span>
+        </button>
+        <button class="act" data-action="focus-comment" data-topic="${t.id}">
+          <span class="ic">💬</span> ${countComments(t)||''} <span style="font-weight:600">Comment</span>
+        </button>
+        <div style="flex:1"></div>
+        ${hearted?`<span class="weight" title="Your current vote weight">your vote: 1/${heartCount(viewer())}</span>`:''}
+      </div>
+      ${hostPanel}
+      ${commentsHtml}
+    </article>`;
+}
+
+function comment(c, topicId){
+  const replies = c.replies.map(r => `
+    <div class="comment">
+      ${avatar(r.authorId,'sm')}
+      <div class="c-body">
+        <div class="c-bubble"><span class="c-name">${esc(u(r.authorId).name)}</span>
+          <div class="c-text">${esc(r.text)}</div></div>
+      </div>
+    </div>`).join('');
+  return `
+    <div class="comment">
+      ${avatar(c.authorId,'sm')}
+      <div class="c-body">
+        <div class="c-bubble"><span class="c-name">${esc(u(c.authorId).name)}</span>
+          <div class="c-text">${esc(c.text)}</div></div>
+        <div class="c-meta"><button data-action="reply" data-topic="${topicId}" data-c="${c.id}">Reply</button></div>
+        ${replies ? `<div class="replies">${replies}</div>`:''}
+      </div>
+    </div>`;
+}
+const cap = s => s.charAt(0).toUpperCase()+s.slice(1);
+
+function renderFeed(){
+  const host = STATE.role==='host' || STATE.role==='admin';
+  const list = publishedTopics();
+
+  // host topic manager (host view only)
+  let manager='';
+  if (STATE.role==='host'){
+    const mine = topics.filter(t => t.hostId===viewer());
+    manager = `
+      <div class="manager">
+        <div class="manager-head">
+          <h2>Your topics</h2>
+          <button class="btn btn-primary btn-sm" data-action="new-topic">+ New topic</button>
+        </div>
+        ${mine.map(t => {
+          const fb = t.adminComments.length ? `<div class="mfeedback"><b>${esc(u(t.adminComments[0].authorId).name)}:</b> ${esc(t.adminComments[0].text)}</div>`:'';
+          const action = t.status==='published'
+            ? `<button class="btn btn-sm" data-action="self-unpub" data-topic="${t.id}">Unpublish</button>`
+            : (t.status==='draft' ? `<button class="btn btn-primary btn-sm" data-action="submit-topic" data-topic="${t.id}">Submit</button>` : `<span class="topic-sub">In review</span>`);
+          return `<div class="mrow">
+            <div style="flex:1; min-width:0"><div class="mtitle">${esc(t.title)}</div>${fb}</div>
+            <span class="badge b-${t.status}">${cap(t.status)}</span>
+            ${action}
+          </div>`;
+        }).join('')}
+      </div>`;
+  }
+
+  const hostOpts = ['all','hannah','six'].map(h =>
+    `<option value="${h}" ${STATE.filterHost===h?'selected':''}>${h==='all'?'Everything':u(h).name+"'s"}</option>`).join('');
+  const sortOpts = [['hearts','Most hearts'],['comments','Latest activity'],['published','Date published']]
+    .map(([v,l]) => `<option value="${v}" ${STATE.sortBy===v?'selected':''}>${l}</option>`).join('');
+
+  $('#screen-feed').innerHTML = `
+    <div class="page-head">
+      <h1>${STATE.role==='elector'?'Topics to weigh in on':'Topic feed'}</h1>
+      <p>${STATE.role==='elector'
+        ? 'Heart the topics you want to see happen, and join the conversation.'
+        : 'The public feed, plus '+RL('host')+'-only vote insight on each topic.'}</p>
+    </div>
+    ${manager}
+    <div class="filterbar">
+      <div class="fb-group">Filter <select class="select" data-action="set-host">${hostOpts}</select></div>
+      <div class="fb-spacer"></div>
+      <div class="fb-group">Sort by <select class="select" data-action="set-sort">${sortOpts}</select></div>
+    </div>
+    ${list.map(t => topicCard(t,{host})).join('')}
+  `;
+}
+
+/* =========================================================
+   RENDER: CALENDAR
+   ========================================================= */
+function audienceSet(){
+  // who counts toward the availability summary, by current filter (host/admin views)
+  const electors = Object.keys(users).filter(id => u(id).roles.includes('elector'));
+  if (STATE.calAudience==='all') return electors;
+  if (STATE.calAudience==='hearted-mine'){
+    const mine = topics.filter(t=>t.hostId===viewer() && t.status==='published').map(t=>t.id);
+    return electors.filter(e => topics.some(t=>mine.includes(t.id) && t.hearts.includes(e)));
+  }
+  if (STATE.calAudience.startsWith('topic:')){
+    const tid = STATE.calAudience.slice(6);
+    const t = topics.find(x=>x.id===tid);
+    return electors.filter(e => t && t.hearts.includes(e));
+  }
+  return electors;
+}
+
+function stripFor(slot, audience){
+  const counts={green:0,yellow:0,red:0};
+  audience.forEach(e => { const a = slot.avail[e] || AV.Y; counts[a]++; });
+  const total = Math.max(1, audience.length);
+  const pct = k => (counts[k]/total*100);
+  return { counts, total:audience.length, html:`
+    <div class="strip">
+      <i class="s-g" style="width:${pct('green')}%"></i>
+      <i class="s-y" style="width:${pct('yellow')}%"></i>
+      <i class="s-r" style="width:${pct('red')}%"></i>
+    </div>
+    <div class="strip-meta">
+      <span><b>${counts.green}</b> available</span>
+      <span><b>${counts.yellow}</b> maybe</span>
+      <span><b>${counts.red}</b> can’t</span>
+    </div>`};
+}
+
+function slotCard(slot){
+  const isElector = STATE.role==='elector';
+  const audience = audienceSet();
+  const filtered = (STATE.calLoc==='all' || slot.loc===STATE.calLoc);
+  if (!filtered) return '';
+  const strip = stripFor(slot, audience);
+
+  const myAvail = slot.avail[viewer()] || AV.Y;
+  const mine = isElector ? `
+    <div class="myavail">
+      <span class="lab">Your availability</span>
+      <div class="avseg">
+        <button class="${myAvail===AV.G?'on-g':''}" data-action="avail" data-slot="${slot.id}" data-state="green">Available</button>
+        <button class="${myAvail===AV.Y?'on-y':''}" data-action="avail" data-slot="${slot.id}" data-state="yellow">Maybe</button>
+        <button class="${myAvail===AV.R?'on-r':''}" data-action="avail" data-slot="${slot.id}" data-state="red">Can’t</button>
+      </div>
+    </div>` : '';
+
+  const chips = slot.topics.map(t => `<span class="chip ${t.yoga?'yoga':''}">${esc(t.label)}</span>`).join('');
+  const open = STATE.expandedSlots.has(slot.id);
+  const dotColor = a => a==='green'?'var(--green)':a==='yellow'?'var(--yellow)':'var(--red)';
+
+  const discPeople = !isElector ? `
+    <div class="disc-people">
+      ${audience.map(e => `<div class="disc-person">${avatar(e,'xs')}
+        <span class="dp-name">${esc(u(e).name)}</span>
+        <span class="dp-dot" style="background:${dotColor(slot.avail[e]||AV.Y)}"></span></div>`).join('')}
+    </div>` : '';
+
+  const discThread = slot.disc.length ? slot.disc.map(d => `
+    <div class="hc">${avatar(d.authorId,'xs')}
+      <div><div class="hc-name">${esc(u(d.authorId).name)}${d.admin?' · admin':''}</div>
+      <div class="hc-bubble">${esc(d.text).replace(/(luma\.com\/[^\s]+)/,'<a href="https://$1" target="_blank" rel="noopener">$1</a>')}</div></div></div>`).join('')
+    : `<div class="cov-meta" style="padding:6px 0">No discussion yet.</div>`;
+
+  return `
+    <div class="slot">
+      <div class="slot-main">
+        <div class="slot-date">
+          <div class="d-wd">${slot.wd}</div>
+          <div class="d-day">${slot.day}</div>
+          <div class="d-mo">${slot.mo}</div>
+        </div>
+        <div class="slot-info">
+          <div class="slot-when">
+            <span class="slot-loc">📍 ${esc(slot.loc)}</span>
+            <span class="dot-sep">·</span>
+            <span>${slot.start}–${slot.end}</span>
+          </div>
+          ${chips ? `<div class="slot-topics">${chips}</div>`:''}
+          <div class="strip-wrap">${strip.html}</div>
+          ${mine}
+        </div>
+      </div>
+      <button class="slot-expand" data-action="toggle-slot" data-slot="${slot.id}">
+        ${open?'▾ Hide details':'▸ Discussion & who’s coming'}${slot.disc.length?` · ${slot.disc.length} messages`:''}
+      </button>
+      ${open ? `<div class="disc">
+        ${discPeople}
+        <div class="host-panel-head" style="padding:6px 0 0; color:var(--host-ink)">Host & admin discussion <span class="badge b-host" style="margin-left:4px">${RL('host')}-only</span></div>
+        ${discThread}
+        ${(!isElector)?`<div class="composer"><textarea rows="1" placeholder="Add to the discussion…" data-disc-input="${slot.id}"></textarea><button class="btn btn-sm btn-primary" data-action="disc-add" data-slot="${slot.id}">Send</button></div>`:''}
+      </div>`:''}
+    </div>`;
+}
+
+function renderCalendar(){
+  const isElector = STATE.role==='elector';
+  let tools='';
+  if (!isElector){
+    const myTopics = topics.filter(t=>t.hostId===viewer() && t.status==='published');
+    const audOpts = [
+      `<option value="all" ${STATE.calAudience==='all'?'selected':''}>All electors</option>`,
+      `<option value="hearted-mine" ${STATE.calAudience==='hearted-mine'?'selected':''}>Hearted any of my topics</option>`,
+      ...myTopics.map(t=>`<option value="topic:${t.id}" ${STATE.calAudience==='topic:'+t.id?'selected':''}>Hearted “${esc(t.title)}”</option>`)
+    ].join('');
+    const locs = ['all','Classroom','Hall','Lounge','Terrace']
+      .map(l=>`<option value="${l}" ${STATE.calLoc===l?'selected':''}>${l==='all'?'All locations':l}</option>`).join('');
+    const aud = audienceSet();
+    tools = `
+      <div class="cal-tools">
+        <div class="fb-group">Show <select class="select" data-action="set-aud">${audOpts}</select></div>
+        <div class="fb-group">Location <select class="select" data-action="set-loc">${locs}</select></div>
+        <div class="fb-spacer"></div>
+        <span class="topic-sub">${aud.length} electors in view</span>
+      </div>`;
+  }
+
+  const pattern = isElector ? `
+    <div class="pattern">
+      <h3>Set a repeating pattern</h3>
+      <p>Tap to set a default for every weekday at once. You can still override any single slot above.</p>
+      <div class="daypick">
+        ${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d=>`
+          <button data-action="pattern" data-day="${d}"><span class="pd">·</span>${d}</button>`).join('')}
+      </div>
+    </div>` : '';
+
+  const cards = slots.map(slotCard).join('');
+  $('#screen-calendar').innerHTML = `
+    <div class="page-head">
+      <h1>Availability</h1>
+      <p>${isElector?'Mark when you can make each slot. Default is “maybe”.':'See who can make each slot, filtered by who you care about.'}</p>
+    </div>
+    ${tools}
+    <div class="legend">
+      <span><i class="i-g"></i> Available</span>
+      <span><i class="i-y"></i> Maybe</span>
+      <span><i class="i-r"></i> Can’t</span>
+    </div>
+    ${pattern}
+    ${cards || `<div class="empty"><div class="ee">▦</div><h3>No slots match</h3><p>Try a different location.</p></div>`}
+  `;
+}
+
+/* =========================================================
+   RENDER: MODERATION
+   ========================================================= */
+function renderModeration(){
+  const queue = topics.filter(t => t.status==='submitted');
+  const cards = queue.map(t => {
+    const fb = t.adminComments.length ? `
+      <div class="mod-feedback">
+        <div class="mf-head">⤷ Feedback sent to host</div>
+        ${esc(t.adminComments[0].text)}
+      </div>` : '';
+    return `
+      <div class="mod-card">
+        <div class="mod-card-body">
+          <div class="topic-head">
+            ${avatar(t.hostId)}
+            <div class="topic-meta"><div class="topic-by">
+              <span class="topic-author">${esc(u(t.hostId).name)}</span>
+              <span class="topic-sub">${RL('host')}</span>
+              <span class="dot-sep">·</span>
+              <span class="badge b-submitted">Submitted</span>
+            </div></div>
+          </div>
+          <h2 class="topic-title">${esc(t.title)}</h2>
+          <p class="topic-text">${esc(t.body)}</p>
+          ${fb}
+        </div>
+        <div class="mod-actions">
+          <button class="btn btn-primary btn-sm" data-action="mod" data-op="publish" data-topic="${t.id}">Publish</button>
+          <button class="btn btn-sm" data-action="mod" data-op="changes" data-topic="${t.id}">Request changes</button>
+          <button class="btn btn-sm" data-action="mod" data-op="edit" data-topic="${t.id}">Edit</button>
+          <div style="flex:1"></div>
+          <button class="btn-ghost btn btn-sm" data-action="mod" data-op="reject" data-topic="${t.id}">Reject</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  $('#screen-moderation').innerHTML = `
+    <div class="page-head">
+      <h1>Moderation queue</h1>
+      <p>Submitted topics waiting for review. Electors never see this.</p>
+    </div>
+    <div class="backstage"><span class="ic">🛠</span> Backstage — actions here are logged to the activity log and visible to other admins.</div>
+    ${cards || `<div class="empty"><div class="ee">✓</div><h3>Queue is clear</h3><p>Nothing is waiting for review right now.</p></div>`}
+  `;
+}
+
+/* =========================================================
+   RENDER: TIMELINE
+   ========================================================= */
+function renderTimeline(){
+  const items = timeline.slice().reverse().map(it => `
+    <div class="tl-item act-${it.act}">
+      <div class="tl-when">${esc(it.when)}</div>
+      <div class="tl-text">${it.text}</div>
+      ${it.note ? `<div class="tl-note"><span class="tn-by">${esc(it.note.by)} (admin)</span><br>${esc(it.note.text)}</div>`:''}
+    </div>`).join('');
+  $('#screen-timeline').innerHTML = `
+    <div class="page-head">
+      <h1>Activity log</h1>
+      <p>Every admin action, with room for a note. Newest first.</p>
+    </div>
+    <div class="timeline">${items}</div>
+  `;
+}
+
+/* =========================================================
+   RENDER: SETTINGS
+   ========================================================= */
+function renderSettings(){
+  const privacyOpts = [
+    ['deactivated','Deactivated','Only admins can see the timetable. Use this while you set things up.'],
+    ['private','Private','Invited members can see and take part. Nothing is public.'],
+    ['public','Public','Anyone with the link can read the elector feed and comments.'],
+  ].map(([v,t,d]) => `
+    <div class="popt ${STATE.privacy===v?'sel':''}" data-action="privacy" data-v="${v}">
+      <div class="pradio"></div>
+      <div><div class="ptitle">${t}</div><div class="pdesc">${d}</div></div>
+    </div>`).join('');
+
+  const roleRows = Object.keys(users).map(id => {
+    const x=u(id);
+    const cell = role => `<td class="cen"><span class="chk ${x.roles.includes(role)?'on':''}" data-action="role" data-user="${id}" data-r="${role}"></span></td>`;
+    return `<tr>
+      <td><div class="ru">${avatar(id,'sm')}<div><div class="rn">${esc(x.name)}</div><div class="re">${id}@np.house</div></div></div></td>
+      ${cell('admin')}${cell('host')}${cell('elector')}
+    </tr>`;
+  }).join('');
+
+  $('#screen-settings').innerHTML = `
+    <div class="page-head">
+      <h1>Settings</h1>
+      <p>You are an ${RL('admin').toLowerCase()}, so you can change how this timetable looks and who can do what.</p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Timetable profile</h2><p>Shown at the top of every page.</p></div>
+      <div class="panel-body">
+        <div class="cover">Cover image<button class="btn btn-sm cover-btn" data-action="noop">Change</button></div>
+        <div class="field"><label>Name</label><input class="input" id="set-name" value="Newspeak House 2026"></div>
+        <div class="field"><label>Description</label><textarea class="textarea" id="set-desc">A shared timetable for the 2026 fellowship — propose sessions, vote with hearts, and find time that works.</textarea></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Visibility</h2><p>Controls who can reach this timetable.</p></div>
+      <div class="panel-body"><div class="privacy-opts">${privacyOpts}</div></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Address & colours</h2><p>Your custom domain and brand colours. Try the colour picker — it updates this whole prototype live.</p></div>
+      <div class="panel-body">
+        <div class="field">
+          <label>Custom domain</label>
+          <div class="domain-row"><input id="set-domain" value="timetable.2026" placeholder="your-subdomain"><span class="suffix">.newspeak.house</span></div>
+        </div>
+        <div class="field">
+          <label>Colours</label>
+          <div class="color-row">
+            <div class="color-pick"><span class="swatch"><input type="color" id="set-primary" value="#2f54eb"></span><label>Primary</label></div>
+            <div class="color-pick"><span class="swatch"><input type="color" id="set-secondary" value="#0c8599"></span><label>Secondary</label></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>People & roles</h2><p>Invite members and set what each person can do.</p></div>
+      <div class="panel-body">
+        <div class="field">
+          <label>Invite by email <span class="hint">— paste a list, one per line or comma-separated</span></label>
+          <textarea class="textarea" id="set-invite" placeholder="ada@np.house, grace@np.house&#10;katherine@np.house"></textarea>
+          <div style="margin-top:9px"><button class="btn btn-primary btn-sm" data-action="invite">Send invites</button></div>
+        </div>
+        <div class="field">
+          <label>Roles</label>
+          <table class="role-table">
+            <thead><tr><th>Member</th><th class="cen">${RL('admin')}</th><th class="cen">${RL('host')}</th><th class="cen">${RL('elector')}</th></tr></thead>
+            <tbody>${roleRows}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Role names</h2><p>Rename roles to match your community. Names update across the app immediately.</p></div>
+      <div class="panel-body">
+        <div class="renames">
+          <div class="rename"><div class="ra">Admin is called</div><input class="input" data-rename="admin" value="${esc(RL('admin'))}"></div>
+          <div class="rename"><div class="ra">Host is called</div><input class="input" data-rename="host" value="${esc(RL('host'))}"></div>
+          <div class="rename"><div class="ra">Elector is called</div><input class="input" data-rename="elector" value="${esc(RL('elector'))}"></div>
+        </div>
+        <div class="preview-roles">A <b>${esc(RL('host'))}</b> proposes topics; an <b>${esc(RL('elector'))}</b> hearts and comments; an <b>${esc(RL('admin'))}</b> moderates and runs settings.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Default digest</h2><p>New members start with these. Each person can change their own.</p></div>
+      <div class="panel-body">
+        <div class="toggle-row"><div><div class="tl-lab">Daily email digest</div><div class="tl-sub">New topics, replies, and activity, once a day.</div></div><div class="switch on" data-action="switch"></div></div>
+        <div class="toggle-row"><div><div class="tl-lab">Notify hosts of new hearts</div><div class="tl-sub">Hosts hear when their topics gain support.</div></div><div class="switch on" data-action="switch"></div></div>
+        <div class="toggle-row"><div><div class="tl-lab">WhatsApp & Matrix</div><div class="tl-sub">Off until each member connects an account.</div></div><div class="switch" data-action="switch"></div></div>
+      </div>
+    </div>
+
+    <div class="settings-foot">
+      <button class="btn" data-action="noop">Discard</button>
+      <button class="btn btn-primary" data-action="save-settings">Save changes</button>
+    </div>
+  `;
+}
+
+/* =========================================================
+   ROUTER + CHROME
+   ========================================================= */
+function renderNav(){
+  const items = navByRole[STATE.role].map(([id,label,ic]) => {
+    const lbl = id==='moderation'||id==='timeline'||id==='settings' ? label : label;
+    return `<button data-nav="${id}" class="${STATE.screen===id?'on':''}"><span class="ic">${ic}</span><span class="lab">${label}</span></button>`;
+  }).join('');
+  $('#nav').innerHTML = items;
+}
+
+function showScreen(){
+  ['feed','calendar','moderation','timeline','settings'].forEach(s =>
+    $('#screen-'+s).classList.toggle('on', s===STATE.screen));
+  if (STATE.screen==='feed') renderFeed();
+  if (STATE.screen==='calendar') renderCalendar();
+  if (STATE.screen==='moderation') renderModeration();
+  if (STATE.screen==='timeline') renderTimeline();
+  if (STATE.screen==='settings') renderSettings();
+  window.scrollTo({top:0, behavior:'auto'});
+}
+
+function setRole(role){
+  STATE.role = role;
+  // reset role-specific filters
+  STATE.filterHost='all'; STATE.calAudience='all'; STATE.calLoc='all';
+  // pick a valid screen for this role
+  const allowed = navByRole[role].map(n=>n[0]);
+  if (!allowed.includes(STATE.screen)) STATE.screen = allowed[0];
+  $('#role-switch').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.role===role));
+  renderNav();
+  showScreen();
+}
+
+function refreshChrome(){
+  // privacy pill
+  const map={deactivated:['Deactivated','var(--faint)'],private:['Private','var(--yellow)'],public:['Public','var(--green)']};
+  const [lbl,col]=map[STATE.privacy];
+  const pill=$('#privacy-pill'); pill.querySelector('.dot').style.background=col;
+  pill.childNodes[1].textContent=' '+lbl;
+  // role switch labels
+  const rs=$('#role-switch').querySelectorAll('button');
+  rs[0].textContent=RL('elector'); rs[1].textContent=RL('host'); rs[2].textContent=RL('admin');
+}
+
+/* =========================================================
+   EVENTS (delegation)
+   ========================================================= */
+document.addEventListener('click', e => {
+  const nav = e.target.closest('[data-nav]');
+  if (nav){ STATE.screen=nav.dataset.nav; renderNav(); showScreen(); return; }
+
+  const roleBtn = e.target.closest('#role-switch button');
+  if (roleBtn){ setRole(roleBtn.dataset.role); return; }
+
+  const a = e.target.closest('[data-action]');
+  if (!a) return;
+  const act = a.dataset.action;
+  const tid = a.dataset.topic;
+  const sid = a.dataset.slot;
+  const t = tid && topics.find(x=>x.id===tid);
+
+  switch(act){
+    case 'heart': {
+      const v=viewer(); const i=t.hearts.indexOf(v);
+      if (i>=0) t.hearts.splice(i,1); else t.hearts.push(v);
+      renderFeed();
+      // re-pop the heart icon
+      const btn=document.querySelector(`[data-action="heart"][data-topic="${tid}"] .ic`);
+      if (btn && i<0){ btn.classList.add('heart-pop'); }
+      break;
+    }
+    case 'comment': {
+      const ta=document.querySelector(`[data-c-input="${tid}"]`);
+      const text=ta.value.trim(); if(!text) break;
+      t.comments.push({ id:'c'+Date.now(), authorId:viewer(), text, replies:[] });
+      renderFeed(); toast('Comment added'); break;
+    }
+    case 'reply': {
+      const text=prompt('Reply'); if(!text||!text.trim()) break;
+      const c=t.comments.find(x=>x.id===a.dataset.c);
+      c.replies.push({ id:'r'+Date.now(), authorId:viewer(), text:text.trim() });
+      renderFeed(); break;
+    }
+    case 'focus-comment': {
+      const ta=document.querySelector(`[data-c-input="${tid}"]`); if(ta) ta.focus(); break;
+    }
+    case 'toggle-host': {
+      STATE.expandedHostPanels.has(tid)?STATE.expandedHostPanels.delete(tid):STATE.expandedHostPanels.add(tid);
+      renderFeed(); break;
+    }
+    case 'new-topic': {
+      const title=prompt('Topic title'); if(!title||!title.trim()) break;
+      topics.push({ id:'t'+Date.now(), title:title.trim(), hostId:viewer(), status:'draft',
+        body:'Draft — add a description and submit when ready.', image:false, hearts:[], comments:[], hostComments:[], adminComments:[] });
+      renderFeed(); toast('Draft created'); break;
+    }
+    case 'submit-topic': {
+      t.status='submitted';
+      timeline.push({ when:'now', act:'submit', text:`<b>${esc(u(viewer()).name)}</b> submitted <b>${esc(t.title)}</b>.` });
+      renderFeed(); toast('Submitted for review'); break;
+    }
+    case 'self-unpub': { t.status='unpublished'; renderFeed(); toast('Topic unpublished'); break; }
+
+    case 'set-host': break; // handled by change
+    case 'avail': {
+      const slot=slots.find(s=>s.id===sid); slot.avail[viewer()]=a.dataset.state; renderCalendar(); break;
+    }
+    case 'toggle-slot': {
+      STATE.expandedSlots.has(sid)?STATE.expandedSlots.delete(sid):STATE.expandedSlots.add(sid);
+      renderCalendar(); break;
+    }
+    case 'disc-add': {
+      const ta=document.querySelector(`[data-disc-input="${sid}"]`); const text=ta.value.trim(); if(!text) break;
+      const slot=slots.find(s=>s.id===sid);
+      slot.disc.push({ authorId:viewer(), admin:STATE.role==='admin', text });
+      renderCalendar(); break;
+    }
+    case 'pattern': {
+      const day=a.dataset.day;
+      // cycle the button state g -> y -> r -> none
+      const order=['','pg','py','pr']; const cur=['','pg','py','pr'].find(c=>c&&a.classList.contains(c))||'';
+      const next=order[(order.indexOf(cur)+1)%order.length];
+      a.classList.remove('pg','py','pr'); if(next)a.classList.add(next);
+      const stateMap={pg:'green',py:'yellow',pr:'red'};
+      if(next){
+        slots.filter(s=>s.wd===day).forEach(s=>s.avail[viewer()]=stateMap[next]);
+        toast(`Every ${day} set to “${next==='pg'?'available':next==='py'?'maybe':'can’t'}”`);
+      }
+      break;
+    }
+
+    case 'mod': {
+      const op=a.dataset.op;
+      if (op==='publish'){ t.status='published';
+        timeline.push({ when:'now', act:'pub', text:`<b>${esc(u(viewer()).name)}</b> published <b>${esc(t.title)}</b>.` });
+        renderModeration(); toast('Published'); }
+      else if (op==='reject'){ t.status='unpublished';
+        timeline.push({ when:'now', act:'hide', text:`<b>${esc(u(viewer()).name)}</b> rejected <b>${esc(t.title)}</b>.` });
+        renderModeration(); toast('Rejected'); }
+      else if (op==='changes'){
+        const note=prompt('What should the host change?'); if(note&&note.trim()){
+          t.adminComments=[{ authorId:viewer(), text:note.trim() }];
+          timeline.push({ when:'now', act:'submit', text:`<b>${esc(u(viewer()).name)}</b> requested changes on <b>${esc(t.title)}</b>.`, note:{by:u(viewer()).name, text:note.trim()} });
+          renderModeration(); toast('Feedback sent to host'); } }
+      else { toast('Editing isn’t wired up in this prototype'); }
+      break;
+    }
+
+    case 'privacy': { STATE.privacy=a.dataset.v; refreshChrome(); renderSettings(); break; }
+    case 'role': {
+      const x=u(a.dataset.user), r=a.dataset.r, i=x.roles.indexOf(r);
+      if(i>=0) x.roles.splice(i,1); else x.roles.push(r);
+      renderSettings(); break;
+    }
+    case 'switch': { a.classList.toggle('on'); break; }
+    case 'invite': {
+      const ta=$('#set-invite'); const raw=(ta.value||'').split(/[\n,]+/).map(s=>s.trim()).filter(Boolean);
+      if(!raw.length){ toast('Add at least one email first'); break; }
+      ta.value=''; toast(`Invites queued for ${raw.length} ${raw.length===1?'person':'people'}`); break;
+    }
+    case 'save-settings': toast('Settings saved'); break;
+    case 'noop': break;
+  }
+});
+
+document.addEventListener('change', e => {
+  const a=e.target.closest('[data-action]'); if(!a) return;
+  if (a.dataset.action==='set-host'){ STATE.filterHost=a.value; renderFeed(); }
+  if (a.dataset.action==='set-sort'){ STATE.sortBy=a.value; renderFeed(); }
+  if (a.dataset.action==='set-aud'){ STATE.calAudience=a.value; renderCalendar(); }
+  if (a.dataset.action==='set-loc'){ STATE.calLoc=a.value; renderCalendar(); }
+});
+
+document.addEventListener('input', e => {
+  // live theming
+  if (e.target.id==='set-primary'){
+    document.documentElement.style.setProperty('--primary', e.target.value);
+    document.documentElement.style.setProperty('--primary-soft', e.target.value+'1a');
+  }
+  if (e.target.id==='set-secondary'){
+    document.documentElement.style.setProperty('--host-ink', e.target.value);
+  }
+  // brand name live
+  if (e.target.id==='set-name'){ $('#brand-name').textContent=e.target.value||'Untitled timetable'; }
+  if (e.target.id==='set-domain'){ document.querySelector('.brand-domain').textContent=(e.target.value||'your-subdomain')+'.newspeak.house'; }
+  // role renames live
+  const rn=e.target.closest('[data-rename]');
+  if (rn){
+    STATE.roleLabels[rn.dataset.rename]=e.target.value||cap(rn.dataset.rename);
+    refreshChrome(); renderNav();
+    // refresh the preview line only (avoid stealing focus from the input)
+    const prev=document.querySelector('.preview-roles');
+    if(prev) prev.innerHTML=`A <b>${esc(RL('host'))}</b> proposes topics; an <b>${esc(RL('elector'))}</b> hearts and comments; an <b>${esc(RL('admin'))}</b> moderates and runs settings.`;
+  }
+});
+
+// auto-grow comment textareas
+document.addEventListener('input', e => {
+  if (e.target.matches('.composer textarea')){ e.target.style.height='auto'; e.target.style.height=Math.min(120,e.target.scrollHeight)+'px'; }
+});
+
+/* =========================================================
+   INIT
+   ========================================================= */
+renderNav();
+refreshChrome();
+showScreen();
+</script>
+</body>
+</html>

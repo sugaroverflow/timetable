@@ -1,0 +1,33 @@
+{
+  "name": "timetable",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Collaborative timetables — multi-tenant topic feed, availability calendar, and moderation. Produced by Sparkle Bureaucracy.",
+  "license": "SEE LICENSE.md",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "dev": "npm run dev --workspace @timetable/api & npm run dev --workspace @timetable/web",
+    "dev:api": "npm run dev --workspace @timetable/api",
+    "dev:web": "npm run dev --workspace @timetable/web",
+    "db:generate": "npm run generate --workspace @timetable/db",
+    "db:migrate": "npm run migrate --workspace @timetable/db",
+    "db:studio": "npm run studio --workspace @timetable/db",
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose down"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "prettier": "^3.8.4",
+    "typescript": "^6.0.3"
+  }
+}

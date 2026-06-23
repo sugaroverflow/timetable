@@ -1,0 +1,30 @@
+{
+  "name": "@timetable/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@auth/drizzle-adapter": "^1.11.2",
+    "@timetable/core": "*",
+    "@timetable/db": "*",
+    "@timetable/shared": "*",
+    "next": "^16.2.9",
+    "next-auth": "^5.0.0-beta.31",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.5",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.9"
+  }
+}
