@@ -11,6 +11,7 @@ import {
   slugify,
   withRandomSuffix,
   type CreateTimetableInput,
+  type Privacy,
   type Role,
 } from "@timetable/shared";
 
@@ -58,6 +59,26 @@ export async function createTimetable(
   });
 
   return timetable;
+}
+
+/** Admin: update a timetable's profile and visibility. */
+export async function updateTimetableProfile(
+  timetableId: string,
+  patch: { name?: string; description?: string | null; privacy?: Privacy },
+): Promise<Timetable | null> {
+  const [updated] = await db
+    .update(timetables)
+    .set({
+      ...(patch.name !== undefined ? { name: patch.name } : {}),
+      ...(patch.description !== undefined
+        ? { description: patch.description }
+        : {}),
+      ...(patch.privacy !== undefined ? { privacy: patch.privacy } : {}),
+      updatedAt: new Date(),
+    })
+    .where(eq(timetables.id, timetableId))
+    .returning();
+  return updated ?? null;
 }
 
 export type MembershipWithTimetable = {

@@ -1,0 +1,313 @@
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
+
+import {
+  availability,
+  db,
+  hearts,
+  slotComments,
+  slotTopics,
+  timeslots,
+  timetableMemberships,
+  topics,
+  users,
+  type AvailabilityState,
+  type SlotComment,
+  type Timeslot,
+} from "@timetable/db";
+
+// --------------------------------------------------------------------------
+// Slot CRUD (admin)
+// --------------------------------------------------------------------------
+
+export async function getSlotById(slotId: string): Promise<Timeslot | null> {
+  const [slot] = await db
+    .select()
+    .from(timeslots)
+    .where(eq(timeslots.id, slotId))
+    .limit(1);
+  return slot ?? null;
+}
+
+export type SlotInput = {
+  startsAt: Date;
+  endsAt: Date;
+  location?: string;
+};
+
+export async function createSlots(
+  timetableId: string,
+  inputs: SlotInput[],
+): Promise<Timeslot[]> {
+  if (inputs.length === 0) return [];
+  return db
+    .insert(timeslots)
+    .values(
+      inputs.map((s) => ({
+        timetableId,
+        startsAt: s.startsAt,
+        endsAt: s.endsAt,
+        location: s.location ?? "",
+      })),
+    )
+    .returning();
+}
+
+export async function updateSlot(
+  slotId: string,
+  patch: { startsAt?: Date; endsAt?: Date; location?: string },
+): Promise<Timeslot | null> {
+  const [updated] = await db
+    .update(timeslots)
+    .set({
+      ...(patch.startsAt ? { startsAt: patch.startsAt } : {}),
+      ...(patch.endsAt ? { endsAt: patch.endsAt } : {}),
+      ...(patch.location !== undefined ? { location: patch.location } : {}),
+      updatedAt: new Date(),
+    })
+    .where(eq(timeslots.id, slotId))
+    .returning();
+  return updated ?? null;
+}
+
+export async function deleteSlot(slotId: string): Promise<void> {
+  await db.delete(timeslots).where(eq(timeslots.id, slotId));
+}
+
+export async function listSlots(timetableId: string): Promise<Timeslot[]> {
+  return db
+    .select()
+    .from(timeslots)
+    .where(eq(timeslots.timetableId, timetableId))
+    .orderBy(asc(timeslots.startsAt));
+}
+
+// --------------------------------------------------------------------------
+// Availability (elector)
+// --------------------------------------------------------------------------
+
+export async function setAvailability(
+  slotId: string,
+  userId: string,
+  state: AvailabilityState,
+): Promise<void> {
+  await db
+    .insert(availability)
+    .values({ slotId, userId, state })
+    .onConflictDoUpdate({
+      target: [availability.slotId, availability.userId],
+      set: { state, updatedAt: new Date() },
+    });
+}
+
+/** Set availability for every slot on a given UTC weekday (0=Sun..6=Sat). */
+export async function setWeekdayAvailability(
+  timetableId: string,
+  userId: string,
+  weekday: number,
+  state: AvailabilityState,
+): Promise<number> {
+  const slots = await listSlots(timetableId);
+  const matching = slots.filter((s) => s.startsAt.getUTCDay() === weekday);
+  for (const slot of matching) {
+    await setAvailability(slot.id, userId, state);
+  }
+  return matching.length;
+}
+
+// --------------------------------------------------------------------------
+// Slot discussion (host/admin) and topic tagging
+// --------------------------------------------------------------------------
+
+export async function listSlotComments(slotId: string): Promise<
+  { id: string; authorId: string; authorName: string | null; body: string; createdAt: Date }[]
+> {
+  const rows = await db
+    .select({
+      id: slotComments.id,
+      authorId: slotComments.authorId,
+      authorName: users.name,
+      body: slotComments.body,
+      createdAt: slotComments.createdAt,
+    })
+    .from(slotComments)
+    .innerJoin(users, eq(users.id, slotComments.authorId))
+    .where(eq(slotComments.slotId, slotId))
+    .orderBy(asc(slotComments.createdAt));
+  return rows;
+}
+
+export async function addSlotComment(
+  slotId: string,
+  authorId: string,
+  body: string,
+): Promise<SlotComment> {
+  const [comment] = await db
+    .insert(slotComments)
+    .values({ slotId, authorId, body })
+    .returning();
+  if (!comment) throw new Error("Failed to add slot comment");
+  return comment;
+}
+
+export async function tagSlotTopic(
+  slotId: string,
+  topicId: string,
+): Promise<void> {
+  await db
+    .insert(slotTopics)
+    .values({ slotId, topicId })
+    .onConflictDoNothing();
+}
+
+export async function untagSlotTopic(
+  slotId: string,
+  topicId: string,
+): Promise<void> {
+  await db
+    .delete(slotTopics)
+    .where(and(eq(slotTopics.slotId, slotId), eq(slotTopics.topicId, topicId)));
+}
+
+// --------------------------------------------------------------------------
+// Audience resolution + calendar view
+// --------------------------------------------------------------------------
+
+export type Audience =
+  | { kind: "all" }
+  | { kind: "hearted_mine"; hostId: string }
+  | { kind: "hearted_topic"; topicId: string };
+
+/** Elector user ids that match the selected audience filter. */
+export async function getAudienceElectorIds(
+  timetableId: string,
+  audience: Audience,
+): Promise<string[]> {
+  if (audience.kind === "all") {
+    const rows = await db
+      .select({ userId: timetableMemberships.userId })
+      .from(timetableMemberships)
+      .where(
+        and(
+          eq(timetableMemberships.timetableId, timetableId),
+          sql`'elector' = ANY(${timetableMemberships.roles})`,
+        ),
+      );
+    return rows.map((r) => r.userId);
+  }
+
+  if (audience.kind === "hearted_topic") {
+    const rows = await db
+      .select({ userId: hearts.userId })
+      .from(hearts)
+      .where(eq(hearts.topicId, audience.topicId));
+    return Array.from(new Set(rows.map((r) => r.userId)));
+  }
+
+  // hearted_mine: electors who hearted any published topic hosted by hostId.
+  const rows = await db
+    .select({ userId: hearts.userId })
+    .from(hearts)
+    .innerJoin(topics, eq(topics.id, hearts.topicId))
+    .where(
+      and(
+        eq(topics.timetableId, timetableId),
+        eq(topics.hostId, audience.hostId),
+        eq(topics.status, "published"),
+      ),
+    );
+  return Array.from(new Set(rows.map((r) => r.userId)));
+}
+
+export type CalendarSlot = {
+  id: string;
+  startsAt: Date;
+  endsAt: Date;
+  location: string;
+  topics: { id: string; title: string }[];
+  viewerState: AvailabilityState | null;
+  counts: { green: number; yellow: number; red: number };
+  perUser: { userId: string; name: string | null; state: AvailabilityState }[];
+  commentCount: number;
+};
+
+/**
+ * Build the calendar for a timetable. Aggregate counts and per-user rows are
+ * limited to `audienceIds` (the resolved audience). `perUser` should only be
+ * surfaced to hosts/admins by the caller.
+ */
+export async function buildCalendar(
+  timetableId: string,
+  audienceIds: string[],
+  viewerUserId: string | null,
+): Promise<CalendarSlot[]> {
+  const slots = await listSlots(timetableId);
+  if (slots.length === 0) return [];
+  const slotIds = slots.map((s) => s.id);
+  const audience = new Set(audienceIds);
+
+  const availRows = await db
+    .select({
+      slotId: availability.slotId,
+      userId: availability.userId,
+      state: availability.state,
+      name: users.name,
+    })
+    .from(availability)
+    .innerJoin(users, eq(users.id, availability.userId))
+    .where(inArray(availability.slotId, slotIds));
+
+  const tagRows = await db
+    .select({
+      slotId: slotTopics.slotId,
+      topicId: slotTopics.topicId,
+      title: topics.title,
+    })
+    .from(slotTopics)
+    .innerJoin(topics, eq(topics.id, slotTopics.topicId))
+    .where(inArray(slotTopics.slotId, slotIds));
+
+  const commentRows = await db
+    .select({
+      slotId: slotComments.slotId,
+      n: sql<number>`count(*)::int`,
+    })
+    .from(slotComments)
+    .where(inArray(slotComments.slotId, slotIds))
+    .groupBy(slotComments.slotId);
+
+  const tagsBySlot = new Map<string, { id: string; title: string }[]>();
+  for (const t of tagRows) {
+    const list = tagsBySlot.get(t.slotId) ?? [];
+    list.push({ id: t.topicId, title: t.title });
+    tagsBySlot.set(t.slotId, list);
+  }
+
+  const commentCountBySlot = new Map<string, number>();
+  for (const c of commentRows) commentCountBySlot.set(c.slotId, c.n);
+
+  return slots.map((slot) => {
+    const rows = availRows.filter((r) => r.slotId === slot.id);
+    const counts = { green: 0, yellow: 0, red: 0 };
+    const perUser: CalendarSlot["perUser"] = [];
+    let viewerState: AvailabilityState | null = null;
+
+    for (const r of rows) {
+      if (r.userId === viewerUserId) viewerState = r.state;
+      if (!audience.has(r.userId)) continue;
+      counts[r.state] += 1;
+      perUser.push({ userId: r.userId, name: r.name, state: r.state });
+    }
+
+    return {
+      id: slot.id,
+      startsAt: slot.startsAt,
+      endsAt: slot.endsAt,
+      location: slot.location,
+      topics: tagsBySlot.get(slot.id) ?? [],
+      viewerState,
+      counts,
+      perUser,
+      commentCount: commentCountBySlot.get(slot.id) ?? 0,
+    };
+  });
+}
