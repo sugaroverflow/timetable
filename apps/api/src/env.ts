@@ -19,7 +19,12 @@ const nodeEnv = process.env.NODE_ENV ?? "development";
 const isProd = nodeEnv === "production";
 
 if (isProd) {
-  const required = ["DATABASE_URL", "CLERK_SECRET_KEY", "WEB_ORIGIN"] as const;
+  const required = [
+    "DATABASE_URL",
+    "CLERK_SECRET_KEY",
+    "CRON_SECRET",
+    "WEB_ORIGIN",
+  ] as const;
   const missing = required.filter((name) => !process.env[name]);
   if (missing.length > 0) {
     throw new Error(

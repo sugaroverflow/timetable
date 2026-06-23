@@ -63,7 +63,7 @@ Important variables:
 | `GRAPHQL_ROUTE_URL` | Web | Server-side custom-domain route lookup URL |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Web | Clerk browser SDK |
 | `CLERK_SECRET_KEY` | Web, API | Clerk server SDK and token verification |
-| `CRON_SECRET` | API | Digest job protection |
+| `CRON_SECRET` | API | Digest job protection; required in hosted environments |
 | `RESEND_API_KEY`, `EMAIL_FROM` | API | Digest email sending |
 | `SPACES_*` | Reserved | Future object storage configuration |
 
@@ -80,6 +80,10 @@ CI runs on pull requests, but `main` pushes are path-filtered to app, package,
 GitHub workflow, DigitalOcean app spec, deploy, and root build files.
 README/docs-only changes on `main` do not trigger CI and therefore do not
 trigger dev deploys.
+
+The dev deploy workflow is serialized with a single `deploy-dev` concurrency
+group. After DigitalOcean reports a successful deploy, GitHub Actions verifies
+that `/health`, `/`, and `/graphql` are reachable on `https://dev.timetable.love`.
 
 Repository-level secrets:
 
@@ -117,6 +121,24 @@ Ingress routes:
 
 The specs use `preserve_path_prefix: true` for API paths so Express receives the
 same route prefixes it registers locally.
+
+## Deploy Runbook
+
+For dev deploys:
+
+1. Confirm the `CI` workflow passed for the `main` commit.
+2. Confirm the `Deploy Dev` workflow passed.
+3. Confirm DigitalOcean shows `timetable-dev` with no in-progress deployment.
+4. Open `https://dev.timetable.love/health`; it should return JSON with
+   `ok: true`.
+5. Open `https://dev.timetable.love/` and confirm the homepage responds.
+
+If a deploy fails before DigitalOcean activates it, the previous active
+deployment should remain live. If a deploy activates but is bad, roll back to
+the previous `timetable-dev` deployment in DigitalOcean App Platform, then
+re-run the health checks above. Code/config rollback does not roll back database
+state, so migration-related incidents require restoring from a managed database
+backup or applying a forward fix.
 
 ## Clerk
 
