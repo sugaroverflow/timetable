@@ -1,0 +1,101 @@
+# DigitalOcean App Platform spec for Timetable.
+# One app: web + api services (shared domain) + a pre-deploy migration job,
+# bound to a managed Postgres cluster.
+#
+# Primary deploy path: GitHub Actions (`.github/workflows/deploy.yml`) applies
+# this spec on every successful CI run on `main`. Secret placeholders below
+# (${CLERK_SECRET_KEY}, etc.) are filled from repository secrets at deploy time.
+#
+# Manual fallback: import in the DO console or `doctl apps create --spec .do/app.yaml`
+# Update:  doctl apps update <app-id> --spec .do/app.yaml
+
+name: timetable
+region: lon
+
+# HTTP routing on one domain. API owns /api, /graphql, /health; web owns the rest.
+# preserve_path_prefix keeps the prefix so Express (mounted at /api, /graphql,
+# /health) receives the full path instead of a stripped one.
+ingress:
+  rules:
+    - match: { path: { prefix: /api } }
+      component: { name: api, preserve_path_prefix: true }
+    - match: { path: { prefix: /graphql } }
+      component: { name: api, preserve_path_prefix: true }
+    - match: { path: { prefix: /health } }
+      component: { name: api, preserve_path_prefix: true }
+    - match: { path: { prefix: / } }
+      component: { name: web }
+
+services:
+  # API — Express + GraphQL Yoga, runs TypeScript via tsx (no build step).
+  - name: api
+    github: { repo: sugaroverflow/timetable, branch: main, deploy_on_push: false }
+    source_dir: /
+    build_command: npm ci
+    run_command: npm run start -w @timetable/api
+    http_port: 4000
+    instance_count: 1
+    instance_size_slug: apps-s-1vcpu-0.5gb
+    health_check:
+      http_path: /health
+    envs:
+      - { key: API_PORT, value: "4000", scope: RUN_TIME }
+      - { key: DATABASE_URL, value: "${timetable-db.DATABASE_URL}", scope: RUN_TIME }
+      - { key: DATABASE_SSL, value: "require", scope: RUN_TIME }
+      - { key: WEB_ORIGIN, value: "${APP_URL}", scope: RUN_TIME }
+      - { key: CLERK_SECRET_KEY, value: "${CLERK_SECRET_KEY}", scope: RUN_TIME, type: SECRET }
+      - { key: CRON_SECRET, value: "${CRON_SECRET}", scope: RUN_TIME, type: SECRET }
+      # Optional digests: RESEND_API_KEY, EMAIL_FROM
+      # Optional image uploads to Spaces (S3). Without these the /api/uploads
+      # endpoint returns 503; set them in the console to enable uploads.
+      # Optionally also set SPACES_PUBLIC_BASE_URL for a CDN/custom domain.
+      - { key: SPACES_ENDPOINT, scope: RUN_TIME }
+      - { key: SPACES_REGION, scope: RUN_TIME }
+      - { key: SPACES_BUCKET, scope: RUN_TIME }
+      - { key: SPACES_KEY, scope: RUN_TIME, type: SECRET }
+      - { key: SPACES_SECRET, scope: RUN_TIME, type: SECRET }
+
+  # Web — Next.js (build then start). 1 GB so `next build` has headroom.
+  - name: web
+    github: { repo: sugaroverflow/timetable, branch: main, deploy_on_push: false }
+    source_dir: /
+    build_command: npm ci && npm run build -w @timetable/web
+    run_command: npm run start -w @timetable/web
+    http_port: 3000
+    instance_count: 1
+    instance_size_slug: apps-s-1vcpu-1gb
+    envs:
+      - { key: NEXT_PUBLIC_API_URL, value: "${APP_URL}", scope: RUN_AND_BUILD_TIME }
+      - { key: NEXT_PUBLIC_GRAPHQL_URL, value: "${APP_URL}/graphql", scope: RUN_AND_BUILD_TIME }
+      - { key: NEXT_PUBLIC_CLERK_SIGN_IN_URL, value: "/sign-in", scope: RUN_AND_BUILD_TIME }
+      - { key: NEXT_PUBLIC_CLERK_SIGN_UP_URL, value: "/sign-up", scope: RUN_AND_BUILD_TIME }
+      - { key: NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL, value: "/timetables", scope: RUN_AND_BUILD_TIME }
+      - { key: NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL, value: "/timetables", scope: RUN_AND_BUILD_TIME }
+      - { key: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, value: "${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}", scope: RUN_AND_BUILD_TIME }
+      - { key: CLERK_SECRET_KEY, value: "${CLERK_SECRET_KEY}", scope: RUN_TIME, type: SECRET }
+
+jobs:
+  # Runs migrations before every deploy.
+  - name: migrate
+    kind: PRE_DEPLOY
+    github: { repo: sugaroverflow/timetable, branch: main, deploy_on_push: false }
+    source_dir: /
+    build_command: npm ci
+    run_command: npm run db:migrate
+    instance_count: 1
+    instance_size_slug: apps-s-1vcpu-0.5gb
+    envs:
+      - { key: DATABASE_URL, value: "${timetable-db.DATABASE_URL}", scope: RUN_TIME }
+      - { key: DATABASE_SSL, value: "require", scope: RUN_TIME }
+
+databases:
+  # Attaches the managed PG cluster you create first. Name the cluster
+  # "timetable-db" so ${timetable-db.DATABASE_URL} resolves. (db_name/db_user
+  # default to defaultdb/doadmin on a fresh managed cluster.)
+  - name: timetable-db
+    engine: PG
+    version: "16"
+    production: true
+    cluster_name: timetable-db
+    db_name: defaultdb
+    db_user: doadmin

@@ -8,14 +8,18 @@ The original single-file prototype lives in [timetable.html](timetable.html) and
 is kept as a **design reference only**; this application replaces it. The product
 spec is in [Specifications.md](Specifications.md).
 
-> **Status:** the full phased plan (foundation → topic feed → profiles/privacy →
-> availability calendar → notifications/domains/analytics) is implemented.
-> Authentication is handled by **Clerk**. The app runs on **DigitalOcean**
-> (App Platform + Managed PostgreSQL).
+> **Status:** Phases 0–3 from the backend implementation plan are implemented in
+> code; Phase 4 is **partially** implemented (dashboard analytics, conflict
+> alerts, digest job code, and ICS export exist, but multi-channel notifications,
+> custom-domain routing, and production job scheduling still need work). The app
+> is ready for **first integrated testing** once Postgres, Clerk, and env vars
+> are configured locally or on DigitalOcean. Authoritative plan:
+> [`.cursor/plans/timetable_backend_plan_5ea00e75.plan.md`](.cursor/plans/timetable_backend_plan_5ea00e75.plan.md).
 
 ## Contents
 
 - [What it does](#what-it-does)
+- [Current status & phase checklist](#current-status--phase-checklist)
 - [Architecture](#architecture)
 - [Getting started (local dev)](#getting-started-local-dev)
 - [Environment variables](#environment-variables)
@@ -72,6 +76,129 @@ subscribe to from any calendar app.
 
 ---
 
+## Current status & phase checklist
+
+Progress is tracked against the backend implementation plan in
+[`.cursor/plans/timetable_backend_plan_5ea00e75.plan.md`](.cursor/plans/timetable_backend_plan_5ea00e75.plan.md).
+Status below reflects the **current codebase**, not only the plan file’s todo
+metadata (which still marks Phase 4 as pending).
+
+| Phase | Plan status | Summary |
+| --- | --- | --- |
+| Phase 0 — Foundation | **Done** | Monorepo, Drizzle + migrations, Clerk auth, timetable/membership/invite REST + core GraphQL, timetable switcher, `.do/app.yaml`, CI. Original plan used Auth.js magic links; the repo migrated wholesale to Clerk. |
+| Phase 1 — Topic Feed MVP | **Done** | Topics/hearts/comments/activity log, moderation workflow, weighted hearts, markdown rendering, feed + host/moderation/activity UI. Optional REST extras (bulk invite resend, activity CSV export) not built. |
+| Phase 2 — Profiles, privacy & polish | **Mostly done** | Clerk SSO, profiles, privacy enforcement, comment hide, admin unpublish, archive hearts, host filter on feed, digest prefs (stored). **Partial:** Spaces upload code wired but needs `SPACES_*`; custom role labels + theme colors saved but not rendered; cursor/infinite scroll not built; feed “comments” sort uses comment counts, not latest-comment SQL. |
+| Phase 3 — Availability calendar | **Done** | Timeslot CRUD + weekly repeat, availability + weekday patterns, audience filters, slot discussion, topic tagging. ICS export built (plan originally deferred this). |
+| Phase 4 — Notifications, domains, analytics | **Partial** | Dashboard analytics and slot-conflict alerts done; daily digest compute/send + cron REST endpoint done (needs Resend + scheduled caller). **Not started:** Novu / WhatsApp / Matrix / webhooks; calendar sync provider; hostname → timetable routing for custom domains. |
+
+### Phase 0 — Foundation
+
+| Item | Status | Notes |
+| --- | --- | --- |
+| Monorepo (`apps/web`, `apps/api`, `packages/db`, `packages/core`, `packages/shared`) | Done | npm workspaces |
+| Drizzle schema + migrations | Done | `packages/db/drizzle` 0000–0005 |
+| Auth (Clerk; plan originally Auth.js magic link) | Done | `@clerk/nextjs` + `@clerk/backend`; local `user` row keyed by Clerk id |
+| Core tables: users, timetables, memberships, invites | Done | |
+| REST: create timetable, invite emails, patch member roles | Done | `apps/api/src/rest/router.ts` |
+| GraphQL: `me`, `myTimetables`, `timetable`, membership reads | Done | |
+| Next.js: sign-in/up, timetable switcher, role-aware nav | Done | |
+| DigitalOcean deploy spec + CI | Done | `.do/app.yaml`, `.github/workflows/ci.yml` |
+| Exit criteria (create/switch timetables, invite, role-scoped nav) | Done | Ready to verify manually |
+
+### Phase 1 — Topic Feed MVP
+
+| Item | Status | Notes |
+| --- | --- | --- |
+| Entities: topics, hearts, comments, activity_events | Done | |
+| Topic lifecycle (draft → submit → publish/unpublish, request changes) | Done | |
+| GraphQL feed, host dashboard, moderation queue, activity timeline | Done | No cursor pagination yet |
+| Mutations: heart, comment/reply, moderate, hide comment | Done | |
+| Weighted hearts (server-side) | Done | `packages/shared/src/hearts.ts` + `buildFeed` |
+| Markdown render + sanitize | Done | API-side |
+| Image upload to Spaces for topic covers | Partial | `POST /api/uploads` + `ImageUpload` component; returns 503 without `SPACES_*` |
+| REST bulk invite resend / activity CSV export | Not started | Marked optional in plan |
+| Frontend: feed, host topics, moderation, settings (role matrix/labels/theme) | Done | Settings persist; labels/theme not applied in UI (see Phase 2) |
+
+### Phase 2 — Profiles, privacy & polish
+
+| Item | Status | Notes |
+| --- | --- | --- |
+| Clerk SSO (Google/Microsoft via dashboard) | Done | Replaced Auth.js entirely |
+| User profile (name, avatar, bio) | Done | `/profile` + `updateMyProfile` |
+| Timetable profile (name, description, cover, visibility, custom domain field) | Done | `/t/[slug]/settings` |
+| Privacy modes enforced server-side | Done | `canReadTimetable` in `@timetable/shared` |
+| Comment hide/unhide, admin unpublish, archive hearts | Done | |
+| Host filter on feed | Done | By host, not by elector activity |
+| Digest preference storage | Done | No sends until Phase 4 job runs |
+| Spaces uploads (avatars, covers) | Partial | Backend + UI wired; bucket/credentials required |
+| Custom role labels + theme colors rendered in UI | Partial | Saved via `updateTimetableSettings`; `RolePills`/nav still use hardcoded labels/CSS |
+| Cursor infinite scroll + `recent`-sort pagination | Not started | Decided approach documented in plan |
+| Host dashboard filter by elector activity | Not started | Calendar audience filters cover the elector case in Phase 3 |
+
+### Phase 3 — Availability calendar
+
+| Item | Status | Notes |
+| --- | --- | --- |
+| Entities: timeslots, availability, slot_comments, slot_topics | Done | Migration 0004 |
+| Admin slot CRUD + weekly repeat | Done | |
+| Elector availability + weekday bulk pattern | Done | |
+| Audience filters (all / hearted mine / hearted topic) | Done | Calendar page |
+| Slot discussion (host/admin) | Done | |
+| Admin slot–topic tagging | Done | |
+| ICS export | Done | `GET /api/timetables/:idOrSlug/calendar.ics` + `myIcsToken` |
+| Calendar sync provider (Nylas/Cronofy) | Not started | Plan deferred evaluation |
+
+### Phase 4 — Notifications, domains & analytics
+
+| Item | Status | Notes |
+| --- | --- | --- |
+| Dashboard analytics | Done | `dashboard` GraphQL query + `/t/[slug]/dashboard` |
+| Multi-topic slot conflict alerts | Done | Shown on dashboard |
+| Daily digest job (new topics, replies, host activity) | Partial | `computeUserDigest`, `POST /api/jobs/digests`, Resend/console fallback; needs `CRON_SECRET`, `RESEND_API_KEY`, and an external scheduler |
+| Custom domain per timetable | Partial | Field + `timetableByDomain` query; no Next.js middleware to route by hostname |
+| Novu / WhatsApp / Matrix / webhooks | Not started | |
+| Inngest / BullMQ job queue | Not started | Plan suggested; current impl uses a single cron REST endpoint |
+| Production hardening (plan audit P0) | Not started | No GraphQL depth/cost limits, rate limiting, env validation, or mutation privacy re-check on deactivated timetables |
+
+**Housekeeping from the plan:** the overview page at `/t/[slug]` still shows stale
+copy (“feed/calendar/moderation arrive in Phase 1”) even though those routes exist.
+
+### Ready for first testing when
+
+- `npm install` has completed and the local or managed Postgres database is up.
+- Root `.env` is configured for the API/DB tooling and `apps/web/.env.local` is
+  configured for Next.js.
+- Clerk dev or live keys are present in the right env files and the Clerk app
+  allows the local/production origins.
+- Migrations have been applied with `npm run db:migrate`.
+- Optional services are either configured or accepted as disabled: `SPACES_*`
+  for uploads, `RESEND_API_KEY`/`EMAIL_FROM` plus `CRON_SECRET` for digests.
+- A smoke test creates a timetable, assigns/invites roles, submits/publishes a
+  topic, hearts/comments on it, creates slots, marks availability, and opens the
+  dashboard/ICS feed.
+
+### Known gaps before wider testing
+
+These align with the plan’s **P0 hardening** and **Phase 4** remaining work:
+
+- **No integrated/E2E test pass yet.** Only weighted-heart unit tests exist;
+  the plan’s per-role GraphQL integration tests and Playwright E2E are not built.
+- **P0 security/ops (plan audit H1–H4):** no GraphQL depth/cost limits, API rate
+  limiting, zod env validation with fail-fast startup, or privacy re-check on
+  mutations when a timetable is `deactivated`.
+- **Phase 2 UI parity gaps:** custom role labels and theme colors are stored but
+  not rendered; cursor/infinite scroll for the feed is not implemented.
+- **Phase 4 deployment gaps:** digest sending needs a scheduled caller hitting
+  `POST /api/jobs/digests`; custom domains need DNS **and** web hostname routing;
+  Novu/multi-channel notifications are not started.
+- **Spaces uploads:** code is wired, but without `SPACES_*` the upload endpoint
+  returns 503; externally hosted image URLs still work.
+- **DigitalOcean provisioning:** `.do/app.yaml` exists, but the repo alone does
+  not prove App Platform, Managed PostgreSQL, Clerk production origins, Spaces,
+  Resend, or cron have been provisioned.
+
+---
+
 ## Architecture
 
 A single npm-workspaces monorepo:
@@ -86,6 +213,11 @@ packages/
   shared/ Pure logic: roles, permissions, weighted-heart math, zod validation
 ```
 
+The important boundary is that `apps/web` should stay a UI/client for API calls,
+while `packages/core` owns timetable business operations and `packages/shared`
+owns pure validation/authorization helpers. Both GraphQL and REST call into the
+same core services, so behavior should not fork between API surfaces.
+
 ### Stack
 
 | Concern | Choice |
@@ -98,6 +230,22 @@ packages/
 | Email | Resend (digests); logs to console in dev |
 | Hosting | DigitalOcean App Platform + Managed PostgreSQL (+ Spaces for uploads) |
 | Tooling | TypeScript, ESLint, Vitest, Docker (local Postgres) |
+
+### Apps and packages
+
+- `apps/web` is a Next.js App Router app. It renders the signed-in app shell,
+  Clerk sign-in/up pages, timetable list, topic feed, host dashboard, moderation,
+  activity, settings, profile, and availability calendar. Server components call
+  GraphQL through `apps/web/src/lib/graphql.ts`; client components call REST or
+  upload endpoints through `apps/web/src/lib/clientApi.ts`.
+- `apps/api` is an Express service. It mounts GraphQL Yoga at `/graphql`, REST
+  routes under `/api`, health checks at `/health`, Clerk token verification, email
+  rendering/sending, ICS generation, markdown rendering, and Spaces uploads.
+- `packages/db` defines the Drizzle schema, client, and SQL migrations.
+- `packages/core` implements timetable, member, invite, topic, heart, comment,
+  profile, setting, calendar, analytics, digest, and activity-log operations.
+- `packages/shared` contains roles/permissions, zod input schemas, slug helpers,
+  and weighted-heart math. It is the only package with unit tests today.
 
 ### API surface
 
@@ -112,6 +260,8 @@ packages/
   - `POST /api/timetables` — create a timetable (creator becomes owner+admin)
   - `POST /api/timetables/:id/invites` — invite emails / assign roles
   - `PATCH /api/memberships/:id/roles` — change a member's roles
+  - `POST /api/uploads?kind=avatar|topic-cover|timetable-cover` — authenticated
+    image upload (raw file body); stores it in Spaces and returns its public URL
   - `POST /api/jobs/digests` — cron-triggered digest send (header `x-cron-secret`)
   - `GET /api/timetables/:idOrSlug/calendar.ics` — ICS feed (public, or
     `?token=<user.icsToken>` for private)
@@ -119,6 +269,34 @@ packages/
 
 Both layers call the same `@timetable/core` services and enforce authorization
 via `@timetable/shared`.
+
+### Main flows
+
+- **Auth and membership:** Clerk owns sessions and identity. The API verifies a
+  Bearer token, upserts a local user row keyed by Clerk user id, and claims any
+  pending email invites. Timetable roles are stored per membership, not globally
+  on the user.
+- **Admin setup:** a signed-in user creates a timetable through REST and becomes
+  owner/admin. Admins invite emails, assign roles, update profile/visibility,
+  role labels, theme colors, cover image URL, and member roles.
+- **Topics and moderation:** hosts create drafts, edit them, and submit for
+  moderation. Admins publish, reject, request changes, unpublish, archive hearts,
+  and hide comments. Published topics appear in the feed.
+- **Hearts and comments:** electors can heart published topics. Weighted scores
+  are computed as `1 / number of published topics hearted by that elector`;
+  host/admin views can see weighted totals and per-elector breakdowns. Members
+  can post public comments; hosts/admins can use host-only threads.
+- **Profiles and images:** users can edit name, bio, and avatar URL. The upload
+  component sends raw image bodies to `POST /api/uploads`, which stores PNG/JPEG/
+  WebP/GIF files in DigitalOcean Spaces when configured.
+- **Calendar:** admins create one-off or weekly timeslots. Electors set red,
+  yellow, or green availability per slot or by weekday. Hosts/admins can filter
+  availability audiences, discuss slots, tag topics to slots, and see conflicts
+  where one slot has multiple topic tags.
+- **Notifications and sync:** users opt into digest sections. A cron caller hits
+  `POST /api/jobs/digests` with `x-cron-secret`; without Resend configured, dev
+  email sending falls back to console logging. Calendar slots are exposed as ICS
+  through REST, with a per-user token for private timetables.
 
 ### Authentication flow
 
@@ -175,6 +353,11 @@ npm run dev
 #   api → http://localhost:4000  (GraphQL at /graphql)
 ```
 
+For a minimal local smoke test, sign in, create a timetable, add yourself or
+test users as host/elector/admin as needed, create and publish a topic, heart and
+comment on it, create slots, mark availability, and open the dashboard and ICS
+link. Use Clerk development test users if you do not want to send real email.
+
 ### Test sign-in (dev)
 
 Clerk development instances accept **test emails** using the `+clerk_test`
@@ -211,7 +394,8 @@ server-side Clerk calls use it too).
 | `API_PORT` | root | API port (default 4000) |
 | `RESEND_API_KEY`, `EMAIL_FROM` | root | digest email (optional in dev — logs to console without a key) |
 | `CRON_SECRET` | root | shared secret for `POST /api/jobs/digests` |
-| `SPACES_*` | root | DigitalOcean Spaces for uploads (optional, not yet wired) |
+| `SPACES_*` | root | DigitalOcean Spaces (S3) for image uploads — see `.env.example`. Optional: without it, uploads return 503 and only external image URLs work |
+| `SPACES_PUBLIC_BASE_URL` | root | optional CDN/custom domain for serving uploads |
 
 ---
 
@@ -229,6 +413,8 @@ server-side Clerk calls use it too).
 | `npm run db:migrate` | Apply migrations |
 | `npm run db:studio` | Open Drizzle Studio |
 | `npm run db:up` / `npm run db:down` | Start/stop local Postgres (Docker) |
+
+Production deploy: push to `main` (CI → Deploy workflow) or run **Actions → Deploy** manually. See [Deployment](#deployment-clerk--digitalocean).
 
 ---
 
@@ -254,10 +440,47 @@ your team org and assign it to your project.
 
 ### 2. DigitalOcean
 
-Prereqs: `doctl auth init` (authenticate to the team org); note your project id
-(`doctl projects list`).
+#### GitHub Actions (recommended)
 
-**Managed PostgreSQL**
+Deploys run from [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)
+using [DigitalOcean's deploy action](https://github.com/digitalocean/app_action).
+After CI passes on `main`, the workflow applies [`.do/app.yaml`](.do/app.yaml)
+and creates or updates the App Platform app (including managed Postgres on first
+deploy). You can also trigger a deploy manually from **Actions → Deploy → Run
+workflow**.
+
+**One-time setup — GitHub repository secrets** (Settings → Secrets and variables
+→ Actions):
+
+| Secret | Value |
+| --- | --- |
+| `DIGITALOCEAN_ACCESS_TOKEN` | DO API token with `app:read`, `app:create`, `app:update`, `database:read`, `database:create`, `database:view_credentials`, `account:read` (or Full Access for a pilot) |
+| `CLERK_SECRET_KEY` | `sk_test_…` or `sk_live_…` from Clerk |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | `pk_test_…` or `pk_live_…` from Clerk |
+| `CRON_SECRET` | Any random string (digest cron endpoint) |
+
+Then push to `main` (or run the Deploy workflow manually). Build and deploy logs
+appear in the Actions run. No local `doctl` or separate DO↔GitHub OAuth step is
+required — the deploy action runs inside this repo and passes secrets into the
+app spec.
+
+**After the first deploy:**
+
+1. Open the App Platform app in the DO console and note the `*.ondigitalocean.app` URL.
+2. Add that URL to **Clerk → allowed origins**.
+3. Optionally assign the app and database to your DO project (Projects → assign resources).
+4. Smoke test: `/health`, sign in, create a timetable, publish a topic.
+
+Optional env vars (`SPACES_*`, `RESEND_API_KEY`, `EMAIL_FROM`) can be added in
+the DO console on the API service after deploy — they are not required for first
+user tests.
+
+#### Manual fallback (`doctl`)
+
+Prereqs: `doctl auth init` (authenticate to the team org); note your project id
+(`doctl projects list`). See [`scripts/deploy-do.sh`](scripts/deploy-do.sh).
+
+**Managed PostgreSQL** (only if not using the `databases:` block in `.do/app.yaml`)
 
 ```bash
 doctl databases create timetable-db --engine pg --version 16 --region lon1 --size db-s-1vcpu-1gb
@@ -266,81 +489,65 @@ doctl databases connection <db-id> --format URI   # use as DATABASE_URL (sslmode
 
 Set `DATABASE_URL` to that URI and `DATABASE_SSL=require`.
 
-**Spaces (optional — for future image uploads)**
+**Spaces (image uploads)**
 
 Create a Space and set `SPACES_ENDPOINT`, `SPACES_REGION`, `SPACES_BUCKET`,
-`SPACES_KEY`, `SPACES_SECRET` (keys under API → Spaces Keys).
+`SPACES_KEY`, `SPACES_SECRET` (keys under API → Spaces Keys). Uploaded objects
+are stored `public-read`; optionally front the Space with the DO CDN and set
+`SPACES_PUBLIC_BASE_URL`. Without these vars the app still runs — the upload
+endpoint just returns 503 and image fields accept external URLs only.
 
-**App Platform** — one app, two services (web + API) building from the repo
-root, plus a pre-deploy migration job. Example `app.yaml`:
+**App Platform** — one app, two services (web + API) on a shared domain, plus a
+pre-deploy migration job, all bound to the managed PG cluster. The full spec is
+committed at [`.do/app.yaml`](.do/app.yaml) — **that file is the source of
+truth**; the key choices are summarised below.
 
-```yaml
-name: timetable
-region: lon
-services:
-  - name: api
-    github: { repo: <org>/<repo>, branch: main, deploy_on_push: true }
-    source_dir: /
-    build_command: npm ci
-    run_command: npm run start -w @timetable/api
-    http_port: 4000
-    instance_size_slug: basic-xxs
-    routes:
-      - path: /graphql
-      - path: /api
-      - path: /health
-    envs:
-      - { key: CLERK_SECRET_KEY, scope: RUN_TIME, type: SECRET }
-      - { key: DATABASE_URL, scope: RUN_TIME, type: SECRET }
-      - { key: DATABASE_SSL, value: "require" }
-      - { key: WEB_ORIGIN, value: "https://<web-domain>" }
-      - { key: API_PORT, value: "4000" }
-      - { key: CRON_SECRET, scope: RUN_TIME, type: SECRET }
-      - { key: RESEND_API_KEY, scope: RUN_TIME, type: SECRET }
+With GitHub Actions, the spec is applied automatically. For manual deploy:
 
-  - name: web
-    github: { repo: <org>/<repo>, branch: main, deploy_on_push: true }
-    source_dir: /
-    build_command: npm ci && npm run build -w @timetable/web
-    run_command: npm run start -w @timetable/web
-    http_port: 3000
-    instance_size_slug: basic-xxs
-    routes:
-      - path: /
-    envs:
-      - { key: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, scope: BUILD_TIME }
-      - { key: CLERK_SECRET_KEY, scope: RUN_TIME, type: SECRET }
-      - { key: NEXT_PUBLIC_API_URL, scope: BUILD_TIME }
-      - { key: NEXT_PUBLIC_GRAPHQL_URL, scope: BUILD_TIME }
-      - { key: NEXT_PUBLIC_CLERK_SIGN_IN_URL, value: "/sign-in", scope: BUILD_TIME }
-      - { key: NEXT_PUBLIC_CLERK_SIGN_UP_URL, value: "/sign-up", scope: BUILD_TIME }
-
-jobs:
-  - name: migrate
-    kind: PRE_DEPLOY
-    github: { repo: <org>/<repo>, branch: main }
-    source_dir: /
-    build_command: npm ci
-    run_command: npm run db:migrate
-    envs:
-      - { key: DATABASE_URL, scope: RUN_TIME, type: SECRET }
-      - { key: DATABASE_SSL, value: "require" }
-```
+1. The managed PG cluster is created by the spec's `databases:` block on first
+   deploy (named `timetable-db`). You only need the separate `doctl databases
+   create` step above if you pre-provision Postgres outside the app spec.
+2. Import the spec — in the console (**Create App → import app spec**) or via
+   `doctl`:
 
 ```bash
-doctl apps create --spec app.yaml
+doctl apps create --spec .do/app.yaml              # first time
+doctl apps update <app-id> --spec .do/app.yaml     # subsequent updates
 doctl projects resources assign <project-id> --resource "do:app:<app-id>"
 doctl projects resources assign <project-id> --resource "do:dbaas:<db-id>"
 ```
 
-Notes:
+3. When prompted (manual deploy only), fill Clerk/CRON secrets. With GitHub
+   Actions these come from repository secrets via `${…}` placeholders in the spec.
+4. If enabling uploads, fill the `SPACES_*` env vars on the API service. If
+   enabling digests, add `RESEND_API_KEY`, `EMAIL_FROM`, and a scheduler that
+   calls the digest endpoint with `x-cron-secret`.
+5. After the first deploy, add your `*.ondigitalocean.app` URL (and any custom
+   domain) to **Clerk → allowed origins**.
+6. Run a production smoke test against the deployed URL before inviting testers:
+   sign in, create/read a timetable, exercise GraphQL-backed pages, upload an
+   image if Spaces is enabled, and check `/health`.
 
-- `NEXT_PUBLIC_*` must be **BUILD_TIME** (inlined into the client bundle).
-- With both services in one app, `/graphql`, `/api`, `/health` route to the API
-  and everything else to the web. Alternatively run two apps with separate
-  domains and point `NEXT_PUBLIC_API_URL` at the API domain.
-- The buildpack honours `engines.node` (>=20); pin to 20/22 if needed.
-- Migrations run automatically via the pre-deploy job.
+How the spec is wired:
+
+- **Routing uses `ingress` with `preserve_path_prefix: true`**, not `routes`.
+  `/api`, `/graphql`, and `/health` go to the API and **keep their prefix**, so
+  Express (mounted at `/api`, `/graphql`, `/health`) receives the full path;
+  everything else goes to web. (The older `routes:` approach stripped the matched
+  prefix, so `/api/...` would have reached Express as `/...` and silently
+  broken.)
+- **`${APP_URL}`** is the app's own URL. On buildpack builds (used here) it
+  resolves at **build time**, so `NEXT_PUBLIC_API_URL=${APP_URL}` and
+  `NEXT_PUBLIC_GRAPHQL_URL=${APP_URL}/graphql` are correct on the **first**
+  deploy — no redeploy dance. These `NEXT_PUBLIC_*` vars are `RUN_AND_BUILD_TIME`
+  so they're inlined into the client bundle.
+- **`DATABASE_URL`** comes from the managed cluster via the
+  `${timetable-db.DATABASE_URL}` binding, with `DATABASE_SSL=require`.
+- The buildpack honours `engines.node` (>=20); migrations run automatically via
+  the `PRE_DEPLOY` job before every deploy.
+- A single shared domain keeps `WEB_ORIGIN`/CORS simple. To split into two apps
+  with separate domains instead, point `NEXT_PUBLIC_API_URL` at the API domain
+  and set `WEB_ORIGIN` to the web domain.
 
 **Digests** — schedule `POST https://<api>/api/jobs/digests` with the
 `x-cron-secret: <CRON_SECRET>` header (e.g. a DigitalOcean scheduled job or
@@ -348,20 +555,39 @@ external cron) to send daily digests.
 
 **Custom domains** — set a timetable's custom domain in its settings; add the
 domain (and an `api.` subdomain if running two apps) under the App's Domains tab
-or via `doctl`, then update `WEB_ORIGIN` / `NEXT_PUBLIC_*` and redeploy.
+or via `doctl`, then update `WEB_ORIGIN` / `NEXT_PUBLIC_*` and redeploy. Note:
+the database field and GraphQL lookup are implemented, but automatic hostname →
+timetable routing still needs web routing/middleware work before custom domains
+behave as timetable entry points.
 
 ---
 
 ## Roadmap & known limitations
 
-The product is feature-complete against the spec. Remaining hardening and
-optional work:
+Phases 0–3 from the
+[backend plan](.cursor/plans/timetable_backend_plan_5ea00e75.plan.md) are
+largely complete in code; remaining work is Phase 4 finish + plan audit hardening:
 
-**Hardening (before real users):**
+**P0 hardening (plan audit — before real users):**
 
 - No GraphQL depth/cost limit or API rate limiting yet.
 - No env-var validation (a missing `CLERK_SECRET_KEY` looks like "signed out").
+- Mutations on topics/slots do not re-check timetable `deactivated` privacy.
 - `console`-only logging; no structured logging or error reporting.
+
+**Phase 2/3 polish still open:**
+
+- Custom role labels and theme colors saved but not applied in the UI.
+- No cursor pagination / infinite scroll on the feed (`recent` sort).
+- Activity log covers topic lifecycle + archive-hearts only (not hearts/comments).
+- Optional REST: bulk invite resend, activity CSV export.
+
+**Phase 4 still open:**
+
+- Scheduled digest delivery (code exists; needs cron + Resend in prod).
+- Custom domain hostname routing in the web app.
+- Novu / WhatsApp / Matrix / webhooks.
+- Calendar sync provider (beyond one-way ICS export).
 
 **Performance:**
 
@@ -373,11 +599,12 @@ optional work:
 
 - Only unit tests for the weighted-heart math. Biggest gaps: permission-guard
   and topic/heart lifecycle unit tests, an integration test per role, and E2E.
+- No checked-in seed script or scripted smoke test yet; testers need to create
+  timetables, users, roles, topics, and slots manually.
 
 **Feature follow-ups:**
 
-- Cursor-based infinite scroll (decided approach: paginate the `recent` sort).
-- DigitalOcean Spaces uploads — avatars and topic/timetable covers are URL-only
-  until `SPACES_*` is configured.
-- Optional multi-channel notifications (WhatsApp / Matrix / webhooks).
-- Activity log currently covers topic moderation (not hearts/comments).
+- DigitalOcean Spaces uploads are wired (avatars, topic covers, timetable
+  covers) via `POST /api/uploads`. Uploads need `SPACES_*` configured; without
+  it those fields fall back to externally-hosted image URLs. Possible follow-ups:
+  server-side image resizing/thumbnails and orphaned-object cleanup on replace.
