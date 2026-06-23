@@ -604,7 +604,8 @@ workflow**.
 
 | Secret | Value |
 | --- | --- |
-| `DIGITALOCEAN_ACCESS_TOKEN` | DO API token with `app:read`, `app:create`, `app:update`, `database:read`, `database:create`, `database:update`, `database:view_credentials`, `account:read` (or Full Access for a pilot) |
+| `DIGITALOCEAN_ACCESS_TOKEN` | DO API token with `app:read`, `app:create`, `app:update`, `database:read`, `database:create`, `database:update`, `database:view_credentials`, `account:read`, `project:read`, `project:update` (or Full Access for a pilot) |
+| `DIGITALOCEAN_PROJECT_ID` | Timetable project ID from `doctl projects list` (deploys into that project, not your default) |
 | `CLERK_SECRET_KEY` | `sk_test_…` or `sk_live_…` from Clerk |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | `pk_test_…` or `pk_live_…` from Clerk |
 | `CRON_SECRET` | Any random string (digest cron endpoint) |
