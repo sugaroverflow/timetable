@@ -1,7 +1,7 @@
 import { getViewerRoles } from "@timetable/core";
 import type { Viewer } from "@timetable/shared";
 
-import { getUserFromCookieHeader, type SessionUser } from "./auth/session";
+import { getUserFromRequest, type SessionUser } from "./auth/clerk";
 
 export type ApiContext = {
   user: SessionUser | null;
@@ -9,10 +9,11 @@ export type ApiContext = {
   getViewer(timetableId: string): Promise<Viewer>;
 };
 
-export async function buildContext(
-  cookieHeader?: string | null,
-): Promise<ApiContext> {
-  const user = await getUserFromCookieHeader(cookieHeader);
+export async function buildContext(args: {
+  authHeader?: string | null;
+  cookieHeader?: string | null;
+}): Promise<ApiContext> {
+  const user = await getUserFromRequest(args.authHeader, args.cookieHeader);
   return {
     user,
     async getViewer(timetableId: string): Promise<Viewer> {

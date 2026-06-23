@@ -15,6 +15,7 @@ app.use(
   cors({
     origin: env.webOrigin,
     credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization"],
   }),
 );
 
@@ -24,7 +25,11 @@ const yoga = createYoga({
   // CORS is handled by the express middleware above.
   cors: false,
   graphiql: !env.isProd,
-  context: ({ request }) => buildContext(request.headers.get("cookie")),
+  context: ({ request }) =>
+    buildContext({
+      authHeader: request.headers.get("authorization"),
+      cookieHeader: request.headers.get("cookie"),
+    }),
 });
 
 app.use(yoga.graphqlEndpoint, yoga);

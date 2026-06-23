@@ -28,6 +28,13 @@ function h(
   };
 }
 
+function contextFromRequest(req: Request) {
+  return buildContext({
+    authHeader: req.headers.authorization,
+    cookieHeader: req.headers.cookie,
+  });
+}
+
 /**
  * POST /api/timetables
  * Create a timetable; the creator becomes owner + admin.
@@ -35,7 +42,7 @@ function h(
 restRouter.post(
   "/timetables",
   h(async (req, res) => {
-    const ctx = await buildContext(req.headers.cookie);
+    const ctx = await contextFromRequest(req);
     if (!ctx.user) {
       res.status(401).json({ error: "Not authenticated" });
       return;
@@ -61,7 +68,7 @@ restRouter.post(
 restRouter.post(
   "/timetables/:id/invites",
   h(async (req, res) => {
-    const ctx = await buildContext(req.headers.cookie);
+    const ctx = await contextFromRequest(req);
     if (!ctx.user) {
       res.status(401).json({ error: "Not authenticated" });
       return;
@@ -100,7 +107,7 @@ restRouter.post(
 restRouter.patch(
   "/memberships/:id/roles",
   h(async (req, res) => {
-    const ctx = await buildContext(req.headers.cookie);
+    const ctx = await contextFromRequest(req);
     if (!ctx.user) {
       res.status(401).json({ error: "Not authenticated" });
       return;
