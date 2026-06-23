@@ -19,6 +19,7 @@
     "generate": "drizzle-kit generate",
     "migrate": "tsx src/migrate.ts",
     "push": "drizzle-kit push",
+    "seed": "tsx src/seed-dev.ts",
     "studio": "drizzle-kit studio",
     "typecheck": "tsc --noEmit"
   },
