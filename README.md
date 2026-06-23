@@ -41,6 +41,7 @@ cp .env.example apps/web/.env.local
 
 npm run db:up
 npm run db:migrate
+npm run db:seed
 npm run dev
 ```
 
@@ -52,6 +53,11 @@ Local URLs:
 
 For Clerk development instances, test emails using `+clerk_test` can sign in
 with OTP code `424242`.
+
+The seed command reads `dev-sample-data.md` and replaces only the sample
+timetable with slug `spt-test-data`. It creates deterministic local dev users,
+including owner `dev_sample_admin-edwin`
+(`admin-edwin@sample.timetable.test`), without calling Clerk.
 
 ## Docs
 
@@ -81,6 +87,7 @@ The web app logo lives in [apps/web/public/assets](apps/web/public/assets).
 | `npm run build` | Build all workspaces |
 | `npm run db:generate` | Generate a SQL migration from the schema |
 | `npm run db:migrate` | Apply migrations |
+| `npm run db:seed` | Seed the local dev database from `dev-sample-data.md` |
 | `npm run db:studio` | Open Drizzle Studio |
 | `npm run db:up` / `npm run db:down` | Start or stop local Postgres |
 

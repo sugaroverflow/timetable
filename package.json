@@ -21,6 +21,7 @@
     "dev:web": "npm run dev --workspace @timetable/web",
     "db:generate": "npm run generate --workspace @timetable/db",
     "db:migrate": "npm run migrate --workspace @timetable/db",
+    "db:seed": "npm run seed --workspace @timetable/db",
     "db:studio": "npm run studio --workspace @timetable/db",
     "db:up": "docker compose up -d postgres",
     "db:down": "docker compose down"
