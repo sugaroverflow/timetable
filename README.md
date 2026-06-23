@@ -10,6 +10,7 @@ A [Newspeak House](https://www.newspeak.house/) x [Sparkle Bureaucracy](https://
 - [What it does](#what-it-does)
 - [Current status & phase checklist](#current-status--phase-checklist)
 - [Architecture](#architecture)
+- [Assets](#assets)
 - [How production works](#how-production-works)
 - [Environments (local, dev, production)](#environments-local-dev-production)
 - [Getting started (local dev)](#getting-started-local-dev)
@@ -309,6 +310,21 @@ There are no Auth.js tables and no webhook is required for normal operation.
 `users`, `timetables`, `timetable_memberships`, `timetable_invites`, `topics`,
 `hearts`, `comments`, `activity_events`, `timeslots`, `availability`,
 `slot_comments`, `slot_topics`. Migrations live in `packages/db/drizzle` (0000–0005).
+
+---
+
+## Assets
+
+Static web assets live in [apps/web/public/assets](apps/web/public/assets).
+Next.js serves files in `apps/web/public` from the site root, so the current app
+logo is available in code as:
+
+```txt
+/assets/timetable.love-logo-transparent.png
+```
+
+The checked-in logo file is
+[apps/web/public/assets/timetable.love-logo-transparent.png](apps/web/public/assets/timetable.love-logo-transparent.png).
 
 ---
 
