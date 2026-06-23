@@ -19,16 +19,27 @@ export async function toggleHeart(
   }
 
   const [existing] = await db
-    .select({ id: hearts.id })
+    .select({ id: hearts.id, archivedAt: hearts.archivedAt })
     .from(hearts)
     .where(and(eq(hearts.topicId, topicId), eq(hearts.userId, userId)))
     .limit(1);
 
-  if (existing) {
+  // Only an active (non-archived) heart counts as "hearted". Toggling it off
+  // removes it.
+  if (existing && existing.archivedAt === null) {
     await db.delete(hearts).where(eq(hearts.id, existing.id));
     return { hearted: false };
   }
 
-  await db.insert(hearts).values({ topicId, userId });
+  // No active heart: create one, or reactivate an archived row in place (the
+  // unique (topicId, userId) constraint means we can't blindly insert a second
+  // row). Re-hearting after an admin reset is a fresh vote.
+  await db
+    .insert(hearts)
+    .values({ topicId, userId })
+    .onConflictDoUpdate({
+      target: [hearts.topicId, hearts.userId],
+      set: { archivedAt: null, createdAt: new Date() },
+    });
   return { hearted: true };
 }

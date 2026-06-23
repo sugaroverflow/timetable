@@ -153,10 +153,21 @@ export async function tagSlotTopic(
   slotId: string,
   topicId: string,
 ): Promise<void> {
-  await db
-    .insert(slotTopics)
-    .values({ slotId, topicId })
-    .onConflictDoNothing();
+  // The topic and slot must belong to the same timetable.
+  const [slot] = await db
+    .select({ timetableId: timeslots.timetableId })
+    .from(timeslots)
+    .where(eq(timeslots.id, slotId))
+    .limit(1);
+  const [topic] = await db
+    .select({ timetableId: topics.timetableId })
+    .from(topics)
+    .where(eq(topics.id, topicId))
+    .limit(1);
+  if (!slot || !topic || slot.timetableId !== topic.timetableId) {
+    throw new Error("Topic and slot must belong to the same timetable");
+  }
+  await db.insert(slotTopics).values({ slotId, topicId }).onConflictDoNothing();
 }
 
 export async function untagSlotTopic(
@@ -196,10 +207,17 @@ export async function getAudienceElectorIds(
   }
 
   if (audience.kind === "hearted_topic") {
+    // Scope to this timetable so a foreign topic id can't pull in its electors.
     const rows = await db
       .select({ userId: hearts.userId })
       .from(hearts)
-      .where(eq(hearts.topicId, audience.topicId));
+      .innerJoin(topics, eq(topics.id, hearts.topicId))
+      .where(
+        and(
+          eq(hearts.topicId, audience.topicId),
+          eq(topics.timetableId, timetableId),
+        ),
+      );
     return Array.from(new Set(rows.map((r) => r.userId)));
   }
 
@@ -243,18 +261,25 @@ export async function buildCalendar(
   const slots = await listSlots(timetableId);
   if (slots.length === 0) return [];
   const slotIds = slots.map((s) => s.id);
-  const audience = new Set(audienceIds);
 
   const availRows = await db
     .select({
       slotId: availability.slotId,
       userId: availability.userId,
       state: availability.state,
-      name: users.name,
     })
     .from(availability)
-    .innerJoin(users, eq(users.id, availability.userId))
     .where(inArray(availability.slotId, slotIds));
+
+  // Names for the whole audience (including electors who never saved a row).
+  const audienceNameById = new Map<string, string | null>();
+  if (audienceIds.length > 0) {
+    const nameRows = await db
+      .select({ id: users.id, name: users.name })
+      .from(users)
+      .where(inArray(users.id, audienceIds));
+    for (const u of nameRows) audienceNameById.set(u.id, u.name);
+  }
 
   const tagRows = await db
     .select({
@@ -286,16 +311,27 @@ export async function buildCalendar(
   for (const c of commentRows) commentCountBySlot.set(c.slotId, c.n);
 
   return slots.map((slot) => {
-    const rows = availRows.filter((r) => r.slotId === slot.id);
+    const stateByUser = new Map<string, AvailabilityState>();
+    for (const r of availRows) {
+      if (r.slotId === slot.id) stateByUser.set(r.userId, r.state);
+    }
+
+    const viewerState = viewerUserId
+      ? (stateByUser.get(viewerUserId) ?? null)
+      : null;
+
+    // Availability defaults to yellow, so audience electors without a saved
+    // row still count as yellow.
     const counts = { green: 0, yellow: 0, red: 0 };
     const perUser: CalendarSlot["perUser"] = [];
-    let viewerState: AvailabilityState | null = null;
-
-    for (const r of rows) {
-      if (r.userId === viewerUserId) viewerState = r.state;
-      if (!audience.has(r.userId)) continue;
-      counts[r.state] += 1;
-      perUser.push({ userId: r.userId, name: r.name, state: r.state });
+    for (const uid of audienceIds) {
+      const state = stateByUser.get(uid) ?? "yellow";
+      counts[state] += 1;
+      perUser.push({
+        userId: uid,
+        name: audienceNameById.get(uid) ?? null,
+        state,
+      });
     }
 
     return {

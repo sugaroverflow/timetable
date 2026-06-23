@@ -8,6 +8,7 @@ import {
   archiveTopicHearts,
   buildCalendar,
   buildFeed,
+  claimInvitesForUser,
   createSlots,
   createTopic,
   deleteSlot,
@@ -302,6 +303,10 @@ builder.queryType({
       type: [MembershipType],
       resolve: async (_p, _a, ctx) => {
         if (!ctx.user) return [];
+        // Claim any invites that arrived after the user's first sign-in.
+        if (ctx.user.email) {
+          await claimInvitesForUser(ctx.user.id, ctx.user.email);
+        }
         const rows = await listMembershipsForUser(ctx.user.id);
         return rows.map((r) => ({
           id: r.membershipId,
@@ -503,6 +508,11 @@ builder.mutationType({
         const { topic, viewer } = await loadTopicAndViewer(ctx, args.topicId);
         const ownerHost = topic.hostId === user.id && isHost(viewer.roles);
         if (!(ownerHost || isAdmin(viewer.roles))) forbidden();
+        if (topic.status !== "draft" && topic.status !== "unpublished") {
+          throw new GraphQLError(
+            "Only draft or unpublished topics can be submitted",
+          );
+        }
         const updated = await submitTopic(topic, user.id);
         if (!updated) notFound("Topic not found");
         return updated;
@@ -578,8 +588,12 @@ builder.mutationType({
         const visibility = args.visibility === "host_only" ? "host_only" : "public";
         if (visibility === "host_only") {
           if (!canSeeHostOnly(viewer)) forbidden("Hosts/admins only");
-        } else if (!canComment(viewer)) {
-          forbidden("Members only");
+        } else {
+          if (!canComment(viewer)) forbidden("Members only");
+          // Public comments are only allowed on published topics.
+          if (topic.status !== "published") {
+            forbidden("This topic isn't open for comments yet");
+          }
         }
         const body = args.body.trim();
         if (!body) throw new GraphQLError("Comment cannot be empty");
