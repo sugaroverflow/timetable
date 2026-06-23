@@ -103,11 +103,9 @@ show_status() {
   echo "Health check:"
   curl -fsS "https://${url}/health" && echo || echo "  /health not reachable yet"
   echo
-  echo "Clerk checklist (Dashboard → Configure → Paths / Domains):"
-  echo "  Allowed origins: https://${url}"
-  echo "  Sign-in URL:     /sign-in"
-  echo "  Sign-up URL:     /sign-up"
-  echo "  After sign-in:   /timetables"
+  echo "Clerk checklist (test keys — usually no dashboard step):"
+  echo "  Try sign-in at: https://${url}/sign-in"
+  echo "  If using live keys + custom domain: Configure → Domains in Clerk"
 }
 
 case "${1:-}" in
@@ -132,7 +130,7 @@ case "${1:-}" in
     echo "Next steps:"
     echo "  1. Wait for the deploy to finish in the DO console."
     echo "  2. Run: ./scripts/deploy-do.sh --status"
-    echo "  3. Add the *.ondigitalocean.app URL to Clerk allowed origins."
+    echo "  3. Try sign-in at the app URL (test keys need no Clerk dashboard URL step)."
     echo "  4. Smoke test: sign in, create a timetable, publish a topic."
     ;;
   *)

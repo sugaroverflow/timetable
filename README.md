@@ -342,10 +342,20 @@ Check **GitHub → Actions → Deploy**. A green run means DigitalOcean accepted
 spec and kicked off a build. The app URL appears in the run logs and in the
 [DigitalOcean Apps console](https://cloud.digitalocean.com/apps).
 
-**Clerk is not configured automatically.** The deploy injects your Clerk keys
-into the running app, but you must add the deployed `https://….ondigitalocean.app`
-URL to **Clerk → Configure → Domains → Allowed origins** before sign-in works in
-production.
+**Clerk dashboard setup depends on which keys you use.** With **test keys**
+(`pk_test_` / `sk_test_`, what GitHub Actions injects today), Clerk's development
+instance talks to `*.accounts.dev` cross-origin — you usually **do not** add
+`*.ondigitalocean.app` anywhere in the dashboard. Just deploy and try sign-in.
+
+**Allowed Subdomains** (Configure → DNS & Domains) is a different thing: a
+*production* security setting that restricts which subdomains of **your own root
+domain** (e.g. `app.example.com`) may call Clerk. It is **not** where you
+whitelist DigitalOcean's default URL.
+
+For real production on a custom domain, create a **Production** instance (header
+switcher → Create production instance), then **Configure → Domains** to add your
+domain and the DNS records Clerk shows you. Update GitHub secrets to
+`pk_live_` / `sk_live_` and redeploy.
 
 ### End-to-end flow
 
@@ -431,7 +441,9 @@ DigitalOcean console, not GitHub, unless you extend the deploy workflow.
 1. GitHub repository secrets are set (see [Deployment → GitHub Actions](#github-actions-recommended)).
 2. Merge to `main` → **CI** green → **Deploy** green.
 3. Copy the `*.ondigitalocean.app` URL from the Deploy run or DO console.
-4. **Clerk → Allowed origins** — add `https://<that-url>`.
+4. **Clerk:** with test keys, try sign-in immediately (no dashboard URL step).
+   If auth fails, see [Clerk setup](#1-clerk) below. For production on your own
+   domain, use a Production instance + **Configure → Domains**.
 5. Smoke test:
    - `curl https://<url>/health` → `{"ok":true}`
    - Sign in, create a timetable, publish a topic.
@@ -444,8 +456,11 @@ Open the failed **Deploy** run log. Common causes:
   `${VAR}` across the *entire* file (including comments) before parsing. Never
   put `${…}` in comments; only in `value:` fields that should be filled.
 - **DO token missing scopes** — needs `app:create` / `app:update` and
-  `database:create` on first deploy.
-- **Clerk sign-in fails after deploy** — allowed origins not updated yet.
+  `database:create` / `database:update` on first deploy.
+- **Clerk sign-in fails after deploy** — with test keys, check browser console
+  and that GitHub secrets match your Clerk **Development** API keys. For a custom
+  domain, create a Production instance and configure **Domains** (not Allowed
+  Subdomains).
 
 Re-run deploy from **Actions → Deploy → Run workflow** after fixing the issue.
 
@@ -564,12 +579,14 @@ your team org and assign it to your project.
    (`pk_test_…`/`sk_test_…` in dev, `pk_live_…`/`sk_live_…` in prod).
 3. Enable the sign-in methods you want (email code, **Google**, **Microsoft**, …)
    — SSO is configured in the dashboard, no app code change needed.
-4. **Paths**: Sign-in `/sign-in`, Sign-up `/sign-up`, after sign-in/up
-   `/timetables`.
-5. **Allowed origins**: add `http://localhost:3000` (dev) and your production
-   web domain.
-6. Production checklist: swap to live keys, add the prod domain, and (optional)
-   add a `user.deleted` webhook if you want to hard-delete local user rows.
+4. **Paths** are set via env vars in `.do/app.yaml` (`/sign-in`, `/sign-up`,
+   `/timetables`) — Clerk no longer has a Dashboard "Paths" page for this.
+5. **Local dev:** `http://localhost:3000` works with development keys out of the box.
+6. **Production on your domain:** header switcher → **Create production instance**
+   → **Configure → Domains** → add DNS records → swap GitHub secrets to live keys
+   and redeploy. **Allowed Subdomains** is optional hardening once a root domain
+   is configured — it is not for `*.ondigitalocean.app`.
+7. Optional: add a `user.deleted` webhook if you want to hard-delete local user rows.
 
 ### 2. DigitalOcean
 
@@ -587,7 +604,8 @@ workflow**.
 
 | Secret | Value |
 | --- | --- |
-| `DIGITALOCEAN_ACCESS_TOKEN` | DO API token with `app:read`, `app:create`, `app:update`, `database:read`, `database:create`, `database:view_credentials`, `account:read` (or Full Access for a pilot) |
+| `DIGITALOCEAN_ACCESS_TOKEN` | DO API token with `app:read`, `app:create`, `app:update`, `database:read`, `database:create`, `database:update`, `database:view_credentials`, `account:read`, `project:read`, `project:update` (or Full Access for a pilot) |
+| `DIGITALOCEAN_PROJECT_ID` | Timetable project ID from `doctl projects list` (deploys into that project, not your default) |
 | `CLERK_SECRET_KEY` | `sk_test_…` or `sk_live_…` from Clerk |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | `pk_test_…` or `pk_live_…` from Clerk |
 | `CRON_SECRET` | Any random string (digest cron endpoint) |
@@ -600,7 +618,7 @@ app spec.
 **After the first deploy:**
 
 1. Open the App Platform app in the DO console and note the `*.ondigitalocean.app` URL.
-2. Add that URL to **Clerk → allowed origins**.
+2. With **test keys**, try sign-in at that URL — no Clerk dashboard URL step needed.
 3. Optionally assign the app and database to your DO project (Projects → assign resources).
 4. Smoke test: `/health`, sign in, create a timetable, publish a topic.
 
@@ -656,7 +674,7 @@ doctl projects resources assign <project-id> --resource "do:dbaas:<db-id>"
    enabling digests, add `RESEND_API_KEY`, `EMAIL_FROM`, and a scheduler that
    calls the digest endpoint with `x-cron-secret`.
 5. After the first deploy, add your `*.ondigitalocean.app` URL (and any custom
-   domain) to **Clerk → allowed origins**.
+   domain) to Clerk via a **Production instance → Domains** when using live keys.
 6. Run a production smoke test against the deployed URL before inviting testers:
    sign in, create/read a timetable, exercise GraphQL-backed pages, upload an
    image if Spaces is enabled, and check `/health`.
