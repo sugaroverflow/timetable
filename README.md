@@ -9,28 +9,78 @@ See [Specifications.md](Specifications.md) for the product spec and
 prototype lives in [timetable.html](timetable.html) and is the **design
 reference only** — it is being replaced by this application.
 
-## Status: Phase 0 — Foundation
+## Status: Phases 0–3 complete; Phase 4 groundwork started (auth via Clerk)
 
-Implemented:
+A pre-Phase-4 audit and the cleanup/next-steps checklist live in
+[NEXT_STEPS.md](NEXT_STEPS.md). Phase 4 (notifications, custom domains, and
+dashboard analytics) is in progress — the analytics service layer exists; the
+GraphQL/UI wiring, digests, and ICS export are still to come.
+
+Phase 0 — Foundation:
 
 - Monorepo (npm workspaces): Next.js web app, Express + GraphQL API, shared
   packages.
-- PostgreSQL schema via Drizzle: users, timetables, per-timetable memberships
-  (roles), and pending invites — plus Auth.js tables.
-- Magic-link auth (Auth.js v5), with database sessions shared between web and API.
+- PostgreSQL via Drizzle (users, timetables, memberships, invites).
+- Authentication via Clerk (the API verifies Clerk session tokens; a local
+  `user` row is created on first sign-in). _Phase 0 originally shipped Auth.js
+  magic links; replaced by Clerk in Phase 2._
 - Multi-tenancy: create timetables, switch between them, per-timetable roles.
 - Invite by email (existing users added immediately; unknown emails get a
-  pending invite claimed on sign-up).
-- Role management (owner/admin/host/elector) with the owner protected.
+  pending invite claimed on sign-up). Role management with the owner protected.
 
-Topic feed, availability calendar, notifications, and custom domains arrive in
-later phases (see the plan).
+Phase 1 — Topic Feed:
+
+- Topics with markdown bodies and a draft -> submitted -> published/unpublished
+  lifecycle.
+- Weighted hearts (`1 / # published topics hearted`), computed server-side;
+  host/admin-only score and per-elector breakdown.
+- Threaded comments with public and host-only visibility; admin hide/unhide.
+- Moderation queue (publish / request changes / reject) and an append-only
+  activity log.
+- Host dashboard (draft/submit/unpublish/edit), role-aware topic feed, and
+  admin settings (role labels + theme colors persisted).
+
+Phase 2 — Profiles, privacy & polish:
+
+- Anonymous read of **public** timetables (feed + public comments); private
+  redirects to sign-in; deactivated is admin-only — enforced in the API.
+- User profile editing (name, about) and email-digest preferences (stored;
+  sending is Phase 4).
+- Admin timetable profile + visibility editing, topic unpublish, and
+  archive-hearts (vote reset); comment hide/unhide.
+- Host filter on the feed.
+
+Phase 3 — Availability calendar:
+
+- Admin timeslot CRUD with weekly-repeat generation.
+- Elector availability (red/yellow/green, default yellow) plus a weekday-pattern
+  helper that applies a state to every slot on a given weekday.
+- Host/admin calendar views: aggregate availability per slot, per-elector
+  breakdown, and audience filters (all electors / hearted my topics / hearted a
+  specific topic).
+- Slot discussion threads (host/admin) and admin slot–topic tagging.
+
+Phase 4 — Notifications, domains, analytics (in progress):
+
+- Done: analytics service layer (`packages/core/analytics.ts`) for dashboard
+  metrics, leaderboards, unallocated topics, and slot conflicts; schema for
+  digest tracking (`users.lastDigestAt`) and ICS subscription (`users.icsToken`).
+- To do: GraphQL/UI for the dashboard, daily digest jobs, ICS export endpoint,
+  and custom-domain mapping. See [NEXT_STEPS.md](NEXT_STEPS.md).
+
+Authentication is handled by **Clerk** (see [SETUP.md](SETUP.md)); Auth.js was
+removed and `user.id` is the Clerk user id.
+
+Deferred (see [NEXT_STEPS.md](NEXT_STEPS.md)): DigitalOcean Spaces uploads,
+cursor-based infinite scroll (decided: paginate the `recent` sort), multi-channel
+notifications (WhatsApp/Matrix).
+Notifications and custom domains arrive in Phase 4.
 
 ## Architecture
 
 ```
 apps/
-  web/    Next.js 16 App Router — UI, Auth.js, server actions
+  web/    Next.js 16 App Router — UI, Clerk auth, server actions
   api/    Express + GraphQL Yoga (Pothos) — GraphQL for the UI, REST for admin
 packages/
   db/     Drizzle schema, client, migrations
@@ -58,7 +108,8 @@ npm install
 # 2. Configure environment
 cp .env.example .env                 # used by the API and DB tooling
 cp .env.example apps/web/.env.local  # used by the Next.js web app
-#   then edit values (at minimum set AUTH_SECRET: `openssl rand -base64 32`)
+#   then set your Clerk keys (NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, CLERK_SECRET_KEY).
+#   See SETUP.md for Clerk + DigitalOcean configuration.
 
 # 3. Start PostgreSQL (Docker)
 npm run db:up
@@ -72,8 +123,8 @@ npm run dev
 #   api → http://localhost:4000  (GraphQL at /graphql)
 ```
 
-In local development without `RESEND_API_KEY`, magic-link sign-in URLs are
-printed to the web server console instead of being emailed.
+Sign in with Clerk. In dev you can use a test email (`you+clerk_test@example.com`)
+with the OTP `424242` — no real email is sent. See [SETUP.md](SETUP.md).
 
 ## Common scripts
 
@@ -96,11 +147,12 @@ See [.env.example](.env.example). Key ones:
 
 - `DATABASE_URL` — Postgres connection string. Set `DATABASE_SSL=require` for
   DigitalOcean Managed PostgreSQL.
-- `AUTH_SECRET`, `AUTH_URL` — Auth.js.
-- `RESEND_API_KEY`, `EMAIL_FROM` — magic-link email (optional in dev).
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` — Clerk auth (web +
+  API). Plus the `NEXT_PUBLIC_CLERK_SIGN_IN_URL` / `..._SIGN_UP_URL` paths.
+- `RESEND_API_KEY`, `EMAIL_FROM` — email digests (Phase 4; optional).
 - `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_GRAPHQL_URL` — where the web app reaches
   the API.
-- `SPACES_*` — DigitalOcean Spaces (used from Phase 1 for uploads).
+- `SPACES_*` — DigitalOcean Spaces (uploads; Phase 1+ once configured).
 
 ## Deployment (DigitalOcean)
 
@@ -109,3 +161,33 @@ See [.env.example](.env.example). Key ones:
 - Database: DigitalOcean Managed PostgreSQL (`DATABASE_SSL=require`).
 - Uploads: DigitalOcean Spaces (S3-compatible).
 - Run `npm run db:migrate` as a release/pre-deploy step.
+
+See [SETUP.md](SETUP.md) for the full Clerk + DigitalOcean walkthrough.
+
+## Known limitations & roadmap
+
+The full audit and prioritized next steps live in the project plan
+(`.cursor/plans/`). Headlines:
+
+**Hardening (do before real users):**
+
+- No GraphQL depth/cost limit or API rate limiting yet.
+- Topic/slot mutations check roles but not timetable `deactivated` privacy.
+- No environment-variable validation (a missing `CLERK_SECRET_KEY` looks like
+  "signed out").
+
+**Feature gaps:**
+
+- Custom role labels and theme colors are **saved but not yet applied** in the UI.
+- No pagination/infinite scroll yet (decided approach: paginate the `recent` sort).
+- Activity log covers topic moderation only (not hearts/comments).
+- Image uploads are URL-only until DigitalOcean Spaces is configured.
+
+**Testing/ops:**
+
+- Only unit tests for the weighted-heart math; integration/E2E/IDOR tests are
+  the biggest gap.
+- Logging is `console` only; no structured logging or error reporting.
+
+**Next phase:** Phase 4 — email digests (preferences already stored), custom
+domains, multi-topic slot conflict alerts, and dashboard analytics.
