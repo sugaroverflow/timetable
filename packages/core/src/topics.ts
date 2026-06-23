@@ -25,7 +25,7 @@ export async function getTopicById(topicId: string): Promise<Topic | null> {
 export async function createTopic(
   timetableId: string,
   hostId: string,
-  input: { title: string; bodyMd?: string },
+  input: { title: string; bodyMd?: string; coverImageUrl?: string | null },
 ): Promise<Topic> {
   const [topic] = await db
     .insert(topics)
@@ -34,6 +34,7 @@ export async function createTopic(
       hostId,
       title: input.title,
       bodyMd: input.bodyMd ?? "",
+      coverImageUrl: input.coverImageUrl ?? null,
       status: "draft",
     })
     .returning();
@@ -227,6 +228,7 @@ export type FeedTopic = {
   weightedScore: number;
   viewerHasHearted: boolean;
   commentCount: number;
+  latestCommentAt: Date | null;
 };
 
 /**
@@ -238,7 +240,12 @@ export type FeedTopic = {
 export async function buildFeed(
   timetableId: string,
   viewerUserId: string | null,
-  opts: { hostId?: string; sort?: FeedSort } = {},
+  opts: {
+    hostId?: string;
+    sort?: FeedSort;
+    limit?: number;
+    offset?: number;
+  } = {},
 ): Promise<FeedTopic[]> {
   // All published topic ids (for correct weight denominators).
   const allPublished = await db
@@ -292,13 +299,17 @@ export async function buildFeed(
 
   const displayedIds = rows.map((r) => r.topic.id);
 
-  // Public, non-hidden comment counts.
-  const commentCounts = new Map<string, number>();
+  // Public, non-hidden comment counts and latest-comment timestamps.
+  const commentStats = new Map<
+    string,
+    { count: number; latestCommentAt: Date | null }
+  >();
   if (displayedIds.length > 0) {
-    const countRows = await db
+    const statRows = await db
       .select({
         topicId: comments.topicId,
-        n: sql<number>`count(*)::int`,
+        count: sql<number>`count(*)::int`,
+        latestCommentAt: sql<Date | null>`max(${comments.createdAt})`,
       })
       .from(comments)
       .where(
@@ -309,7 +320,12 @@ export async function buildFeed(
         ),
       )
       .groupBy(comments.topicId);
-    for (const c of countRows) commentCounts.set(c.topicId, c.n);
+    for (const c of statRows) {
+      commentStats.set(c.topicId, {
+        count: c.count,
+        latestCommentAt: c.latestCommentAt,
+      });
+    }
   }
 
   const feed: FeedTopic[] = rows.map(({ topic, hostName, hostImage }) => {
@@ -333,13 +349,19 @@ export async function buildFeed(
       viewerHasHearted: viewerUserId
         ? topicHearts.some((h) => h.electorId === viewerUserId)
         : false,
-      commentCount: commentCounts.get(topic.id) ?? 0,
+      commentCount: commentStats.get(topic.id)?.count ?? 0,
+      latestCommentAt: commentStats.get(topic.id)?.latestCommentAt ?? null,
     };
   });
 
   const sort = opts.sort ?? "hearts";
   feed.sort((a, b) => {
-    if (sort === "comments") return b.commentCount - a.commentCount;
+    if (sort === "comments") {
+      const at = a.latestCommentAt?.getTime() ?? 0;
+      const bt = b.latestCommentAt?.getTime() ?? 0;
+      if (bt !== at) return bt - at;
+      return b.commentCount - a.commentCount;
+    }
     if (sort === "recent") {
       const at = a.publishedAt?.getTime() ?? a.createdAt.getTime();
       const bt = b.publishedAt?.getTime() ?? b.createdAt.getTime();
@@ -348,7 +370,9 @@ export async function buildFeed(
     return b.weightedScore - a.weightedScore;
   });
 
-  return feed;
+  const offset = Math.max(0, opts.offset ?? 0);
+  const limit = Math.max(1, Math.min(opts.limit ?? feed.length, 50));
+  return feed.slice(offset, offset + limit);
 }
 
 export type WeightedHeartEntry = {

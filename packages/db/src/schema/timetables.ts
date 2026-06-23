@@ -19,7 +19,7 @@ import { inviteStatusEnum, privacyEnum, roleEnum } from "./enums";
 export type TimetableSettings = {
   roleLabels?: { admin?: string; host?: string; elector?: string };
   theme?: { primary?: string; secondary?: string };
-  coverImageUrl?: string;
+  coverImageUrl?: string | null;
 };
 
 export const timetables = pgTable("timetables", {

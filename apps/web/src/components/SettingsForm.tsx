@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { clientGql } from "@/lib/clientGraphql";
 
 const MUTATION = `mutation Settings(
-  $s: String!, $ra: String, $rh: String, $re: String, $tp: String, $ts: String
+  $s: String!, $ra: String, $rh: String, $re: String, $tp: String, $ts: String, $cover: String
 ) {
   updateTimetableSettings(
     idOrSlug: $s
@@ -15,12 +15,14 @@ const MUTATION = `mutation Settings(
     roleLabelElector: $re
     themePrimary: $tp
     themeSecondary: $ts
+    coverImageUrl: $cover
   ) { id }
 }`;
 
 export type SettingsValues = {
   roleLabels?: { admin?: string; host?: string; elector?: string };
   theme?: { primary?: string; secondary?: string };
+  coverImageUrl?: string | null;
 };
 
 export function SettingsForm({
@@ -43,6 +45,7 @@ export function SettingsForm({
   const [secondary, setSecondary] = useState(
     current.theme?.secondary ?? "#5b7bff",
   );
+  const [cover, setCover] = useState(current.coverImageUrl ?? "");
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -55,6 +58,7 @@ export function SettingsForm({
         re: elector,
         tp: primary,
         ts: secondary,
+        cover: cover.trim() || null,
       });
       setSaved(true);
       startTransition(() => router.refresh());
@@ -105,6 +109,16 @@ export function SettingsForm({
             style={{ width: 64, padding: 2, height: 38 }}
           />
         </div>
+      </div>
+
+      <div className="field" style={{ marginTop: 12 }}>
+        <label htmlFor="cover">Cover image URL</label>
+        <input
+          id="cover"
+          value={cover}
+          onChange={(e) => setCover(e.target.value)}
+          placeholder="https://…"
+        />
       </div>
 
       <button

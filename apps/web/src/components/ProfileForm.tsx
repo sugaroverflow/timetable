@@ -5,20 +5,23 @@ import { useRouter } from "next/navigation";
 
 import { clientGql } from "@/lib/clientGraphql";
 
-const MUTATION = `mutation($name: String, $bio: String) {
-  updateMyProfile(name: $name, bio: $bio) { id }
+const MUTATION = `mutation($name: String, $bio: String, $image: String) {
+  updateMyProfile(name: $name, bio: $bio, image: $image) { id }
 }`;
 
 export function ProfileForm({
   name: initialName,
   bio: initialBio,
+  image: initialImage,
 }: {
   name: string | null;
   bio: string | null;
+  image: string | null;
 }) {
   const router = useRouter();
   const [name, setName] = useState(initialName ?? "");
   const [bio, setBio] = useState(initialBio ?? "");
+  const [image, setImage] = useState(initialImage ?? "");
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
 
@@ -26,7 +29,11 @@ export function ProfileForm({
     e.preventDefault();
     setSaved(false);
     try {
-      await clientGql(MUTATION, { name, bio });
+      await clientGql(MUTATION, {
+        name,
+        bio,
+        image: image.trim() || null,
+      });
       setSaved(true);
       startTransition(() => router.refresh());
     } catch (err) {
@@ -48,6 +55,15 @@ export function ProfileForm({
           value={bio}
           onChange={(e) => setBio(e.target.value)}
           placeholder="A sentence or two about you."
+        />
+      </div>
+      <div className="field">
+        <label htmlFor="image">Profile image URL</label>
+        <input
+          id="image"
+          value={image}
+          onChange={(e) => setImage(e.target.value)}
+          placeholder="https://…"
         />
       </div>
       <button className="btn btn-primary" type="submit" disabled={pending}>

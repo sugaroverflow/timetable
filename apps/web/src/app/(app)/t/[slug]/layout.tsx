@@ -7,6 +7,11 @@ import { NavLink } from "@/components/NavLink";
 import { RolePills } from "@/components/RolePills";
 import { TimetableSwitcher } from "@/components/TimetableSwitcher";
 import { gqlFetch } from "@/lib/graphql";
+import {
+  parseTimetableSettings,
+  roleLabel,
+  themeStyle,
+} from "@/lib/timetableSettings";
 
 type TimetableResult = {
   timetable: {
@@ -15,6 +20,7 @@ type TimetableResult = {
     name: string;
     privacy: string;
     viewerRoles: string[];
+    settings: string;
   } | null;
 };
 
@@ -30,6 +36,7 @@ const TIMETABLE_QUERY = `
       name
       privacy
       viewerRoles
+      settings
     }
   }
 `;
@@ -71,10 +78,11 @@ export default async function TimetableLayout({
   }
 
   const roles = timetable.viewerRoles as Role[];
+  const settings = parseTimetableSettings(timetable.settings);
   const base = `/t/${slug}`;
 
   return (
-    <main className="container">
+    <main className="container" style={themeStyle(settings)}>
       <div
         className="row wrap"
         style={{ justifyContent: "space-between", marginBottom: 14 }}
@@ -89,12 +97,21 @@ export default async function TimetableLayout({
             /{slug}
           </span>
         )}
-        {isAuthed ? <RolePills roles={roles} /> : null}
+        {isAuthed ? (
+          <RolePills roles={roles} labels={settings.roleLabels} />
+        ) : null}
       </div>
 
       <div className="page-head" style={{ marginBottom: 14 }}>
         <h1>{timetable.name}</h1>
       </div>
+      {settings.coverImageUrl ? (
+        <div
+          className="timetable-cover"
+          style={{ backgroundImage: `url(${settings.coverImageUrl})` }}
+          aria-label={`${timetable.name} cover image`}
+        />
+      ) : null}
 
       <nav className="nav" style={{ marginBottom: 18 }}>
         <NavLink href={base} exact>
@@ -104,7 +121,11 @@ export default async function TimetableLayout({
         {(isHost(roles) || isAdmin(roles)) && (
           <NavLink href={`${base}/dashboard`}>Dashboard</NavLink>
         )}
-        {isHost(roles) && <NavLink href={`${base}/topics`}>My topics</NavLink>}
+        {isHost(roles) && (
+          <NavLink href={`${base}/topics`}>
+            My {roleLabel(settings.roleLabels, "host").toLowerCase()} topics
+          </NavLink>
+        )}
         {(isElector(roles) || isHost(roles) || isAdmin(roles)) && (
           <NavLink href={`${base}/calendar`}>Availability</NavLink>
         )}

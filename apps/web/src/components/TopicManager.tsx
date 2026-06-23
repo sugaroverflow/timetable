@@ -8,8 +8,8 @@ import type { ManagedTopic } from "@/lib/feedTypes";
 
 const SUBMIT = `mutation($id: String!){ submitTopic(topicId: $id){ id } }`;
 const UNPUBLISH = `mutation($id: String!){ unpublishTopic(topicId: $id){ id } }`;
-const UPDATE = `mutation($id: String!, $title: String!, $body: String!){
-  updateTopic(topicId: $id, title: $title, bodyMd: $body){ id }
+const UPDATE = `mutation($id: String!, $title: String!, $body: String!, $cover: String){
+  updateTopic(topicId: $id, title: $title, bodyMd: $body, coverImageUrl: $cover){ id }
 }`;
 
 export function TopicManager({ topic }: { topic: ManagedTopic }) {
@@ -18,6 +18,7 @@ export function TopicManager({ topic }: { topic: ManagedTopic }) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(topic.title);
   const [body, setBody] = useState(topic.bodyMd);
+  const [cover, setCover] = useState(topic.coverImageUrl ?? "");
 
   async function run(query: string, variables: Record<string, unknown>) {
     try {
@@ -30,7 +31,12 @@ export function TopicManager({ topic }: { topic: ManagedTopic }) {
 
   async function saveEdit(e: React.FormEvent) {
     e.preventDefault();
-    await run(UPDATE, { id: topic.id, title: title.trim(), body });
+    await run(UPDATE, {
+      id: topic.id,
+      title: title.trim(),
+      body,
+      cover: cover.trim() || null,
+    });
     setEditing(false);
   }
 
@@ -53,6 +59,11 @@ export function TopicManager({ topic }: { topic: ManagedTopic }) {
         <form onSubmit={saveEdit} className="stack" style={{ marginTop: 10 }}>
           <input value={title} onChange={(e) => setTitle(e.target.value)} />
           <textarea value={body} onChange={(e) => setBody(e.target.value)} />
+          <input
+            value={cover}
+            onChange={(e) => setCover(e.target.value)}
+            placeholder="Cover image URL"
+          />
           <div className="row">
             <button className="btn btn-primary" type="submit" disabled={pending}>
               Save

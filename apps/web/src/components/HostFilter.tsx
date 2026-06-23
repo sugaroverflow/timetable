@@ -17,6 +17,7 @@ export function HostFilter({
     const params = new URLSearchParams(searchParams.toString());
     if (next) params.set("host", next);
     else params.delete("host");
+    params.delete("page");
     router.push(`${pathname}?${params.toString()}`);
   }
 

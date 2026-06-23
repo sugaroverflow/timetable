@@ -94,6 +94,9 @@ REST through `apps/web/src/lib/clientApi.ts`.
 - digest rendering/sending
 - ICS generation
 - markdown rendering/sanitization
+- request logging
+- process-local rate limiting
+- GraphQL depth limiting
 
 REST routes currently include:
 
@@ -107,7 +110,7 @@ REST routes currently include:
 | `GET /health` | Health check |
 
 Object-storage env placeholders exist, but the tracked API currently has no
-committed upload endpoint.
+committed binary upload endpoint.
 
 ## GraphQL Surface
 
@@ -127,6 +130,7 @@ Main queries include:
 - `slotComments`
 - `dashboard`
 - `myIcsToken`
+- `timetableRouteByDomain`
 - `timetableByDomain`
 
 Main mutations cover:
@@ -141,6 +145,9 @@ Main mutations cover:
 - availability and weekday availability
 - slot comments
 - slot topic tagging
+
+The web proxy uses `timetableRouteByDomain` to rewrite custom-domain requests
+onto the existing `/t/[slug]` route tree.
 
 ## Auth Flow
 
@@ -190,9 +197,11 @@ root. The current logo path is:
 
 ## Architecture Risks
 
-- No GraphQL depth or cost limits yet.
-- No API rate limiting yet.
-- No fail-fast environment validation yet.
-- Some mutations do not re-check `deactivated` privacy at the mutation boundary.
+- GraphQL has a depth limit, but no cost model yet.
+- API rate limiting is process-local and should move to infrastructure for
+  horizontally scaled production.
+- Production env validation exists for core API variables but is not exhaustive.
+- Topic and slot mutations check `deactivated` privacy; future mutations need
+  the same review.
 - Activity logging is not comprehensive across all user actions.
 - Weighted feed and dashboard queries may need batching/materialization at scale.

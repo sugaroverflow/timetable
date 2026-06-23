@@ -87,8 +87,9 @@ The web app logo lives in [apps/web/public/assets](apps/web/public/assets).
 ## Status
 
 Phases 0-3 are substantially implemented. Phase 4 is partial: dashboard
-analytics, conflict alerts, digest job code, and ICS export exist, while
-scheduled production digest delivery, custom-domain routing, multi-channel
-notifications, and broader hardening still need work.
+analytics, conflict alerts, digest job code, custom-domain routing, and ICS
+export exist, while scheduled production digest delivery, multi-channel
+notifications, production object storage uploads, and broader hardening still
+need work.
 
 See [Roadmap](docs/ROADMAP.md) for the full status and risk list.

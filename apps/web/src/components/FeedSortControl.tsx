@@ -10,6 +10,7 @@ export function FeedSortControl({ value }: { value: string }) {
   function change(next: string) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("sort", next);
+    params.delete("page");
     router.push(`${pathname}?${params.toString()}`);
   }
 
@@ -20,7 +21,7 @@ export function FeedSortControl({ value }: { value: string }) {
       onChange={(e) => change(e.target.value)}
     >
       <option value="hearts">Most hearts</option>
-      <option value="comments">Most comments</option>
+      <option value="comments">Latest comments</option>
       <option value="recent">Newest</option>
     </select>
   );
