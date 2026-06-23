@@ -1,34 +1,38 @@
+import { UserButton } from "@clerk/nextjs";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import Link from "next/link";
-import { redirect } from "next/navigation";
-
-import { auth } from "@/auth";
-
-import { signOutAction } from "./actions";
 
 export default async function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth();
-  if (!session?.user) redirect("/login");
+  // No redirect here: public timetables are readable by anonymous visitors.
+  // Pages that require a session enforce it themselves.
+  const { userId } = await auth();
+  const user = userId ? await currentUser() : null;
+  const email = user?.primaryEmailAddress?.emailAddress ?? null;
 
   return (
     <>
       <header className="topbar">
-        <Link className="brand" href="/timetables">
+        <Link className="brand" href={userId ? "/timetables" : "/"}>
           <span className="mark">T</span>
           <span>Timetable</span>
         </Link>
         <div className="spacer" />
-        <span className="muted" style={{ fontSize: 13 }}>
-          {session.user.email}
-        </span>
-        <form action={signOutAction}>
-          <button className="btn btn-ghost" type="submit">
-            Sign out
-          </button>
-        </form>
+        {userId ? (
+          <>
+            <Link className="muted" href="/profile" style={{ fontSize: 13 }}>
+              {email ?? "Account"}
+            </Link>
+            <UserButton />
+          </>
+        ) : (
+          <Link className="btn" href="/sign-in">
+            Sign in
+          </Link>
+        )}
       </header>
       {children}
     </>

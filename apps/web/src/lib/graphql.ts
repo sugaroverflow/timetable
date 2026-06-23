@@ -1,4 +1,4 @@
-import { headers } from "next/headers";
+import { auth } from "@clerk/nextjs/server";
 
 import { env } from "@/env";
 
@@ -8,20 +8,21 @@ type GraphQLResponse<T> = {
 };
 
 /**
- * Server-side GraphQL fetch that forwards the incoming session cookie so the
- * API can authenticate the request (shared Auth.js database session).
+ * Server-side GraphQL fetch. Attaches the Clerk session token as a Bearer so
+ * the API can authenticate. Works anonymously too (no token → no header).
  */
 export async function gqlFetch<T>(
   query: string,
   variables?: Record<string, unknown>,
 ): Promise<T> {
-  const cookie = (await headers()).get("cookie") ?? "";
+  const { getToken } = await auth();
+  const token = await getToken();
 
   const res = await fetch(env.graphqlUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      cookie,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({ query, variables }),
     cache: "no-store",

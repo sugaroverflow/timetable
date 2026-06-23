@@ -1,11 +1,10 @@
+import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { auth } from "@/auth";
-
 export default async function HomePage() {
-  const session = await auth();
-  if (session?.user) redirect("/timetables");
+  const { userId } = await auth();
+  if (userId) redirect("/timetables");
 
   return (
     <main className="container">
@@ -24,11 +23,16 @@ export default async function HomePage() {
 
       <div className="card" style={{ maxWidth: 440 }}>
         <p className="muted" style={{ marginTop: 0 }}>
-          Sign in with a magic link — no password required.
+          Sign in to create and join timetables.
         </p>
-        <Link className="btn btn-primary" href="/login">
-          Get started
-        </Link>
+        <div className="row">
+          <Link className="btn btn-primary" href="/sign-in">
+            Sign in
+          </Link>
+          <Link className="btn" href="/sign-up">
+            Create account
+          </Link>
+        </div>
       </div>
     </main>
   );

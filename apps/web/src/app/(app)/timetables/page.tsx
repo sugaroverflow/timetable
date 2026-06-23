@@ -1,4 +1,6 @@
+import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { CreateTimetableForm } from "@/components/CreateTimetableForm";
 import { RolePills } from "@/components/RolePills";
@@ -35,6 +37,9 @@ const QUERY = `
 `;
 
 export default async function TimetablesPage() {
+  const { userId } = await auth();
+  if (!userId) redirect("/sign-in");
+
   const data = await gqlFetch<MyTimetables>(QUERY);
   const memberships = data.myTimetables;
 

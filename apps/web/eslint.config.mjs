@@ -1,7 +1,7 @@
 import next from "eslint-config-next";
 
 // eslint-config-next v16 ships a complete flat-config array (rules + ignores).
-export default [
+const config = [
   ...next,
   {
     rules: {
@@ -11,3 +11,5 @@ export default [
     },
   },
 ];
+
+export default config;
