@@ -96,7 +96,7 @@ REST through `apps/web/src/lib/clientApi.ts`.
 - markdown rendering/sanitization
 - request logging
 - structured REST/Yoga error logging
-- process-local rate limiting
+- store-backed rate limiting, with shared PostgreSQL buckets in hosted apps
 - GraphQL depth and cost limiting
 
 REST routes currently include:
@@ -185,6 +185,7 @@ Core tables:
 - `availability`
 - `slot_comments`
 - `slot_topics`
+- `api_rate_limit_buckets`
 
 Migrations live in `packages/db/drizzle`.
 
@@ -201,9 +202,10 @@ root. The current logo path is:
 
 ## Architecture Risks
 
-- GraphQL has a depth limit, but no cost model yet.
-- API rate limiting is process-local and should move to infrastructure for
-  horizontally scaled production.
+- GraphQL has depth and cost limits, but both should be tuned as public traffic
+  grows.
+- Hosted API rate limiting uses shared PostgreSQL buckets; a dedicated edge/WAF
+  limit may still be needed for high-volume public traffic.
 - Production env validation exists for core API variables but is not exhaustive.
 - Topic and slot mutations check `deactivated` privacy; future mutations need
   the same review.

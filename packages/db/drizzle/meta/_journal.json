@@ -43,6 +43,13 @@
       "when": 1782216906421,
       "tag": "0005_lucky_mac_gargan",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1782250152250,
+      "tag": "0006_dry_manta",
+      "breakpoints": true
     }
   ]
 }

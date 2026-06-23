@@ -57,6 +57,7 @@ Important variables:
 | `WEB_ORIGIN` | API | CORS origin list |
 | `TRUST_PROXY_HOPS` | API | Express trusted proxy hop count for client IP handling |
 | `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX` | API | App-level rate limit window and request cap |
+| `RATE_LIMIT_BACKEND`, `RATE_LIMIT_CLEANUP_INTERVAL_MS`, `RATE_LIMIT_KEY_PREFIX` | API | `memory` for local development; `database` for shared hosted rate-limit buckets |
 | `GRAPHQL_MAX_DEPTH`, `GRAPHQL_MAX_COST` | API | GraphQL validation limits |
 | `NEXT_PUBLIC_API_URL` | Web | REST API base URL |
 | `NEXT_PUBLIC_GRAPHQL_URL` | Web | GraphQL URL |

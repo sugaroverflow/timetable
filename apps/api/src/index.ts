@@ -7,7 +7,10 @@ import { createYoga } from "graphql-yoga";
 import { buildContext } from "./context";
 import { env } from "./env";
 import { useOperationLimits } from "./graphql/depth-limit";
-import { rateLimit } from "./http/rate-limit";
+import {
+  createDatabaseRateLimitStore,
+  rateLimit,
+} from "./http/rate-limit";
 import { requestLog, structuredLogger } from "./http/request-log";
 import { schema } from "./graphql/schema";
 import { restRouter } from "./rest/router";
@@ -29,6 +32,14 @@ app.use(
 const limiter = rateLimit({
   windowMs: env.rateLimitWindowMs,
   max: env.rateLimitMax,
+  keyPrefix: env.rateLimitKeyPrefix,
+  store:
+    env.rateLimitBackend === "database"
+      ? createDatabaseRateLimitStore({
+          windowMs: env.rateLimitWindowMs,
+          cleanupIntervalMs: env.rateLimitCleanupIntervalMs,
+        })
+      : undefined,
 });
 
 const yoga = createYoga({

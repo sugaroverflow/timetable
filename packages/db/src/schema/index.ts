@@ -3,8 +3,10 @@ export * from "./auth";
 export * from "./timetables";
 export * from "./topics";
 export * from "./calendar";
+export * from "./rate-limits";
 
 import { users } from "./auth";
+import { apiRateLimitBuckets } from "./rate-limits";
 import {
   availability,
   slotComments,
@@ -62,3 +64,6 @@ export type NewSlotComment = typeof slotComments.$inferInsert;
 
 export type SlotTopic = typeof slotTopics.$inferSelect;
 export type NewSlotTopic = typeof slotTopics.$inferInsert;
+
+export type ApiRateLimitBucket = typeof apiRateLimitBuckets.$inferSelect;
+export type NewApiRateLimitBucket = typeof apiRateLimitBuckets.$inferInsert;
