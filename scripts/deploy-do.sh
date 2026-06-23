@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Manual deploy fallback for DigitalOcean App Platform.
 #
-# Primary deploy: GitHub Actions — see .github/workflows/deploy-staging.yml and
+# Primary deploy: GitHub Actions — see .github/workflows/deploy-dev.yml and
 # deploy-production.yml (see README § Environments).
 #
 # This script is for local doctl use when you need to create/update outside CI.

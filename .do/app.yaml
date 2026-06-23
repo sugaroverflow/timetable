@@ -3,7 +3,7 @@
 # App name: timetable (new app). Deployed manually via deploy-production.yml.
 # GitHub Environment "production", Clerk Production live keys.
 #
-# Dev/staging uses .do/app.staging.yaml → app timetable-dev @ dev.timetable.love
+# Dev uses .do/app.dev.yaml → app timetable-dev @ dev.timetable.love
 
 name: timetable
 region: lon

@@ -1,7 +1,7 @@
 # Deploy dev (timetable-dev @ dev.timetable.love) after CI passes on main.
-# Secrets: GitHub Environment "staging" — see README § Environments.
+# Secrets: GitHub Environment "timetable-dev" — see README § Environments.
 
-name: Deploy Staging
+name: Deploy Dev
 
 on:
   workflow_run:
@@ -19,7 +19,7 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    environment: staging
+    environment: timetable-dev
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -34,7 +34,7 @@ jobs:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
-          app_spec_location: .do/app.staging.yaml
+          app_spec_location: .do/app.dev.yaml
           project_id: ${{ secrets.DIGITALOCEAN_PROJECT_ID }}
           print_build_logs: true
           print_deploy_logs: true

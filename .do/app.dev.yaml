@@ -1,7 +1,7 @@
-# DigitalOcean App Platform spec — DEV / STAGING (dev.timetable.love)
+# DigitalOcean App Platform spec — DEV (dev.timetable.love)
 #
-# App name: timetable-dev (existing app — rename in DO console if still "timetable").
-# Deployed by deploy-staging.yml. GitHub Environment "staging", Clerk Development keys.
+# App name: timetable-dev
+# Deployed by deploy-dev.yml. GitHub Environment "timetable-dev", Clerk Development keys.
 
 name: timetable-dev
 region: lon
