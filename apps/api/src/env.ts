@@ -37,4 +37,5 @@ export const env = {
   rateLimitWindowMs: intEnv("RATE_LIMIT_WINDOW_MS", 60_000),
   rateLimitMax: intEnv("RATE_LIMIT_MAX", 300),
   graphqlMaxDepth: intEnv("GRAPHQL_MAX_DEPTH", 12),
+  graphqlMaxCost: intEnv("GRAPHQL_MAX_COST", 500),
 };

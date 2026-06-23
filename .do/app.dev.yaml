@@ -38,8 +38,11 @@ services:
       - { key: DATABASE_SSL, value: "require", scope: RUN_TIME }
       - { key: WEB_ORIGIN, value: "${APP_URL}", scope: RUN_TIME }
       - { key: TRUST_PROXY_HOPS, value: "1", scope: RUN_TIME }
+      - { key: GRAPHQL_MAX_COST, value: "500", scope: RUN_TIME }
       - { key: CLERK_SECRET_KEY, value: "${CLERK_SECRET_KEY}", scope: RUN_TIME, type: SECRET }
       - { key: CRON_SECRET, value: "${CRON_SECRET}", scope: RUN_TIME, type: SECRET }
+      - { key: RESEND_API_KEY, value: "${RESEND_API_KEY}", scope: RUN_TIME, type: SECRET }
+      - { key: EMAIL_FROM, value: "${EMAIL_FROM}", scope: RUN_TIME }
       - { key: SPACES_ENDPOINT, scope: RUN_TIME }
       - { key: SPACES_REGION, scope: RUN_TIME }
       - { key: SPACES_BUCKET, scope: RUN_TIME }

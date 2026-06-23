@@ -55,8 +55,12 @@ Important variables:
 | `DATABASE_SSL` | API, DB tooling | `require` for managed Postgres |
 | `API_PORT` | API | Local API port |
 | `WEB_ORIGIN` | API | CORS origin list |
+| `TRUST_PROXY_HOPS` | API | Express trusted proxy hop count for client IP handling |
+| `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX` | API | App-level rate limit window and request cap |
+| `GRAPHQL_MAX_DEPTH`, `GRAPHQL_MAX_COST` | API | GraphQL validation limits |
 | `NEXT_PUBLIC_API_URL` | Web | REST API base URL |
 | `NEXT_PUBLIC_GRAPHQL_URL` | Web | GraphQL URL |
+| `GRAPHQL_ROUTE_URL` | Web | Server-side custom-domain route lookup URL |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Web | Clerk browser SDK |
 | `CLERK_SECRET_KEY` | Web, API | Clerk server SDK and token verification |
 | `CRON_SECRET` | API | Digest job protection |
@@ -70,6 +74,7 @@ Important variables:
 | `.github/workflows/ci.yml` | Push to `main`, pull requests | Build, typecheck, lint, test, migrate against throwaway Postgres |
 | `.github/workflows/deploy-dev.yml` | CI success on `main`, manual | Deploys `timetable-dev` from `.do/app.dev.yaml` |
 | `.github/workflows/deploy-production.yml` | Manual only | Deploys `timetable` from `.do/app.yaml` |
+| `.github/workflows/run-digests.yml` | Daily schedule, manual | Calls `POST /api/jobs/digests` with `CRON_SECRET` |
 
 CI runs on pull requests, but `main` pushes are path-filtered to app, package,
 GitHub workflow, DigitalOcean app spec, deploy, and root build files.
@@ -86,9 +91,11 @@ Per-environment secrets for `timetable-dev` and `production`:
 - `CLERK_SECRET_KEY`
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
 - `CRON_SECRET`
+- `RESEND_API_KEY` when digest email sending is enabled
 
-Optional runtime values such as `RESEND_API_KEY` and `EMAIL_FROM` can be added
-to the API service after deploy if digest sending is enabled.
+Per-environment variables:
+
+- `EMAIL_FROM` for the Resend sender identity
 
 ## DigitalOcean App Platform
 
@@ -140,12 +147,15 @@ It requires:
 x-cron-secret: <CRON_SECRET>
 ```
 
-The app computes digest content today, but production delivery needs:
+The scheduled production caller is `.github/workflows/run-digests.yml`. It runs
+daily against `https://timetable.love/api/jobs/digests` and can be dispatched
+manually for production or dev by selecting the GitHub Environment and job URL.
+
+Digest delivery needs:
 
 - `CRON_SECRET`
 - `RESEND_API_KEY`
 - `EMAIL_FROM`
-- an external scheduler
 
 ## Object Storage
 

@@ -42,7 +42,7 @@ flowchart LR
   dbpkg[packages/db]
   pg[(PostgreSQL)]
   email[Resend or console]
-  cron[External scheduler]
+  cron[GitHub Actions scheduler]
   cal[Calendar app]
 
   browser <-->|session| clerk
@@ -95,8 +95,9 @@ REST through `apps/web/src/lib/clientApi.ts`.
 - ICS generation
 - markdown rendering/sanitization
 - request logging
+- structured REST/Yoga error logging
 - process-local rate limiting
-- GraphQL depth limiting
+- GraphQL depth and cost limiting
 
 REST routes currently include:
 

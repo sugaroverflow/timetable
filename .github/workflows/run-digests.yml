@@ -1,0 +1,38 @@
+name: Run Digests
+
+on:
+  schedule:
+    # Production digest run. Keep manual dispatch for dev or one-off retries.
+    - cron: "17 8 * * *"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: GitHub Environment containing CRON_SECRET
+        type: choice
+        options:
+          - production
+          - timetable-dev
+        default: production
+      digest_job_url:
+        description: Full digest job URL
+        type: string
+        default: https://timetable.love/api/jobs/digests
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}
+    steps:
+      - name: Trigger digest job
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          DIGEST_JOB_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.digest_job_url || 'https://timetable.love/api/jobs/digests' }}
+        run: |
+          test -n "$CRON_SECRET"
+          test -n "$DIGEST_JOB_URL"
+          curl --fail --show-error --silent \
+            --request POST "$DIGEST_JOB_URL" \
+            --header "x-cron-secret: $CRON_SECRET"
