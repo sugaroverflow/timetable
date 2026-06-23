@@ -71,6 +71,10 @@ Important variables:
 | `.github/workflows/deploy-dev.yml` | CI success on `main`, manual | Deploys `timetable-dev` from `.do/app.dev.yaml` |
 | `.github/workflows/deploy-production.yml` | Manual only | Deploys `timetable` from `.do/app.yaml` |
 
+CI runs on pull requests, but `main` pushes are path-filtered to app, package,
+deploy, and root build files. README/docs-only changes on `main` do not trigger
+CI and therefore do not trigger dev deploys.
+
 Repository-level secrets:
 
 - `DIGITALOCEAN_ACCESS_TOKEN`

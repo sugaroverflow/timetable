@@ -3,6 +3,15 @@ name: CI
 on:
   push:
     branches: [main]
+    paths:
+      - ".do/**"
+      - "apps/**"
+      - "packages/**"
+      - "scripts/**"
+      - "docker-compose.yml"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig.base.json"
   pull_request:
 
 jobs:

@@ -6,6 +6,10 @@
 name: timetable-dev
 region: lon
 
+domains:
+  - domain: dev.timetable.love
+    type: PRIMARY
+
 ingress:
   rules:
     - match: { path: { prefix: /api } }
