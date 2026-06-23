@@ -8,6 +8,12 @@
 name: timetable
 region: lon
 
+domains:
+  - domain: timetable.love
+    type: PRIMARY
+  - domain: www.timetable.love
+    type: ALIAS
+
 # HTTP routing on one domain. API owns /api, /graphql, /health; web owns the rest.
 # preserve_path_prefix keeps the prefix so Express (mounted at /api, /graphql,
 # /health) receives the full path instead of a stripped one.
