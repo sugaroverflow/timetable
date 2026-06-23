@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { eq } from "drizzle-orm";
 
 import {
@@ -6,6 +8,31 @@ import {
   type NotificationSettings,
   type User,
 } from "@timetable/db";
+
+/** Return the user's ICS subscription token, creating one on first use. */
+export async function getOrCreateIcsToken(
+  userId: string,
+): Promise<string | null> {
+  const [user] = await db
+    .select({ icsToken: users.icsToken })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (!user) return null;
+  if (user.icsToken) return user.icsToken;
+  const token = randomUUID();
+  await db.update(users).set({ icsToken: token }).where(eq(users.id, userId));
+  return token;
+}
+
+export async function getUserByIcsToken(token: string): Promise<User | null> {
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.icsToken, token))
+    .limit(1);
+  return user ?? null;
+}
 
 export async function getUserProfile(userId: string): Promise<User | null> {
   const [user] = await db

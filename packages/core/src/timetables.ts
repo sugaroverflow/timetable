@@ -61,10 +61,15 @@ export async function createTimetable(
   return timetable;
 }
 
-/** Admin: update a timetable's profile and visibility. */
+/** Admin: update a timetable's profile, visibility, and custom domain. */
 export async function updateTimetableProfile(
   timetableId: string,
-  patch: { name?: string; description?: string | null; privacy?: Privacy },
+  patch: {
+    name?: string;
+    description?: string | null;
+    privacy?: Privacy;
+    customDomain?: string | null;
+  },
 ): Promise<Timetable | null> {
   const [updated] = await db
     .update(timetables)
@@ -74,11 +79,26 @@ export async function updateTimetableProfile(
         ? { description: patch.description }
         : {}),
       ...(patch.privacy !== undefined ? { privacy: patch.privacy } : {}),
+      ...(patch.customDomain !== undefined
+        ? { customDomain: patch.customDomain || null }
+        : {}),
       updatedAt: new Date(),
     })
     .where(eq(timetables.id, timetableId))
     .returning();
   return updated ?? null;
+}
+
+/** Resolve a timetable by its custom domain (for hostname-based routing). */
+export async function getTimetableByDomain(
+  host: string,
+): Promise<Timetable | null> {
+  const [timetable] = await db
+    .select()
+    .from(timetables)
+    .where(eq(timetables.customDomain, host))
+    .limit(1);
+  return timetable ?? null;
 }
 
 export type MembershipWithTimetable = {

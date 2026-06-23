@@ -81,6 +81,42 @@ export async function listSlots(timetableId: string): Promise<Timeslot[]> {
     .orderBy(asc(timeslots.startsAt));
 }
 
+export type IcsSlot = {
+  id: string;
+  startsAt: Date;
+  endsAt: Date;
+  location: string;
+  topicTitles: string[];
+};
+
+/** Slots with their tagged topic titles, for the ICS calendar feed. */
+export async function getSlotsForIcs(timetableId: string): Promise<IcsSlot[]> {
+  const slots = await listSlots(timetableId);
+  if (slots.length === 0) return [];
+  const slotIds = slots.map((s) => s.id);
+
+  const tagRows = await db
+    .select({ slotId: slotTopics.slotId, title: topics.title })
+    .from(slotTopics)
+    .innerJoin(topics, eq(topics.id, slotTopics.topicId))
+    .where(inArray(slotTopics.slotId, slotIds));
+
+  const titlesBySlot = new Map<string, string[]>();
+  for (const r of tagRows) {
+    const list = titlesBySlot.get(r.slotId) ?? [];
+    list.push(r.title);
+    titlesBySlot.set(r.slotId, list);
+  }
+
+  return slots.map((s) => ({
+    id: s.id,
+    startsAt: s.startsAt,
+    endsAt: s.endsAt,
+    location: s.location,
+    topicTitles: titlesBySlot.get(s.id) ?? [],
+  }));
+}
+
 // --------------------------------------------------------------------------
 // Availability (elector)
 // --------------------------------------------------------------------------

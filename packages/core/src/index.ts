@@ -9,3 +9,4 @@ export * from "./settings";
 export * from "./profile";
 export * from "./calendar";
 export * from "./analytics";
+export * from "./digests";
