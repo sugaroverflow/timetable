@@ -9,12 +9,11 @@ See [Specifications.md](Specifications.md) for the product spec and
 prototype lives in [timetable.html](timetable.html) and is the **design
 reference only** — it is being replaced by this application.
 
-## Status: Phases 0–3 complete; Phase 4 groundwork started (auth via Clerk)
+## Status: Phases 0–4 complete (auth via Clerk)
 
-A pre-Phase-4 audit and the cleanup/next-steps checklist live in
-[NEXT_STEPS.md](NEXT_STEPS.md). Phase 4 (notifications, custom domains, and
-dashboard analytics) is in progress — the analytics service layer exists; the
-GraphQL/UI wiring, digests, and ICS export are still to come.
+The full phased plan is delivered. A pre-Phase-4 audit and remaining backlog
+(performance, tests, optional multi-channel notifications) live in
+[NEXT_STEPS.md](NEXT_STEPS.md).
 
 Phase 0 — Foundation:
 
@@ -60,20 +59,26 @@ Phase 3 — Availability calendar:
   specific topic).
 - Slot discussion threads (host/admin) and admin slot–topic tagging.
 
-Phase 4 — Notifications, domains, analytics (in progress):
+Phase 4 — Notifications, domains, analytics:
 
-- Done: analytics service layer (`packages/core/analytics.ts`) for dashboard
-  metrics, leaderboards, unallocated topics, and slot conflicts; schema for
-  digest tracking (`users.lastDigestAt`) and ICS subscription (`users.icsToken`).
-- To do: GraphQL/UI for the dashboard, daily digest jobs, ICS export endpoint,
-  and custom-domain mapping. See [NEXT_STEPS.md](NEXT_STEPS.md).
+- Dashboard (host/admin): topic-status counts, weighted topic & host
+  leaderboards, unallocated published topics, and slot conflicts.
+- Slot conflict alerts (a badge in the calendar + a dashboard list when a slot
+  has more than one tagged topic).
+- Daily email digests: per-user deltas (new topics, replies, host activity) via
+  a cron-secret endpoint (`POST /api/jobs/digests`); sends through Resend, or
+  logs to the console in dev.
+- ICS calendar export: `GET /api/timetables/:idOrSlug/calendar.ics` (public, or
+  per-user via `users.icsToken`), with a "Subscribe (ICS)" link on the calendar.
+- Custom-domain mapping per timetable (editable in settings; hostname → timetable
+  resolution; DNS/edge wiring documented in [SETUP.md](SETUP.md)).
 
 Authentication is handled by **Clerk** (see [SETUP.md](SETUP.md)); Auth.js was
 removed and `user.id` is the Clerk user id.
 
 Deferred (see [NEXT_STEPS.md](NEXT_STEPS.md)): DigitalOcean Spaces uploads,
-cursor-based infinite scroll (decided: paginate the `recent` sort), multi-channel
-notifications (WhatsApp/Matrix).
+cursor-based infinite scroll (decided: paginate the `recent` sort), and optional
+multi-channel notifications (WhatsApp/Matrix/webhooks).
 Notifications and custom domains arrive in Phase 4.
 
 ## Architecture

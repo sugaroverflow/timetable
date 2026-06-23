@@ -65,23 +65,34 @@ addressed** in commit `fix: address pre-Phase-4 audit findings`.
 
 ---
 
-## Phase 4 — remaining work
+## Phase 4 — delivered
 
-- [ ] **Dashboard analytics** — GraphQL `dashboard(idOrSlug)` query over the
-  existing `getDashboard` service; web dashboard page (host/admin) with topic
-  status counts, weighted leaderboards, unallocated topics, and slot conflicts.
-- [ ] **Slot conflict alerts** — surface multi-topic slots (a conflict badge in
-  the calendar) and include them in the dashboard + (later) digests.
-- [ ] **Daily digests** — compute per-user deltas since `lastDigestAt`
-  (new topics, replies, host activity), a Resend-or-console sender, and a
-  cron-secret-protected `POST /api/jobs/digests` endpoint; DO cron triggers it.
-- [ ] **ICS export** — `GET /api/timetables/:idOrSlug/calendar.ics` (public, or
-  per-user via `users.icsToken`); a "subscribe" link on the profile page. Also
-  closes the deferred Phase 3 ICS item / calendar-sync evaluation.
-- [ ] **Custom domains** — editable `customDomain` per timetable + hostname →
-  timetable resolution; DO DNS/edge wiring documented in SETUP.md.
-- [ ] **Multi-channel notifications** (optional) — WhatsApp/Matrix/webhooks via
-  Novu or direct integration, only if required.
+- [x] **Dashboard analytics** — GraphQL `dashboard(idOrSlug)` (host/admin) + web
+  dashboard page: topic-status counts, weighted topic & host leaderboards,
+  unallocated published topics, slot conflicts.
+- [x] **Slot conflict alerts** — conflict badge in the calendar + a conflicts
+  list on the dashboard when a slot has more than one tagged topic.
+- [x] **Daily digests** — `computeUserDigest` deltas since `lastDigestAt`
+  (new topics, replies, host activity), Resend-or-console sender, cron-secret
+  `POST /api/jobs/digests`.
+- [x] **ICS export** — `GET /api/timetables/:idOrSlug/calendar.ics` (public, or
+  per-user via `users.icsToken`) + "Subscribe (ICS)" link on the calendar.
+  (Closes the deferred Phase 3 ICS / calendar-sync item.)
+- [x] **Custom domains** — editable `customDomain` per timetable + a
+  `timetableByDomain` resolver for hostname routing; DO DNS/edge wiring in
+  SETUP.md.
+- [ ] **Multi-channel notifications** (optional, deferred) — WhatsApp / Matrix /
+  webhooks via Novu or direct integration, only if required.
+
+## Remaining backlog (post-Phase-4)
+
+- [ ] Performance: dataloaders / materialized weighted scores (N+1 in feed and
+  `ManagedTopic` resolvers); the digest cron is O(users) and fine for now.
+- [ ] Broader tests: permission guards, topic/heart lifecycle, an integration
+  test per role, and an E2E pass.
+- [ ] Rate limiting on mutations/REST before public launch.
+- [ ] Cursor infinite scroll (decided: paginate the `recent` sort).
+- [ ] DigitalOcean Spaces uploads (needs `SPACES_*` + bucket).
 
 ## Deferred (need credentials or a decision)
 
