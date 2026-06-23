@@ -14,6 +14,8 @@ import { restRouter } from "./rest/router";
 
 const app = express();
 
+app.set("trust proxy", env.trustProxyHops);
+
 app.use(requestLog);
 
 app.use(
