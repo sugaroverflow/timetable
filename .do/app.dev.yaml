@@ -1,16 +1,11 @@
-# DigitalOcean App Platform spec — PRODUCTION (timetable.love)
+# DigitalOcean App Platform spec — DEV (dev.timetable.love)
 #
-# App name: timetable (new app). Deployed manually via deploy-production.yml.
-# GitHub Environment "production", Clerk Production live keys.
-#
-# Dev uses .do/app.dev.yaml → app timetable-dev @ dev.timetable.love
+# App name: timetable-dev
+# Deployed by deploy-dev.yml. GitHub Environment "timetable-dev", Clerk Development keys.
 
-name: timetable
+name: timetable-dev
 region: lon
 
-# HTTP routing on one domain. API owns /api, /graphql, /health; web owns the rest.
-# preserve_path_prefix keeps the prefix so Express (mounted at /api, /graphql,
-# /health) receives the full path instead of a stripped one.
 ingress:
   rules:
     - match: { path: { prefix: /api } }
@@ -23,7 +18,6 @@ ingress:
       component: { name: web }
 
 services:
-  # API — Express + GraphQL Yoga, runs TypeScript via tsx (no build step).
   - name: api
     github: { repo: sugaroverflow/timetable, branch: main, deploy_on_push: false }
     source_dir: /
@@ -41,17 +35,12 @@ services:
       - { key: WEB_ORIGIN, value: "${APP_URL}", scope: RUN_TIME }
       - { key: CLERK_SECRET_KEY, value: "${CLERK_SECRET_KEY}", scope: RUN_TIME, type: SECRET }
       - { key: CRON_SECRET, value: "${CRON_SECRET}", scope: RUN_TIME, type: SECRET }
-      # Optional digests: RESEND_API_KEY, EMAIL_FROM
-      # Optional image uploads to Spaces (S3). Without these the /api/uploads
-      # endpoint returns 503; set them in the console to enable uploads.
-      # Optionally also set SPACES_PUBLIC_BASE_URL for a CDN/custom domain.
       - { key: SPACES_ENDPOINT, scope: RUN_TIME }
       - { key: SPACES_REGION, scope: RUN_TIME }
       - { key: SPACES_BUCKET, scope: RUN_TIME }
       - { key: SPACES_KEY, scope: RUN_TIME, type: SECRET }
       - { key: SPACES_SECRET, scope: RUN_TIME, type: SECRET }
 
-  # Web — Next.js (build then start). 1 GB so `next build` has headroom.
   - name: web
     github: { repo: sugaroverflow/timetable, branch: main, deploy_on_push: false }
     source_dir: /
@@ -71,7 +60,6 @@ services:
       - { key: CLERK_SECRET_KEY, value: "${CLERK_SECRET_KEY}", scope: RUN_TIME, type: SECRET }
 
 jobs:
-  # Runs migrations before every deploy.
   - name: migrate
     kind: PRE_DEPLOY
     github: { repo: sugaroverflow/timetable, branch: main, deploy_on_push: false }
@@ -85,11 +73,11 @@ jobs:
       - { key: DATABASE_SSL, value: "require", scope: RUN_TIME }
 
 databases:
-  # New production cluster (separate from timetable-db used by timetable-dev).
+  # Existing cluster (currently attached to the app you are renaming to timetable-dev).
   - name: timetable-db
     engine: PG
     version: "16"
     production: true
-    cluster_name: timetable-db-prod
+    cluster_name: timetable-db
     db_name: defaultdb
     db_user: doadmin

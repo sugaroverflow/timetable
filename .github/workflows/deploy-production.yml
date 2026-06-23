@@ -1,0 +1,31 @@
+# Deploy production (new app timetable @ timetable.love). Manual only.
+# Secrets: GitHub Environment "production" — see README § Environments.
+
+name: Deploy Production
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy production to App Platform
+        uses: digitalocean/app_action/deploy@v2
+        env:
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          app_spec_location: .do/app.yaml
+          project_id: ${{ secrets.DIGITALOCEAN_PROJECT_ID }}
+          print_build_logs: true
+          print_deploy_logs: true
