@@ -1,69 +1,35 @@
-import {
-  integer,
-  pgTable,
-  primaryKey,
-  text,
-  timestamp,
-} from "drizzle-orm/pg-core";
+import { jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+
+/** Per-user digest/notification preferences (no sends yet — Phase 4). */
+export type NotificationSettings = {
+  digestNewTopics?: boolean;
+  digestReplies?: boolean;
+  digestActivity?: boolean;
+};
 
 /**
- * Auth.js (NextAuth v5) Drizzle-adapter compatible tables.
+ * Local user record. Authentication is handled by Clerk; `id` is the Clerk
+ * user id, and this row mirrors profile fields so domain tables can hold
+ * foreign keys without calling Clerk. Created/updated on sign-in by the API.
  *
- * Column DB names are snake_cased via the `casing` option, but the property
- * keys (e.g. `emailVerified`, `providerAccountId`) must stay camelCase because
- * the adapter references them through these Drizzle objects.
- *
- * `bio` is our own profile field ("about" text from the spec). `image` holds
- * the profile picture URL.
+ * `bio` is the "about" text; `image` is the profile picture URL.
  */
 export const users = pgTable("user", {
-  id: text()
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
+  id: text().primaryKey(),
   name: text(),
   email: text().unique(),
   emailVerified: timestamp({ withTimezone: true }),
   image: text(),
   bio: text(),
+  notificationSettings: jsonb()
+    .$type<NotificationSettings>()
+    .notNull()
+    .default({}),
+  /** When the last email digest was sent (for computing deltas). */
+  lastDigestAt: timestamp({ withTimezone: true }),
+  /** Secret token for subscribing to the ICS calendar feed. */
+  icsToken: text()
+    .unique()
+    .$defaultFn(() => crypto.randomUUID()),
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });
-
-export const accounts = pgTable(
-  "account",
-  {
-    userId: text()
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    type: text().notNull(),
-    provider: text().notNull(),
-    providerAccountId: text().notNull(),
-    refresh_token: text(),
-    access_token: text(),
-    expires_at: integer(),
-    token_type: text(),
-    scope: text(),
-    id_token: text(),
-    session_state: text(),
-  },
-  (account) => [
-    primaryKey({ columns: [account.provider, account.providerAccountId] }),
-  ],
-);
-
-export const sessions = pgTable("session", {
-  sessionToken: text().primaryKey(),
-  userId: text()
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  expires: timestamp({ withTimezone: true }).notNull(),
-});
-
-export const verificationTokens = pgTable(
-  "verification_token",
-  {
-    identifier: text().notNull(),
-    token: text().notNull(),
-    expires: timestamp({ withTimezone: true }).notNull(),
-  },
-  (vt) => [primaryKey({ columns: [vt.identifier, vt.token] })],
-);

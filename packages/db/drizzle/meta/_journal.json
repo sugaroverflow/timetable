@@ -8,6 +8,41 @@
       "when": 1782211411567,
       "tag": "0000_bitter_veda",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1782212179273,
+      "tag": "0001_next_black_queen",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1782213605761,
+      "tag": "0002_fuzzy_fixer",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1782214778417,
+      "tag": "0003_slippery_roulette",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1782215689340,
+      "tag": "0004_nifty_roughhouse",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1782216906421,
+      "tag": "0005_lucky_mac_gargan",
+      "breakpoints": true
     }
   ]
 }
