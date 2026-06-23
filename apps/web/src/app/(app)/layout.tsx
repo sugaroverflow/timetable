@@ -1,5 +1,6 @@
 import { UserButton } from "@clerk/nextjs";
 import { auth, currentUser } from "@clerk/nextjs/server";
+import Image from "next/image";
 import Link from "next/link";
 
 export default async function AppLayout({
@@ -17,7 +18,14 @@ export default async function AppLayout({
     <>
       <header className="topbar">
         <Link className="brand" href={userId ? "/timetables" : "/"}>
-          <span className="mark">T</span>
+          <Image
+            className="brand-logo"
+            src="/assets/timetable.love-logo-transparent.png"
+            alt=""
+            width={30}
+            height={30}
+            priority
+          />
           <span>Timetable</span>
         </Link>
         <div className="spacer" />

@@ -26,6 +26,7 @@ logs/
 
 # OS / editor
 .DS_Store
+.cursor/
 .idea/
 .vscode/*
 !.vscode/extensions.json

@@ -1,4 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -9,7 +10,14 @@ export default async function HomePage() {
   return (
     <main className="container">
       <div className="brand" style={{ marginBottom: 24 }}>
-        <span className="mark">T</span>
+        <Image
+          className="brand-logo"
+          src="/assets/timetable.love-logo-transparent.png"
+          alt=""
+          width={36}
+          height={36}
+          priority
+        />
         <span>Timetable</span>
       </div>
 

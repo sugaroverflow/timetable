@@ -22,6 +22,7 @@
   --radius-sm: 9px;
   --shadow: 0 1px 2px rgba(20, 30, 50, 0.05), 0 2px 8px rgba(20, 30, 50, 0.05);
   --shadow-pop: 0 8px 28px rgba(20, 30, 50, 0.16);
+  --brand-display: "Poetsen One", "Fraunces", Georgia, serif;
   --sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --serif: "Fraunces", Georgia, serif;
   --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
@@ -90,17 +91,23 @@ h3 {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-weight: 700;
+  color: var(--ink);
+  font-family: var(--brand-display);
+  font-size: 20px;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1;
 }
-.brand .mark {
+
+.brand:hover {
+  text-decoration: none;
+}
+
+.brand-logo {
   width: 30px;
   height: 30px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, var(--primary), #5b7bff);
-  color: #fff;
-  display: grid;
-  place-items: center;
-  font-weight: 700;
+  flex: 0 0 auto;
+  object-fit: contain;
 }
 
 .spacer {
