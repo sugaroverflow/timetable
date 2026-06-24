@@ -68,6 +68,8 @@ export function createDatabaseRateLimitStore(opts: {
       const { apiRateLimitBuckets, db } = await getDbModule();
       const nowDate = new Date(now);
       const resetAt = new Date(now + opts.windowMs);
+      const nowSql = nowDate.toISOString();
+      const resetAtSql = resetAt.toISOString();
 
       const [row] = await db
         .insert(apiRateLimitBuckets)
@@ -80,8 +82,8 @@ export function createDatabaseRateLimitStore(opts: {
         .onConflictDoUpdate({
           target: apiRateLimitBuckets.bucketKey,
           set: {
-            count: sql<number>`case when ${apiRateLimitBuckets.resetAt} <= ${nowDate} then 1 else ${apiRateLimitBuckets.count} + 1 end`,
-            resetAt: sql<Date>`case when ${apiRateLimitBuckets.resetAt} <= ${nowDate} then ${resetAt} else ${apiRateLimitBuckets.resetAt} end`,
+            count: sql<number>`case when ${apiRateLimitBuckets.resetAt} <= ${nowSql}::timestamptz then 1 else ${apiRateLimitBuckets.count} + 1 end`,
+            resetAt: sql<Date>`case when ${apiRateLimitBuckets.resetAt} <= ${nowSql}::timestamptz then ${resetAtSql}::timestamptz else ${apiRateLimitBuckets.resetAt} end`,
             updatedAt: nowDate,
           },
         })

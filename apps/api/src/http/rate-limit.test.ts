@@ -9,6 +9,18 @@ import {
 
 type DbCall = { method: string; value?: unknown; args?: unknown };
 
+function queryChunks(value: unknown): unknown[] {
+  if (
+    value &&
+    typeof value === "object" &&
+    "queryChunks" in value &&
+    Array.isArray((value as { queryChunks: unknown }).queryChunks)
+  ) {
+    return (value as { queryChunks: unknown[] }).queryChunks;
+  }
+  return [];
+}
+
 function createFakeRateLimitDb(row: { count: number; resetAt: Date }) {
   const calls: DbCall[] = [];
   const apiRateLimitBuckets = {
@@ -111,6 +123,20 @@ describe("createDatabaseRateLimitStore", () => {
       expect.objectContaining({ method: "insert.onConflictDoUpdate" }),
       expect.objectContaining({ method: "insert.returning" }),
     ]);
+
+    const conflict = fakeDb.calls.find(
+      (call) => call.method === "insert.onConflictDoUpdate",
+    )?.args as { set: { count: unknown; resetAt: unknown } };
+    const sqlFragmentChunks = [
+      ...queryChunks(conflict.set.count),
+      ...queryChunks(conflict.set.resetAt),
+    ];
+
+    expect(sqlFragmentChunks).toContain("1970-01-01T00:00:10.000Z");
+    expect(sqlFragmentChunks).toContain("1970-01-01T00:00:11.000Z");
+    expect(sqlFragmentChunks.some((chunk) => chunk instanceof Date)).toBe(
+      false,
+    );
   });
 
   it("cleans expired buckets only after the cleanup interval elapses", async () => {
