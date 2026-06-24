@@ -23,6 +23,7 @@
     "db:generate": "npm run generate --workspace @timetable/db",
     "db:migrate": "npm run migrate --workspace @timetable/db",
     "db:seed": "npm run seed --workspace @timetable/db",
+    "clerk:seed-dev-users": "npm run seed:clerk-dev-users --workspace @timetable/api",
     "db:studio": "npm run studio --workspace @timetable/db",
     "db:up": "docker compose up -d postgres",
     "db:down": "docker compose down"
