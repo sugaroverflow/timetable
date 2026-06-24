@@ -56,9 +56,9 @@ services:
       # Optional image uploads to Spaces (S3). Without these the /api/uploads
       # endpoint returns 503; set them in the console to enable uploads.
       # Optionally also set SPACES_PUBLIC_BASE_URL for a CDN/custom domain.
-      - { key: SPACES_ENDPOINT, scope: RUN_TIME }
-      - { key: SPACES_REGION, scope: RUN_TIME }
-      - { key: SPACES_BUCKET, scope: RUN_TIME }
+      - { key: SPACES_ENDPOINT, value: "https://lon1.digitaloceanspaces.com", scope: RUN_TIME }
+      - { key: SPACES_REGION, value: "lon1", scope: RUN_TIME }
+      - { key: SPACES_BUCKET, value: "timetable", scope: RUN_TIME }
       - { key: SPACES_KEY_PREFIX, value: "uploads/production", scope: RUN_TIME }
       - { key: SPACES_PUBLIC_BASE_URL, scope: RUN_TIME }
       - { key: SPACES_KEY, scope: RUN_TIME, type: SECRET }

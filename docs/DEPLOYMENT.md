@@ -141,7 +141,16 @@ For dev deploys:
 3. Confirm DigitalOcean shows `timetable-dev` with no in-progress deployment.
 4. Open `https://dev.timetable.love/health`; it should return JSON with
    `ok: true`.
-5. Open `https://dev.timetable.love/` and confirm the homepage responds.
+5. Run a hosted GraphQL smoke request and confirm it returns `200` with a
+   `data` payload:
+
+   ```bash
+   curl -sS -X POST https://dev.timetable.love/graphql \
+     -H 'content-type: application/json' \
+     --data '{"query":"query { __typename }"}'
+   ```
+
+6. Open `https://dev.timetable.love/` and confirm the homepage responds.
 
 To refresh hosted dev sample data, manually run `Deploy Dev` and check
 `seed_sample_data`. This reseeds only the `spt-test-data` timetable after the
@@ -210,15 +219,47 @@ Required API component variables:
 
 - `SPACES_ENDPOINT`, for example `https://lon1.digitaloceanspaces.com`
 - `SPACES_REGION`, for example `lon1`
-- `SPACES_BUCKET`
+- `SPACES_BUCKET`, for example `timetable`
 - `SPACES_KEY`
 - `SPACES_SECRET`
+
+Use one Spaces bucket for dev and production, then isolate objects with
+environment-specific prefixes:
+
+| Environment | `SPACES_BUCKET` | `SPACES_KEY_PREFIX` |
+| --- | --- | --- |
+| Dev/local | `timetable` | `uploads/dev` |
+| Production | `timetable` | `uploads/production` |
+
+This keeps setup simple while preventing dev uploads from appearing in the
+production prefix. Use separate buckets later only if operational isolation,
+access policies, or retention rules require it.
+
+`doctl apps update` can set these App Platform env values. The installed `doctl`
+Spaces commands manage Spaces access keys only; bucket creation and CORS still
+need the DigitalOcean console or `s3cmd` with a Spaces key.
+
+If a Spaces key is created or rotated, set `SPACES_KEY` and `SPACES_SECRET` on
+the relevant DigitalOcean App Platform API components before testing uploads.
 
 Bucket CORS must allow `PUT` from the web origins (`https://dev.timetable.love`,
 `https://timetable.love`, and local dev if needed) with the `Content-Type` and
 `x-amz-acl` headers. The signed PUT uses `public-read`; public reads can be
 served either by the bucket URL or by `SPACES_PUBLIC_BASE_URL` pointing at a
 public CDN/custom domain.
+
+Configure bucket CORS with the helper script:
+
+```bash
+brew install s3cmd
+export SPACES_KEY=...
+export SPACES_SECRET=...
+SPACES_BUCKET=timetable SPACES_REGION=lon1 scripts/configure-spaces-cors.sh
+```
+
+The script writes the XML CORS configuration to a temporary file and applies it
+with `s3cmd setcors`. Do not use `aws s3api put-bucket-cors` for Spaces; this
+setup returned `NotImplemented` from DigitalOcean during the issue #8 rollout.
 
 Optional API component variables:
 
@@ -238,13 +279,17 @@ Without the required `SPACES_*` variables, `POST /api/uploads` returns `503`.
 After deploy:
 
 1. Open `/health`; it should return JSON with `ok: true`.
-2. Sign in through Clerk.
-3. Create a timetable.
-4. Add roles or invite test users.
-5. Create, submit, publish, heart, and comment on a topic.
-6. Create slots and mark availability.
-7. Open the dashboard and calendar.
-8. Subscribe to the ICS URL if testing calendar sync.
+2. Send `POST /graphql` with `query { __typename }`; it should return `200`
+   with a GraphQL `data` payload.
+3. Sign in through Clerk.
+4. Create a timetable.
+5. Add roles or invite test users.
+6. Create, submit, publish, heart, and comment on a topic.
+7. Create slots and mark availability.
+8. Open the dashboard and calendar.
+9. Subscribe to the ICS URL if testing calendar sync.
+10. Upload a profile, topic cover, or timetable cover image if object-storage
+    credentials or bucket CORS changed.
 
 ## Common Deploy Failures
 

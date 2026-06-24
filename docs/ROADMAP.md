@@ -21,6 +21,8 @@ tracked codebase, not local untracked experiments.
 - Root `.env` and `apps/web/.env.local` are configured.
 - Clerk keys and allowed origins/domains are correct.
 - Optional digest services are either configured or intentionally disabled.
+- Local or CI verification passes: `npm run build`, `npm run typecheck`,
+  `npm run lint`, `npm run test`, and `npm run test:e2e`.
 
 Suggested smoke test:
 
@@ -40,7 +42,8 @@ Suggested smoke test:
 - Expand fail-fast environment validation beyond the current production checks.
 - Continue auditing timetable `deactivated` privacy on new mutations.
 - Route structured request/error logs into hosted error reporting or log drains.
-- Add integration tests around permission boundaries.
+- Keep hosted deploy smoke checks aligned with the user-critical API paths they
+  are meant to protect.
 
 ## Product Gaps
 
@@ -67,14 +70,25 @@ Suggested smoke test:
 
 ## Testing Gaps
 
-Current committed tests are limited. The most important next tests are:
+Committed audit guardrails now cover:
 
-- role/permission unit tests
-- topic lifecycle tests
-- heart weighting tests across archived and published topics
-- GraphQL integration tests for each role
-- REST integration tests for invites, memberships, digest job, and ICS
-- Playwright smoke test for the main workflows
+- shared weighted-heart behavior
+- GraphQL depth and cost validation
+- memory and database-backed rate-limit behavior, including timestamp encoding
+- API endpoint smoke for health, REST auth boundaries, invites, memberships,
+  uploads, digest cron protection, and ICS responses
+- anonymous Playwright smoke for `/`, `/sign-in`, and `/sign-up`
+- hosted dev and production deploy smoke for `/health`, `/`, and `POST /graphql`
+
+The most important remaining tests are:
+
+- authenticated browser workflows once there is a Clerk test-user or session
+  harness
+- broader GraphQL role/permission fixtures for permission-sensitive changes
+- topic lifecycle tests across draft, submitted, published, unpublished, and
+  archived states
+- performance regression fixtures for feed/dashboard once pagination,
+  materialized scores, or dataloaders are introduced
 
 ## Performance Risks
 

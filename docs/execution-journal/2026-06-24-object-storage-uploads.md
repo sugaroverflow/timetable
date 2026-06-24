@@ -20,6 +20,12 @@ existing profile image, topic cover, and timetable cover URL fields.
   selected file is still uploading.
 - Updated deployment specs, env examples, README, product docs, roadmap, and API
   integration coverage for the upload path.
+- Updated the live DigitalOcean App Platform dev and production API env values
+  with `doctl apps update`: both use `SPACES_BUCKET=timetable`, with dev using
+  `uploads/dev` and production using `uploads/production`.
+- Added `scripts/configure-spaces-cors.sh` to make the DigitalOcean Spaces CORS
+  setup reproducible without hand-writing XML or using unsupported AWS CLI CORS
+  operations.
 
 ### Decisions
 
@@ -27,6 +33,11 @@ The implementation uses signed direct browser PUTs instead of proxying binary
 bytes through the API. The API authorizes the signing request, validates declared
 image metadata, signs the `public-read` ACL header, and returns the public URL
 that existing GraphQL mutations persist.
+
+The hosted setup should use one Spaces bucket for dev and production, isolated
+by environment-specific `SPACES_KEY_PREFIX` values (`uploads/dev` and
+`uploads/production`). Separate buckets are deferred unless stronger operational
+isolation or retention policies become necessary.
 
 ### Tradeoffs
 
@@ -36,12 +47,19 @@ to the storage provider for the signed PUT.
 
 ### Risks
 
-- Hosted buckets still need CORS allowing `PUT` with `Content-Type` and
-  `x-amz-acl` from the web origins.
+- Hosted buckets need CORS allowing `PUT` with `Content-Type` and `x-amz-acl`
+  from the web origins. The operator reported the shared bucket CORS setup
+  succeeded locally with `s3cmd`; a hosted upload smoke test is still pending.
+- The installed `doctl` can manage Spaces keys but not bucket CORS, and
+  `aws s3api put-bucket-cors` returned `NotImplemented` from DigitalOcean in
+  this environment. Use the helper script or the DigitalOcean console CORS UI.
 - `SPACES_PUBLIC_BASE_URL` or bucket public-read behavior must be configured so
   returned image URLs render in the app.
 - Orphaned objects can remain if a user uploads an image but never saves the
   form, or later replaces an image URL.
+- If the Spaces key is created or rotated, the relevant App Platform API
+  components need `SPACES_KEY` and `SPACES_SECRET` values before uploads can
+  work.
 
 ### Verification
 
@@ -52,6 +70,13 @@ to the storage provider for the signed PUT.
 - `npm run lint` passed.
 - `npm run build` passed.
 - `npm run test:e2e` passed with elevated local bind permission.
+- `doctl apps propose` accepted the generated dev and production App Platform
+  specs.
+- `doctl apps update --wait` completed for `timetable-dev` and `timetable`.
+- DigitalOcean API verification confirmed both live apps use the shared
+  `timetable` bucket with distinct key prefixes.
+- User reported the local `s3cmd setcors` CORS configuration command succeeded
+  after correcting the Spaces key export.
 
 ### Demo Impact
 
@@ -67,5 +92,6 @@ in customer-configurable S3-compatible storage rather than the app filesystem.
 
 ### Next Recommended Step
 
-Configure and test the dev Spaces bucket/CDN path in DigitalOcean, then update
-issue #8 once a hosted upload smoke test succeeds.
+Smoke test uploads in hosted dev. If the Spaces key was created during CORS
+setup, set the App Platform API `SPACES_KEY` and `SPACES_SECRET` values first,
+then repeat the smoke test before using the production prefix.
