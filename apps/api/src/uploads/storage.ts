@@ -67,27 +67,20 @@ function cleanPrefix(value: string): string {
 }
 
 function storageConfig(): StorageConfig {
-  const endpoint = process.env.SPACES_ENDPOINT?.trim();
-  const region = process.env.SPACES_REGION?.trim();
-  const bucket = process.env.SPACES_BUCKET?.trim();
-  const accessKeyId = process.env.SPACES_KEY?.trim();
-  const secretAccessKey = process.env.SPACES_SECRET?.trim();
-
-  if (!endpoint || !region || !bucket || !accessKeyId || !secretAccessKey) {
+  const s = env.storage;
+  if (!s) {
     throw new UploadsNotConfiguredError();
   }
 
   return {
-    endpoint,
-    region,
-    bucket,
-    accessKeyId,
-    secretAccessKey,
-    publicBaseUrl: process.env.SPACES_PUBLIC_BASE_URL?.trim() || null,
-    keyPrefix: cleanPrefix(
-      process.env.SPACES_KEY_PREFIX ?? `uploads/${env.nodeEnv}`,
-    ),
-    forcePathStyle: process.env.SPACES_FORCE_PATH_STYLE === "true",
+    endpoint: s.endpoint,
+    region: s.region,
+    bucket: s.bucket,
+    accessKeyId: s.key,
+    secretAccessKey: s.secret,
+    publicBaseUrl: s.publicBaseUrl,
+    keyPrefix: cleanPrefix(s.keyPrefix ?? `uploads/${env.nodeEnv}`),
+    forcePathStyle: s.forcePathStyle,
   };
 }
 

@@ -56,6 +56,21 @@ if (rateLimitBackend === "database" && !process.env.DATABASE_URL) {
   );
 }
 
+if (process.env.SPACES_BUCKET) {
+  const requiredStorage = [
+    "SPACES_KEY",
+    "SPACES_SECRET",
+    "SPACES_ENDPOINT",
+    "SPACES_BUCKET",
+  ] as const;
+  const missingStorage = requiredStorage.filter((name) => !process.env[name]);
+  if (missingStorage.length > 0) {
+    throw new Error(
+      `[api] SPACES_BUCKET is set but missing required storage vars: ${missingStorage.join(", ")}`,
+    );
+  }
+}
+
 export const env = {
   port: intEnv("API_PORT", 4000),
   webOrigin: listEnv("WEB_ORIGIN", "http://localhost:3000"),
@@ -71,4 +86,16 @@ export const env = {
   graphqlMaxDepth: intEnv("GRAPHQL_MAX_DEPTH", 12),
   graphqlMaxCost: intEnv("GRAPHQL_MAX_COST", 500),
   uploadMaxImageBytes: intEnv("UPLOAD_MAX_IMAGE_BYTES", 5 * 1024 * 1024),
+  storage: process.env.SPACES_BUCKET
+    ? {
+        key: process.env.SPACES_KEY!,
+        secret: process.env.SPACES_SECRET!,
+        endpoint: process.env.SPACES_ENDPOINT!,
+        bucket: process.env.SPACES_BUCKET!,
+        region: process.env.SPACES_REGION ?? "us-east-1",
+        publicBaseUrl: process.env.SPACES_PUBLIC_BASE_URL ?? null,
+        keyPrefix: process.env.SPACES_KEY_PREFIX ?? null,
+        forcePathStyle: process.env.SPACES_FORCE_PATH_STYLE === "true",
+      }
+    : null,
 };

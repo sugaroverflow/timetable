@@ -54,22 +54,16 @@ services:
       - { key: SPACES_SECRET, scope: RUN_TIME, type: SECRET }
 
   - name: web
-    github: { repo: sugaroverflow/timetable, branch: main, deploy_on_push: false }
-    source_dir: /
-    build_command: npm ci && npm run build -w @timetable/web
-    run_command: npm run start -w @timetable/web
+    image:
+      registry_type: DOCR
+      registry: timetable
+      repository: web
+      tag: DEPLOY_TAG
     http_port: 3000
     instance_count: 1
-    instance_size_slug: apps-s-1vcpu-1gb
+    instance_size_slug: apps-s-1vcpu-0.5gb
     envs:
-      - { key: NEXT_PUBLIC_API_URL, value: "${APP_URL}", scope: RUN_AND_BUILD_TIME }
-      - { key: NEXT_PUBLIC_GRAPHQL_URL, value: "${APP_URL}/graphql", scope: RUN_AND_BUILD_TIME }
-      - { key: GRAPHQL_ROUTE_URL, value: "${APP_URL}/graphql", scope: RUN_AND_BUILD_TIME }
-      - { key: NEXT_PUBLIC_CLERK_SIGN_IN_URL, value: "/sign-in", scope: RUN_AND_BUILD_TIME }
-      - { key: NEXT_PUBLIC_CLERK_SIGN_UP_URL, value: "/sign-up", scope: RUN_AND_BUILD_TIME }
-      - { key: NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL, value: "/timetables", scope: RUN_AND_BUILD_TIME }
-      - { key: NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL, value: "/timetables", scope: RUN_AND_BUILD_TIME }
-      - { key: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, value: "${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}", scope: RUN_AND_BUILD_TIME }
+      - { key: GRAPHQL_ROUTE_URL, value: "${APP_URL}/graphql", scope: RUN_TIME }
       - { key: CLERK_SECRET_KEY, value: "${CLERK_SECRET_KEY}", scope: RUN_TIME, type: SECRET }
 
 jobs:
@@ -89,7 +83,10 @@ jobs:
     kind: POST_DEPLOY
     github: { repo: sugaroverflow/timetable, branch: main, deploy_on_push: false }
     source_dir: /
-    build_command: npm ci
+    build_command: |
+      if [ "${SEED_DEV_SAMPLE_DATA:-false}" = "true" ]; then
+        npm ci
+      fi
     run_command: |
       if [ "$SEED_DEV_SAMPLE_DATA" = "true" ]; then
         echo "Resetting hosted dev sample database and Clerk sample users."

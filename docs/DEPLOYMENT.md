@@ -206,6 +206,10 @@ Digest delivery needs:
 - `RESEND_API_KEY`
 - `EMAIL_FROM`
 
+The sender domain for `EMAIL_FROM` must be verified in the Resend dashboard
+before emails will deliver. Without a verified sender identity, the job runs
+but Resend rejects outbound messages.
+
 ## Rate Limiting
 
 Hosted API traffic should use the database-backed limiter so requests are
@@ -302,7 +306,8 @@ Without the required `SPACES_*` variables, `POST /api/uploads` returns `503`.
 
 After deploy:
 
-1. Open `/health`; it should return JSON with `ok: true`.
+1. Open `/health`; it should return JSON with `ok: true`. Note that `/health`
+   passing does not guarantee GraphQL works — always follow up with step 2.
 2. Send `POST /graphql` with `query { __typename }`; it should return `200`
    with a GraphQL `data` payload.
 3. Sign in through Clerk.
