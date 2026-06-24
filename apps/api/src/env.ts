@@ -86,16 +86,4 @@ export const env = {
   graphqlMaxDepth: intEnv("GRAPHQL_MAX_DEPTH", 12),
   graphqlMaxCost: intEnv("GRAPHQL_MAX_COST", 500),
   uploadMaxImageBytes: intEnv("UPLOAD_MAX_IMAGE_BYTES", 5 * 1024 * 1024),
-  storage: process.env.SPACES_BUCKET
-    ? {
-        key: process.env.SPACES_KEY!,
-        secret: process.env.SPACES_SECRET!,
-        endpoint: process.env.SPACES_ENDPOINT!,
-        bucket: process.env.SPACES_BUCKET!,
-        region: process.env.SPACES_REGION ?? "us-east-1",
-        publicBaseUrl: process.env.SPACES_PUBLIC_BASE_URL ?? null,
-        keyPrefix: process.env.SPACES_KEY_PREFIX ?? null,
-        forcePathStyle: process.env.SPACES_FORCE_PATH_STYLE === "true",
-      }
-    : null,
 };
