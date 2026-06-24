@@ -83,6 +83,24 @@ jobs:
       - { key: DATABASE_URL, value: "${timetable-db.DATABASE_URL}", scope: RUN_TIME }
       - { key: DATABASE_SSL, value: "require", scope: RUN_TIME }
 
+  - name: seed-sample-data
+    kind: POST_DEPLOY
+    github: { repo: sugaroverflow/timetable, branch: main, deploy_on_push: false }
+    source_dir: /
+    build_command: npm ci
+    run_command: |
+      if [ "$SEED_DEV_SAMPLE_DATA" = "true" ]; then
+        npm run db:seed
+      else
+        echo "Skipping dev sample data seed. Set seed_sample_data when manually dispatching Deploy Dev to run it."
+      fi
+    instance_count: 1
+    instance_size_slug: apps-s-1vcpu-0.5gb
+    envs:
+      - { key: DATABASE_URL, value: "${timetable-db.DATABASE_URL}", scope: RUN_TIME }
+      - { key: DATABASE_SSL, value: "require", scope: RUN_TIME }
+      - { key: SEED_DEV_SAMPLE_DATA, value: "${SEED_DEV_SAMPLE_DATA}", scope: RUN_TIME }
+
 databases:
   # Existing cluster (currently attached to the app you are renaming to timetable-dev).
   - name: timetable-db

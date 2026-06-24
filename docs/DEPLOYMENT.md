@@ -73,7 +73,7 @@ Important variables:
 | Workflow | Trigger | Target |
 | --- | --- | --- |
 | `.github/workflows/ci.yml` | Push to `main`, pull requests | Build, typecheck, lint, test, migrate against throwaway Postgres |
-| `.github/workflows/deploy-dev.yml` | CI success on `main`, manual | Deploys `timetable-dev` from `.do/app.dev.yaml` |
+| `.github/workflows/deploy-dev.yml` | CI success on `main`, manual | Deploys `timetable-dev` from `.do/app.dev.yaml`; manual runs can optionally seed sample data |
 | `.github/workflows/deploy-production.yml` | Manual only | Deploys `timetable` from `.do/app.yaml` |
 | `.github/workflows/run-digests.yml` | Daily schedule, manual | Calls `POST /api/jobs/digests` with `CRON_SECRET` |
 
@@ -85,6 +85,10 @@ trigger dev deploys.
 The dev deploy workflow is serialized with a single `deploy-dev` concurrency
 group. After DigitalOcean reports a successful deploy, GitHub Actions verifies
 that `/health`, `/`, and `/graphql` are reachable on `https://dev.timetable.love`.
+Manual `Deploy Dev` runs include a `seed_sample_data` checkbox. When checked,
+the dev App Platform post-deploy job runs `npm run db:seed` against the
+`timetable-dev` database. Automatic deploys after `main` CI leave the checkbox
+unset and skip the seed job.
 
 Repository-level secrets:
 
@@ -109,6 +113,8 @@ Each App Platform spec defines:
 - `api` service on port `4000`
 - `web` service on port `3000`
 - `migrate` pre-deploy job running `npm run db:migrate`
+- dev only: `seed-sample-data` post-deploy job that runs `npm run db:seed` only
+  when manually enabled through the `Deploy Dev` workflow
 - managed PostgreSQL binding exposed as `DATABASE_URL`
 
 Ingress routes:
@@ -133,6 +139,10 @@ For dev deploys:
 4. Open `https://dev.timetable.love/health`; it should return JSON with
    `ok: true`.
 5. Open `https://dev.timetable.love/` and confirm the homepage responds.
+
+To refresh hosted dev sample data, manually run `Deploy Dev` and check
+`seed_sample_data`. This reseeds only the `spt-test-data` timetable after the
+dev deployment completes; production has no seed job.
 
 If a deploy fails before DigitalOcean activates it, the previous active
 deployment should remain live. If a deploy activates but is bad, roll back to
