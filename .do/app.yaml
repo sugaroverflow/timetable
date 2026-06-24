@@ -46,6 +46,8 @@ services:
       - { key: DATABASE_SSL, value: "require", scope: RUN_TIME }
       - { key: WEB_ORIGIN, value: "${APP_URL}", scope: RUN_TIME }
       - { key: TRUST_PROXY_HOPS, value: "1", scope: RUN_TIME }
+      - { key: RATE_LIMIT_BACKEND, value: "database", scope: RUN_TIME }
+      - { key: RATE_LIMIT_KEY_PREFIX, value: "timetable:production:api", scope: RUN_TIME }
       - { key: GRAPHQL_MAX_COST, value: "500", scope: RUN_TIME }
       - { key: CLERK_SECRET_KEY, value: "${CLERK_SECRET_KEY}", scope: RUN_TIME, type: SECRET }
       - { key: CRON_SECRET, value: "${CRON_SECRET}", scope: RUN_TIME, type: SECRET }

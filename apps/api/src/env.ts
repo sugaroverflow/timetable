@@ -15,8 +15,25 @@ function listEnv(name: string, fallback: string): string[] {
     .filter(Boolean);
 }
 
+function enumEnv<const T extends readonly string[]>(
+  name: string,
+  allowed: T,
+  fallback: T[number],
+): T[number] {
+  const raw = process.env[name] ?? fallback;
+  if (!allowed.includes(raw)) {
+    throw new Error(`[api] ${name} must be one of: ${allowed.join(", ")}`);
+  }
+  return raw;
+}
+
 const nodeEnv = process.env.NODE_ENV ?? "development";
 const isProd = nodeEnv === "production";
+const rateLimitBackend = enumEnv(
+  "RATE_LIMIT_BACKEND",
+  ["memory", "database"] as const,
+  isProd ? "database" : "memory",
+);
 
 if (isProd) {
   const required = [
@@ -33,14 +50,27 @@ if (isProd) {
   }
 }
 
+if (rateLimitBackend === "database" && !process.env.DATABASE_URL) {
+  throw new Error(
+    "[api] RATE_LIMIT_BACKEND=database requires DATABASE_URL so buckets are shared across API instances",
+  );
+}
+
 export const env = {
   port: intEnv("API_PORT", 4000),
   webOrigin: listEnv("WEB_ORIGIN", "http://localhost:3000"),
   nodeEnv,
   isProd,
   trustProxyHops: intEnv("TRUST_PROXY_HOPS", 1),
+  rateLimitBackend,
+  rateLimitKeyPrefix:
+    process.env.RATE_LIMIT_KEY_PREFIX ?? `timetable:${nodeEnv}:api`,
   rateLimitWindowMs: intEnv("RATE_LIMIT_WINDOW_MS", 60_000),
   rateLimitMax: intEnv("RATE_LIMIT_MAX", 300),
+  rateLimitCleanupIntervalMs: intEnv(
+    "RATE_LIMIT_CLEANUP_INTERVAL_MS",
+    300_000,
+  ),
   graphqlMaxDepth: intEnv("GRAPHQL_MAX_DEPTH", 12),
   graphqlMaxCost: intEnv("GRAPHQL_MAX_COST", 500),
 };

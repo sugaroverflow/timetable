@@ -36,7 +36,7 @@ Suggested smoke test:
 ## P0 Hardening Before Real Users
 
 - Tune GraphQL depth/cost limits as the schema and public traffic grow.
-- Replace process-local API rate limiting with infrastructure-aware limits.
+- Tune database-backed API rate limits after observing hosted traffic.
 - Expand fail-fast environment validation beyond the current production checks.
 - Continue auditing timetable `deactivated` privacy on new mutations.
 - Route structured request/error logs into hosted error reporting or log drains.
@@ -82,7 +82,8 @@ Current committed tests are limited. The most important next tests are:
 - Dashboard analytics derive weighted data through the feed path.
 - Some GraphQL field resolvers perform per-row lookups.
 - Digest job is O(users) and should be revisited before large-scale usage.
-- API rate limiting is currently process-local.
+- Hosted API rate limiting uses shared database buckets; local development uses
+  process-local memory buckets by default.
 
 Potential future fixes:
 
