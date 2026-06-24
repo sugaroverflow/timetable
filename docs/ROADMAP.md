@@ -47,7 +47,7 @@ Suggested smoke test:
 - Custom role labels and theme colors are rendered in the timetable shell and
   main feed fallbacks, but some lower-level copy remains generic.
 - Feed has limit/offset pagination but no cursor pagination or infinite scroll.
-- Host dashboard filter by elector activity is not implemented.
+- Host dashboard elector activity can be filtered by host and activity state.
 - Custom-domain hostname routing is implemented in the web proxy; production
   DNS/Clerk domain setup still has to be configured per environment.
 - Email digest is the first notification channel; additional channels such as

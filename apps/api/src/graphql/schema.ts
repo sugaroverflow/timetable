@@ -54,6 +54,7 @@ import {
   type CalendarSlot,
   type CommentNode,
   type DashboardData,
+  type ElectorActivityFilter,
   type FeedTopic,
   type WeightedHeartEntry,
 } from "@timetable/core";
@@ -398,7 +399,7 @@ builder.queryType({
           {
             hostId: args.hostId ?? undefined,
             sort,
-            limit: args.limit ?? undefined,
+            limit: args.limit ?? 50,
             offset: args.offset ?? undefined,
           },
         );
@@ -1314,6 +1315,22 @@ const ConflictSlotType = builder
     }),
   });
 
+const ElectorActivityType = builder
+  .objectRef<DashboardData["electorActivity"][number]>("ElectorActivity")
+  .implement({
+    fields: (t) => ({
+      electorId: t.exposeID("electorId"),
+      electorName: t.exposeString("electorName", { nullable: true }),
+      heartCount: t.exposeInt("heartCount"),
+      commentCount: t.exposeInt("commentCount"),
+      availabilityCount: t.exposeInt("availabilityCount"),
+      latestActivityAt: t.string({
+        nullable: true,
+        resolve: (activity) => activity.latestActivityAt?.toISOString() ?? null,
+      }),
+    }),
+  });
+
 const DashboardType = builder
   .objectRef<DashboardData>("Dashboard")
   .implement({
@@ -1342,15 +1359,38 @@ const DashboardType = builder
         type: [ConflictSlotType],
         resolve: (d) => d.conflicts,
       }),
+      electorActivity: t.field({
+        type: [ElectorActivityType],
+        resolve: (d) => d.electorActivity,
+      }),
     }),
   });
+
+function parseElectorActivityFilter(
+  raw: string | null | undefined,
+): ElectorActivityFilter {
+  if (
+    raw === "active" ||
+    raw === "quiet" ||
+    raw === "no_hearts" ||
+    raw === "no_comments" ||
+    raw === "no_availability"
+  ) {
+    return raw;
+  }
+  return "all";
+}
 
 builder.queryFields((t) => ({
   /** Dashboard analytics for a timetable (host/admin only). */
   dashboard: t.field({
     type: DashboardType,
     nullable: true,
-    args: { idOrSlug: t.arg.string({ required: true }) },
+    args: {
+      idOrSlug: t.arg.string({ required: true }),
+      hostId: t.arg.string({ required: false }),
+      electorActivity: t.arg.string({ required: false }),
+    },
     resolve: async (_p, args, ctx) => {
       const readable = await getReadableTimetable(
         ctx.user?.id ?? null,
@@ -1359,7 +1399,10 @@ builder.queryFields((t) => ({
       if (!readable) return null;
       const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
       if (!canSeeHostOnly(viewer)) return null;
-      return getDashboard(readable.timetable.id);
+      return getDashboard(readable.timetable.id, {
+        hostId: args.hostId ?? undefined,
+        electorActivity: parseElectorActivityFilter(args.electorActivity),
+      });
     },
   }),
 

@@ -1,6 +1,17 @@
 import { isAdmin, isHost, type Role } from "@timetable/shared";
 
+import { DashboardActivityFilter } from "@/components/DashboardActivityFilter";
+import { HostFilter } from "@/components/HostFilter";
 import { gqlFetch } from "@/lib/graphql";
+
+const ACTIVITY_FILTERS = new Set([
+  "all",
+  "active",
+  "quiet",
+  "no_hearts",
+  "no_comments",
+  "no_availability",
+]);
 
 type Dashboard = {
   totalHearts: number;
@@ -26,6 +37,14 @@ type Dashboard = {
     hostName: string | null;
     weightedScore: number;
   }[];
+  electorActivity: {
+    electorId: string;
+    electorName: string | null;
+    heartCount: number;
+    commentCount: number;
+    availabilityCount: number;
+    latestActivityAt: string | null;
+  }[];
   unallocatedTopics: { id: string; title: string }[];
   conflicts: {
     slotId: string;
@@ -37,17 +56,23 @@ type Dashboard = {
 
 type Data = {
   timetable: { viewerRoles: string[] } | null;
+  timetableHosts: { id: string; name: string | null }[];
   dashboard: Dashboard | null;
 };
 
 const QUERY = `
-  query Dashboard($s: String!) {
+  query Dashboard($s: String!, $host: String, $activity: String) {
     timetable(idOrSlug: $s) { viewerRoles }
-    dashboard(idOrSlug: $s) {
+    timetableHosts(idOrSlug: $s) { id name }
+    dashboard(idOrSlug: $s, hostId: $host, electorActivity: $activity) {
       totalHearts electorCount hostCount slotCount
       topicCounts { draft submitted published unpublished archived }
       topicLeaderboard { id title hostName weightedScore heartCount }
       hostLeaderboard { hostId hostName weightedScore }
+      electorActivity {
+        electorId electorName heartCount commentCount availabilityCount
+        latestActivityAt
+      }
       unallocatedTopics { id title }
       conflicts { slotId location startsAt topics { id title } }
     }
@@ -67,11 +92,21 @@ function Stat({ label, value }: { label: string; value: number }) {
 
 export default async function DashboardPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ host?: string; activity?: string }>;
 }) {
   const { slug } = await params;
-  const data = await gqlFetch<Data>(QUERY, { s: slug });
+  const { host: hostParam, activity: activityParam } = await searchParams;
+  const host = hostParam ?? "";
+  const activity =
+    activityParam && ACTIVITY_FILTERS.has(activityParam) ? activityParam : "all";
+  const data = await gqlFetch<Data>(QUERY, {
+    s: slug,
+    host: host || null,
+    activity,
+  });
   const roles = (data.timetable?.viewerRoles ?? []) as Role[];
 
   if (!isHost(roles) && !isAdmin(roles)) {
@@ -85,6 +120,13 @@ export default async function DashboardPage({
       <div className="page-head">
         <h2 style={{ fontSize: 18, margin: 0 }}>Dashboard</h2>
         <p>Activity and standings across this timetable.</p>
+      </div>
+
+      <div className="toolbar">
+        <label>Host</label>
+        <HostFilter value={host} hosts={data.timetableHosts} />
+        <label>Elector activity</label>
+        <DashboardActivityFilter value={activity} />
       </div>
 
       <div className="grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
@@ -157,6 +199,56 @@ export default async function DashboardPage({
             </ul>
           )}
         </div>
+      </div>
+
+      <div className="card">
+        <div
+          className="row wrap"
+          style={{ justifyContent: "space-between", marginBottom: 12 }}
+        >
+          <h3 style={{ margin: 0, fontSize: 15 }}>Elector activity</h3>
+          <span className="faint" style={{ fontSize: 12 }}>
+            {d.electorActivity.length} shown
+          </span>
+        </div>
+        {d.electorActivity.length === 0 ? (
+          <p className="faint" style={{ fontSize: 13 }}>
+            No electors match this filter.
+          </p>
+        ) : (
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Elector</th>
+                  <th>Hearts</th>
+                  <th>Comments</th>
+                  <th>Availability</th>
+                  <th>Last activity</th>
+                </tr>
+              </thead>
+              <tbody>
+                {d.electorActivity.map((elector) => (
+                  <tr key={elector.electorId}>
+                    <td>
+                      <strong>{elector.electorName ?? "Elector"}</strong>
+                    </td>
+                    <td className="mono">{elector.heartCount}</td>
+                    <td className="mono">{elector.commentCount}</td>
+                    <td className="mono">{elector.availabilityCount}</td>
+                    <td>
+                      {elector.latestActivityAt ? (
+                        new Date(elector.latestActivityAt).toLocaleString()
+                      ) : (
+                        <span className="faint">None</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div className="card">
