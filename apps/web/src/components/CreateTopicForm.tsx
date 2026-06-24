@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
+import { ImageUploadField } from "@/components/ImageUploadField";
 import { clientGql } from "@/lib/clientGraphql";
 
 const MUTATION = `mutation Create($s: String!, $title: String!, $body: String, $cover: String) {
@@ -14,6 +15,7 @@ export function CreateTopicForm({ slug }: { slug: string }) {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [cover, setCover] = useState("");
+  const [uploadingCover, setUploadingCover] = useState(false);
   const [pending, startTransition] = useTransition();
 
   async function submit(e: React.FormEvent) {
@@ -56,17 +58,21 @@ export function CreateTopicForm({ slug }: { slug: string }) {
           placeholder="What is this session about?"
         />
       </div>
-      <div className="field">
-        <label htmlFor="topic-cover">Cover image URL</label>
-        <input
-          id="topic-cover"
-          value={cover}
-          onChange={(e) => setCover(e.target.value)}
-          placeholder="https://…"
-        />
-      </div>
-      <button className="btn btn-primary" type="submit" disabled={pending}>
-        {pending ? "Creating…" : "Create draft"}
+      <ImageUploadField
+        id="topic-cover"
+        label="Cover image URL"
+        value={cover}
+        onChange={setCover}
+        purpose="topic-cover"
+        timetableIdOrSlug={slug}
+        onUploadingChange={setUploadingCover}
+      />
+      <button
+        className="btn btn-primary"
+        type="submit"
+        disabled={pending || uploadingCover}
+      >
+        {uploadingCover ? "Uploading…" : pending ? "Creating…" : "Create draft"}
       </button>
     </form>
   );

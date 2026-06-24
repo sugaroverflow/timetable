@@ -36,6 +36,19 @@ vi.mock("./context", async (importOriginal) => {
 });
 
 const originalCronSecret = process.env.CRON_SECRET;
+const storageEnvKeys = [
+  "SPACES_ENDPOINT",
+  "SPACES_REGION",
+  "SPACES_BUCKET",
+  "SPACES_KEY",
+  "SPACES_SECRET",
+  "SPACES_PUBLIC_BASE_URL",
+  "SPACES_KEY_PREFIX",
+  "SPACES_FORCE_PATH_STYLE",
+] as const;
+const originalStorageEnv = Object.fromEntries(
+  storageEnvKeys.map((key) => [key, process.env[key]]),
+) as Record<(typeof storageEnvKeys)[number], string | undefined>;
 
 function testContext(userId: string | null, roles: Role[] = []): ApiContext {
   return {
@@ -62,6 +75,32 @@ function restoreCronSecret() {
   } else {
     process.env.CRON_SECRET = originalCronSecret;
   }
+}
+
+function restoreStorageEnv() {
+  for (const key of storageEnvKeys) {
+    const value = originalStorageEnv[key];
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  }
+}
+
+function clearStorageEnv() {
+  for (const key of storageEnvKeys) delete process.env[key];
+}
+
+function configureStorageEnv() {
+  process.env.SPACES_ENDPOINT = "https://lon1.digitaloceanspaces.com";
+  process.env.SPACES_REGION = "lon1";
+  process.env.SPACES_BUCKET = "timetable-dev";
+  process.env.SPACES_KEY = "test-key";
+  process.env.SPACES_SECRET = "test-secret";
+  process.env.SPACES_KEY_PREFIX = "test-uploads";
+  delete process.env.SPACES_PUBLIC_BASE_URL;
+  delete process.env.SPACES_FORCE_PATH_STYLE;
 }
 
 function timetableFixture(patch: Partial<Timetable> = {}): Timetable {
@@ -136,6 +175,7 @@ beforeEach(() => {
 
 afterEach(() => {
   restoreCronSecret();
+  restoreStorageEnv();
   vi.mocked(context.buildContext).mockReset();
   vi.mocked(core.getMembershipById).mockReset();
   vi.mocked(core.getReadableTimetable).mockReset();
@@ -174,14 +214,11 @@ describe("createApiApp", () => {
 
   it("rejects unauthenticated invite management", async () => {
     await withTestServer(async (baseUrl) => {
-      const res = await fetch(
-        `${baseUrl}/api/timetables/timetable-1/invites`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ emails: ["host@example.com"] }),
-        },
-      );
+      const res = await fetch(`${baseUrl}/api/timetables/timetable-1/invites`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emails: ["host@example.com"] }),
+      });
 
       expect(res.status).toBe(401);
       await expect(res.json()).resolves.toEqual({
@@ -209,17 +246,14 @@ describe("createApiApp", () => {
     mockSession("host-1", ["host"]);
 
     await withTestServer(async (baseUrl) => {
-      const res = await fetch(
-        `${baseUrl}/api/timetables/timetable-1/invites`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            emails: ["new-host@example.com"],
-            roles: ["host"],
-          }),
-        },
-      );
+      const res = await fetch(`${baseUrl}/api/timetables/timetable-1/invites`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          emails: ["new-host@example.com"],
+          roles: ["host"],
+        }),
+      });
 
       expect(res.status).toBe(403);
       await expect(res.json()).resolves.toEqual({ error: "Admins only" });
@@ -235,17 +269,14 @@ describe("createApiApp", () => {
     vi.mocked(core.inviteEmails).mockResolvedValue(results);
 
     await withTestServer(async (baseUrl) => {
-      const res = await fetch(
-        `${baseUrl}/api/timetables/timetable-1/invites`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            emails: ["new-host@example.com"],
-            roles: ["host"],
-          }),
-        },
-      );
+      const res = await fetch(`${baseUrl}/api/timetables/timetable-1/invites`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          emails: ["new-host@example.com"],
+          roles: ["host"],
+        }),
+      });
 
       expect(res.status).toBe(200);
       await expect(res.json()).resolves.toEqual({ results });
@@ -320,6 +351,146 @@ describe("createApiApp", () => {
         "owner",
         "admin",
       ]);
+    });
+  });
+
+  it("rejects unauthenticated upload signing", async () => {
+    await withTestServer(async (baseUrl) => {
+      const res = await fetch(`${baseUrl}/api/uploads`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          purpose: "profile-image",
+          filename: "avatar.png",
+          contentType: "image/png",
+          size: 100,
+        }),
+      });
+
+      expect(res.status).toBe(401);
+      await expect(res.json()).resolves.toEqual({
+        error: "Not authenticated",
+      });
+    });
+  });
+
+  it("returns 503 for upload signing when storage is not configured", async () => {
+    mockSession("user-1", []);
+    clearStorageEnv();
+
+    await withTestServer(async (baseUrl) => {
+      const res = await fetch(`${baseUrl}/api/uploads`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          purpose: "profile-image",
+          filename: "avatar.png",
+          contentType: "image/png",
+          size: 100,
+        }),
+      });
+
+      expect(res.status).toBe(503);
+      await expect(res.json()).resolves.toEqual({
+        error: "Object storage is not configured",
+      });
+    });
+  });
+
+  it("returns a signed profile image upload", async () => {
+    mockSession("user-1", []);
+    configureStorageEnv();
+
+    await withTestServer(async (baseUrl) => {
+      const res = await fetch(`${baseUrl}/api/uploads`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          purpose: "profile-image",
+          filename: "avatar.png",
+          contentType: "image/png",
+          size: 100,
+        }),
+      });
+      const body = (await res.json()) as {
+        key: string;
+        publicUrl: string;
+        uploadUrl: string;
+        method: string;
+        headers: Record<string, string>;
+      };
+
+      expect(res.status).toBe(200);
+      expect(body.key).toMatch(
+        /^test-uploads\/profile-image\/users\/user-1\/[0-9a-f-]+\.png$/,
+      );
+      expect(body.publicUrl).toBe(
+        `https://timetable-dev.lon1.digitaloceanspaces.com/${body.key}`,
+      );
+      expect(body.uploadUrl).toContain("X-Amz-Signature=");
+      expect(body.method).toBe("PUT");
+      expect(body.headers).toEqual({
+        "Content-Type": "image/png",
+        "x-amz-acl": "public-read",
+      });
+    });
+  });
+
+  it("rejects topic cover uploads from authenticated non-host members", async () => {
+    mockSession("elector-1", ["elector"]);
+    configureStorageEnv();
+    vi.mocked(core.getReadableTimetable).mockResolvedValue({
+      timetable: timetableFixture(),
+      roles: ["elector"],
+    });
+
+    await withTestServer(async (baseUrl) => {
+      const res = await fetch(`${baseUrl}/api/uploads`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          purpose: "topic-cover",
+          timetableIdOrSlug: "public-calendar",
+          filename: "cover.webp",
+          contentType: "image/webp",
+          size: 100,
+        }),
+      });
+
+      expect(res.status).toBe(403);
+      await expect(res.json()).resolves.toEqual({ error: "Hosts only" });
+    });
+  });
+
+  it("lets admins sign timetable cover uploads", async () => {
+    mockSession("admin-1", ["admin"]);
+    configureStorageEnv();
+    vi.mocked(core.getReadableTimetable).mockResolvedValue({
+      timetable: timetableFixture(),
+      roles: ["admin"],
+    });
+
+    await withTestServer(async (baseUrl) => {
+      const res = await fetch(`${baseUrl}/api/uploads`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          purpose: "timetable-cover",
+          timetableIdOrSlug: "public-calendar",
+          filename: "cover.jpg",
+          contentType: "image/jpeg",
+          size: 100,
+        }),
+      });
+      const body = (await res.json()) as { key: string; publicUrl: string };
+
+      expect(res.status).toBe(200);
+      expect(body.key).toMatch(
+        /^test-uploads\/timetable-cover\/timetables\/11111111-1111-1111-1111-111111111111\/admin-1\/[0-9a-f-]+\.jpg$/,
+      );
+      expect(body.publicUrl).toContain(
+        "/test-uploads/timetable-cover/timetables/",
+      );
     });
   });
 

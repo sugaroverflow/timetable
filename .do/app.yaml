@@ -59,6 +59,8 @@ services:
       - { key: SPACES_ENDPOINT, scope: RUN_TIME }
       - { key: SPACES_REGION, scope: RUN_TIME }
       - { key: SPACES_BUCKET, scope: RUN_TIME }
+      - { key: SPACES_KEY_PREFIX, value: "uploads/production", scope: RUN_TIME }
+      - { key: SPACES_PUBLIC_BASE_URL, scope: RUN_TIME }
       - { key: SPACES_KEY, scope: RUN_TIME, type: SECRET }
       - { key: SPACES_SECRET, scope: RUN_TIME, type: SECRET }
 

@@ -106,10 +106,10 @@ app now includes:
 - custom-domain routing hooks and separate DigitalOcean dev/prod app specs
 - API hardening with GraphQL depth/cost limits, structured request/error
   logging, and database-backed hosted rate limiting
+- S3-compatible uploads for profile images, topic covers, and timetable covers
 
 Remaining major gaps include verified production email delivery, multi-channel
-notifications, object-storage-backed media uploads, production DNS/Clerk
-verification, traffic-based tuning, and broader permission/integration/browser
-test coverage.
+notifications, hosted media bucket/CDN configuration, production DNS/Clerk
+verification, traffic-based tuning, and feed/dashboard scalability work.
 
 See [Roadmap](docs/ROADMAP.md) for the full status and risk list.

@@ -50,7 +50,7 @@ export default async function MyTopicsPage({
         ) : (
           <ul className="list">
             {data.hostDashboard.map((topic) => (
-              <TopicManager key={topic.id} topic={topic} />
+              <TopicManager key={topic.id} topic={topic} slug={slug} />
             ))}
           </ul>
         )}

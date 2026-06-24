@@ -73,9 +73,8 @@ Admin surfaces include:
 Custom role labels and theme colors are rendered in the timetable shell and main
 feed fallbacks. Some lower-level UI copy still uses generic role names.
 
-Profile images, topic covers, and timetable covers can currently be edited as
-image URLs. Binary uploads and object-storage-backed media handling are not part
-of the tracked app yet.
+Profile images, topic covers, and timetable covers can be pasted as image URLs
+or uploaded through the app to S3-compatible object storage.
 
 ## Privacy
 
