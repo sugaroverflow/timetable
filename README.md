@@ -59,6 +59,9 @@ timetable with slug `spt-test-data`. It creates deterministic local dev users,
 including owner `dev_sample_admin-edwin`
 (`admin-edwin@sample.timetable.test`), without calling Clerk.
 
+Hosted dev can run the same seed as an optional manual `Deploy Dev` workflow
+task; production deploys never run it.
+
 ## Docs
 
 Detailed project docs are tracked in this repository so they can be reviewed in

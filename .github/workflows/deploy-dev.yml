@@ -9,6 +9,12 @@ on:
     types: [completed]
     branches: [main]
   workflow_dispatch:
+    inputs:
+      seed_sample_data:
+        description: "Seed dev sample data after deploy"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -38,6 +44,7 @@ jobs:
           EMAIL_FROM: ${{ vars.EMAIL_FROM }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          SEED_DEV_SAMPLE_DATA: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.seed_sample_data == 'true' && 'true' || 'false' }}
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
           app_spec_location: .do/app.dev.yaml
