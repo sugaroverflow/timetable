@@ -16,6 +16,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
+    "test:e2e": "playwright test",
     "dev": "npm run dev --workspace @timetable/api & npm run dev --workspace @timetable/web",
     "dev:api": "npm run dev --workspace @timetable/api",
     "dev:web": "npm run dev --workspace @timetable/web",
@@ -27,6 +28,7 @@
     "db:down": "docker compose down"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@types/node": "^26.0.0",
     "prettier": "^3.8.4",
     "typescript": "^6.0.3"

@@ -4,7 +4,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 export default async function HomePage() {
-  const { userId } = await auth();
+  const { userId } =
+    process.env.E2E_TEST_MODE === "1" ? { userId: null } : await auth();
   if (userId) redirect("/timetables");
 
   return (

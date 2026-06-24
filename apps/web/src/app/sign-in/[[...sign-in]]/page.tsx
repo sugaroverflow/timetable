@@ -7,12 +7,14 @@ export default function SignInPage() {
         <h1>Sign in</h1>
         <p>Continue with your account to access your timetables.</p>
       </div>
-      <SignIn
-        path="/sign-in"
-        routing="path"
-        signUpUrl="/sign-up"
-        fallbackRedirectUrl="/timetables"
-      />
+      {process.env.E2E_TEST_MODE === "1" ? null : (
+        <SignIn
+          path="/sign-in"
+          routing="path"
+          signUpUrl="/sign-up"
+          fallbackRedirectUrl="/timetables"
+        />
+      )}
     </main>
   );
 }
