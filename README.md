@@ -21,8 +21,8 @@ Core workflows:
 - Hosts propose and submit topics.
 - Admins moderate topics, manage members, create slots, and tag topics to slots.
 - Electors heart topics, comment, and mark availability.
-- Hosts and admins use weighted-heart scores and availability breakdowns to plan
-  the final schedule.
+- Hosts and admins use weighted-heart scores, elector activity filters,
+  availability breakdowns, and conflict alerts to plan the final schedule.
 - Users can subscribe to a timetable's slots through an ICS calendar feed.
 
 ## Quick Start
@@ -96,10 +96,20 @@ The web app logo lives in [apps/web/public/assets](apps/web/public/assets).
 
 ## Status
 
-Phases 0-3 are substantially implemented. Phase 4 is partial: dashboard
-analytics, conflict alerts, digest job code, custom-domain routing, and ICS
-export exist, while scheduled production digest delivery, multi-channel
-notifications, production object storage uploads, and broader hardening still
-need work.
+Phases 0-3 are substantially implemented. Phase 4 is partial, but the tracked
+app now includes:
+
+- dashboard analytics with host-scoped elector activity filters
+- conflict alerts, topic-to-slot tagging, and ICS calendar export
+- digest computation, a protected digest job endpoint, scheduled GitHub Actions
+  caller, and Resend environment plumbing
+- custom-domain routing hooks and separate DigitalOcean dev/prod app specs
+- API hardening with GraphQL depth/cost limits, structured request/error
+  logging, and database-backed hosted rate limiting
+
+Remaining major gaps include verified production email delivery, multi-channel
+notifications, object-storage-backed media uploads, production DNS/Clerk
+verification, traffic-based tuning, and broader permission/integration/browser
+test coverage.
 
 See [Roadmap](docs/ROADMAP.md) for the full status and risk list.
