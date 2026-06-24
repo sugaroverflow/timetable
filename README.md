@@ -115,6 +115,9 @@ The remaining testing requirements are richer authenticated browser workflows
 once there is a Clerk test-user/session harness and broader GraphQL role
 fixtures for future permission-sensitive changes.
 
+Hosted post-deploy checks and rate-limit smoke commands live in
+[Deployment](docs/DEPLOYMENT.md#smoke-test).
+
 ## Status
 
 Phases 0-3 are substantially implemented. Phase 4 is partial, but the tracked

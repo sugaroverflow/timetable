@@ -202,6 +202,26 @@ Digest delivery needs:
 - `RESEND_API_KEY`
 - `EMAIL_FROM`
 
+## Rate Limiting
+
+Hosted API traffic should use the database-backed limiter so requests are
+counted across App Platform instances:
+
+| Environment | `RATE_LIMIT_BACKEND` | `RATE_LIMIT_KEY_PREFIX` |
+| --- | --- | --- |
+| Local | `memory` | `timetable:development:api` |
+| Dev | `database` | `timetable:dev:api` |
+| Production | `database` | `timetable:production:api` |
+
+`RATE_LIMIT_BACKEND=database` requires `DATABASE_URL` and the
+`api_rate_limit_buckets` migration. Keep `TRUST_PROXY_HOPS=1` on DigitalOcean so
+the limiter keys by the client IP App Platform forwards instead of the proxy
+itself.
+
+`/health` intentionally does not exercise the rate limiter. Use `POST /graphql`
+or an `/api/*` request in hosted smoke checks to verify the rate-limit and
+database-backed request path.
+
 ## Object Storage
 
 The API exposes `POST /api/uploads` for signed direct browser uploads to an
@@ -291,6 +311,38 @@ After deploy:
 10. Upload a profile, topic cover, or timetable cover image if object-storage
     credentials or bucket CORS changed.
 
+Useful anonymous hosted smoke commands:
+
+```bash
+for host in timetable.love dev.timetable.love; do
+  curl -sS -L -o /dev/null -w "$host / %{http_code}\n" "https://${host}/"
+  curl -sS -L -o /dev/null -w "$host /sign-in %{http_code}\n" "https://${host}/sign-in"
+  curl -sS -L -o /dev/null -w "$host /sign-up %{http_code}\n" "https://${host}/sign-up"
+  curl -sS -w "\n$host /health %{http_code}\n" "https://${host}/health"
+  curl -sS -X POST "https://${host}/graphql" \
+    -H 'content-type: application/json' \
+    --data '{"query":"query { __typename }"}' \
+    -w "\n$host /graphql %{http_code}\n"
+done
+```
+
+Run a short repeated GraphQL probe when checking the hosted rate limiter:
+
+```bash
+for host in timetable.love dev.timetable.love; do
+  for i in 1 2 3 4 5; do
+    curl -sS -o /dev/null -w "$host graphql run=$i %{http_code}\n" \
+      -X POST "https://${host}/graphql" \
+      -H 'content-type: application/json' \
+      --data '{"query":"query { __typename }"}'
+  done
+done
+```
+
+For the uploads route, anonymous `POST /api/uploads` should return `401` once
+the upload code is deployed. `404` means the route is not in the active
+deployment; `503` means object-storage env vars are missing.
+
 ## Common Deploy Failures
 
 - Missing DigitalOcean API scopes.
@@ -299,3 +351,5 @@ After deploy:
 - Clerk keys from the wrong instance.
 - Missing production Clerk domain/DNS setup.
 - Database migration failure in the pre-deploy job.
+- Hosted rate limiter misconfiguration; `/health` may still pass, so check
+  `POST /graphql`.

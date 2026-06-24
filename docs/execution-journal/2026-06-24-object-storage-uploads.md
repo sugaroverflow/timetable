@@ -26,6 +26,10 @@ existing profile image, topic cover, and timetable cover URL fields.
 - Added `scripts/configure-spaces-cors.sh` to make the DigitalOcean Spaces CORS
   setup reproducible without hand-writing XML or using unsupported AWS CLI CORS
   operations.
+- After first-time Spaces credentials were added in the DigitalOcean console,
+  patched the dev App Platform API env back to include `SPACES_ENDPOINT`,
+  `SPACES_REGION`, `SPACES_BUCKET`, and `SPACES_KEY_PREFIX` while preserving the
+  newly added `SPACES_KEY` and `SPACES_SECRET`.
 
 ### Decisions
 
@@ -77,6 +81,10 @@ to the storage provider for the signed PUT.
   `timetable` bucket with distinct key prefixes.
 - User reported the local `s3cmd setcors` CORS configuration command succeeded
   after correcting the Spaces key export.
+- DigitalOcean API verification confirmed hosted dev has all required
+  `SPACES_*` values present after the first-time key setup.
+- Hosted dev `/health` and `POST /graphql` smoke checks returned `ok: true` and
+  `{"data":{"__typename":"Query"}}` after the dev env patch.
 
 ### Demo Impact
 
