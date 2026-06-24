@@ -86,6 +86,7 @@ The web app logo lives in [apps/web/public/assets](apps/web/public/assets).
 | `npm run dev:api` / `npm run dev:web` | Run one app |
 | `npm run typecheck` | Type-check every workspace |
 | `npm run test` | Run unit tests |
+| `npm run test:e2e` | Run Playwright anonymous browser smoke tests |
 | `npm run lint` | Lint the web app |
 | `npm run build` | Build all workspaces |
 | `npm run db:generate` | Generate a SQL migration from the schema |
@@ -93,6 +94,26 @@ The web app logo lives in [apps/web/public/assets](apps/web/public/assets).
 | `npm run db:seed` | Seed the local dev database from `dev-sample-data.md` |
 | `npm run db:studio` | Open Drizzle Studio |
 | `npm run db:up` / `npm run db:down` | Start or stop local Postgres |
+
+## Testing Requirements
+
+Pull requests should keep the full verification path green:
+
+- `npm run build`
+- `npm run typecheck`
+- `npm run lint`
+- `npm run test`
+- `npm run test:e2e`
+- `npm run db:migrate` when migrations or schema-adjacent config change
+
+Committed audit guardrails now cover API health, REST auth boundaries for
+timetables/invites/memberships/uploads, digest cron protection, ICS responses,
+GraphQL depth/cost limits, shared rate-limit behavior, weighted hearts, and
+anonymous browser smoke for `/`, `/sign-in`, and `/sign-up`.
+
+The remaining testing requirements are richer authenticated browser workflows
+once there is a Clerk test-user/session harness and broader GraphQL role
+fixtures for future permission-sensitive changes.
 
 ## Status
 
@@ -110,6 +131,7 @@ app now includes:
 
 Remaining major gaps include verified production email delivery, multi-channel
 notifications, hosted media bucket/CDN configuration, production DNS/Clerk
-verification, traffic-based tuning, and feed/dashboard scalability work.
+verification, authenticated browser coverage, traffic-based tuning, and
+feed/dashboard scalability work.
 
 See [Roadmap](docs/ROADMAP.md) for the full status and risk list.

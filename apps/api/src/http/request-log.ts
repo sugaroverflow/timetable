@@ -4,6 +4,25 @@ import type { NextFunction, Request, Response } from "express";
 
 type RequestWithId = Request & { requestId?: string };
 type LogLevel = "debug" | "info" | "warn" | "error";
+type ErrorLogDetails = {
+  errorName: string;
+  errorMessage: string;
+  stack?: string;
+  cause?: ErrorLogDetails;
+  code?: unknown;
+  detail?: unknown;
+  hint?: unknown;
+  severity?: unknown;
+  routine?: unknown;
+};
+
+const errorFieldNames = [
+  "code",
+  "detail",
+  "hint",
+  "severity",
+  "routine",
+] as const;
 
 function writeLog(level: LogLevel, event: string, fields: Record<string, unknown>) {
   const entry = {
@@ -21,13 +40,24 @@ function writeLog(level: LogLevel, event: string, fields: Record<string, unknown
   }
 }
 
-function errorDetails(error: unknown) {
+function errorDetails(error: unknown, depth = 0): ErrorLogDetails {
   if (error instanceof Error) {
-    return {
+    const details: ErrorLogDetails = {
       errorName: error.name,
       errorMessage: error.message,
       stack: error.stack,
     };
+    const errorWithCause = error as Error & { cause?: unknown };
+    if (errorWithCause.cause && depth < 3) {
+      details.cause = errorDetails(errorWithCause.cause, depth + 1);
+    }
+    const errorRecord = error as unknown as Record<string, unknown>;
+    for (const field of errorFieldNames) {
+      if (errorRecord[field] !== undefined) {
+        details[field] = errorRecord[field];
+      }
+    }
+    return details;
   }
   return {
     errorName: "UnknownError",

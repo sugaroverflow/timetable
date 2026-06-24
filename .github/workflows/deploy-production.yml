@@ -31,3 +31,19 @@ jobs:
           project_id: ${{ secrets.DIGITALOCEAN_PROJECT_ID }}
           print_build_logs: true
           print_deploy_logs: true
+
+      - name: Smoke test production deployment
+        run: |
+          set -euo pipefail
+
+          curl --fail --silent --show-error https://timetable.love/health \
+            | grep -q '"ok":true'
+
+          curl --fail --silent --show-error --output /dev/null \
+            https://timetable.love/
+
+          curl --fail --silent --show-error \
+            --header "content-type: application/json" \
+            --data '{"query":"query Smoke { __typename }"}' \
+            https://timetable.love/graphql \
+            | grep -q '"data"'
