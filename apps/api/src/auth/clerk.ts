@@ -69,12 +69,15 @@ export async function getUserFromRequest(
   const existing = await loadLocalUser(clerkUserId);
   if (existing) return existing;
 
-  // First sign-in: mirror the Clerk profile into a local user row.
+  // First sign-in: mirror the Clerk profile into a local user row. Dev seed
+  // users set Clerk externalId to the deterministic local fixture user id.
   let email: string | null = null;
   let name: string | null = null;
   let image: string | null = null;
+  let externalId: string | null = null;
   try {
     const cu = await clerkClient.users.getUser(clerkUserId);
+    externalId = cu.externalId ?? null;
     email =
       cu.primaryEmailAddress?.emailAddress ??
       cu.emailAddresses[0]?.emailAddress ??
@@ -86,6 +89,11 @@ export async function getUserFromRequest(
     image = cu.imageUrl ?? null;
   } catch {
     // Fall back to a bare row if the Clerk lookup fails.
+  }
+
+  if (externalId) {
+    const externalUser = await loadLocalUser(externalId);
+    if (externalUser) return externalUser;
   }
 
   await db

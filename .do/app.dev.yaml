@@ -92,15 +92,18 @@ jobs:
     build_command: npm ci
     run_command: |
       if [ "$SEED_DEV_SAMPLE_DATA" = "true" ]; then
-        npm run db:seed
+        echo "Resetting hosted dev sample database and Clerk sample users."
+        SEED_DEV_RESET_DATABASE=true npm run db:seed
+        npm run clerk:seed-dev-users
       else
-        echo "Skipping dev sample data seed. Set seed_sample_data when manually dispatching Deploy Dev to run it."
+        echo "Skipping dev sample data and Clerk user seed. Set seed_sample_data when manually dispatching Deploy Dev to run it."
       fi
     instance_count: 1
     instance_size_slug: apps-s-1vcpu-0.5gb
     envs:
       - { key: DATABASE_URL, value: "${timetable-db.DATABASE_URL}", scope: RUN_TIME }
       - { key: DATABASE_SSL, value: "require", scope: RUN_TIME }
+      - { key: CLERK_SECRET_KEY, value: "${CLERK_SECRET_KEY}", scope: RUN_TIME, type: SECRET }
       - { key: SEED_DEV_SAMPLE_DATA, value: "${SEED_DEV_SAMPLE_DATA}", scope: RUN_TIME }
 
 databases:
