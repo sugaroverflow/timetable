@@ -66,7 +66,10 @@ Important variables:
 | `CLERK_SECRET_KEY` | Web, API | Clerk server SDK and token verification |
 | `CRON_SECRET` | API | Digest job protection; required in hosted environments |
 | `RESEND_API_KEY`, `EMAIL_FROM` | API | Digest email sending |
-| `SPACES_*` | Reserved | Future object storage configuration |
+| `SPACES_ENDPOINT`, `SPACES_REGION`, `SPACES_BUCKET` | API | S3-compatible object-storage target for image uploads |
+| `SPACES_KEY`, `SPACES_SECRET` | API | Object-storage credentials for signing direct browser uploads |
+| `SPACES_KEY_PREFIX`, `SPACES_PUBLIC_BASE_URL`, `SPACES_FORCE_PATH_STYLE` | API | Optional upload key namespace, CDN/custom public URL, and path-style mode |
+| `UPLOAD_MAX_IMAGE_BYTES` | API | Optional max image upload size, default `5242880` |
 
 ## GitHub Actions
 
@@ -192,10 +195,43 @@ Digest delivery needs:
 
 ## Object Storage
 
-The deployment specs reserve `SPACES_*` variables for DigitalOcean Spaces.
-The tracked app currently does not include a committed upload endpoint or upload
-UI, so Spaces is not required for first user tests. Update this section when the
-upload implementation lands.
+The API exposes `POST /api/uploads` for signed direct browser uploads to an
+S3-compatible bucket. The browser uploads the image with the returned short-lived
+PUT URL, then saves the returned public URL through the existing profile, topic,
+or timetable settings mutations.
+
+Supported media surfaces:
+
+- profile image
+- topic cover image
+- timetable cover image
+
+Required API component variables:
+
+- `SPACES_ENDPOINT`, for example `https://lon1.digitaloceanspaces.com`
+- `SPACES_REGION`, for example `lon1`
+- `SPACES_BUCKET`
+- `SPACES_KEY`
+- `SPACES_SECRET`
+
+Bucket CORS must allow `PUT` from the web origins (`https://dev.timetable.love`,
+`https://timetable.love`, and local dev if needed) with the `Content-Type` and
+`x-amz-acl` headers. The signed PUT uses `public-read`; public reads can be
+served either by the bucket URL or by `SPACES_PUBLIC_BASE_URL` pointing at a
+public CDN/custom domain.
+
+Optional API component variables:
+
+- `SPACES_KEY_PREFIX`, defaulting to `uploads/<NODE_ENV>`
+- `SPACES_PUBLIC_BASE_URL`, for a CDN or custom public media domain
+- `SPACES_FORCE_PATH_STYLE=true`, for S3-compatible providers that require
+  path-style URLs
+- `UPLOAD_MAX_IMAGE_BYTES`, defaulting to 5 MB
+
+Uploads support PNG, JPEG, WebP, GIF, and AVIF images and default to a 5 MB
+limit. The bucket or CDN path must make the returned object URLs publicly
+readable because profile and cover images are rendered directly in the web app.
+Without the required `SPACES_*` variables, `POST /api/uploads` returns `503`.
 
 ## Smoke Test
 

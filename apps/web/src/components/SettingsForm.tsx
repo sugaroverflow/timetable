@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
+import { ImageUploadField } from "@/components/ImageUploadField";
 import { clientGql } from "@/lib/clientGraphql";
 
 const MUTATION = `mutation Settings(
@@ -46,6 +47,7 @@ export function SettingsForm({
     current.theme?.secondary ?? "#5b7bff",
   );
   const [cover, setCover] = useState(current.coverImageUrl ?? "");
+  const [uploadingCover, setUploadingCover] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -73,7 +75,11 @@ export function SettingsForm({
 
       <div className="field">
         <label htmlFor="ra">Admin label</label>
-        <input id="ra" value={admin} onChange={(e) => setAdmin(e.target.value)} />
+        <input
+          id="ra"
+          value={admin}
+          onChange={(e) => setAdmin(e.target.value)}
+        />
       </div>
       <div className="field">
         <label htmlFor="rh">Host label</label>
@@ -111,23 +117,31 @@ export function SettingsForm({
         </div>
       </div>
 
-      <div className="field" style={{ marginTop: 12 }}>
-        <label htmlFor="cover">Cover image URL</label>
-        <input
+      <div style={{ marginTop: 12 }}>
+        <ImageUploadField
           id="cover"
+          label="Cover image URL"
           value={cover}
-          onChange={(e) => setCover(e.target.value)}
-          placeholder="https://…"
+          onChange={setCover}
+          purpose="timetable-cover"
+          timetableIdOrSlug={slug}
+          onUploadingChange={setUploadingCover}
         />
       </div>
 
       <button
         className="btn btn-primary"
         type="submit"
-        disabled={pending}
+        disabled={pending || uploadingCover}
         style={{ marginTop: 12 }}
       >
-        {pending ? "Saving…" : saved ? "Saved" : "Save settings"}
+        {uploadingCover
+          ? "Uploading…"
+          : pending
+            ? "Saving…"
+            : saved
+              ? "Saved"
+              : "Save settings"}
       </button>
     </form>
   );

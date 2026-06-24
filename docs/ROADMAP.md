@@ -53,15 +53,15 @@ Suggested smoke test:
 - Email digest is the first notification channel; additional channels such as
   Slack or push are not started.
 - Calendar sync is one-way ICS only.
-- Profile images and cover images can be edited as URLs; binary uploads and
-  object-storage-backed media handling are not committed.
+- Profile images and cover images can be edited as URLs or uploaded to
+  S3-compatible object storage.
 
 ## Operational Gaps
 
 - Digest delivery has a scheduled GitHub Actions caller and reserved Resend
   hosted env vars; production still needs verified sender configuration.
-- Object storage variables exist in deployment specs, but binary upload code is
-  not committed.
+- Hosted object storage still needs bucket/CDN credentials configured before
+  upload testing in each environment.
 - DigitalOcean provisioning cannot be proven from the repo alone.
 - Production and dev Clerk instances must stay separate.
 

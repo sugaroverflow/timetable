@@ -67,10 +67,8 @@ export const env = {
     process.env.RATE_LIMIT_KEY_PREFIX ?? `timetable:${nodeEnv}:api`,
   rateLimitWindowMs: intEnv("RATE_LIMIT_WINDOW_MS", 60_000),
   rateLimitMax: intEnv("RATE_LIMIT_MAX", 300),
-  rateLimitCleanupIntervalMs: intEnv(
-    "RATE_LIMIT_CLEANUP_INTERVAL_MS",
-    300_000,
-  ),
+  rateLimitCleanupIntervalMs: intEnv("RATE_LIMIT_CLEANUP_INTERVAL_MS", 300_000),
   graphqlMaxDepth: intEnv("GRAPHQL_MAX_DEPTH", 12),
   graphqlMaxCost: intEnv("GRAPHQL_MAX_COST", 500),
+  uploadMaxImageBytes: intEnv("UPLOAD_MAX_IMAGE_BYTES", 5 * 1024 * 1024),
 };

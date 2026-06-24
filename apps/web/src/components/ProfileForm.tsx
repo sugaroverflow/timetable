@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
+import { ImageUploadField } from "@/components/ImageUploadField";
 import { clientGql } from "@/lib/clientGraphql";
 
 const MUTATION = `mutation($name: String, $bio: String, $image: String) {
@@ -22,6 +23,7 @@ export function ProfileForm({
   const [name, setName] = useState(initialName ?? "");
   const [bio, setBio] = useState(initialBio ?? "");
   const [image, setImage] = useState(initialImage ?? "");
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
 
@@ -46,7 +48,11 @@ export function ProfileForm({
       <h2 style={{ marginTop: 0, fontSize: 18 }}>Profile</h2>
       <div className="field">
         <label htmlFor="name">Name</label>
-        <input id="name" value={name} onChange={(e) => setName(e.target.value)} />
+        <input
+          id="name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
       </div>
       <div className="field">
         <label htmlFor="bio">About</label>
@@ -57,17 +63,26 @@ export function ProfileForm({
           placeholder="A sentence or two about you."
         />
       </div>
-      <div className="field">
-        <label htmlFor="image">Profile image URL</label>
-        <input
-          id="image"
-          value={image}
-          onChange={(e) => setImage(e.target.value)}
-          placeholder="https://…"
-        />
-      </div>
-      <button className="btn btn-primary" type="submit" disabled={pending}>
-        {pending ? "Saving…" : saved ? "Saved" : "Save profile"}
+      <ImageUploadField
+        id="image"
+        label="Profile image URL"
+        value={image}
+        onChange={setImage}
+        purpose="profile-image"
+        onUploadingChange={setUploadingImage}
+      />
+      <button
+        className="btn btn-primary"
+        type="submit"
+        disabled={pending || uploadingImage}
+      >
+        {uploadingImage
+          ? "Uploading…"
+          : pending
+            ? "Saving…"
+            : saved
+              ? "Saved"
+              : "Save profile"}
       </button>
     </form>
   );

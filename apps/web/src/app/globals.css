@@ -249,6 +249,32 @@ textarea {
   min-height: 80px;
   resize: vertical;
 }
+.media-input {
+  display: grid;
+  gap: 8px;
+}
+.media-input input[type="file"] {
+  padding: 7px 9px;
+}
+.media-preview {
+  display: block;
+  width: 100%;
+  height: 140px;
+  margin-top: 8px;
+  background-position: center;
+  background-size: cover;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background-color: #f6f7fa;
+}
+.media-status {
+  min-height: 20px;
+  margin-top: 4px;
+  font-size: 13px;
+}
+.error-text {
+  color: var(--red);
+}
 
 /* Badges / role pills */
 .pill {

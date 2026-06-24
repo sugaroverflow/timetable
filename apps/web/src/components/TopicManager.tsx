@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
+import { ImageUploadField } from "@/components/ImageUploadField";
 import { clientGql } from "@/lib/clientGraphql";
 import type { ManagedTopic } from "@/lib/feedTypes";
 
@@ -12,13 +13,20 @@ const UPDATE = `mutation($id: String!, $title: String!, $body: String!, $cover: 
   updateTopic(topicId: $id, title: $title, bodyMd: $body, coverImageUrl: $cover){ id }
 }`;
 
-export function TopicManager({ topic }: { topic: ManagedTopic }) {
+export function TopicManager({
+  topic,
+  slug,
+}: {
+  topic: ManagedTopic;
+  slug: string;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(topic.title);
   const [body, setBody] = useState(topic.bodyMd);
   const [cover, setCover] = useState(topic.coverImageUrl ?? "");
+  const [uploadingCover, setUploadingCover] = useState(false);
 
   async function run(query: string, variables: Record<string, unknown>) {
     try {
@@ -59,14 +67,22 @@ export function TopicManager({ topic }: { topic: ManagedTopic }) {
         <form onSubmit={saveEdit} className="stack" style={{ marginTop: 10 }}>
           <input value={title} onChange={(e) => setTitle(e.target.value)} />
           <textarea value={body} onChange={(e) => setBody(e.target.value)} />
-          <input
+          <ImageUploadField
+            id={`topic-cover-${topic.id}`}
+            label="Cover image URL"
             value={cover}
-            onChange={(e) => setCover(e.target.value)}
-            placeholder="Cover image URL"
+            onChange={setCover}
+            purpose="topic-cover"
+            timetableIdOrSlug={slug}
+            onUploadingChange={setUploadingCover}
           />
           <div className="row">
-            <button className="btn btn-primary" type="submit" disabled={pending}>
-              Save
+            <button
+              className="btn btn-primary"
+              type="submit"
+              disabled={pending || uploadingCover}
+            >
+              {uploadingCover ? "Uploading…" : "Save"}
             </button>
             <button
               className="btn btn-ghost"
