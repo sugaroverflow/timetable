@@ -33,6 +33,8 @@ logs/
 
 # Test / coverage
 coverage/
+playwright-report/
+test-results/
 
 # Drizzle local artifacts
 packages/db/drizzle/meta/_journal.json.bak

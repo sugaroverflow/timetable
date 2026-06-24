@@ -7,12 +7,14 @@ export default function SignUpPage() {
         <h1>Create account</h1>
         <p>Create an account to create and join timetables.</p>
       </div>
-      <SignUp
-        path="/sign-up"
-        routing="path"
-        signInUrl="/sign-in"
-        fallbackRedirectUrl="/timetables"
-      />
+      {process.env.E2E_TEST_MODE === "1" ? null : (
+        <SignUp
+          path="/sign-up"
+          routing="path"
+          signInUrl="/sign-in"
+          fallbackRedirectUrl="/timetables"
+        />
+      )}
     </main>
   );
 }

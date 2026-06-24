@@ -1,5 +1,9 @@
 import { clerkMiddleware } from "@clerk/nextjs/server";
-import { NextResponse, type NextRequest } from "next/server";
+import {
+  NextResponse,
+  type NextFetchEvent,
+  type NextRequest,
+} from "next/server";
 
 // Next 16 renamed the "middleware" convention to "proxy". Clerk attaches auth
 // to every request; route-level access control is enforced in layouts/pages
@@ -109,9 +113,18 @@ async function customDomainRewrite(request: NextRequest) {
   return NextResponse.rewrite(url);
 }
 
-export default clerkMiddleware(async (_auth, request) => {
+const clerkProxy = clerkMiddleware(async (_auth, request) => {
   return customDomainRewrite(request);
 });
+
+export default function proxy(request: NextRequest, event: NextFetchEvent) {
+  // Playwright smoke tests render anonymous shell routes without Clerk's
+  // development-browser handshake or real Clerk credentials.
+  if (process.env.E2E_TEST_MODE === "1") {
+    return customDomainRewrite(request);
+  }
+  return clerkProxy(request, event);
+}
 
 export const config = {
   matcher: [
