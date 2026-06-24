@@ -16,6 +16,9 @@ object-storage CORS setup reproducible.
 - Added regression coverage proving nested driver details appear in rate-limit
   style request logs.
 - Documented the current test contract in the README and roadmap.
+- Added deployment docs for manual hosted curl checks across `/`, `/sign-in`,
+  `/sign-up`, `/health`, repeated `POST /graphql`, and anonymous
+  `POST /api/uploads` route-shape validation.
 - Added a `scripts/configure-spaces-cors.sh` helper for applying DigitalOcean
   Spaces CORS with `s3cmd`.
 - Updated App Platform specs and env docs to use one shared Spaces bucket with
@@ -62,6 +65,10 @@ a larger product/data-path change.
   Playwright web server.
 - Deployment smoke behavior is validated by workflow review until the workflows
   execute in GitHub Actions.
+- Manual live curl checks showed dev and production serving homepage, auth
+  routes, `/health`, GraphQL CORS preflight, and repeated `POST /graphql`.
+  Production returned `404` for anonymous `POST /api/uploads`, confirming it was
+  still on the pre-upload deployment; dev returned the expected `401`.
 
 ### Demo Impact
 
