@@ -61,7 +61,9 @@ if (process.env.SPACES_BUCKET) {
     "SPACES_KEY",
     "SPACES_SECRET",
     "SPACES_ENDPOINT",
-    "SPACES_BUCKET",
+    "SPACES_KEY",
+    "SPACES_SECRET",
+    "SPACES_ENDPOINT",
   ] as const;
   const missingStorage = requiredStorage.filter((name) => !process.env[name]);
   if (missingStorage.length > 0) {
