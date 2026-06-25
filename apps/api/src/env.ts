@@ -56,6 +56,23 @@ if (rateLimitBackend === "database" && !process.env.DATABASE_URL) {
   );
 }
 
+if (process.env.SPACES_BUCKET) {
+  const requiredStorage = [
+    "SPACES_KEY",
+    "SPACES_SECRET",
+    "SPACES_ENDPOINT",
+    "SPACES_KEY",
+    "SPACES_SECRET",
+    "SPACES_ENDPOINT",
+  ] as const;
+  const missingStorage = requiredStorage.filter((name) => !process.env[name]);
+  if (missingStorage.length > 0) {
+    throw new Error(
+      `[api] SPACES_BUCKET is set but missing required storage vars: ${missingStorage.join(", ")}`,
+    );
+  }
+}
+
 export const env = {
   port: intEnv("API_PORT", 4000),
   webOrigin: listEnv("WEB_ORIGIN", "http://localhost:3000"),

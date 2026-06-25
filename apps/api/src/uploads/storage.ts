@@ -67,23 +67,17 @@ function cleanPrefix(value: string): string {
 }
 
 function storageConfig(): StorageConfig {
-  const endpoint = process.env.SPACES_ENDPOINT?.trim();
-  const region = process.env.SPACES_REGION?.trim();
-  const bucket = process.env.SPACES_BUCKET?.trim();
-  const accessKeyId = process.env.SPACES_KEY?.trim();
-  const secretAccessKey = process.env.SPACES_SECRET?.trim();
-
-  if (!endpoint || !region || !bucket || !accessKeyId || !secretAccessKey) {
+  if (!process.env.SPACES_BUCKET) {
     throw new UploadsNotConfiguredError();
   }
 
   return {
-    endpoint,
-    region,
-    bucket,
-    accessKeyId,
-    secretAccessKey,
-    publicBaseUrl: process.env.SPACES_PUBLIC_BASE_URL?.trim() || null,
+    endpoint: process.env.SPACES_ENDPOINT!,
+    region: process.env.SPACES_REGION ?? "us-east-1",
+    bucket: process.env.SPACES_BUCKET!,
+    accessKeyId: process.env.SPACES_KEY!,
+    secretAccessKey: process.env.SPACES_SECRET!,
+    publicBaseUrl: process.env.SPACES_PUBLIC_BASE_URL ?? null,
     keyPrefix: cleanPrefix(
       process.env.SPACES_KEY_PREFIX ?? `uploads/${env.nodeEnv}`,
     ),

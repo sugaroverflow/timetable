@@ -36,13 +36,50 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web app
+        run: npm run build -w @timetable/web
+        env:
+          NEXT_PUBLIC_API_URL: https://dev.timetable.love
+          NEXT_PUBLIC_GRAPHQL_URL: https://dev.timetable.love/graphql
+          GRAPHQL_ROUTE_URL: https://dev.timetable.love/graphql
+          NEXT_PUBLIC_CLERK_SIGN_IN_URL: /sign-in
+          NEXT_PUBLIC_CLERK_SIGN_UP_URL: /sign-up
+          NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL: /timetables
+          NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL: /timetables
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Authenticate with DO Container Registry
+        run: doctl registry login --expiry-seconds 1200
+
+      - name: Build and push web image
+        run: |
+          IMAGE="registry.digitalocean.com/timetable/web:${{ github.sha }}"
+          docker build -f apps/web/Dockerfile -t "$IMAGE" .
+          docker push "$IMAGE"
+
+      - name: Set image tag in app spec
+        run: sed -i "s/tag: DEPLOY_TAG/tag: ${{ github.sha }}/" .do/app.dev.yaml
+
       - name: Deploy timetable-dev to App Platform
         uses: digitalocean/app_action/deploy@v2
         env:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           EMAIL_FROM: ${{ vars.EMAIL_FROM }}
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           SEED_DEV_SAMPLE_DATA: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.seed_sample_data == 'true' && 'true' || 'false' }}
         with:

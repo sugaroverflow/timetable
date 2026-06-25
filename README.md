@@ -24,6 +24,7 @@ Core workflows:
 - Hosts and admins use weighted-heart scores, elector activity filters,
   availability breakdowns, and conflict alerts to plan the final schedule.
 - Users can subscribe to a timetable's slots through an ICS calendar feed.
+- Profile images, topic covers, and timetable covers can be pasted as URLs or uploaded directly to object storage.
 
 ## Quick Start
 
@@ -80,13 +81,12 @@ never run it.
 Detailed project docs are tracked in this repository so they can be reviewed in
 pull requests with code changes.
 
-- [Product](docs/PRODUCT.md): roles, workflows, privacy, notifications, and sync.
 - [Architecture](docs/ARCHITECTURE.md): apps, packages, API surfaces, auth flow,
   data model, and runtime boundaries.
 - [Deployment](docs/DEPLOYMENT.md): local/dev/prod environments, Clerk,
   DigitalOcean, GitHub Actions, secrets, and cron.
-- [Roadmap](docs/ROADMAP.md): current status, known gaps, testing risks, and
-  next recommended work.
+- [Product](docs/PRODUCT.md): roles, workflows, privacy, notifications, sync,
+  implementation status, go-live checklist, and known gaps.
 
 Static README screenshots live in [docs/assets/readme](docs/assets/readme).
 The web app logo lives in [apps/web/public/assets](apps/web/public/assets).
@@ -134,8 +134,9 @@ Hosted post-deploy checks and rate-limit smoke commands live in
 
 ## Status
 
-Phases 0-3 are substantially implemented. Phase 4 is partial, but the tracked
-app now includes:
+Phases 0-4 are substantially implemented. Phase 4 remains partial: email digest
+delivery requires a verified Resend sender identity before it works in production.
+The tracked app includes:
 
 - dashboard analytics with host-scoped elector activity filters
 - conflict alerts, topic-to-slot tagging, and ICS calendar export
@@ -151,4 +152,4 @@ notifications, hosted media bucket/CDN configuration, production DNS/Clerk
 verification, authenticated browser coverage, traffic-based tuning, and
 feed/dashboard scalability work.
 
-See [Roadmap](docs/ROADMAP.md) for the full status and risk list.
+See [Product](docs/PRODUCT.md) for the full implementation status, go-live checklist, and known gaps.

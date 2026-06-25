@@ -1,3 +1,11 @@
+export type TopicStatus =
+  | "draft"
+  | "submitted"
+  | "published"
+  | "unpublished"
+  | "archived";
+export type CommentVisibility = "public" | "host_only";
+
 export type FeedComment = {
   id: string;
   parentId: string | null;
@@ -5,7 +13,7 @@ export type FeedComment = {
   authorName: string | null;
   authorImage: string | null;
   body: string;
-  visibility: string;
+  visibility: CommentVisibility;
   hidden: boolean;
   createdAt: string;
   replies: FeedComment[];
@@ -26,7 +34,7 @@ export type FeedTopic = {
   title: string;
   bodyHtml: string;
   coverImageUrl: string | null;
-  status: string;
+  status: TopicStatus;
   heartCount: number;
   weightedScore: number | null;
   viewerHasHearted: boolean;
@@ -40,7 +48,7 @@ export type FeedTopic = {
 export type ManagedTopic = {
   id: string;
   title: string;
-  status: string;
+  status: TopicStatus;
   bodyMd: string;
   bodyHtml: string;
   coverImageUrl: string | null;
