@@ -5,12 +5,15 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-# Standalone output includes everything needed to run (server.js + minimal node_modules + traced packages)
-COPY apps/web/.next/standalone ./
-# Static assets must be copied separately (not included in standalone)
-COPY apps/web/.next/static ./.next/static
-# Public assets
-COPY apps/web/public ./apps/web/public
+RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 
+# Standalone output mirrors the monorepo layout (outputFileTracingRoot = repo root).
+# server.js lands at apps/web/server.js inside the image.
+COPY --chown=nextjs:nodejs apps/web/.next/standalone ./
+# Static and public assets must sit next to server.js (not included in standalone).
+COPY --chown=nextjs:nodejs apps/web/.next/static ./apps/web/.next/static
+COPY --chown=nextjs:nodejs apps/web/public ./apps/web/public
+
+USER nextjs
 EXPOSE 3000
-CMD ["node", "server.js"]
+CMD ["node", "apps/web/server.js"]

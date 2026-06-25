@@ -1,0 +1,9 @@
+.git
+node_modules
+apps/api
+apps/web/src
+apps/web/node_modules
+packages
+tests
+docs
+scripts

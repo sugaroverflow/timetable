@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { claimInvitesForUser } from "@timetable/core";
 import { db, users } from "@timetable/db";
 
+import { env } from "../env";
 import { parseCookies } from "../http/cookies";
 
 export type SessionUser = {
@@ -91,9 +92,12 @@ export async function getUserFromRequest(
     // Fall back to a bare row if the Clerk lookup fails.
   }
 
-  if (externalId) {
+  if (externalId && !env.isProd) {
     const externalUser = await loadLocalUser(externalId);
-    if (externalUser) return externalUser;
+    if (externalUser) {
+      if (email) await claimInvitesForUser(externalUser.id, email);
+      return externalUser;
+    }
   }
 
   await db
