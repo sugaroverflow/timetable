@@ -61,15 +61,16 @@ if (process.env.SPACES_BUCKET) {
     "SPACES_KEY",
     "SPACES_SECRET",
     "SPACES_ENDPOINT",
-    "SPACES_KEY",
-    "SPACES_SECRET",
-    "SPACES_ENDPOINT",
+    "SPACES_REGION",
   ] as const;
   const missingStorage = requiredStorage.filter((name) => !process.env[name]);
   if (missingStorage.length > 0) {
-    throw new Error(
-      `[api] SPACES_BUCKET is set but missing required storage vars: ${missingStorage.join(", ")}`,
-    );
+    const msg = `[api] SPACES_BUCKET is set but missing required storage vars: ${missingStorage.join(", ")}`;
+    if (isProd) {
+      throw new Error(msg);
+    } else {
+      console.warn(`${msg} — uploads will return 503`);
+    }
   }
 }
 
