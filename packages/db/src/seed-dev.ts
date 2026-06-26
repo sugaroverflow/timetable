@@ -90,6 +90,8 @@ export type PersonFixture = {
   displayName: string;
   roles: Role[];
   bio: string | null;
+  /** Real Clerk user ID — when set, used directly as the local user ID so this person can sign in with their actual Clerk account. */
+  clerkId: string | null;
 };
 
 type TopicFixture = {
@@ -251,9 +253,9 @@ function parsePeople(markdown: string): PersonFixture[] {
 
   for (const line of block.split("\n")) {
     if (!line.trim().startsWith("|")) continue;
-    if (line.includes("---") || line.includes("Person label")) continue;
+    if (line.includes("---") || line.includes("Person label") || line.includes("Clerk ID")) continue;
 
-    const [label, displayName, rolesRaw, bioRaw] = markdownTableCells(line);
+    const [label, displayName, rolesRaw, bioRaw, clerkIdRaw] = markdownTableCells(line);
     if (!label || !displayName || !rolesRaw) {
       throw new Error(`Invalid person row: ${line}`);
     }
@@ -273,6 +275,7 @@ function parsePeople(markdown: string): PersonFixture[] {
       displayName,
       roles,
       bio: bioRaw?.trim() || null,
+      clerkId: clerkIdRaw?.trim() || null,
     });
   }
 
@@ -606,9 +609,11 @@ function buildRows(fixture: Fixture): {
   const owner = fixture.people.find((person) => person.roles.includes("owner"));
   if (!owner) throw new Error("Sample data must include an owner");
 
-  const ownerId = userIdFor(owner.label);
+  const localIdFor = (person: PersonFixture) =>
+    person.clerkId ?? userIdFor(person.label);
+  const ownerId = localIdFor(owner);
   const userIds = new Map(
-    fixture.people.map((person) => [person.label, userIdFor(person.label)]),
+    fixture.people.map((person) => [person.label, localIdFor(person)]),
   );
   const topicIds = new Map(
     fixture.topics.map((topic) => [
@@ -624,9 +629,9 @@ function buildRows(fixture: Fixture): {
   );
 
   const userRows: NewUser[] = fixture.people.map((person, index) => ({
-    id: userIdFor(person.label),
+    id: localIdFor(person),
     name: person.displayName,
-    email: fakeEmailFor(person.label),
+    email: person.clerkId ? `${person.label.toLowerCase()}@real.clerk` : fakeEmailFor(person.label),
     emailVerified: BASE_TIME,
     image: null,
     bio: person.bio,
@@ -656,7 +661,7 @@ function buildRows(fixture: Fixture): {
   const membershipRows: NewTimetableMembership[] = fixture.people.map(
     (person, index) => ({
       id: stableUuid("membership", person.label),
-      userId: userIdFor(person.label),
+      userId: localIdFor(person),
       timetableId,
       roles: person.roles,
       createdAt: addMinutes(BASE_TIME, index),

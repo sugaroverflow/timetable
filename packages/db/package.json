@@ -10,13 +10,13 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
-    "./dev-seed": {
-      "types": "./src/seed-dev.ts",
-      "default": "./src/seed-dev.ts"
-    },
     "./schema": {
       "types": "./src/schema/index.ts",
       "default": "./src/schema/index.ts"
+    },
+    "./dev-seed": {
+      "types": "./src/seed-dev.ts",
+      "default": "./src/seed-dev.ts"
     }
   },
   "scripts": {

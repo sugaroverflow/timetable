@@ -16,9 +16,11 @@ Role labels, if any:
 
 Use short labels so we can refer to the same person later.
 
-| Person label | Display name | Role(s) | Short bio or notes |
-| --- | --- | --- | --- |
-| admin-edwin | Edwin Sorrel | owner, admin | Dean. |
+| Person label | Display name | Role(s) | Short bio or notes | Clerk ID |
+| --- | --- | --- | --- | --- |
+| admin-fatima | Fatima | owner, admin | | user_3FXuKy3hAdjKgQThCSoTJBXmv6s |
+| admin-ed | Ed | owner, admin | | user_3FXriLia31erIm4qnDRIoEM55LP |
+| admin-edwin | Edwin Sorrel | owner, admin | Dean. | |
 | host-eli | Eli Morgan | host | Voting, collective decision-making, ritual design. |
 | host-jake | Jake Ellis | host | Chat architecture, governance, open data. |
 | host-teddy | Teddy Kelvin | host | Crypto, distributed systems, local AI. |
