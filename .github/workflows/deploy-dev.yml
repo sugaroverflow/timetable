@@ -48,13 +48,13 @@ jobs:
       - name: Build web app
         run: npm run build -w @timetable/web
         env:
-          NEXT_PUBLIC_API_URL: https://dev.timetable.love
-          NEXT_PUBLIC_GRAPHQL_URL: https://dev.timetable.love/graphql
-          GRAPHQL_ROUTE_URL: https://dev.timetable.love/graphql
-          NEXT_PUBLIC_CLERK_SIGN_IN_URL: /sign-in
-          NEXT_PUBLIC_CLERK_SIGN_UP_URL: /sign-up
-          NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL: /timetables
-          NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL: /timetables
+          NEXT_PUBLIC_API_URL: "https://dev.timetable.love"
+          NEXT_PUBLIC_GRAPHQL_URL: "https://dev.timetable.love/graphql"
+          GRAPHQL_ROUTE_URL: "https://dev.timetable.love/graphql"
+          NEXT_PUBLIC_CLERK_SIGN_IN_URL: "/sign-in"
+          NEXT_PUBLIC_CLERK_SIGN_UP_URL: "/sign-up"
+          NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL: "/timetables"
+          NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL: "/timetables"
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
 
       - name: Install doctl
