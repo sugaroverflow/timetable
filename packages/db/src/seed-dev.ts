@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { config } from "dotenv";
-import { eq } from "drizzle-orm";
+import { eq, sql as drizzleSql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
@@ -36,7 +36,7 @@ const sampleFileCandidates = [
 ];
 
 const ROLE_VALUES = ["owner", "admin", "host", "elector"] as const;
-type Role = (typeof ROLE_VALUES)[number];
+export type Role = (typeof ROLE_VALUES)[number];
 
 const TOPIC_STATUS_VALUES = [
   "draft",
@@ -59,6 +59,21 @@ const TOPIC_TIME = new Date("2026-06-09T09:00:00.000Z");
 const COMMENT_TIME = new Date("2026-06-20T09:00:00.000Z");
 const HEART_TIME = new Date("2026-06-21T09:00:00.000Z");
 const ACTIVITY_TIME = new Date("2026-06-22T09:00:00.000Z");
+const RESET_DATABASE_TABLES = [
+  "api_rate_limit_buckets",
+  "activity_events",
+  "slot_topics",
+  "slot_comments",
+  "availability",
+  "timeslots",
+  "comments",
+  "hearts",
+  "topics",
+  "timetable_invites",
+  "timetable_memberships",
+  "timetables",
+  "user",
+];
 
 type RoleLabels = NonNullable<NewTimetable["settings"]>["roleLabels"];
 
@@ -70,7 +85,7 @@ type TimetableFixture = {
   roleLabels: RoleLabels;
 };
 
-type PersonFixture = {
+export type PersonFixture = {
   label: string;
   displayName: string;
   roles: Role[];
@@ -102,7 +117,7 @@ type HeartsFixture = {
   people: string[];
 };
 
-type Fixture = {
+export type Fixture = {
   timetable: TimetableFixture;
   people: PersonFixture[];
   topics: TopicFixture[];
@@ -121,7 +136,19 @@ function addMinutes(date: Date, minutes: number): Date {
   return new Date(date.getTime() + minutes * 60_000);
 }
 
-function stableUuid(scope: string, key: string): string {
+function shouldResetDevDatabase(): boolean {
+  return (
+    process.env.SEED_DEV_RESET_DATABASE === "true" ||
+    process.argv.includes("--reset-dev-database")
+  );
+}
+
+function resetDatabaseSql(): string {
+  const tables = RESET_DATABASE_TABLES.map((table) => `"${table}"`).join(", ");
+  return `TRUNCATE TABLE ${tables} RESTART IDENTITY CASCADE`;
+}
+
+export function stableUuid(scope: string, key: string): string {
   const hash = createHash("sha1")
     .update(`timetable-dev-seed:${scope}:${key}`)
     .digest();
@@ -139,12 +166,12 @@ function stableUuid(scope: string, key: string): string {
   ].join("-");
 }
 
-function userIdFor(label: string): string {
+export function userIdFor(label: string): string {
   return `dev_sample_${label.replace(/[^a-z0-9_-]/gi, "_")}`;
 }
 
-function fakeEmailFor(label: string): string {
-  return `${label.toLowerCase()}@sample.timetable.test`;
+export function fakeEmailFor(label: string): string {
+  return `${label.toLowerCase()}+clerk_test@example.com`;
 }
 
 function normalizeMarkdown(markdown: string): string {
@@ -537,7 +564,7 @@ function validateFixture(fixture: Fixture): void {
   }
 }
 
-function parseFixture(markdown: string): Fixture {
+export function parseFixture(markdown: string): Fixture {
   const normalized = normalizeMarkdown(markdown);
   const fixture = {
     timetable: parseTimetable(normalized),
@@ -551,7 +578,7 @@ function parseFixture(markdown: string): Fixture {
   return fixture;
 }
 
-function findSampleFile(): string {
+export function findSampleFile(): string {
   for (const candidate of sampleFileCandidates) {
     const path = fileURLToPath(candidate);
     if (existsSync(path)) return path;
@@ -835,6 +862,7 @@ async function main(): Promise<void> {
   const sampleFile = findSampleFile();
   const fixture = parseFixture(readFileSync(sampleFile, "utf8"));
   const rows = buildRows(fixture);
+  const resetDevDatabase = shouldResetDevDatabase();
 
   const sql = postgres(databaseUrl, {
     max: 1,
@@ -844,6 +872,10 @@ async function main(): Promise<void> {
 
   try {
     await db.transaction(async (tx) => {
+      if (resetDevDatabase) {
+        await tx.execute(drizzleSql.raw(resetDatabaseSql()));
+      }
+
       for (const user of rows.users) {
         await tx
           .insert(users)
@@ -884,6 +916,9 @@ async function main(): Promise<void> {
   }
 
   console.log(`Seeded "${fixture.timetable.name}" from ${sampleFile}`);
+  if (resetDevDatabase) {
+    console.log("Reset dev database app tables before seeding");
+  }
   console.log(`Timetable slug: ${fixture.timetable.slug}`);
   console.log(`Owner dev user: ${rows.ownerId} (${fakeEmailFor(ownerLabel(fixture))})`);
   console.log(
@@ -903,4 +938,6 @@ function ownerLabel(fixture: Fixture): string {
   return owner.label;
 }
 
-await main();
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await main();
+}

@@ -42,6 +42,8 @@ cp .env.example apps/web/.env.local
 npm run db:up
 npm run db:migrate
 npm run db:seed
+# Optional, after setting real Clerk development keys in .env:
+npm run clerk:seed-dev-users
 npm run dev
 ```
 
@@ -55,12 +57,23 @@ For Clerk development instances, test emails using `+clerk_test` can sign in
 with OTP code `424242`.
 
 The seed command reads `dev-sample-data.md` and replaces only the sample
-timetable with slug `spt-test-data`. It creates deterministic local dev users,
-including owner `dev_sample_admin-edwin`
-(`admin-edwin@sample.timetable.test`), without calling Clerk.
+timetable with slug `spt-test-data`. It creates deterministic local dev users
+with Clerk-compatible test emails, including owner `dev_sample_admin-edwin`
+(`admin-edwin+clerk_test@example.com`), without calling Clerk.
 
-Hosted dev can run the same seed as an optional manual `Deploy Dev` workflow
-task; production deploys never run it.
+To mirror those users into a Clerk development instance, run
+`npm run clerk:seed-dev-users` after `npm run db:seed`. The Clerk script refuses
+non-`sk_test_` keys, creates or updates the sample people with
+`externalId=dev_sample_<label>`, and the API maps that `externalId` back to the
+seeded local memberships when a sample user signs in. Use
+`npm run clerk:seed-dev-users -- --dry-run` to check the target Clerk instance
+without writing users.
+
+Hosted dev can run a destructive fixture refresh as an optional manual
+`Deploy Dev` workflow task. When `seed_sample_data` is checked, the dev
+post-deploy job resets hosted dev app data, reseeds `dev-sample-data.md`, and
+creates or updates the matching Clerk development users. Production deploys
+never run it.
 
 ## Docs
 
@@ -92,6 +105,7 @@ The web app logo lives in [apps/web/public/assets](apps/web/public/assets).
 | `npm run db:generate` | Generate a SQL migration from the schema |
 | `npm run db:migrate` | Apply migrations |
 | `npm run db:seed` | Seed the local dev database from `dev-sample-data.md` |
+| `npm run clerk:seed-dev-users` | Create/update Clerk dev users for the sample people |
 | `npm run db:studio` | Open Drizzle Studio |
 | `npm run db:up` / `npm run db:down` | Start or stop local Postgres |
 
@@ -114,6 +128,9 @@ anonymous browser smoke for `/`, `/sign-in`, and `/sign-up`.
 The remaining testing requirements are richer authenticated browser workflows
 once there is a Clerk test-user/session harness and broader GraphQL role
 fixtures for future permission-sensitive changes.
+
+Hosted post-deploy checks and rate-limit smoke commands live in
+[Deployment](docs/DEPLOYMENT.md#smoke-test).
 
 ## Status
 
