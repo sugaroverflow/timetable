@@ -16,6 +16,28 @@ config({ path: fileURLToPath(new URL("../../../.env", import.meta.url)) });
 
 const SEEDED_ROLES = new Set(["owner", "admin", "host", "elector"]);
 
+async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      return await fn();
+    } catch (err: unknown) {
+      const retryAfter =
+        err instanceof Error &&
+        "retryAfter" in err &&
+        typeof (err as { retryAfter: unknown }).retryAfter === "number"
+          ? (err as { retryAfter: number }).retryAfter
+          : null;
+      if (retryAfter !== null && attempt < 4) {
+        console.log(`Rate limited — waiting ${retryAfter}s before retry...`);
+        await new Promise((r) => setTimeout(r, retryAfter * 1000));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error("Unreachable");
+}
+
 type SeedStatus = "created" | "updated" | "dry-run";
 
 type SeedResult = {
@@ -46,16 +68,14 @@ async function findExistingUser(
   externalId: string,
   email: string,
 ): Promise<User | null> {
-  const byExternalId = await client.users.getUserList({
-    externalId: [externalId],
-    limit: 1,
-  });
+  const byExternalId = await withRetry(() =>
+    client.users.getUserList({ externalId: [externalId], limit: 1 }),
+  );
   if (byExternalId.data[0]) return byExternalId.data[0];
 
-  const byEmail = await client.users.getUserList({
-    emailAddress: [email],
-    limit: 1,
-  });
+  const byEmail = await withRetry(() =>
+    client.users.getUserList({ emailAddress: [email], limit: 1 }),
+  );
   return byEmail.data[0] ?? null;
 }
 
@@ -98,15 +118,17 @@ async function seedPerson(
       );
     }
 
-    const updated = await client.users.updateUser(existing.id, {
-      externalId,
-      firstName,
-      lastName,
-      skipLegalChecks: true,
-    });
-    await client.users.updateUserMetadata(updated.id, {
-      privateMetadata: metadata,
-    });
+    const updated = await withRetry(() =>
+      client.users.updateUser(existing.id, {
+        externalId,
+        firstName,
+        lastName,
+        skipLegalChecks: true,
+      }),
+    );
+    await withRetry(() =>
+      client.users.updateUserMetadata(updated.id, { privateMetadata: metadata }),
+    );
 
     const existingEmail = primaryEmail(updated);
     return {
@@ -123,16 +145,18 @@ async function seedPerson(
     };
   }
 
-  const created = await client.users.createUser({
-    externalId,
-    emailAddress: [email],
-    username: person.label.toLowerCase().replace(/\s+/g, "-"),
-    firstName,
-    lastName,
-    skipPasswordRequirement: true,
-    skipLegalChecks: true,
-    privateMetadata: metadata,
-  });
+  const created = await withRetry(() =>
+    client.users.createUser({
+      externalId,
+      emailAddress: [email],
+      username: person.label.toLowerCase().replace(/\s+/g, "-"),
+      firstName,
+      lastName,
+      skipPasswordRequirement: true,
+      skipLegalChecks: true,
+      privateMetadata: metadata,
+    }),
+  );
 
   return {
     status: "created",
