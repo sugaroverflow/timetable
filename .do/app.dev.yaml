@@ -56,7 +56,7 @@ services:
   - name: web
     image:
       registry_type: DOCR
-      registry: timetable
+      registry: timetable-reg
       repository: web
       tag: DEPLOY_TAG
     http_port: 3000
