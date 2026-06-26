@@ -185,8 +185,11 @@ async function main(): Promise<void> {
   const dryRun = process.argv.includes("--dry-run");
   const sampleFile = findSampleFile();
   const fixture = parseFixture(readFileSync(sampleFile, "utf8"));
-  const people = fixture.people.filter((person) =>
-    person.roles.some((role) => SEEDED_ROLES.has(role)),
+  // Skip people with a real clerkId — they already have an account and the
+  // local user row is seeded with their Clerk user ID directly.
+  const people = fixture.people.filter(
+    (person) =>
+      !person.clerkId && person.roles.some((role) => SEEDED_ROLES.has(role)),
   );
   const client = createClerkClient({ secretKey });
   const results: SeedResult[] = [];
