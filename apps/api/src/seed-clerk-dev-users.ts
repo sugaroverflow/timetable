@@ -126,6 +126,7 @@ async function seedPerson(
   const created = await client.users.createUser({
     externalId,
     emailAddress: [email],
+    username: person.label.toLowerCase().replace(/\s+/g, "-"),
     firstName,
     lastName,
     skipPasswordRequirement: true,
