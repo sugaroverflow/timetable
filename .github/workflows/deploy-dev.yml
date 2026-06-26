@@ -67,7 +67,7 @@ jobs:
 
       - name: Build and push web image
         run: |
-          IMAGE="registry.digitalocean.com/timetable/web:${{ github.sha }}"
+          IMAGE="registry.digitalocean.com/timetable-reg/web:${{ github.sha }}"
           docker build -f apps/web/Dockerfile -t "$IMAGE" .
           docker push "$IMAGE"
 
