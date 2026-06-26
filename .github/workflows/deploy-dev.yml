@@ -82,6 +82,8 @@ jobs:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           EMAIL_FROM: ${{ vars.EMAIL_FROM }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          SPACES_KEY: ${{ secrets.SPACES_KEY }}
+          SPACES_SECRET: ${{ secrets.SPACES_SECRET }}
           SEED_DEV_SAMPLE_DATA: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.seed_sample_data == 'true' && 'true' || 'false' }}
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}

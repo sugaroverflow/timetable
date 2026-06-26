@@ -50,8 +50,8 @@ services:
       - { key: SPACES_BUCKET, value: "timetable", scope: RUN_TIME }
       - { key: SPACES_KEY_PREFIX, value: "uploads/dev", scope: RUN_TIME }
       - { key: SPACES_PUBLIC_BASE_URL, scope: RUN_TIME }
-      - { key: SPACES_KEY, scope: RUN_TIME, type: SECRET }
-      - { key: SPACES_SECRET, scope: RUN_TIME, type: SECRET }
+      - { key: SPACES_KEY, value: "${SPACES_KEY}", scope: RUN_TIME, type: SECRET }
+      - { key: SPACES_SECRET, value: "${SPACES_SECRET}", scope: RUN_TIME, type: SECRET }
 
   - name: web
     image:
