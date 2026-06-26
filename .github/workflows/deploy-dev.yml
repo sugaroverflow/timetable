@@ -72,7 +72,8 @@ jobs:
           docker push "$IMAGE"
 
       - name: Set image tag in app spec
-        run: sed -i "s/tag: DEPLOY_TAG/tag: ${{ github.sha }}/" .do/app.dev.yaml
+        run: |
+          sed -i "s/tag: DEPLOY_TAG/tag: ${{ github.sha }}/" .do/app.dev.yaml
 
       - name: Deploy timetable-dev to App Platform
         uses: digitalocean/app_action/deploy@v2
