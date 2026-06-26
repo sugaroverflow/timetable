@@ -171,7 +171,7 @@ export function userIdFor(label: string): string {
 }
 
 export function fakeEmailFor(label: string): string {
-  return `${label.toLowerCase()}+clerk_test@sample.timetable.test`;
+  return `${label.toLowerCase()}+clerk_test@example.com`;
 }
 
 function normalizeMarkdown(markdown: string): string {

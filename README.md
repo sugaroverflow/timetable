@@ -60,7 +60,7 @@ with OTP code `424242`.
 The seed command reads `dev-sample-data.md` and replaces only the sample
 timetable with slug `spt-test-data`. It creates deterministic local dev users
 with Clerk-compatible test emails, including owner `dev_sample_admin-edwin`
-(`admin-edwin+clerk_test@sample.timetable.test`), without calling Clerk.
+(`admin-edwin+clerk_test@example.com`), without calling Clerk.
 
 To mirror those users into a Clerk development instance, run
 `npm run clerk:seed-dev-users` after `npm run db:seed`. The Clerk script refuses
