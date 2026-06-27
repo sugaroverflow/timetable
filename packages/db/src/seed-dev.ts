@@ -10,19 +10,28 @@ import postgres from "postgres";
 import * as schema from "./schema";
 import {
   activityEvents,
+  availability,
   comments,
   hearts,
+  slotComments,
+  slotTopics,
   timetableMemberships,
   timetables,
+  timeslots,
   topics,
   users,
+  type AvailabilityState,
   type CommentVisibility,
   type NewActivityEvent,
+  type NewAvailability,
   type NewComment,
   type NewHeart,
+  type NewSlotComment,
+  type NewSlotTopic,
   type NewTimetable,
   type NewTimetableMembership,
   type NewTopic,
+  type NewTimeslot,
   type NewUser,
   type TopicStatus,
 } from "./schema";
@@ -53,6 +62,22 @@ const COMMENT_VISIBILITY_VALUES = [
 
 const TIMETABLE_PRIVACY_VALUES = ["deactivated", "private", "public"] as const;
 type TimetablePrivacy = (typeof TIMETABLE_PRIVACY_VALUES)[number];
+
+const AVAILABILITY_STATE_VALUES = ['green', 'yellow', 'red'] as const satisfies readonly AvailabilityState[];
+
+type SlotAvailability = { person: string; state: AvailabilityState };
+type SlotDiscussionEntry = { author: string; text: string };
+
+type SlotFixture = {
+  label: string;
+  date: string;       // YYYY-MM-DD
+  startTime: string;  // HH:MM
+  endTime: string;    // HH:MM
+  location: string;
+  topicTags: string[];
+  availability: SlotAvailability[];
+  discussion: SlotDiscussionEntry[];
+};
 
 const BASE_TIME = new Date("2026-06-01T09:00:00.000Z");
 const TOPIC_TIME = new Date("2026-06-09T09:00:00.000Z");
@@ -125,6 +150,7 @@ export type Fixture = {
   topics: TopicFixture[];
   comments: CommentFixture[];
   hearts: HeartsFixture[];
+  slots: SlotFixture[];
 };
 
 function hasValue<T extends string>(
@@ -458,6 +484,99 @@ function parseHearts(markdown: string): HeartsFixture[] {
   return parsed;
 }
 
+function parseSlots(markdown: string): SlotFixture[] {
+  let block: string;
+  try {
+    block = section(markdown, "Timeslots");
+  } catch {
+    return [];
+  }
+
+  const slotBlocks = block.split(/^### Slot:\s*/m).slice(1);
+  const parsed: SlotFixture[] = [];
+
+  for (const slotBlock of slotBlocks) {
+    const firstNewline = slotBlock.indexOf("\n");
+    const label =
+      firstNewline === -1
+        ? slotBlock.trim()
+        : slotBlock.slice(0, firstNewline).trim();
+    const rest = firstNewline === -1 ? "" : slotBlock.slice(firstNewline + 1);
+
+    if (!label) throw new Error("Found slot section without a label");
+
+    const date = fieldFromBlock(rest, "Date", { required: true });
+    const startTime = fieldFromBlock(rest, "Start", { required: true });
+    const endTime = fieldFromBlock(rest, "End", { required: true });
+    const location = fieldFromBlock(rest, "Location", { required: true });
+    const topicsRaw = fieldFromBlock(rest, "Topics");
+    const topicTags = topicsRaw
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
+
+    // Parse Availability table
+    const availabilityEntries: SlotAvailability[] = [];
+    const availMatch = /^Availability:\s*$([\s\S]*?)(?=^(?:Discussion:|###|\Z))/m.exec(rest);
+    if (availMatch) {
+      for (const line of availMatch[1]!.split("\n")) {
+        if (!line.trim().startsWith("|")) continue;
+        if (line.includes("---") || line.toLowerCase().includes("person label") || line.toLowerCase().includes("state")) continue;
+        const cells = markdownTableCells(line);
+        const person = cells[0]?.trim();
+        const stateRaw = cells[1]?.trim().toLowerCase() ?? "";
+        if (!person) continue;
+        if (!hasValue(AVAILABILITY_STATE_VALUES, stateRaw)) {
+          throw new Error(`Invalid availability state "${stateRaw}" for slot "${label}"`);
+        }
+        availabilityEntries.push({ person, state: stateRaw });
+      }
+    }
+
+    // Parse Discussion list
+    const discussion: SlotDiscussionEntry[] = [];
+    const discussMatch = /^Discussion:\s*$([\s\S]*?)(?=^###|\Z)/m.exec(rest);
+    if (discussMatch) {
+      let current: SlotDiscussionEntry | null = null;
+      for (const rawLine of discussMatch[1]!.split("\n")) {
+        const line = rawLine.trimEnd();
+        const authorMatch = /^- Author:\s*(.+)$/.exec(line);
+        if (authorMatch) {
+          if (current) discussion.push(current);
+          current = { author: authorMatch[1]!.trim(), text: "" };
+          continue;
+        }
+        if (current) {
+          const textMatch = /^ {2}Text:\s*(.*)$/.exec(line);
+          if (textMatch) {
+            current.text = textMatch[1]?.trim() ?? "";
+            continue;
+          }
+          if (line.startsWith("  ") && line.trim()) {
+            current.text = current.text
+              ? `${current.text}\n${line.trim()}`
+              : line.trim();
+          }
+        }
+      }
+      if (current) discussion.push(current);
+    }
+
+    parsed.push({
+      label,
+      date,
+      startTime,
+      endTime,
+      location,
+      topicTags,
+      availability: availabilityEntries,
+      discussion,
+    });
+  }
+
+  return parsed;
+}
+
 function assertUnique<T>(
   values: T[],
   getKey: (value: T) => string,
@@ -565,6 +684,23 @@ function validateFixture(fixture: Fixture): void {
       seenHearts.add(key);
     }
   }
+
+  assertUnique(fixture.slots, s => s.label, 'slot label');
+  for (const slot of fixture.slots) {
+    for (const tag of slot.topicTags) {
+      if (!topicsByLabel.has(tag)) throw new Error(`Slot "${slot.label}" references missing topic "${tag}"`);
+    }
+    for (const av of slot.availability) {
+      const p = peopleByLabel.get(av.person);
+      if (!p) throw new Error(`Slot "${slot.label}" availability references missing person "${av.person}"`);
+      if (!p.roles.includes('elector') && !p.roles.includes('host') && !p.roles.includes('admin') && !p.roles.includes('owner')) {
+        throw new Error(`Slot "${slot.label}" availability person "${av.person}" has no recognised role`);
+      }
+    }
+    for (const d of slot.discussion) {
+      if (!peopleByLabel.has(d.author)) throw new Error(`Slot "${slot.label}" discussion references missing author "${d.author}"`);
+    }
+  }
 }
 
 export function parseFixture(markdown: string): Fixture {
@@ -575,6 +711,7 @@ export function parseFixture(markdown: string): Fixture {
     topics: parseTopics(normalized),
     comments: parseComments(normalized),
     hearts: parseHearts(normalized),
+    slots: parseSlots(normalized),
   };
 
   validateFixture(fixture);
@@ -604,6 +741,10 @@ function buildRows(fixture: Fixture): {
   comments: NewComment[];
   hearts: NewHeart[];
   activities: NewActivityEvent[];
+  timeslotRows: NewTimeslot[];
+  availabilityRows: NewAvailability[];
+  slotCommentRows: NewSlotComment[];
+  slotTopicRows: NewSlotTopic[];
 } {
   const timetableId = stableUuid("timetable", fixture.timetable.slug);
   const owner = fixture.people.find((person) => person.roles.includes("owner"));
@@ -721,6 +862,9 @@ function buildRows(fixture: Fixture): {
     commentIds,
   );
 
+  const { timeslotRows, availabilityRows, slotCommentRows, slotTopicRows } =
+    buildSlotRows(fixture, timetableId, userIds, topicIds);
+
   return {
     timetableId,
     ownerId,
@@ -731,6 +875,10 @@ function buildRows(fixture: Fixture): {
     comments: commentRows,
     hearts: heartRows,
     activities: activityRows,
+    timeslotRows,
+    availabilityRows,
+    slotCommentRows,
+    slotTopicRows,
   };
 }
 
@@ -858,6 +1006,67 @@ function buildActivityRows(
   return rows;
 }
 
+function buildSlotRows(
+  fixture: Fixture,
+  timetableId: string,
+  userIds: Map<string, string>,
+  topicIds: Map<string, string>,
+): {
+  timeslotRows: NewTimeslot[];
+  availabilityRows: NewAvailability[];
+  slotCommentRows: NewSlotComment[];
+  slotTopicRows: NewSlotTopic[];
+} {
+  const timeslotRows: NewTimeslot[] = [];
+  const availabilityRows: NewAvailability[] = [];
+  const slotCommentRows: NewSlotComment[] = [];
+  const slotTopicRows: NewSlotTopic[] = [];
+
+  for (const slot of fixture.slots) {
+    const slotId = stableUuid('slot', slot.label);
+    const startsAt = new Date(`${slot.date}T${slot.startTime}:00.000Z`);
+    const endsAt = new Date(`${slot.date}T${slot.endTime}:00.000Z`);
+
+    timeslotRows.push({
+      id: slotId,
+      timetableId,
+      startsAt,
+      endsAt,
+      location: slot.location,
+      createdAt: BASE_TIME,
+      updatedAt: BASE_TIME,
+    });
+
+    for (const av of slot.availability) {
+      availabilityRows.push({
+        id: stableUuid('slot-avail', `${slot.label}:${av.person}`),
+        slotId,
+        userId: userIds.get(av.person) ?? "",
+        state: av.state,
+        updatedAt: BASE_TIME,
+      });
+    }
+
+    for (let i = 0; i < slot.discussion.length; i++) {
+      const d = slot.discussion[i]!;
+      slotCommentRows.push({
+        id: stableUuid('slot-comment', `${slot.label}:${i}`),
+        slotId,
+        authorId: userIds.get(d.author) ?? "",
+        body: d.text,
+        createdAt: BASE_TIME,
+      });
+    }
+
+    for (const tag of slot.topicTags) {
+      const topicId = topicIds.get(tag) ?? "";
+      slotTopicRows.push({ slotId, topicId, createdAt: BASE_TIME });
+    }
+  }
+
+  return { timeslotRows, availabilityRows, slotCommentRows, slotTopicRows };
+}
+
 async function main(): Promise<void> {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
@@ -915,6 +1124,18 @@ async function main(): Promise<void> {
       if (rows.activities.length > 0) {
         await tx.insert(activityEvents).values(rows.activities);
       }
+      if (rows.timeslotRows.length > 0) {
+        await tx.insert(timeslots).values(rows.timeslotRows);
+      }
+      if (rows.availabilityRows.length > 0) {
+        await tx.insert(availability).values(rows.availabilityRows);
+      }
+      if (rows.slotCommentRows.length > 0) {
+        await tx.insert(slotComments).values(rows.slotCommentRows);
+      }
+      if (rows.slotTopicRows.length > 0) {
+        await tx.insert(slotTopics).values(rows.slotTopicRows);
+      }
     });
   } finally {
     await sql.end();
@@ -933,6 +1154,7 @@ async function main(): Promise<void> {
       `${rows.comments.length} comments`,
       `${rows.hearts.length} hearts`,
       `${rows.activities.length} activity events`,
+      `${rows.timeslotRows.length} timeslots`,
     ].join(", "),
   );
 }
