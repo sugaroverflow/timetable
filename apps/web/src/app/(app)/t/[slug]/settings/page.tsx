@@ -110,6 +110,7 @@ export default async function SettingsPage({
                 name={m.name}
                 email={m.email}
                 roles={m.roles}
+                roleLabels={settings.roleLabels}
               />
             ))}
           </ul>

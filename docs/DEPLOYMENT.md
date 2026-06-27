@@ -95,6 +95,14 @@ the dev App Platform post-deploy job resets hosted dev app data, runs
 Automatic deploys after `main` CI leave the checkbox unset and skip the seed
 job.
 
+People in `dev-sample-data.md` can have a `Clerk ID` column set to a real
+Clerk user ID. `db:seed` uses that ID as the local user ID directly, so that
+person can sign in with their actual Clerk account and will be recognized as the
+seeded owner or admin. `clerk:seed-dev-users` skips people with a real Clerk
+ID. All other people are created in Clerk with an `externalId` of
+`dev_sample_<label>` and can sign in with the test email
+`<label>+clerk_test@example.com` using OTP code `424242`.
+
 Repository-level secrets:
 
 - `DIGITALOCEAN_ACCESS_TOKEN`

@@ -37,7 +37,18 @@ export function ModerationCard({ topic }: { topic: ManagedTopic }) {
 
   return (
     <li className="card stack">
-      <strong>{topic.title}</strong>
+      <div className="row wrap" style={{ justifyContent: "space-between" }}>
+        <strong>{topic.title}</strong>
+        {topic.feedback && (
+          <span className="status-badge status-submitted">submitted</span>
+        )}
+      </div>
+      {topic.feedback ? (
+        <div className="mod-feedback-box">
+          <div className="mfb-head">↩ Changes requested</div>
+          <div>Admin feedback: &ldquo;{topic.feedback}&rdquo;</div>
+        </div>
+      ) : null}
       <div
         className="topic-body"
         dangerouslySetInnerHTML={{ __html: topic.bodyHtml }}
@@ -57,7 +68,7 @@ export function ModerationCard({ topic }: { topic: ManagedTopic }) {
           disabled={pending}
           onClick={() => setShowNote((v) => !v)}
         >
-          Request changes
+          {topic.feedback ? "Update feedback" : "Request changes"}
         </button>
         <button
           className="btn btn-ghost"

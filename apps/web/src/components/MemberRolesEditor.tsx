@@ -6,17 +6,32 @@ import { useRouter } from "next/navigation";
 import { clientApi } from "@/lib/clientApi";
 
 const ASSIGNABLE = ["admin", "host", "elector"] as const;
+type AssignableRole = (typeof ASSIGNABLE)[number];
+
+const PILL_CLASS: Record<AssignableRole, string> = {
+  admin: "pill-admin",
+  host: "pill-host",
+  elector: "pill-elector",
+};
+
+const DEFAULT_LABEL: Record<AssignableRole, string> = {
+  admin: "Admin",
+  host: "Host",
+  elector: "Elector",
+};
 
 export function MemberRolesEditor({
   membershipId,
   name,
   email,
   roles: initialRoles,
+  roleLabels,
 }: {
   membershipId: string;
   name: string | null;
   email: string | null;
   roles: string[];
+  roleLabels?: { admin?: string; host?: string; elector?: string };
 }) {
   const router = useRouter();
   const isOwner = initialRoles.includes("owner");
@@ -62,18 +77,34 @@ export function MemberRolesEditor({
       </div>
 
       <div className="row wrap" style={{ marginTop: 10 }}>
-        {ASSIGNABLE.map((role) => (
-          <label key={role} className="pill" style={{ cursor: "pointer" }}>
-            <input
-              type="checkbox"
-              checked={roles.includes(role)}
-              onChange={() => toggleRole(role)}
-              disabled={isOwner && role === "admin"}
-              style={{ width: "auto", marginRight: 6 }}
-            />
-            {role}
-          </label>
-        ))}
+        {ASSIGNABLE.map((role) => {
+          const active = roles.includes(role);
+          const locked = isOwner && role === "admin";
+          const customLabel = roleLabels?.[role];
+          const displayLabel = customLabel ?? DEFAULT_LABEL[role];
+          const titleAttr = customLabel ? role : undefined;
+
+          return (
+            <button
+              key={role}
+              type="button"
+              className={`pill${active ? ` ${PILL_CLASS[role]}` : ""}`}
+              style={{
+                cursor: locked ? "not-allowed" : "pointer",
+                opacity: locked ? 0.6 : 1,
+                border: undefined,
+                font: "inherit",
+              }}
+              onClick={() => !locked && toggleRole(role)}
+              disabled={locked}
+              title={titleAttr}
+              aria-pressed={active}
+            >
+              {displayLabel}
+              {active ? " ✓" : ""}
+            </button>
+          );
+        })}
         <button className="btn" type="button" onClick={save} disabled={busy}>
           {busy ? "Saving…" : saved ? "Saved" : "Save"}
         </button>

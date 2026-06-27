@@ -1,5 +1,6 @@
 import { isAdmin, type Role } from "@timetable/shared";
 
+import { ActivityFilter } from "@/components/ActivityFilter";
 import type { ActivityEvent } from "@/lib/feedTypes";
 import { gqlFetch } from "@/lib/graphql";
 
@@ -24,6 +25,7 @@ const ACTION_LABELS: Record<string, string> = {
   "topic.unpublish": "unpublished a topic",
   "topic.request_changes": "requested changes",
   "hearts.archive": "archived hearts on a topic",
+  "comment.hide": "hid a comment",
 };
 
 function describe(event: ActivityEvent): string {
@@ -32,10 +34,13 @@ function describe(event: ActivityEvent): string {
 
 export default async function ActivityPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ action?: string }>;
 }) {
   const { slug } = await params;
+  const { action } = await searchParams;
   const data = await gqlFetch<Data>(QUERY, { s: slug });
   const roles = (data.timetable?.viewerRoles ?? []) as Role[];
 
@@ -43,17 +48,28 @@ export default async function ActivityPage({
     return <div className="notice">Admins only.</div>;
   }
 
+  const uniqueActions = Array.from(
+    new Set(data.activityTimeline.map((e) => e.action)),
+  ).sort();
+
+  const visibleEvents = action
+    ? data.activityTimeline.filter((e) => e.action === action)
+    : data.activityTimeline;
+
   return (
     <div className="stack">
       <div className="page-head">
         <h2 style={{ fontSize: 18, margin: 0 }}>Activity log</h2>
         <p>Every moderation and lifecycle action in this timetable.</p>
       </div>
-      {data.activityTimeline.length === 0 ? (
+      {data.activityTimeline.length > 0 && (
+        <ActivityFilter value={action ?? ""} actions={uniqueActions} />
+      )}
+      {visibleEvents.length === 0 ? (
         <div className="notice">No activity yet.</div>
       ) : (
         <ul className="list">
-          {data.activityTimeline.map((event) => (
+          {visibleEvents.map((event) => (
             <li key={event.id} className="card">
               <div className="row wrap" style={{ justifyContent: "space-between" }}>
                 <span>
