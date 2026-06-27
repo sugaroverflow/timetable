@@ -21,7 +21,7 @@ Use short labels so we can refer to the same person later.
 | admin-fatima | Fatima | owner, admin | | user_3FXuKy3hAdjKgQThCSoTJBXmv6s |
 | admin-ed | Ed | owner, admin | | user_3FXriLia31erIm4qnDRIoEM55LP |
 | admin-edwin | Edwin Sorrel | owner, admin | Dean. | |
-| host-eli | Eli Morgan | host | Voting, collective decision-making, ritual design. |
+| host-eli | Eli Morgan | host, elector | Voting, collective decision-making, ritual design. |
 | host-jake | Jake Ellis | host | Chat architecture, governance, open data. |
 | host-teddy | Teddy Kelvin | host | Crypto, distributed systems, local AI. |
 | host-hayley | Hayley O'Brien | host | Campaigning & political technology. |
@@ -184,7 +184,7 @@ Title: Cryptocurrencies
 Host: host-teddy
 Status: published
 Published date, if published: 2026-06-10
-Cover image URL, if any:
+Cover image URL, if any: https://picsum.photos/seed/spt-crypto/800/400
 
 Body:
 
@@ -230,7 +230,7 @@ Title: AI
 Host: host-teddy
 Status: published
 Published date, if published: 2026-06-10
-Cover image URL, if any:
+Cover image URL, if any: https://picsum.photos/seed/spt-ai/800/400
 
 Body:
 
@@ -1572,7 +1572,7 @@ List the people who hearted each topic.
 | topic-constructing-legitimacy | elector-sofia, elector-hana, elector-ella, elector-kwame, elector-noah, elector-farah, elector-tariq, elector-maya, elector-amara, elector-grace, elector-leila, elector-daniel |
 | topic-iad-framework-ostrom | elector-grace, elector-ella, elector-ben, elector-farah, elector-amara, elector-sofia, elector-maya, elector-noah, elector-kwame |
 | topic-self-determination-theory | elector-priya, elector-farah, elector-leila, elector-hana, elector-tom, elector-noah, elector-oscar, elector-ella, elector-tariq |
-| topic-science-of-collectivity | elector-farah, elector-oscar, elector-yuki, elector-noah, elector-ben, elector-amara, elector-maya, elector-ella, elector-sofia, elector-tariq |
+| topic-science-of-collectivity | elector-farah, elector-oscar, elector-yuki, elector-noah, elector-ben, elector-amara, elector-maya, elector-ella, elector-sofia, elector-tariq, host-eli |
 | topic-commoning-theory-and-praxis | elector-grace, elector-marcus, elector-yuki, elector-tariq, elector-farah, elector-leila, elector-ella, elector-sofia, elector-noah |
 | topic-future-crafting | elector-grace, elector-oscar, elector-amara, elector-maya, elector-tom, elector-noah, elector-rosa, elector-ben, elector-ella |
 | topic-utopian-justice | elector-tariq, elector-grace, elector-ella, elector-maya, elector-marcus, elector-daniel, elector-amara, elector-farah, elector-noah |
@@ -1585,8 +1585,8 @@ List the people who hearted each topic.
 | topic-politics-of-social-media | elector-grace, elector-ella, elector-kwame, elector-noah, elector-yuki, elector-marcus, elector-tariq, elector-tom, elector-oscar, elector-farah |
 | topic-moderation-and-social-media | elector-yuki, elector-oscar, elector-ella, elector-tom, elector-sofia, elector-marcus, elector-noah, elector-farah |
 | topic-how-governance-works-in-britain | elector-grace, elector-farah, elector-noah, elector-yuki, elector-rosa, elector-daniel, elector-amara, elector-maya, elector-marcus, elector-ella, elector-sofia |
-| topic-the-nature-of-voting | elector-grace, elector-tariq, elector-maya, elector-leila, elector-farah, elector-tom, elector-ella, elector-amara, elector-daniel, elector-noah, elector-hana |
-| topic-demography-voting-and-numbers | elector-grace, elector-leila, elector-daniel, elector-ella, elector-noah, elector-priya, elector-yuki, elector-marcus, elector-tom, elector-sofia, elector-tariq |
+| topic-the-nature-of-voting | elector-grace, elector-tariq, elector-maya, elector-leila, elector-farah, elector-tom, elector-ella, elector-amara, elector-daniel, elector-noah, elector-hana, host-eli |
+| topic-demography-voting-and-numbers | elector-grace, elector-leila, elector-daniel, elector-ella, elector-noah, elector-priya, elector-yuki, elector-marcus, elector-tom, elector-sofia, elector-tariq, host-eli |
 | topic-audience-participation | elector-farah, elector-amara, elector-noah, elector-ben, elector-grace, elector-marcus, elector-ella, elector-maya, elector-tariq |
 | topic-designing-rituals-of-participation | elector-maya, elector-tariq, elector-ella, elector-marcus, elector-rosa, elector-ben, elector-daniel, elector-noah, elector-oscar, elector-priya, elector-sofia, elector-amara |
 | topic-herds-birds-and-words | elector-amara, elector-tariq, elector-maya, elector-marcus, elector-sofia, elector-grace, elector-noah, elector-farah, elector-kwame |
@@ -1613,10 +1613,9 @@ List the people who hearted each topic.
 - **Names are fictional**: all display names are anonymised placeholders (initials
   preserved), so the file is safe to commit to the public repo as-is.
 - **No emails** are included. Add fake ones only if the seed script needs them.
-- **Hosts as electors**: no person is both host and elector in this sample. The spec
-  allows it — add `elector` to any host if you want host-as-elector cases in the seed.
+- **Hosts as electors**: `host-eli` holds both `host` and `elector` roles, enabling dual-role UX testing (weighted hearts from a host, host-only comment access, etc.).
 - **Custom role labels** (Dean / Faculty / Fellow) come from the spec's suggestion that
   timetables can rename roles; drop them if v1 doesn't support custom labels yet.
-- Not modelled here (out of scope for Part 1, but the seed script in the follow-up issue
-  will need them): timeslots / sessions, availability, and the vote ledger. The source
-  doc's Calendar section has sample availability if you want it next.
+- **Cover images**: `topic-cryptocurrencies` and `topic-ai` have cover image URLs set via picsum.photos with stable seeds.
+- **Submitted with feedback**: `topic-serious-games` is submitted and has a host-only admin comment (`c-games-1`), which surfaces as the `feedback` field in the moderation queue and host topic manager.
+- **Not yet modelled** (tracked in issue #44): timeslots / sessions, elector availability, slot discussions, slot-topic tags, and the resulting conflict alerts on the dashboard.
