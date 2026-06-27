@@ -111,17 +111,11 @@ export default async function TimetableOverviewPage({
         <div className="card">
           <h2 style={{ margin: "0 0 6px", fontSize: 16 }}>{hostLabel} tools</h2>
           <p className="muted" style={{ margin: "0 0 12px", fontSize: 14 }}>
-            Draft and submit your topics, then track their progress on the
-            dashboard.
+            Draft and submit your topics for review.
           </p>
-          <div className="row wrap" style={{ gap: 8 }}>
-            <Link href={`${base}/topics`} className="btn btn-primary">
-              My {hostLabel.toLowerCase()} topics →
-            </Link>
-            <Link href={`${base}/dashboard`} className="btn">
-              Dashboard →
-            </Link>
-          </div>
+          <Link href={`${base}/topics`} className="btn btn-primary">
+            My {hostLabel.toLowerCase()} topics →
+          </Link>
         </div>
       )}
 
