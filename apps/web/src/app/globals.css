@@ -759,3 +759,32 @@ textarea {
 
 .mod-feedback-box { background: #fff7e8; border: 1px solid #f3e0b8; border-radius: 10px; padding: 10px 13px; font-size: 13px; margin-bottom: 10px; }
 .mod-feedback-box .mfb-head { font-weight: 700; color: #a9700f; font-size: 12px; margin-bottom: 3px; }
+
+/* Slot date widget */
+.slot-date {
+  flex: none;
+  width: 54px;
+  text-align: center;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 7px 0;
+  background: #fbfcfe;
+}
+.slot-date .d-wd {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--red);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.slot-date .d-day {
+  font-family: var(--serif);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1;
+}
+.slot-date .d-mo {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+}
