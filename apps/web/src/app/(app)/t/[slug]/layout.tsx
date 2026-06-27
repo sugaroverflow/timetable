@@ -97,9 +97,27 @@ export default async function TimetableLayout({
             /{slug}
           </span>
         )}
-        {isAuthed ? (
-          <RolePills roles={roles} labels={settings.roleLabels} />
-        ) : null}
+        <div className="row" style={{ gap: 8, alignItems: "center" }}>
+          {isAuthed ? (
+            <RolePills roles={roles} labels={settings.roleLabels} />
+          ) : null}
+          {(() => {
+            const privacyConfig = {
+              public:      { dot: "var(--green)",  label: "Public" },
+              private:     { dot: "var(--yellow)", label: "Private" },
+              deactivated: { dot: "var(--faint)",  label: "Deactivated" },
+            };
+            const cfg =
+              privacyConfig[timetable.privacy as keyof typeof privacyConfig] ??
+              { dot: "var(--faint)", label: timetable.privacy };
+            return (
+              <span className="privacy-pill">
+                <span className="privacy-dot" style={{ background: cfg.dot }} />
+                {cfg.label}
+              </span>
+            );
+          })()}
+        </div>
       </div>
 
       <div className="page-head" style={{ marginBottom: 14 }}>
