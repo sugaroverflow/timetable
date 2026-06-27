@@ -19,6 +19,7 @@ type TimetableResult = {
     slug: string;
     name: string;
     privacy: string;
+    customDomain: string | null;
     viewerRoles: string[];
     settings: string;
   } | null;
@@ -35,6 +36,7 @@ const TIMETABLE_QUERY = `
       slug
       name
       privacy
+      customDomain
       viewerRoles
       settings
     }
@@ -122,6 +124,9 @@ export default async function TimetableLayout({
 
       <div className="page-head" style={{ marginBottom: 14 }}>
         <h1>{timetable.name}</h1>
+        <p className="mono faint" style={{ fontSize: 12, margin: "4px 0 0" }}>
+          {timetable.customDomain ?? `timetable.love/t/${slug}`}
+        </p>
       </div>
       {settings.coverImageUrl ? (
         <div
