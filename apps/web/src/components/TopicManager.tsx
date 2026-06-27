@@ -58,9 +58,10 @@ export function TopicManager({
       </div>
 
       {topic.feedback ? (
-        <p className="notice" style={{ marginTop: 10 }}>
-          <strong>Admin feedback:</strong> {topic.feedback}
-        </p>
+        <div className="mod-feedback-box" style={{ marginTop: 10 }}>
+          <div className="mfb-head">↩ Changes requested</div>
+          <div>Admin feedback: &ldquo;{topic.feedback}&rdquo;</div>
+        </div>
       ) : null}
 
       {editing ? (
@@ -115,10 +116,24 @@ export function TopicManager({
               Unpublish
             </button>
           )}
-          {topic.status === "submitted" && (
+          {topic.status === "submitted" && !topic.feedback && (
             <span className="faint" style={{ fontSize: 13 }}>
               In the moderation queue…
             </span>
+          )}
+          {topic.status === "submitted" && topic.feedback && (
+            <>
+              <span className="faint" style={{ fontSize: 13 }}>
+                Changes requested — edit and resubmit when ready
+              </span>
+              <button
+                className="btn btn-primary"
+                type="button"
+                onClick={() => setEditing(true)}
+              >
+                Edit &amp; resubmit
+              </button>
+            </>
           )}
           <button
             className="btn btn-ghost"

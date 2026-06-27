@@ -62,7 +62,14 @@ timetable with slug `spt-test-data`. It creates deterministic local dev users
 with Clerk-compatible test emails, including owner `dev_sample_admin-edwin`
 (`admin-edwin+clerk_test@example.com`), without calling Clerk.
 
-To mirror those users into a Clerk development instance, run
+People rows in `dev-sample-data.md` accept an optional `Clerk ID` column.
+When a real Clerk user ID is set, `db:seed` uses that ID directly as the local
+user ID instead of generating a `dev_sample_` ID — that person can sign in with
+their actual Clerk account immediately and will be recognized as the seeded
+timetable owner or admin. People with a real `Clerk ID` are skipped by
+`clerk:seed-dev-users` since they already have a Clerk account.
+
+To mirror the remaining test users into a Clerk development instance, run
 `npm run clerk:seed-dev-users` after `npm run db:seed`. The Clerk script refuses
 non-`sk_test_` keys, creates or updates the sample people with
 `externalId=dev_sample_<label>`, and the API maps that `externalId` back to the

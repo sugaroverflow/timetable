@@ -5,6 +5,7 @@ import { Avatar } from "./Avatar";
 import { CommentComposer } from "./CommentComposer";
 import { CommentList } from "./CommentList";
 import { HeartButton } from "./HeartButton";
+import { HostInsightsPanel } from "./HostInsightsPanel";
 
 export type FeedPerms = {
   canHeart: boolean;
@@ -22,6 +23,13 @@ export function TopicCard({
   perms: FeedPerms;
   hostLabel?: string;
 }) {
+  const publicComments = topic.comments.filter(
+    (c) => c.visibility !== "host_only",
+  );
+  const hostComments = topic.comments.filter(
+    (c) => c.visibility === "host_only",
+  );
+
   return (
     <article className="card stack">
       <div
@@ -45,7 +53,7 @@ export function TopicCard({
           />
         ) : (
           <span className="heart-btn" aria-hidden>
-            <span className="ic">{"\u2665"}</span>
+            <span className="ic">{"♥"}</span>
             {topic.heartCount}
           </span>
         )}
@@ -64,22 +72,13 @@ export function TopicCard({
         />
       ) : null}
 
-      {topic.weightedScore != null && topic.weightedBreakdown ? (
-        <div className="host-panel">
-          <h4>Weighted hearts — {topic.weightedScore.toFixed(2)}</h4>
-          {topic.weightedBreakdown.length === 0 ? (
-            <div className="faint" style={{ fontSize: 12 }}>
-              No hearts yet.
-            </div>
-          ) : (
-            topic.weightedBreakdown.map((w) => (
-              <div className="weight-row" key={w.electorId}>
-                <span>{w.electorName ?? "Elector"}</span>
-                <span className="mono">{w.weight.toFixed(2)}</span>
-              </div>
-            ))
-          )}
-        </div>
+      {perms.canHostOnly && topic.weightedScore != null ? (
+        <HostInsightsPanel
+          weightedScore={topic.weightedScore}
+          heartCount={topic.heartCount}
+          weightedBreakdown={topic.weightedBreakdown ?? []}
+          hostComments={hostComments}
+        />
       ) : null}
 
       <div className="faint" style={{ fontSize: 12 }}>
@@ -87,7 +86,7 @@ export function TopicCard({
       </div>
 
       <CommentList
-        comments={topic.comments}
+        comments={publicComments}
         canReply={perms.canComment}
         canModerate={perms.canModerate}
       />
