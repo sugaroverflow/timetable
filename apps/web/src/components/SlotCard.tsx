@@ -10,17 +10,16 @@ export type CalendarPerms = {
   canAdmin: boolean;
 };
 
-function formatStart(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+function formatWeekday(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, { weekday: "short" }).toUpperCase();
 }
-
-function formatEnd(iso: string): string {
+function formatDay(iso: string): string {
+  return String(new Date(iso).getDate());
+}
+function formatMonth(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, { month: "short" }).toUpperCase();
+}
+function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, {
     hour: "2-digit",
     minute: "2-digit",
@@ -46,13 +45,22 @@ export function SlotCard({
 
   return (
     <li className="card stack">
-      <div className="row wrap" style={{ justifyContent: "space-between" }}>
-        <div>
-          <div className="slot-when">
-            {formatStart(slot.startsAt)} – {formatEnd(slot.endsAt)}
+      <div className="row wrap" style={{ justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div className="row" style={{ gap: 14, alignItems: "flex-start" }}>
+          <div className="slot-date">
+            <div className="d-wd">{formatWeekday(slot.startsAt)}</div>
+            <div className="d-day">{formatDay(slot.startsAt)}</div>
+            <div className="d-mo">{formatMonth(slot.startsAt)}</div>
           </div>
-          <div className="faint" style={{ fontSize: 12 }}>
-            {slot.location || "—"}
+          <div>
+            <div className="slot-when">
+              {formatTime(slot.startsAt)}–{formatTime(slot.endsAt)}
+            </div>
+            {slot.location ? (
+              <div className="faint" style={{ fontSize: 13, marginTop: 3 }}>
+                📍 {slot.location}
+              </div>
+            ) : null}
           </div>
         </div>
         {perms.canSetAvailability ? (

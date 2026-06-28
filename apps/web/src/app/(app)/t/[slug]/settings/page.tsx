@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { isAdmin, type Role } from "@timetable/shared";
 
 import { InviteForm } from "@/components/InviteForm";
-import { MemberRolesEditor } from "@/components/MemberRolesEditor";
+import { MemberRolesPicker } from "@/components/MemberRolesPicker";
 import { SettingsForm, type SettingsValues } from "@/components/SettingsForm";
 import { TimetableProfileForm } from "@/components/TimetableProfileForm";
 import { gqlFetch } from "@/lib/graphql";
@@ -100,20 +100,12 @@ export default async function SettingsPage({
         <div className="stack">
           <div className="page-head">
             <h2 style={{ fontSize: 18, margin: 0 }}>Members</h2>
-            <p>Assign roles within this timetable.</p>
+            <p>Select a member to edit their roles.</p>
           </div>
-          <ul className="list">
-            {data.timetableMembers.map((m) => (
-              <MemberRolesEditor
-                key={m.membershipId}
-                membershipId={m.membershipId}
-                name={m.name}
-                email={m.email}
-                roles={m.roles}
-                roleLabels={settings.roleLabels}
-              />
-            ))}
-          </ul>
+          <MemberRolesPicker
+            members={data.timetableMembers}
+            roleLabels={settings.roleLabels}
+          />
         </div>
       </div>
     </div>

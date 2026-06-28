@@ -17,10 +17,10 @@ function CommentItem({
     <div className={`comment ${comment.hidden ? "hidden" : ""}`}>
       <Avatar name={comment.authorName} small />
       <div className="comment-main">
-        <div className="comment-meta">
-          <span className="who">{comment.authorName ?? "Someone"}</span>
+        <div className="c-bubble">
+          <span className="c-name">{comment.authorName ?? "Someone"}</span>
           {comment.visibility === "host_only" ? (
-            <span className="pill pill-host" style={{ marginLeft: 6 }}>
+            <span className="pill pill-host" style={{ marginLeft: 6, fontSize: 10 }}>
               hosts
             </span>
           ) : null}
@@ -29,8 +29,8 @@ function CommentItem({
               hidden
             </span>
           ) : null}
+          <div className="c-text">{comment.body}</div>
         </div>
-        <div className="comment-body">{comment.body}</div>
         <CommentActions
           commentId={comment.id}
           canReply={canReply}

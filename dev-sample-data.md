@@ -1598,6 +1598,119 @@ List the people who hearted each topic.
 <!-- topic-how-do-media-organisations-work is archived; its hearts let you test the
      "include hearts added after [archive date]" behaviour. -->
 
+
+## Timeslots
+
+### Slot: slot-mon
+Date: 2026-10-05
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-the-nature-of-voting, topic-demography-voting-and-numbers
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-noah | green |
+| elector-ella | green |
+| elector-farah | yellow |
+| elector-amara | green |
+| elector-tariq | red |
+| host-eli | green |
+
+Discussion:
+- Author: admin-edwin
+  Text: Booking this for the voting double-header — Nature of Voting first, then Demography.
+
+### Slot: slot-tue
+Date: 2026-10-06
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-science-of-collectivity
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-noah | green |
+| elector-ella | yellow |
+| elector-farah | green |
+| elector-amara | green |
+| elector-tariq | green |
+| host-eli | yellow |
+
+Discussion:
+- Author: host-eli
+  Text: I'll run the Science of Collectivity session here — great space for discussion.
+- Author: admin-edwin
+  Text: Confirmed. I'll tag the topic once we have the room booking.
+- Author: elector-noah
+  Text: Really looking forward to this one.
+- Author: host-eli
+  Text: Bring questions about emergence and collective intelligence!
+
+### Slot: slot-wed
+Date: 2026-10-07
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-cryptocurrencies
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-noah | yellow |
+| elector-ella | green |
+| elector-farah | green |
+| elector-amara | red |
+| elector-tariq | green |
+| host-eli | green |
+
+Discussion:
+- Author: admin-edwin
+  Text: Lounge works well for the crypto session — more informal.
+
+### Slot: slot-thu
+Date: 2026-10-08
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-digital-deliberative-spaces
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-noah | green |
+| elector-ella | green |
+| elector-farah | red |
+| elector-amara | yellow |
+| elector-tariq | yellow |
+| host-eli | red |
+
+### Slot: slot-fri
+Date: 2026-10-09
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics:
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-noah | green |
+| elector-ella | green |
+| elector-farah | green |
+| elector-amara | yellow |
+| elector-tariq | green |
+| host-eli | yellow |
+
+Discussion:
+- Author: elector-noah
+  Text: Is the terrace available? Would be nice to be outside.
+- Author: admin-edwin
+  Text: Yes — no session tagged yet so it's open.
+
+
 ## Notes for engineers
 
 - **Statuses cover all five states**: published (most), draft (title-only / placeholder

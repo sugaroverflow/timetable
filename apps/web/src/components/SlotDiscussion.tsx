@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { clientGql } from "@/lib/clientGraphql";
+import { Avatar } from "./Avatar";
 
 const QUERY = `query($id: String!) {
   slotComments(slotId: $id) { id authorName body createdAt }
@@ -65,33 +66,42 @@ export function SlotDiscussion({
   }
 
   return (
-    <div style={{ marginTop: 10 }}>
-      <button className="btn btn-ghost" type="button" onClick={toggle}>
-        {open ? "Hide" : "Host chat"} ({count})
+    <div>
+      <button className="slot-expand" type="button" onClick={toggle}>
+        {open ? "▾ Hide discussion" : "▸ Discussion & host chat"}
+        {count > 0 ? ` · ${count} message${count === 1 ? "" : "s"}` : ""}
       </button>
       {open ? (
-        <div className="comments" style={{ marginTop: 8 }}>
+        <div className="host-thread">
           {comments?.map((c) => (
-            <div key={c.id} className="comment-meta">
-              <span className="who">{c.authorName ?? "Someone"}:</span> {c.body}
+            <div key={c.id} className="hc">
+              <Avatar name={c.authorName} small />
+              <div>
+                <div className="hc-name">{c.authorName ?? "Someone"}</div>
+                <div className="hc-bubble">{c.body}</div>
+              </div>
             </div>
           ))}
           {comments && comments.length === 0 ? (
-            <div className="faint" style={{ fontSize: 12 }}>
+            <div className="faint" style={{ fontSize: 12, padding: "4px 0" }}>
               No messages yet.
             </div>
           ) : null}
-          <form onSubmit={add} className="inline-form">
-            <textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              placeholder="Message hosts/admins…"
-              aria-label="Slot message"
-            />
-            <button className="btn" type="submit" disabled={pending}>
-              Send
-            </button>
-          </form>
+          <div className="hc" style={{ alignItems: "flex-start" }}>
+            <Avatar name={null} small />
+            <form onSubmit={add} style={{ flex: 1, display: "flex", gap: 8 }}>
+              <textarea
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                placeholder="Add to the discussion…"
+                aria-label="Slot message"
+                style={{ flex: 1, minHeight: 36 }}
+              />
+              <button className="btn btn-sm btn-primary" type="submit" disabled={pending}>
+                Send
+              </button>
+            </form>
+          </div>
         </div>
       ) : null}
     </div>

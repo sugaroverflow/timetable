@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { CreateTimetableForm } from "@/components/CreateTimetableForm";
 import { RolePills } from "@/components/RolePills";
 import { gqlFetch } from "@/lib/graphql";
+import { parseTimetableSettings } from "@/lib/timetableSettings";
 
 type MyTimetables = {
   myTimetables: {
@@ -16,6 +17,7 @@ type MyTimetables = {
       name: string;
       description: string | null;
       privacy: string;
+      settings: string;
     };
   }[];
 };
@@ -31,6 +33,7 @@ const QUERY = `
         name
         description
         privacy
+        settings
       }
     }
   }
@@ -63,23 +66,38 @@ export default async function TimetablesPage() {
                   <Link
                     href={`/t/${m.timetable.slug}`}
                     className="card"
-                    style={{ display: "block" }}
+                    style={{ display: "block", padding: 0, overflow: "hidden" }}
                   >
-                    <div
-                      className="row wrap"
-                      style={{ justifyContent: "space-between" }}
-                    >
-                      <strong>{m.timetable.name}</strong>
-                      <RolePills roles={m.roles} />
-                    </div>
-                    {m.timetable.description ? (
-                      <p className="muted" style={{ margin: "8px 0 0" }}>
-                        {m.timetable.description}
+                    {(() => {
+                      const s = parseTimetableSettings(m.timetable.settings);
+                      return s.coverImageUrl ? (
+                        <div
+                          style={{
+                            height: 80,
+                            backgroundImage: `url(${s.coverImageUrl})`,
+                            backgroundSize: "cover",
+                            backgroundPosition: "center",
+                          }}
+                        />
+                      ) : null;
+                    })()}
+                    <div style={{ padding: "14px 16px" }}>
+                      <div
+                        className="row wrap"
+                        style={{ justifyContent: "space-between" }}
+                      >
+                        <strong>{m.timetable.name}</strong>
+                        <RolePills roles={m.roles} />
+                      </div>
+                      {m.timetable.description ? (
+                        <p className="muted" style={{ margin: "6px 0 0", fontSize: 14 }}>
+                          {m.timetable.description}
+                        </p>
+                      ) : null}
+                      <p className="faint mono" style={{ margin: "6px 0 0", fontSize: 12 }}>
+                        /{m.timetable.slug} · {m.timetable.privacy}
                       </p>
-                    ) : null}
-                    <p className="faint mono" style={{ margin: "8px 0 0", fontSize: 12 }}>
-                      /{m.timetable.slug} · {m.timetable.privacy}
-                    </p>
+                    </div>
                   </Link>
                 </li>
               ))}

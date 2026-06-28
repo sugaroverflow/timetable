@@ -19,6 +19,7 @@ type TimetableResult = {
     slug: string;
     name: string;
     privacy: string;
+    customDomain: string | null;
     viewerRoles: string[];
     settings: string;
   } | null;
@@ -35,6 +36,7 @@ const TIMETABLE_QUERY = `
       slug
       name
       privacy
+      customDomain
       viewerRoles
       settings
     }
@@ -97,13 +99,34 @@ export default async function TimetableLayout({
             /{slug}
           </span>
         )}
-        {isAuthed ? (
-          <RolePills roles={roles} labels={settings.roleLabels} />
-        ) : null}
+        <div className="row" style={{ gap: 8, alignItems: "center" }}>
+          {isAuthed ? (
+            <RolePills roles={roles} labels={settings.roleLabels} />
+          ) : null}
+          {(() => {
+            const privacyConfig = {
+              public:      { dot: "var(--green)",  label: "Public" },
+              private:     { dot: "var(--yellow)", label: "Private" },
+              deactivated: { dot: "var(--faint)",  label: "Deactivated" },
+            };
+            const cfg =
+              privacyConfig[timetable.privacy as keyof typeof privacyConfig] ??
+              { dot: "var(--faint)", label: timetable.privacy };
+            return (
+              <span className="privacy-pill">
+                <span className="privacy-dot" style={{ background: cfg.dot }} />
+                {cfg.label}
+              </span>
+            );
+          })()}
+        </div>
       </div>
 
       <div className="page-head" style={{ marginBottom: 14 }}>
         <h1>{timetable.name}</h1>
+        <p className="mono faint" style={{ fontSize: 12, margin: "4px 0 0" }}>
+          {timetable.customDomain ?? `timetable.love/t/${slug}`}
+        </p>
       </div>
       {settings.coverImageUrl ? (
         <div
@@ -118,9 +141,6 @@ export default async function TimetableLayout({
           Overview
         </NavLink>
         <NavLink href={`${base}/feed`}>Topic feed</NavLink>
-        {(isHost(roles) || isAdmin(roles)) && (
-          <NavLink href={`${base}/dashboard`}>Dashboard</NavLink>
-        )}
         {isHost(roles) && (
           <NavLink href={`${base}/topics`}>
             My {roleLabel(settings.roleLabels, "host").toLowerCase()} topics

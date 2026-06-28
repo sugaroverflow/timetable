@@ -759,3 +759,90 @@ textarea {
 
 .mod-feedback-box { background: #fff7e8; border: 1px solid #f3e0b8; border-radius: 10px; padding: 10px 13px; font-size: 13px; margin-bottom: 10px; }
 .mod-feedback-box .mfb-head { font-weight: 700; color: #a9700f; font-size: 12px; margin-bottom: 3px; }
+
+/* Slot date widget */
+.slot-date {
+  flex: none;
+  width: 54px;
+  text-align: center;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 7px 0;
+  background: #fbfcfe;
+}
+.slot-date .d-wd {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--red);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.slot-date .d-day {
+  font-family: var(--serif);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1;
+}
+.slot-date .d-mo {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+/* Comment bubbles (prototype .c-bubble style) */
+.c-bubble {
+  background: #eef1f6;
+  border-radius: 13px;
+  padding: 8px 12px;
+  display: inline-block;
+  max-width: 100%;
+}
+.c-name { font-weight: 600; font-size: 13px; }
+.c-text { font-size: 14px; margin-top: 2px; }
+
+/* Slot discussion expand row */
+.slot-expand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 9px 18px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  background: none;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  text-align: left;
+  cursor: pointer;
+}
+.slot-expand:hover { background: #f6f7fa; }
+
+/* Host chat thread bubbles */
+.hc { display: flex; gap: 9px; padding: 7px 0; }
+.hc-bubble { background: #fff; border: 1px solid var(--host-line); border-radius: 11px; padding: 7px 11px; font-size: 13.5px; }
+.hc-name { font-weight: 600; font-size: 12.5px; color: var(--host-ink); margin-bottom: 2px; }
+
+/* Small button variant */
+.btn-sm { padding: 6px 11px; font-size: 12.5px; }
+
+.privacy-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  color: var(--muted);
+  background: var(--card);
+}
+.privacy-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+}
