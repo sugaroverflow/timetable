@@ -23,9 +23,11 @@ type SlotComment = {
 export function SlotDiscussion({
   slotId,
   count,
+  canPost = false,
 }: {
   slotId: string;
   count: number;
+  canPost?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -87,21 +89,23 @@ export function SlotDiscussion({
               No messages yet.
             </div>
           ) : null}
-          <div className="hc" style={{ alignItems: "flex-start" }}>
-            <Avatar name={null} small />
-            <form onSubmit={add} style={{ flex: 1, display: "flex", gap: 8 }}>
-              <textarea
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                placeholder="Add to the discussion…"
-                aria-label="Slot message"
-                style={{ flex: 1, minHeight: 36 }}
-              />
-              <button className="btn btn-sm btn-primary" type="submit" disabled={pending}>
-                Send
-              </button>
-            </form>
-          </div>
+          {canPost ? (
+            <div className="hc" style={{ alignItems: "flex-start" }}>
+              <Avatar name={null} small />
+              <form onSubmit={add} style={{ flex: 1, display: "flex", gap: 8 }}>
+                <textarea
+                  value={body}
+                  onChange={(e) => setBody(e.target.value)}
+                  placeholder="Add to the discussion…"
+                  aria-label="Slot message"
+                  style={{ flex: 1, minHeight: 36 }}
+                />
+                <button className="btn btn-sm btn-primary" type="submit" disabled={pending}>
+                  Send
+                </button>
+              </form>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>

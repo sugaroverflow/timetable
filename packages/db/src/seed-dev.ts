@@ -533,9 +533,10 @@ function parseSlots(markdown: string): SlotFixture[] {
       }
     }
 
-    // Parse Discussion list
+    // Parse Discussion list — rest is already isolated to one slot block,
+    // so capture greedily to end of block (\Z is not valid in JS regex)
     const discussion: SlotDiscussionEntry[] = [];
-    const discussMatch = /^Discussion:\s*$([\s\S]*?)(?=^###|\Z)/m.exec(rest);
+    const discussMatch = /^Discussion:\s*$([\s\S]*)/m.exec(rest);
     if (discussMatch) {
       let current: SlotDiscussionEntry | null = null;
       for (const rawLine of discussMatch[1]!.split("\n")) {
