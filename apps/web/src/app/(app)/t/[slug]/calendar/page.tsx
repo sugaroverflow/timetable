@@ -1,3 +1,4 @@
+import { auth } from "@clerk/nextjs/server";
 import { isAdmin, isElector, isHost, type Role } from "@timetable/shared";
 
 import { env } from "@/env";
@@ -12,11 +13,24 @@ type Data = {
   timetable: { viewerRoles: string[] } | null;
   calendar: CalendarSlot[];
   topicFeed: TopicOption[];
-  myIcsToken: string | null;
+  myIcsToken?: string | null;
 };
 
 const QUERY = `
   query Calendar($s: String!, $audience: String) {
+    timetable(idOrSlug: $s) { viewerRoles }
+    calendar(idOrSlug: $s, audience: $audience) {
+      id startsAt endsAt location commentCount viewerState
+      topics { id title }
+      counts { green yellow red }
+      perUser { userId name state }
+    }
+    topicFeed(idOrSlug: $s) { id title }
+  }
+`;
+
+const QUERY_AUTHED = `
+  query CalendarAuthed($s: String!, $audience: String) {
     timetable(idOrSlug: $s) { viewerRoles }
     calendar(idOrSlug: $s, audience: $audience) {
       id startsAt endsAt location commentCount viewerState
@@ -38,8 +52,9 @@ export default async function CalendarPage({
 }) {
   const { slug } = await params;
   const { audience } = await searchParams;
+  const { userId } = await auth();
 
-  const data = await gqlFetch<Data>(QUERY, {
+  const data = await gqlFetch<Data>(userId ? QUERY_AUTHED : QUERY, {
     s: slug,
     audience: audience ?? null,
   });
