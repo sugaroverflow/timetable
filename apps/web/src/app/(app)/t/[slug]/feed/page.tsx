@@ -25,7 +25,7 @@ const QUERY = `
     timetableHosts(idOrSlug: $s) { id name }
     topicFeed(idOrSlug: $s, sort: $sort, hostId: $host, limit: $limit, offset: $offset) {
       id timetableId hostId hostName hostImage title bodyHtml coverImageUrl status
-      heartCount weightedScore viewerHasHearted commentCount
+      heartCount weightedScore viewerHasHearted viewerWeight commentCount
       publishedAt createdAt
       comments { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} } } }
       weightedBreakdown { electorId electorName weight }

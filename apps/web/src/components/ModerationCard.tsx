@@ -5,13 +5,12 @@ import { useRouter } from "next/navigation";
 
 import { clientGql } from "@/lib/clientGraphql";
 import type { ManagedTopic } from "@/lib/feedTypes";
-import { Avatar } from "./Avatar";
 
 const MUTATION = `mutation Moderate($id: String!, $action: String!, $note: String) {
   moderateTopic(topicId: $id, action: $action, note: $note) { id status }
 }`;
 
-export function ModerationCard({ topic }: { topic: ManagedTopic }) {
+export function ModerationCard({ topic, slug }: { topic: ManagedTopic; slug: string }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [note, setNote] = useState("");
@@ -38,18 +37,18 @@ export function ModerationCard({ topic }: { topic: ManagedTopic }) {
 
   return (
     <li className="card stack">
-      <div className="row" style={{ gap: 10, marginBottom: 8 }}>
-        <Avatar name={topic.hostName} />
-        <div>
-          <div style={{ fontWeight: 600, fontSize: 14 }}>{topic.hostName ?? "Host"}</div>
-          <div className="faint" style={{ fontSize: 12 }}>submitted for review</div>
-        </div>
+      <div className="row wrap" style={{ justifyContent: "space-between" }}>
+        <strong>{topic.title}</strong>
+        {topic.feedback && (
+          <span className="status-badge status-submitted">submitted</span>
+        )}
       </div>
-      <strong>{topic.title}</strong>
-      {topic.coverImageUrl && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img className="topic-cover" src={topic.coverImageUrl} alt="" />
-      )}
+      {topic.feedback ? (
+        <div className="mod-feedback-box">
+          <div className="mfb-head">↩ Changes requested</div>
+          <div>Admin feedback: &ldquo;{topic.feedback}&rdquo;</div>
+        </div>
+      ) : null}
       <div
         className="topic-body"
         dangerouslySetInnerHTML={{ __html: topic.bodyHtml }}
@@ -69,8 +68,9 @@ export function ModerationCard({ topic }: { topic: ManagedTopic }) {
           disabled={pending}
           onClick={() => setShowNote((v) => !v)}
         >
-          Request changes
+          {topic.feedback ? "Update feedback" : "Request changes"}
         </button>
+        <a href={`/t/${slug}/topics`} className="btn">Edit</a>
         <button
           className="btn btn-ghost"
           type="button"

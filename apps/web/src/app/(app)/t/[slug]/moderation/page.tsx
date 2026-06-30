@@ -13,7 +13,7 @@ const QUERY = `
   query Moderation($s: String!) {
     timetable(idOrSlug: $s) { viewerRoles }
     moderationQueue(idOrSlug: $s) {
-      id title status bodyMd bodyHtml updatedAt feedback hostName coverImageUrl
+      id title status bodyMd bodyHtml updatedAt feedback
     }
   }
 `;
@@ -37,12 +37,16 @@ export default async function ModerationPage({
         <h2 style={{ fontSize: 18, margin: 0 }}>Moderation queue</h2>
         <p>Review submitted topics and publish, request changes, or reject.</p>
       </div>
+      <div className="backstage">
+        <span style={{ fontSize: 17 }}>🛠</span>
+        Backstage — actions here are logged to the activity log and visible to all admins.
+      </div>
       {data.moderationQueue.length === 0 ? (
         <div className="notice">Nothing awaiting review.</div>
       ) : (
         <ul className="list">
           {data.moderationQueue.map((topic) => (
-            <ModerationCard key={topic.id} topic={topic} />
+            <ModerationCard key={topic.id} topic={topic} slug={slug} />
           ))}
         </ul>
       )}

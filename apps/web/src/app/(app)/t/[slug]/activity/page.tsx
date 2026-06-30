@@ -32,6 +32,12 @@ function describe(event: ActivityEvent): string {
   return ACTION_LABELS[event.action] ?? event.action;
 }
 
+function actionClass(action: string): string {
+  if (action === "topic.publish") return " act-pub";
+  if (action === "comment.hide") return " act-hide";
+  return "";
+}
+
 export default async function ActivityPage({
   params,
   searchParams,
@@ -68,26 +74,22 @@ export default async function ActivityPage({
       {visibleEvents.length === 0 ? (
         <div className="notice">No activity yet.</div>
       ) : (
-        <ul className="list">
+        <div className="timeline">
           {visibleEvents.map((event) => (
-            <li key={event.id} className="card">
-              <div className="row wrap" style={{ justifyContent: "space-between" }}>
-                <span>
-                  <strong>{event.actorName ?? "Someone"}</strong>{" "}
-                  {describe(event)}
-                </span>
-                <span className="faint mono" style={{ fontSize: 12 }}>
-                  {new Date(event.createdAt).toLocaleString()}
-                </span>
+            <div key={event.id} className={`tl-item${actionClass(event.action)}`}>
+              <div className="tl-when">{new Date(event.createdAt).toLocaleString()}</div>
+              <div className="tl-text">
+                <b>{event.actorName ?? "Someone"}</b> {describe(event)}
               </div>
               {event.note ? (
-                <p className="muted" style={{ margin: "6px 0 0", fontSize: 13 }}>
-                  {event.note}
-                </p>
+                <div className="tl-note">
+                  <span className="tn-by">{event.actorName ?? "Admin"} (admin)</span>
+                  <br />{event.note}
+                </div>
               ) : null}
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
     </div>
   );

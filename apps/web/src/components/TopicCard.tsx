@@ -32,31 +32,14 @@ export function TopicCard({
 
   return (
     <article className="card stack">
-      <div
-        className="row"
-        style={{ justifyContent: "space-between", alignItems: "flex-start" }}
-      >
-        <div className="row">
-          <Avatar name={topic.hostName} />
-          <div>
-            <h3 className="topic-title">{topic.title}</h3>
-            <div className="faint" style={{ fontSize: 12 }}>
-              by {topic.hostName ?? hostLabel}
-            </div>
+      <div className="row" style={{ alignItems: "flex-start" }}>
+        <Avatar name={topic.hostName} />
+        <div>
+          <h3 className="topic-title">{topic.title}</h3>
+          <div className="faint" style={{ fontSize: 12 }}>
+            by {topic.hostName ?? hostLabel}
           </div>
         </div>
-        {perms.canHeart ? (
-          <HeartButton
-            topicId={topic.id}
-            hearted={topic.viewerHasHearted}
-            count={topic.heartCount}
-          />
-        ) : (
-          <span className="heart-btn" aria-hidden>
-            <span className="ic">{"♥"}</span>
-            {topic.heartCount}
-          </span>
-        )}
       </div>
 
       <div
@@ -81,10 +64,6 @@ export function TopicCard({
         />
       ) : null}
 
-      <div className="faint" style={{ fontSize: 12 }}>
-        {topic.commentCount} comment{topic.commentCount === 1 ? "" : "s"}
-      </div>
-
       <CommentList
         comments={publicComments}
         canReply={perms.canComment}
@@ -94,6 +73,36 @@ export function TopicCard({
       {perms.canComment ? (
         <CommentComposer topicId={topic.id} canHostOnly={perms.canHostOnly} />
       ) : null}
+
+      <div className="card-actions">
+        {perms.canHeart ? (
+          <HeartButton
+            topicId={topic.id}
+            hearted={topic.viewerHasHearted}
+            count={topic.heartCount}
+          />
+        ) : (
+          <span className="heart-btn" aria-hidden>
+            <span className="ic">{"♥"}</span>
+            {topic.heartCount}
+          </span>
+        )}
+        <button
+          className="act"
+          type="button"
+          onClick={() => {
+            const ta = document.querySelector<HTMLTextAreaElement>(
+              `[data-topic-composer="${topic.id}"]`,
+            );
+            ta?.focus();
+          }}
+        >
+          <span className="ic">💬</span>
+          {topic.commentCount || ""}
+          <span style={{ fontWeight: 600 }}>Comment</span>
+        </button>
+        <span style={{ flex: 1 }} />
+      </div>
 
       {perms.canModerate ? <AdminTopicActions topicId={topic.id} /> : null}
     </article>
