@@ -116,9 +116,11 @@ export function SlotCard({
         </div>
       ) : null}
 
-      {perms.canSeeHostOnly ? (
-        <SlotDiscussion slotId={slot.id} count={slot.commentCount} />
-      ) : null}
+      <SlotDiscussion
+        slotId={slot.id}
+        count={slot.commentCount}
+        canPost={perms.canSeeHostOnly}
+      />
 
       {perms.canAdmin ? (
         <SlotAdminControls

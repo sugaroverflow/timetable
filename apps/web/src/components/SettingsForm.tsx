@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 import { ImageUploadField } from "@/components/ImageUploadField";
@@ -48,6 +48,18 @@ export function SettingsForm({
   );
   const [cover, setCover] = useState(current.coverImageUrl ?? "");
   const [uploadingCover, setUploadingCover] = useState(false);
+
+  useEffect(() => {
+    if (primary) {
+      document.documentElement.style.setProperty('--primary', primary);
+      document.documentElement.style.setProperty('--primary-soft', primary + '1a');
+    }
+    if (secondary) {
+      document.documentElement.style.setProperty('--host-ink', secondary);
+      document.documentElement.style.setProperty('--host-wash', secondary + '15');
+      document.documentElement.style.setProperty('--host-line', secondary + '40');
+    }
+  }, []); // run once on mount
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -101,7 +113,12 @@ export function SettingsForm({
             id="tp"
             type="color"
             value={primary}
-            onChange={(e) => setPrimary(e.target.value)}
+            onChange={(e) => {
+              setPrimary(e.target.value);
+              document.documentElement.style.setProperty('--primary', e.target.value);
+              document.documentElement.style.setProperty('--primary-soft', e.target.value + '1a');
+              document.documentElement.style.setProperty('--primary-ink', '#ffffff');
+            }}
             style={{ width: 64, padding: 2, height: 38 }}
           />
         </div>
@@ -111,7 +128,12 @@ export function SettingsForm({
             id="ts"
             type="color"
             value={secondary}
-            onChange={(e) => setSecondary(e.target.value)}
+            onChange={(e) => {
+              setSecondary(e.target.value);
+              document.documentElement.style.setProperty('--host-ink', e.target.value);
+              document.documentElement.style.setProperty('--host-wash', e.target.value + '15');
+              document.documentElement.style.setProperty('--host-line', e.target.value + '40');
+            }}
             style={{ width: 64, padding: 2, height: 38 }}
           />
         </div>

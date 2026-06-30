@@ -45,6 +45,7 @@ export function CommentComposer({
         onChange={(e) => setBody(e.target.value)}
         placeholder={hostOnly ? "Add a host-only note…" : "Add a comment…"}
         aria-label="Comment"
+        data-topic-composer={topicId}
       />
       <div className="stack" style={{ gap: 6 }}>
         <button className="btn btn-primary" type="submit" disabled={pending}>

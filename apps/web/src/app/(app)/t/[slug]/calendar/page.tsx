@@ -1,7 +1,9 @@
+import { auth } from "@clerk/nextjs/server";
 import { isAdmin, isElector, isHost, type Role } from "@timetable/shared";
 
 import { env } from "@/env";
 import { AudienceFilter } from "@/components/AudienceFilter";
+import { LocationFilter } from "@/components/LocationFilter";
 import { SlotAdminForm } from "@/components/SlotAdminForm";
 import { SlotCard, type CalendarPerms } from "@/components/SlotCard";
 import { WeekdayPatternControl } from "@/components/WeekdayPatternControl";
@@ -12,18 +14,28 @@ type Data = {
   timetable: { viewerRoles: string[] } | null;
   calendar: CalendarSlot[];
   topicFeed: TopicOption[];
-  myIcsToken: string | null;
+  myIcsToken?: string | null;
 };
+
+const SLOT_FIELDS = `
+  id startsAt endsAt location commentCount viewerState
+  topics { id title }
+  counts { green yellow red }
+  perUser { userId name state }
+`;
 
 const QUERY = `
   query Calendar($s: String!, $audience: String) {
     timetable(idOrSlug: $s) { viewerRoles }
-    calendar(idOrSlug: $s, audience: $audience) {
-      id startsAt endsAt location commentCount viewerState
-      topics { id title }
-      counts { green yellow red }
-      perUser { userId name state }
-    }
+    calendar(idOrSlug: $s, audience: $audience) { ${SLOT_FIELDS} }
+    topicFeed(idOrSlug: $s) { id title }
+  }
+`;
+
+const QUERY_AUTHED = `
+  query CalendarAuthed($s: String!, $audience: String) {
+    timetable(idOrSlug: $s) { viewerRoles }
+    calendar(idOrSlug: $s, audience: $audience) { ${SLOT_FIELDS} }
     topicFeed(idOrSlug: $s) { id title }
     myIcsToken
   }
@@ -34,12 +46,13 @@ export default async function CalendarPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ audience?: string }>;
+  searchParams: Promise<{ audience?: string; location?: string }>;
 }) {
   const { slug } = await params;
-  const { audience } = await searchParams;
+  const { audience, location } = await searchParams;
+  const { userId } = await auth();
 
-  const data = await gqlFetch<Data>(QUERY, {
+  const data = await gqlFetch<Data>(userId ? QUERY_AUTHED : QUERY, {
     s: slug,
     audience: audience ?? null,
   });
@@ -55,6 +68,14 @@ export default async function CalendarPage({
     `${env.apiUrl}/api/timetables/${slug}/calendar.ics` +
     (data.myIcsToken ? `?token=${data.myIcsToken}` : "");
 
+  const locations = [
+    ...new Set(data.calendar.map((s) => s.location).filter(Boolean)),
+  ].sort();
+
+  const visibleSlots = location
+    ? data.calendar.filter((s) => s.location === location)
+    : data.calendar;
+
   return (
     <div className="stack">
       <div className="toolbar">
@@ -68,6 +89,9 @@ export default async function CalendarPage({
             />
           </>
         ) : null}
+        {locations.length > 0 ? (
+          <LocationFilter value={location ?? ""} locations={locations} />
+        ) : null}
         <span className="spacer" />
         <a className="btn btn-ghost" href={icsUrl}>
           Subscribe (ICS)
@@ -77,13 +101,15 @@ export default async function CalendarPage({
       {perms.canAdmin ? <SlotAdminForm slug={slug} /> : null}
       {perms.canSetAvailability ? <WeekdayPatternControl slug={slug} /> : null}
 
-      {data.calendar.length === 0 ? (
+      {visibleSlots.length === 0 ? (
         <div className="notice">
-          No timeslots yet{perms.canAdmin ? " — add one above." : "."}
+          {data.calendar.length === 0
+            ? `No timeslots yet${perms.canAdmin ? " — add one above." : "."}`
+            : "No slots match this filter."}
         </div>
       ) : (
         <ul className="list">
-          {data.calendar.map((slot) => (
+          {visibleSlots.map((slot) => (
             <SlotCard
               key={slot.id}
               slot={slot}

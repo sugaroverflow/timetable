@@ -846,3 +846,22 @@ textarea {
   border-radius: 50%;
   flex: none;
 }
+
+/* Activity timeline */
+.timeline { position: relative; margin-left: 8px; padding-left: 22px; border-left: 2px solid var(--line-strong); }
+.tl-item { position: relative; padding: 0 0 18px; }
+.tl-item::before { content: ""; position: absolute; left: -29px; top: 3px; width: 12px; height: 12px; border-radius: 50%; background: var(--card); border: 2.5px solid var(--primary); }
+.tl-item.act-pub::before { border-color: var(--green); }
+.tl-item.act-hide::before { border-color: var(--red); }
+.tl-when { font-family: var(--mono); font-size: 11px; color: var(--faint); }
+.tl-text { font-size: 14px; margin-top: 2px; }
+.tl-note { margin-top: 6px; padding: 8px 11px; background: #f6f7fa; border: 1px solid var(--line); border-radius: 9px; font-size: 13px; color: #3a4350; }
+.tl-note .tn-by { font-weight: 600; font-size: 12px; color: var(--muted); }
+
+/* Moderation backstage banner */
+.backstage { background: #f1f2f6; border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 13px 15px; margin-bottom: 16px; font-size: 13px; color: var(--muted); display: flex; gap: 10px; align-items: center; }
+
+/* Topic card action bar */
+.card-actions { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-top: 1px solid var(--line); }
+.act { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 9px; font-weight: 600; font-size: 13.5px; color: var(--muted); border: none; background: none; cursor: pointer; }
+.act:hover { background: #f1f3f7; }
