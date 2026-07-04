@@ -61,8 +61,8 @@ export default async function TimetableOverviewPage({
   const privacyLabel =
     timetable.privacy === "public"
       ? "Public"
-      : timetable.privacy === "unlisted"
-        ? "Unlisted"
+      : timetable.privacy === "deactivated"
+        ? "Deactivated"
         : "Private";
 
   return (

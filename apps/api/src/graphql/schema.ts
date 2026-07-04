@@ -34,6 +34,7 @@ import {
   listSlotComments,
   listSubmittedTopics,
   listTimetableHosts,
+  logActivity,
   moderateTopic,
   setAvailability,
   setCommentHidden,
@@ -549,6 +550,14 @@ builder.mutationType({
               : undefined,
         });
         if (!updated) notFound("Topic not found");
+        if (!ownerHost) {
+          await logActivity({
+            timetableId: topic.timetableId,
+            actorId: user.id,
+            action: "topic.edit",
+            payload: { topicId: topic.id, title: updated.title },
+          });
+        }
         return updated;
       },
     }),
