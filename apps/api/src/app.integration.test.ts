@@ -16,6 +16,7 @@ vi.mock("@timetable/core", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@timetable/core")>();
   return {
     ...actual,
+    countViewerPublishedHearts: vi.fn(),
     getMembershipById: vi.fn(),
     getReadableTimetable: vi.fn(),
     getSlotsForIcs: vi.fn(),
@@ -177,6 +178,7 @@ afterEach(() => {
   restoreCronSecret();
   restoreStorageEnv();
   vi.mocked(context.buildContext).mockReset();
+  vi.mocked(core.countViewerPublishedHearts).mockReset();
   vi.mocked(core.getMembershipById).mockReset();
   vi.mocked(core.getReadableTimetable).mockReset();
   vi.mocked(core.getSlotsForIcs).mockReset();
@@ -575,6 +577,68 @@ describe("createApiApp", () => {
       expect(body).toContain("SUMMARY:Opening Session");
       expect(body).toContain("LOCATION:Main Hall");
       expect(core.getSlotsForIcs).toHaveBeenCalledWith(timetable.id);
+    });
+  });
+
+  it("exposes the viewer's published-hearted count to signed-in members", async () => {
+    const timetable = timetableFixture();
+    mockSession("elector-1", ["elector"]);
+    vi.mocked(core.getReadableTimetable).mockResolvedValue({
+      timetable,
+      roles: ["elector"],
+    });
+    vi.mocked(core.countViewerPublishedHearts).mockResolvedValue(3);
+
+    await withTestServer(async (baseUrl) => {
+      const res = await fetch(`${baseUrl}/graphql`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: `query($s: String!) {
+            timetable(idOrSlug: $s) { viewerHeartedPublishedCount }
+          }`,
+          variables: { s: timetable.slug },
+        }),
+      });
+
+      const body = (await res.json()) as {
+        data: { timetable: { viewerHeartedPublishedCount: number | null } };
+      };
+      expect(res.status).toBe(200);
+      expect(body.data.timetable.viewerHeartedPublishedCount).toBe(3);
+      expect(core.countViewerPublishedHearts).toHaveBeenCalledWith(
+        timetable.id,
+        "elector-1",
+      );
+    });
+  });
+
+  it("returns null viewer heart count for anonymous visitors", async () => {
+    const timetable = timetableFixture();
+    vi.mocked(context.buildContext).mockResolvedValue(testContext(null));
+    vi.mocked(core.getReadableTimetable).mockResolvedValue({
+      timetable,
+      roles: [],
+    });
+
+    await withTestServer(async (baseUrl) => {
+      const res = await fetch(`${baseUrl}/graphql`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: `query($s: String!) {
+            timetable(idOrSlug: $s) { viewerHeartedPublishedCount }
+          }`,
+          variables: { s: timetable.slug },
+        }),
+      });
+
+      const body = (await res.json()) as {
+        data: { timetable: { viewerHeartedPublishedCount: number | null } };
+      };
+      expect(res.status).toBe(200);
+      expect(body.data.timetable.viewerHeartedPublishedCount).toBeNull();
+      expect(core.countViewerPublishedHearts).not.toHaveBeenCalled();
     });
   });
 });

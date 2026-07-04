@@ -19,10 +19,12 @@ export function TopicCard({
   topic,
   perms,
   hostLabel = "Host",
+  viewerHeartCount = null,
 }: {
   topic: FeedTopic;
   perms: FeedPerms;
   hostLabel?: string;
+  viewerHeartCount?: number | null;
 }) {
   const publicComments = topic.comments.filter(
     (c) => c.visibility !== "host_only",
@@ -93,6 +95,11 @@ export function TopicCard({
           commentCount={topic.commentCount}
         />
         <span style={{ flex: 1 }} />
+        {topic.viewerHasHearted && viewerHeartCount ? (
+          <span className="weight-chip" title="Your current vote weight">
+            your vote: 1/{viewerHeartCount}
+          </span>
+        ) : null}
       </div>
 
       {perms.canModerate ? <AdminTopicActions topicId={topic.id} /> : null}

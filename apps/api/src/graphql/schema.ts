@@ -9,6 +9,7 @@ import {
   buildCalendar,
   buildFeed,
   claimInvitesForUser,
+  countViewerPublishedHearts,
   createSlots,
   createTopic,
   deleteSlot,
@@ -160,6 +161,16 @@ const TimetableType = builder.objectRef<GqlTimetable>("Timetable").implement({
     settings: t.field({
       type: "String",
       resolve: (tt) => JSON.stringify(tt.settings ?? {}),
+    }),
+    /**
+     * Published topics the signed-in viewer currently hearts — their vote
+     * weight is 1/count. Null for anonymous viewers. Viewer-scoped, so safe
+     * for any member (unlike the host-only weighted breakdowns).
+     */
+    viewerHeartedPublishedCount: t.int({
+      nullable: true,
+      resolve: (tt, _args, ctx) =>
+        ctx.user ? countViewerPublishedHearts(tt.id, ctx.user.id) : null,
     }),
     createdAt: t.string({ resolve: (tt) => tt.createdAt.toISOString() }),
   }),

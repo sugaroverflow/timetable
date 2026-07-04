@@ -956,3 +956,15 @@ textarea {
 .legend .i-g { background: var(--green); }
 .legend .i-y { background: var(--yellow, #f3a712); }
 .legend .i-r { background: var(--red); }
+
+/* Viewer vote-weight chip (prototype .weight) */
+.weight-chip {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--host-ink, #5a44b8);
+  background: var(--host-wash, #f4f1fc);
+  padding: 2px 7px;
+  border-radius: 6px;
+  white-space: nowrap;
+}

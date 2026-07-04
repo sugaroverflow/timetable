@@ -210,6 +210,29 @@ export async function archiveTopicHearts(
   return archived.length;
 }
 
+/**
+ * Number of published topics this user currently hearts (non-archived).
+ * The user's per-heart vote weight is 1/count — shown to them in the feed.
+ */
+export async function countViewerPublishedHearts(
+  timetableId: string,
+  userId: string,
+): Promise<number> {
+  const [row] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(hearts)
+    .innerJoin(topics, eq(topics.id, hearts.topicId))
+    .where(
+      and(
+        eq(topics.timetableId, timetableId),
+        eq(topics.status, "published"),
+        eq(hearts.userId, userId),
+        isNull(hearts.archivedAt),
+      ),
+    );
+  return row?.n ?? 0;
+}
+
 export type FeedSort = "hearts" | "comments" | "recent";
 
 export type FeedTopic = {

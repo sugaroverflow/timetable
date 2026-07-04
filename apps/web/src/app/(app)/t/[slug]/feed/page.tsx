@@ -11,7 +11,11 @@ import { gqlFetch } from "@/lib/graphql";
 import { parseTimetableSettings } from "@/lib/timetableSettings";
 
 type Data = {
-  timetable: { viewerRoles: string[]; settings: string } | null;
+  timetable: {
+    viewerRoles: string[];
+    settings: string;
+    viewerHeartedPublishedCount: number | null;
+  } | null;
   topicFeed: FeedTopic[];
   timetableHosts: { id: string; name: string | null }[];
 };
@@ -22,7 +26,7 @@ const COMMENT_FIELDS = `
 
 const QUERY = `
   query Feed($s: String!, $sort: String, $host: String, $limit: Int, $offset: Int) {
-    timetable(idOrSlug: $s) { viewerRoles settings }
+    timetable(idOrSlug: $s) { viewerRoles settings viewerHeartedPublishedCount }
     timetableHosts(idOrSlug: $s) { id name }
     topicFeed(idOrSlug: $s, sort: $sort, hostId: $host, limit: $limit, offset: $offset) {
       id timetableId hostId hostName hostImage title bodyHtml coverImageUrl status
@@ -121,6 +125,7 @@ export default async function FeedPage({
             topic={topic}
             perms={perms}
             hostLabel={settings.roleLabels?.host}
+            viewerHeartCount={data.timetable?.viewerHeartedPublishedCount ?? null}
           />
         ))
       )}
