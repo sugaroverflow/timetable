@@ -12,6 +12,7 @@ import {
 import { computeElectorWeights, topicWeightedScore } from "@timetable/shared";
 
 import { logActivity } from "./activity";
+import { coerceDate } from "./dates";
 
 export async function getTopicById(topicId: string): Promise<Topic | null> {
   const [topic] = await db
@@ -346,7 +347,7 @@ export async function buildFeed(
     for (const c of statRows) {
       commentStats.set(c.topicId, {
         count: c.count,
-        latestCommentAt: c.latestCommentAt,
+        latestCommentAt: coerceDate(c.latestCommentAt),
       });
     }
   }

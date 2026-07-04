@@ -38,7 +38,11 @@ async function seedDigestDefaults(
     .where(eq(timetables.id, timetableId))
     .limit(1);
   const defaults = tt?.settings?.digestDefaults;
-  if (!defaults || Object.keys(defaults).length === 0) return;
+  // All-false defaults are indistinguishable from the {} a user starts with,
+  // so seeding them would only burn the "never customized" guard and block a
+  // later timetable's real defaults from applying. Seed only when something
+  // is actually enabled.
+  if (!defaults || !Object.values(defaults).some(Boolean)) return;
 
   const [user] = await db
     .select({ notificationSettings: users.notificationSettings })

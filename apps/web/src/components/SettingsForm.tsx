@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { useToast } from "@/components/Toast";
 import { clientGql } from "@/lib/clientGraphql";
+import { themeVars } from "@/lib/timetableSettings";
 
 const MUTATION = `mutation Settings(
   $s: String!, $ra: String, $rh: String, $re: String, $tp: String, $ts: String, $cover: String,
@@ -37,13 +38,14 @@ export type SettingsValues = {
 };
 
 function applyThemeVars(primary: string, secondary: string) {
-  const root = document.documentElement.style;
-  root.setProperty("--primary", primary);
-  root.setProperty("--primary-soft", primary + "1a");
-  root.setProperty("--primary-ink", "#ffffff");
-  root.setProperty("--host-ink", secondary);
-  root.setProperty("--host-wash", secondary + "15");
-  root.setProperty("--host-line", secondary + "40");
+  // The timetable shell (<main>) carries the saved theme as inline CSS vars,
+  // which shadow anything set on <html> — write the preview where it wins.
+  const target =
+    document.querySelector<HTMLElement>("main.container") ??
+    document.documentElement;
+  for (const [name, value] of Object.entries(themeVars(primary, secondary))) {
+    target.style.setProperty(name, value);
+  }
 }
 
 export function SettingsForm({
@@ -79,12 +81,6 @@ export function SettingsForm({
   const [digestActivity, setDigestActivity] = useState(
     current.digestDefaults?.digestActivity ?? false,
   );
-
-  useEffect(() => {
-    applyThemeVars(initialPrimary, initialSecondary);
-    // apply the saved theme once on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   function discard() {
     setAdmin(current.roleLabels?.admin ?? "Admin");

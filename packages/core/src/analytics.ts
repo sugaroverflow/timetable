@@ -13,6 +13,7 @@ import {
   type TopicStatus,
 } from "@timetable/db";
 
+import { coerceDate } from "./dates";
 import { buildFeed } from "./topics";
 
 export const ELECTOR_ACTIVITY_FILTERS = [
@@ -66,10 +67,8 @@ type Stat = { count: number; latestAt: Date | null };
 function latestDate(...dates: (Date | string | null | undefined)[]): Date | null {
   let latest: Date | null = null;
   for (const raw of dates) {
-    if (!raw) continue;
-    // raw SQL max() aggregates bypass Drizzle's column mappers and arrive as strings
-    const date = raw instanceof Date ? raw : new Date(raw);
-    if (Number.isNaN(date.getTime())) continue;
+    const date = coerceDate(raw);
+    if (!date) continue;
     if (!latest || date.getTime() > latest.getTime()) latest = date;
   }
   return latest;

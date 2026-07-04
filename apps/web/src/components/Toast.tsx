@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { createPortal } from "react-dom";
 
@@ -23,8 +24,17 @@ const ToastContext = createContext<ToastApi | null>(null);
 const SUCCESS_MS = 2200;
 const ERROR_MS = 4500;
 
+const emptySubscribe = () => () => {};
+
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([]);
+  // Portal only after hydration: the server renders nothing here, so
+  // rendering the portal during the hydration pass is a mismatch React drops.
+  const mounted = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false,
+  );
   const nextId = useRef(1);
 
   const push = useCallback((kind: ToastKind, message: string) => {
@@ -47,7 +57,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={api}>
       {children}
-      {typeof document !== "undefined" && items.length > 0
+      {/* The live region must exist BEFORE a toast arrives or most screen
+          readers won't announce it — keep the container mounted permanently
+          and only toggle its children. */}
+      {mounted
         ? createPortal(
             <div className="toast-wrap" role="status" aria-live="polite">
               {items.map((t) => (

@@ -37,16 +37,32 @@ export function roleLabel(
   return role;
 }
 
-export function themeStyle(
-  settings: TimetableSettings,
-): CSSProperties & { "--primary"?: string; "--primary-soft"?: string } {
-  const style: CSSProperties & {
-    "--primary"?: string;
-    "--primary-soft"?: string;
-  } = {};
-  if (settings.theme?.primary) style["--primary"] = settings.theme.primary;
-  if (settings.theme?.secondary) {
-    style["--primary-soft"] = settings.theme.secondary;
+/**
+ * The single theme→CSS-variable mapping, used for both server render
+ * (themeStyle) and the settings page's live preview. Primary drives the
+ * accent colours; secondary drives the host-only panel colours.
+ */
+export function themeVars(
+  primary: string | undefined,
+  secondary: string | undefined,
+): Record<string, string> {
+  const vars: Record<string, string> = {};
+  if (primary) {
+    vars["--primary"] = primary;
+    vars["--primary-soft"] = primary + "1a";
+    vars["--primary-ink"] = "#ffffff";
   }
-  return style;
+  if (secondary) {
+    vars["--host-ink"] = secondary;
+    vars["--host-wash"] = secondary + "15";
+    vars["--host-line"] = secondary + "40";
+  }
+  return vars;
+}
+
+export function themeStyle(settings: TimetableSettings): CSSProperties {
+  return themeVars(
+    settings.theme?.primary,
+    settings.theme?.secondary,
+  ) as CSSProperties;
 }
