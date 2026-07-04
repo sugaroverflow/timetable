@@ -4,6 +4,7 @@ import { CreateTopicForm } from "@/components/CreateTopicForm";
 import { TopicManager } from "@/components/TopicManager";
 import type { ManagedTopic } from "@/lib/feedTypes";
 import { gqlFetch } from "@/lib/graphql";
+import { displayRolesFromCookies } from "@/lib/previewRoles.server";
 
 type Data = {
   timetable: { viewerRoles: string[] } | null;
@@ -26,7 +27,9 @@ export default async function MyTopicsPage({
 }) {
   const { slug } = await params;
   const data = await gqlFetch<Data>(QUERY, { s: slug });
-  const roles = (data.timetable?.viewerRoles ?? []) as Role[];
+  const roles = await displayRolesFromCookies(
+    (data.timetable?.viewerRoles ?? []) as Role[],
+  );
 
   if (!isHost(roles)) {
     return (

@@ -7,6 +7,7 @@ import { MemberRolesPicker } from "@/components/MemberRolesPicker";
 import { SettingsForm, type SettingsValues } from "@/components/SettingsForm";
 import { TimetableProfileForm } from "@/components/TimetableProfileForm";
 import { gqlFetch } from "@/lib/graphql";
+import { displayRolesFromCookies } from "@/lib/previewRoles.server";
 
 type Data = {
   timetable: {
@@ -63,7 +64,10 @@ export default async function SettingsPage({
     { idOrSlug: slug },
   );
   if (!first.timetable) notFound();
-  if (!isAdmin(first.timetable.viewerRoles as Role[])) {
+  const roles = await displayRolesFromCookies(
+    first.timetable.viewerRoles as Role[],
+  );
+  if (!isAdmin(roles)) {
     return (
       <div className="notice">You need an admin role to manage settings.</div>
     );

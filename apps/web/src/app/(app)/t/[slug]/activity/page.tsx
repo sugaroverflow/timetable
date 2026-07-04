@@ -4,6 +4,7 @@ import { ActivityFilter } from "@/components/ActivityFilter";
 import { EmptyState } from "@/components/EmptyState";
 import type { ActivityEvent } from "@/lib/feedTypes";
 import { gqlFetch } from "@/lib/graphql";
+import { displayRolesFromCookies } from "@/lib/previewRoles.server";
 
 type Data = {
   timetable: { viewerRoles: string[] } | null;
@@ -50,7 +51,9 @@ export default async function ActivityPage({
   const { slug } = await params;
   const { action } = await searchParams;
   const data = await gqlFetch<Data>(QUERY, { s: slug });
-  const roles = (data.timetable?.viewerRoles ?? []) as Role[];
+  const roles = await displayRolesFromCookies(
+    (data.timetable?.viewerRoles ?? []) as Role[],
+  );
 
   if (!isAdmin(roles)) {
     return <div className="notice">Admins only.</div>;

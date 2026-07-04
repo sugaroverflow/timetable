@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { isAdmin, isElector, isHost, type Role } from "@timetable/shared";
 
 import { gqlFetch } from "@/lib/graphql";
+import { displayRolesFromCookies } from "@/lib/previewRoles.server";
 import {
   parseTimetableSettings,
   roleLabel,
@@ -46,7 +47,7 @@ export default async function TimetableOverviewPage({
   });
   if (!timetable) notFound();
 
-  const roles = timetable.viewerRoles as Role[];
+  const roles = await displayRolesFromCookies(timetable.viewerRoles as Role[]);
   const settings = parseTimetableSettings(timetable.settings);
   const base = `/t/${slug}`;
 

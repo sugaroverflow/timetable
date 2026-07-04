@@ -8,6 +8,7 @@ import { HostFilter } from "@/components/HostFilter";
 import { TopicCard, type FeedPerms } from "@/components/TopicCard";
 import type { FeedTopic } from "@/lib/feedTypes";
 import { gqlFetch } from "@/lib/graphql";
+import { displayRolesFromCookies } from "@/lib/previewRoles.server";
 import { parseTimetableSettings } from "@/lib/timetableSettings";
 
 type Data = {
@@ -79,7 +80,9 @@ export default async function FeedPage({
     limit: PAGE_SIZE + 1,
     offset,
   });
-  const roles = (data.timetable?.viewerRoles ?? []) as Role[];
+  const roles = await displayRolesFromCookies(
+    (data.timetable?.viewerRoles ?? []) as Role[],
+  );
   const settings = parseTimetableSettings(data.timetable?.settings);
   const topics = data.topicFeed.slice(0, PAGE_SIZE);
   const hasNext = data.topicFeed.length > PAGE_SIZE;

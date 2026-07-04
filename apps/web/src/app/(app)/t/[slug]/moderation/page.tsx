@@ -4,6 +4,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { ModerationCard } from "@/components/ModerationCard";
 import type { ManagedTopic } from "@/lib/feedTypes";
 import { gqlFetch } from "@/lib/graphql";
+import { displayRolesFromCookies } from "@/lib/previewRoles.server";
 
 type Data = {
   timetable: { viewerRoles: string[] } | null;
@@ -26,7 +27,9 @@ export default async function ModerationPage({
 }) {
   const { slug } = await params;
   const data = await gqlFetch<Data>(QUERY, { s: slug });
-  const roles = (data.timetable?.viewerRoles ?? []) as Role[];
+  const roles = await displayRolesFromCookies(
+    (data.timetable?.viewerRoles ?? []) as Role[],
+  );
 
   if (!isAdmin(roles)) {
     return <div className="notice">Admins only.</div>;

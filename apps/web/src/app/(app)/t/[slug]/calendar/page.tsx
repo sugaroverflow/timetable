@@ -10,6 +10,7 @@ import { SlotCard, type CalendarPerms } from "@/components/SlotCard";
 import { WeekdayPatternControl } from "@/components/WeekdayPatternControl";
 import type { CalendarSlot, TopicOption } from "@/lib/calendarTypes";
 import { gqlFetch } from "@/lib/graphql";
+import { displayRolesFromCookies } from "@/lib/previewRoles.server";
 
 type Data = {
   timetable: { viewerRoles: string[] } | null;
@@ -57,7 +58,9 @@ export default async function CalendarPage({
     s: slug,
     audience: audience ?? null,
   });
-  const roles = (data.timetable?.viewerRoles ?? []) as Role[];
+  const roles = await displayRolesFromCookies(
+    (data.timetable?.viewerRoles ?? []) as Role[],
+  );
 
   const perms: CalendarPerms = {
     canSetAvailability: isElector(roles),
