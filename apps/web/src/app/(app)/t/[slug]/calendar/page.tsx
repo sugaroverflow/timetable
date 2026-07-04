@@ -77,6 +77,10 @@ export default async function CalendarPage({
     ? data.calendar.filter((s) => s.location === location)
     : data.calendar;
 
+  // Every slot carries the full audience in perUser (host/admin only), so
+  // the audience size is the same across slots.
+  const audienceCount = data.calendar[0]?.perUser?.length ?? null;
+
   return (
     <div className="stack">
       <div className="toolbar">
@@ -94,6 +98,11 @@ export default async function CalendarPage({
           <LocationFilter value={location ?? ""} locations={locations} />
         ) : null}
         <span className="spacer" />
+        {perms.canSeeHostOnly && audienceCount !== null ? (
+          <span className="faint" style={{ fontSize: 12 }}>
+            {audienceCount} elector{audienceCount === 1 ? "" : "s"} in view
+          </span>
+        ) : null}
         <a className="btn btn-ghost" href={icsUrl}>
           Subscribe (ICS)
         </a>
@@ -101,6 +110,20 @@ export default async function CalendarPage({
 
       {perms.canAdmin ? <SlotAdminForm slug={slug} /> : null}
       {perms.canSetAvailability ? <WeekdayPatternControl slug={slug} /> : null}
+
+      {data.calendar.length > 0 ? (
+        <div className="legend">
+          <span>
+            <i className="i-g" /> Available
+          </span>
+          <span>
+            <i className="i-y" /> Maybe
+          </span>
+          <span>
+            <i className="i-r" /> Can’t
+          </span>
+        </div>
+      ) : null}
 
       {visibleSlots.length === 0 ? (
         data.calendar.length === 0 ? (

@@ -894,3 +894,65 @@ textarea {
 @media (prefers-reduced-motion: reduce) {
   .toast, .heart-pop { animation: none !important; }
 }
+
+/* Availability segmented control (prototype .avseg) */
+.avseg {
+  display: inline-flex;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  overflow: hidden;
+  background: #fff;
+}
+.avseg button {
+  padding: 6px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-right: 1px solid var(--line-strong);
+}
+.avseg button:last-child {
+  border-right: none;
+}
+.avseg button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.avseg button.on-g {
+  background: var(--green-soft);
+  color: #1f7a32;
+}
+.avseg button.on-y {
+  background: var(--yellow-soft, #fdf2dc);
+  color: #a9700f;
+}
+.avseg button.on-r {
+  background: var(--red-soft, #fbe9e9);
+  color: #b23131;
+}
+
+/* Calendar legend */
+.legend {
+  display: flex;
+  gap: 13px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.legend i {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  display: inline-block;
+}
+.legend .i-g { background: var(--green); }
+.legend .i-y { background: var(--yellow, #f3a712); }
+.legend .i-r { background: var(--red); }

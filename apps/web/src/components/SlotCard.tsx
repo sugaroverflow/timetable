@@ -64,7 +64,15 @@ export function SlotCard({
           </div>
         </div>
         {perms.canSetAvailability ? (
-          <AvailabilityControl slotId={slot.id} state={slot.viewerState} />
+          <span
+            className="stack"
+            style={{ gap: 4, alignItems: "flex-end" }}
+          >
+            <span className="faint" style={{ fontSize: 11, fontWeight: 600 }}>
+              Your availability
+            </span>
+            <AvailabilityControl slotId={slot.id} state={slot.viewerState} />
+          </span>
         ) : null}
       </div>
 

@@ -10,10 +10,10 @@ const MUTATION = `mutation($id: String!, $state: String!) {
   setAvailability(slotId: $id, state: $state)
 }`;
 
-const STATES: { value: string; icon: string }[] = [
-  { value: "green", icon: "\uD83D\uDFE2" },
-  { value: "yellow", icon: "\uD83D\uDFE1" },
-  { value: "red", icon: "\uD83D\uDD34" },
+const STATES: { value: string; label: string; onClass: string }[] = [
+  { value: "green", label: "Available", onClass: "on-g" },
+  { value: "yellow", label: "Maybe", onClass: "on-y" },
+  { value: "red", label: "Can’t", onClass: "on-r" },
 ];
 
 export function AvailabilityControl({
@@ -36,18 +36,21 @@ export function AvailabilityControl({
     }
   }
 
+  // Unsaved availability counts as "maybe" server-side, so reflect that here.
+  const effective = state ?? "yellow";
+
   return (
-    <span className="avail-btns">
+    <span className="avseg">
       {STATES.map((s) => (
         <button
           key={s.value}
           type="button"
-          className={`avail-btn ${s.value} ${state === s.value ? "on" : ""}`}
+          className={effective === s.value ? s.onClass : ""}
           disabled={pending}
           onClick={() => set(s.value)}
-          aria-label={s.value}
+          aria-pressed={effective === s.value}
         >
-          {s.icon}
+          {s.label}
         </button>
       ))}
     </span>
