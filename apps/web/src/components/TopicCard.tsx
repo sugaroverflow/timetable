@@ -4,6 +4,7 @@ import { AdminTopicActions } from "./AdminTopicActions";
 import { Avatar } from "./Avatar";
 import { CommentComposer } from "./CommentComposer";
 import { CommentList } from "./CommentList";
+import { FocusCommentButton } from "./FocusCommentButton";
 import { HeartButton } from "./HeartButton";
 import { HostInsightsPanel } from "./HostInsightsPanel";
 
@@ -87,20 +88,10 @@ export function TopicCard({
             {topic.heartCount}
           </span>
         )}
-        <button
-          className="act"
-          type="button"
-          onClick={() => {
-            const ta = document.querySelector<HTMLTextAreaElement>(
-              `[data-topic-composer="${topic.id}"]`,
-            );
-            ta?.focus();
-          }}
-        >
-          <span className="ic">💬</span>
-          {topic.commentCount || ""}
-          <span style={{ fontWeight: 600 }}>Comment</span>
-        </button>
+        <FocusCommentButton
+          topicId={topic.id}
+          commentCount={topic.commentCount}
+        />
         <span style={{ flex: 1 }} />
       </div>
 
