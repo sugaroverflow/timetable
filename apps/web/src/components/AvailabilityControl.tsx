@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 
+import { useToast } from "@/components/Toast";
 import { clientGql } from "@/lib/clientGraphql";
 
 const MUTATION = `mutation($id: String!, $state: String!) {
@@ -23,6 +24,7 @@ export function AvailabilityControl({
   state: string | null;
 }) {
   const router = useRouter();
+  const { toastError } = useToast();
   const [pending, startTransition] = useTransition();
 
   async function set(value: string) {
@@ -30,7 +32,7 @@ export function AvailabilityControl({
       await clientGql(MUTATION, { id: slotId, state: value });
       startTransition(() => router.refresh());
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Could not set availability");
+      toastError(err instanceof Error ? err.message : "Could not set availability");
     }
   }
 

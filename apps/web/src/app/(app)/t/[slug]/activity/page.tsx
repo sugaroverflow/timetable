@@ -1,6 +1,7 @@
 import { isAdmin, type Role } from "@timetable/shared";
 
 import { ActivityFilter } from "@/components/ActivityFilter";
+import { EmptyState } from "@/components/EmptyState";
 import type { ActivityEvent } from "@/lib/feedTypes";
 import { gqlFetch } from "@/lib/graphql";
 
@@ -73,7 +74,11 @@ export default async function ActivityPage({
         <ActivityFilter value={action ?? ""} actions={uniqueActions} />
       )}
       {visibleEvents.length === 0 ? (
-        <div className="notice">No activity yet.</div>
+        <EmptyState
+          icon="≣"
+          title="No activity yet"
+          hint="Moderation and lifecycle actions will appear here."
+        />
       ) : (
         <div className="timeline">
           {visibleEvents.map((event) => (

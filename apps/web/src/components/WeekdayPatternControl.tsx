@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
+import { useToast } from "@/components/Toast";
 import { clientGql } from "@/lib/clientGraphql";
 
 const MUTATION = `mutation($s: String!, $wd: Int!, $state: String!) {
@@ -29,6 +30,7 @@ const ICON: Record<string, string> = {
 
 export function WeekdayPatternControl({ slug }: { slug: string }) {
   const router = useRouter();
+  const { toast, toastError } = useToast();
   const [pending, startTransition] = useTransition();
   const [states, setStates] = useState<Record<number, string>>({});
 
@@ -40,9 +42,13 @@ export function WeekdayPatternControl({ slug }: { slug: string }) {
     if (!next) return;
     try {
       await clientGql(MUTATION, { s: slug, wd, state: next });
+      const day = DAYS.find((d) => d.wd === wd)?.label ?? "day";
+      const word =
+        next === "green" ? "available" : next === "yellow" ? "maybe" : "can't";
+      toast(`Every ${day} set to “${word}”`);
       startTransition(() => router.refresh());
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Could not apply pattern");
+      toastError(err instanceof Error ? err.message : "Could not apply pattern");
     }
   }
 

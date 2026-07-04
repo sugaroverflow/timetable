@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
+import { useToast } from "@/components/Toast";
 import { clientGql } from "@/lib/clientGraphql";
 
 const MUTATION = `mutation($t: Boolean, $r: Boolean, $a: Boolean) {
@@ -19,6 +20,7 @@ export type DigestSettings = {
 
 export function DigestSettingsForm({ current }: { current: DigestSettings }) {
   const router = useRouter();
+  const { toast, toastError } = useToast();
   const [topics, setTopics] = useState(current.digestNewTopics ?? false);
   const [replies, setReplies] = useState(current.digestReplies ?? false);
   const [activity, setActivity] = useState(current.digestActivity ?? false);
@@ -31,9 +33,10 @@ export function DigestSettingsForm({ current }: { current: DigestSettings }) {
     try {
       await clientGql(MUTATION, { t: topics, r: replies, a: activity });
       setSaved(true);
+      toast("Digest settings saved");
       startTransition(() => router.refresh());
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Could not save settings");
+      toastError(err instanceof Error ? err.message : "Could not save settings");
     }
   }
 

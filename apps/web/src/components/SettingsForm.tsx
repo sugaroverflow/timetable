@@ -4,6 +4,7 @@ import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 import { ImageUploadField } from "@/components/ImageUploadField";
+import { useToast } from "@/components/Toast";
 import { clientGql } from "@/lib/clientGraphql";
 
 const MUTATION = `mutation Settings(
@@ -34,6 +35,7 @@ export function SettingsForm({
   current: SettingsValues;
 }) {
   const router = useRouter();
+  const { toast, toastError } = useToast();
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
 
@@ -75,9 +77,10 @@ export function SettingsForm({
         cover: cover.trim() || null,
       });
       setSaved(true);
+      toast("Settings saved");
       startTransition(() => router.refresh());
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Could not save settings");
+      toastError(err instanceof Error ? err.message : "Could not save settings");
     }
   }
 

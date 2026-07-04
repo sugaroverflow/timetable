@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { ImageUploadField } from "@/components/ImageUploadField";
+import { useToast } from "@/components/Toast";
 import { clientGql } from "@/lib/clientGraphql";
 import type { ManagedTopic } from "@/lib/feedTypes";
 
@@ -21,6 +22,7 @@ export function TopicManager({
   slug: string;
 }) {
   const router = useRouter();
+  const { toast, toastError } = useToast();
   const [pending, startTransition] = useTransition();
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(topic.title);
@@ -28,23 +30,32 @@ export function TopicManager({
   const [cover, setCover] = useState(topic.coverImageUrl ?? "");
   const [uploadingCover, setUploadingCover] = useState(false);
 
-  async function run(query: string, variables: Record<string, unknown>) {
+  async function run(
+    query: string,
+    variables: Record<string, unknown>,
+    successMessage: string,
+  ) {
     try {
       await clientGql(query, variables);
+      toast(successMessage);
       startTransition(() => router.refresh());
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Action failed");
+      toastError(err instanceof Error ? err.message : "Action failed");
     }
   }
 
   async function saveEdit(e: React.FormEvent) {
     e.preventDefault();
-    await run(UPDATE, {
-      id: topic.id,
-      title: title.trim(),
-      body,
-      cover: cover.trim() || null,
-    });
+    await run(
+      UPDATE,
+      {
+        id: topic.id,
+        title: title.trim(),
+        body,
+        cover: cover.trim() || null,
+      },
+      "Topic updated",
+    );
     setEditing(false);
   }
 
@@ -101,7 +112,7 @@ export function TopicManager({
               className="btn btn-primary"
               type="button"
               disabled={pending}
-              onClick={() => run(SUBMIT, { id: topic.id })}
+              onClick={() => run(SUBMIT, { id: topic.id }, "Submitted for review")}
             >
               Submit for review
             </button>
@@ -111,7 +122,7 @@ export function TopicManager({
               className="btn"
               type="button"
               disabled={pending}
-              onClick={() => run(UNPUBLISH, { id: topic.id })}
+              onClick={() => run(UNPUBLISH, { id: topic.id }, "Topic unpublished")}
             >
               Unpublish
             </button>

@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { ImageUploadField } from "@/components/ImageUploadField";
+import { useToast } from "@/components/Toast";
 import { clientGql } from "@/lib/clientGraphql";
 import type { ManagedTopic } from "@/lib/feedTypes";
 
@@ -17,6 +18,7 @@ const UPDATE_MUTATION = `mutation Update($id: String!, $title: String, $body: St
 
 export function ModerationCard({ topic, slug }: { topic: ManagedTopic; slug: string }) {
   const router = useRouter();
+  const { toast, toastError } = useToast();
   const [pending, startTransition] = useTransition();
   const [note, setNote] = useState("");
   const [showNote, setShowNote] = useState(false);
@@ -39,9 +41,16 @@ export function ModerationCard({ topic, slug }: { topic: ManagedTopic; slug: str
       });
       setNote("");
       setShowNote(false);
+      toast(
+        action === "publish"
+          ? "Topic published"
+          : action === "reject"
+            ? "Topic rejected"
+            : "Feedback sent to host",
+      );
       startTransition(() => router.refresh());
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Moderation failed");
+      toastError(err instanceof Error ? err.message : "Moderation failed");
     }
   }
 
@@ -56,9 +65,10 @@ export function ModerationCard({ topic, slug }: { topic: ManagedTopic; slug: str
         cover: cover.trim() || null,
       });
       setEditing(false);
+      toast("Topic updated");
       startTransition(() => router.refresh());
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Could not save changes");
+      toastError(err instanceof Error ? err.message : "Could not save changes");
     }
   }
 

@@ -3,6 +3,7 @@ import { isAdmin, isElector, isHost, type Role } from "@timetable/shared";
 
 import { env } from "@/env";
 import { AudienceFilter } from "@/components/AudienceFilter";
+import { EmptyState } from "@/components/EmptyState";
 import { LocationFilter } from "@/components/LocationFilter";
 import { SlotAdminForm } from "@/components/SlotAdminForm";
 import { SlotCard, type CalendarPerms } from "@/components/SlotCard";
@@ -102,11 +103,19 @@ export default async function CalendarPage({
       {perms.canSetAvailability ? <WeekdayPatternControl slug={slug} /> : null}
 
       {visibleSlots.length === 0 ? (
-        <div className="notice">
-          {data.calendar.length === 0
-            ? `No timeslots yet${perms.canAdmin ? " — add one above." : "."}`
-            : "No slots match this filter."}
-        </div>
+        data.calendar.length === 0 ? (
+          <EmptyState
+            icon="▦"
+            title="No timeslots yet"
+            hint={perms.canAdmin ? "Add one above to get started." : undefined}
+          />
+        ) : (
+          <EmptyState
+            icon="▦"
+            title="No slots match"
+            hint="Try a different location."
+          />
+        )
       ) : (
         <ul className="list">
           {visibleSlots.map((slot) => (

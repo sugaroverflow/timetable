@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { isAdmin, isElector, isHost, type Role } from "@timetable/shared";
 
+import { EmptyState } from "@/components/EmptyState";
 import { FeedSortControl } from "@/components/FeedSortControl";
 import { HostFilter } from "@/components/HostFilter";
 import { TopicCard, type FeedPerms } from "@/components/TopicCard";
@@ -108,11 +109,11 @@ export default async function FeedPage({
       ) : null}
 
       {topics.length === 0 ? (
-        <div className="notice">
-          No published topics yet. Hosts can draft and submit topics from{" "}
-          <strong>My topics</strong>; admins publish them from the moderation
-          queue.
-        </div>
+        <EmptyState
+          icon="◇"
+          title="No published topics yet"
+          hint="Hosts draft and submit topics from My topics; admins publish them from the moderation queue."
+        />
       ) : (
         topics.map((topic) => (
           <TopicCard

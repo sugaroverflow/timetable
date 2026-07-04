@@ -1,5 +1,6 @@
 import { isAdmin, type Role } from "@timetable/shared";
 
+import { EmptyState } from "@/components/EmptyState";
 import { ModerationCard } from "@/components/ModerationCard";
 import type { ManagedTopic } from "@/lib/feedTypes";
 import { gqlFetch } from "@/lib/graphql";
@@ -42,7 +43,11 @@ export default async function ModerationPage({
         Backstage — actions here are logged to the activity log and visible to all admins.
       </div>
       {data.moderationQueue.length === 0 ? (
-        <div className="notice">Nothing awaiting review.</div>
+        <EmptyState
+          icon="✓"
+          title="Queue is clear"
+          hint="Nothing is waiting for review right now."
+        />
       ) : (
         <ul className="list">
           {data.moderationQueue.map((topic) => (

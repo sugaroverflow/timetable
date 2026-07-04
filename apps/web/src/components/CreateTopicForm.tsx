@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { ImageUploadField } from "@/components/ImageUploadField";
+import { useToast } from "@/components/Toast";
 import { clientGql } from "@/lib/clientGraphql";
 
 const MUTATION = `mutation Create($s: String!, $title: String!, $body: String, $cover: String) {
@@ -12,6 +13,7 @@ const MUTATION = `mutation Create($s: String!, $title: String!, $body: String, $
 
 export function CreateTopicForm({ slug }: { slug: string }) {
   const router = useRouter();
+  const { toast, toastError } = useToast();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [cover, setCover] = useState("");
@@ -31,9 +33,10 @@ export function CreateTopicForm({ slug }: { slug: string }) {
       setTitle("");
       setBody("");
       setCover("");
+      toast("Draft created");
       startTransition(() => router.refresh());
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Could not create topic");
+      toastError(err instanceof Error ? err.message : "Could not create topic");
     }
   }
 
