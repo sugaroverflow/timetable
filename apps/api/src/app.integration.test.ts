@@ -25,6 +25,7 @@ vi.mock("@timetable/core", async (importOriginal) => {
     inviteEmails: vi.fn(),
     listDigestRecipients: vi.fn(),
     setMemberRoles: vi.fn(),
+    updateTimetableSettings: vi.fn(),
   };
 });
 
@@ -187,6 +188,7 @@ afterEach(() => {
   vi.mocked(core.inviteEmails).mockReset();
   vi.mocked(core.listDigestRecipients).mockReset();
   vi.mocked(core.setMemberRoles).mockReset();
+  vi.mocked(core.updateTimetableSettings).mockReset();
 });
 
 describe("createApiApp", () => {
@@ -610,6 +612,38 @@ describe("createApiApp", () => {
         timetable.id,
         "elector-1",
       );
+    });
+  });
+
+  it("patches digest defaults through updateTimetableSettings for admins", async () => {
+    const timetable = timetableFixture();
+    mockSession("admin-1", ["admin"]);
+    vi.mocked(core.getReadableTimetable).mockResolvedValue({
+      timetable,
+      roles: ["admin"],
+    });
+    vi.mocked(core.updateTimetableSettings).mockResolvedValue(timetable);
+
+    await withTestServer(async (baseUrl) => {
+      const res = await fetch(`${baseUrl}/graphql`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: `mutation($s: String!) {
+            updateTimetableSettings(
+              idOrSlug: $s
+              digestNewTopics: true
+              digestReplies: false
+            ) { id }
+          }`,
+          variables: { s: timetable.slug },
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(core.updateTimetableSettings).toHaveBeenCalledWith(timetable.id, {
+        digestDefaults: { digestNewTopics: true, digestReplies: false },
+      });
     });
   });
 

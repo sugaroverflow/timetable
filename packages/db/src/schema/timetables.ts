@@ -20,6 +20,12 @@ export type TimetableSettings = {
   roleLabels?: { admin?: string; host?: string; elector?: string };
   theme?: { primary?: string; secondary?: string };
   coverImageUrl?: string | null;
+  /** Digest settings seeded onto new members who haven't customized theirs. */
+  digestDefaults?: {
+    digestNewTopics?: boolean;
+    digestReplies?: boolean;
+    digestActivity?: boolean;
+  };
 };
 
 export const timetables = pgTable("timetables", {

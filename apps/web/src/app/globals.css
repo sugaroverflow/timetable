@@ -968,3 +968,18 @@ textarea {
   border-radius: 6px;
   white-space: nowrap;
 }
+
+/* Settings role preview line (prototype .preview-roles) */
+.preview-roles {
+  margin: 4px 0 14px;
+  padding: 11px 13px;
+  background: #f6f7fa;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.preview-roles b {
+  color: var(--ink);
+  font-weight: 600;
+}

@@ -10,6 +10,11 @@ export type TimetableSettings = {
   roleLabels?: RoleLabels;
   theme?: { primary?: string; secondary?: string };
   coverImageUrl?: string | null;
+  digestDefaults?: {
+    digestNewTopics?: boolean;
+    digestReplies?: boolean;
+    digestActivity?: boolean;
+  };
 };
 
 export function parseTimetableSettings(raw: string | null | undefined) {

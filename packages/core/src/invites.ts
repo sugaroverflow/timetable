@@ -6,6 +6,7 @@ import {
   db,
   timetableInvites,
   timetableMemberships,
+  timetables,
   users,
 } from "@timetable/db";
 import type { AssignableRole, Role } from "@timetable/shared";
@@ -19,6 +20,37 @@ const INVITE_TTL_DAYS = 30;
 
 function mergeRoles(existing: readonly Role[], incoming: readonly Role[]): Role[] {
   return Array.from(new Set<Role>([...existing, ...incoming]));
+}
+
+/**
+ * Seed the timetable's default digest settings onto a newly added member —
+ * but only if they have never saved their own (settings still `{}`). A user's
+ * notification settings are global, so joining a second timetable must never
+ * overwrite choices they've already made.
+ */
+async function seedDigestDefaults(
+  userId: string,
+  timetableId: string,
+): Promise<void> {
+  const [tt] = await db
+    .select({ settings: timetables.settings })
+    .from(timetables)
+    .where(eq(timetables.id, timetableId))
+    .limit(1);
+  const defaults = tt?.settings?.digestDefaults;
+  if (!defaults || Object.keys(defaults).length === 0) return;
+
+  const [user] = await db
+    .select({ notificationSettings: users.notificationSettings })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (!user || Object.keys(user.notificationSettings ?? {}).length > 0) return;
+
+  await db
+    .update(users)
+    .set({ notificationSettings: defaults })
+    .where(eq(users.id, userId));
 }
 
 /**
@@ -72,6 +104,7 @@ export async function inviteEmails(
           timetableId,
           roles,
         });
+        await seedDigestDefaults(existingUser.id, timetableId);
         outcomes.push({ email, status: "added" });
       }
       continue;
@@ -154,6 +187,7 @@ export async function claimInvitesForUser(
         timetableId: invite.timetableId,
         roles: invite.roles,
       });
+      await seedDigestDefaults(userId, invite.timetableId);
     }
 
     await db
