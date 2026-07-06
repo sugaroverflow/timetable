@@ -79,6 +79,14 @@ export const env = {
   webOrigin: listEnv("WEB_ORIGIN", "http://localhost:3000"),
   nodeEnv,
   isProd,
+  /**
+   * Map Clerk test users (externalId = dev_sample_*) to seeded fixture users
+   * on sign-in. On by default outside production builds; hosted dev runs a
+   * production build, so it opts in explicitly via DEV_SEED_USER_MAPPING.
+   * Never set this in the production app spec.
+   */
+  devSeedUserMapping:
+    process.env.DEV_SEED_USER_MAPPING === "true" || !isProd,
   trustProxyHops: intEnv("TRUST_PROXY_HOPS", 1),
   rateLimitBackend,
   rateLimitKeyPrefix:
