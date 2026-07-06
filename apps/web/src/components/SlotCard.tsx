@@ -35,11 +35,13 @@ export function SlotCard({
   slug,
   perms,
   topicOptions,
+  adminLabel = "Admin",
 }: {
   slot: CalendarSlot;
   slug: string;
   perms: CalendarPerms;
   topicOptions: TopicOption[];
+  adminLabel?: string;
 }) {
   const total = slot.counts.green + slot.counts.yellow + slot.counts.red;
 
@@ -135,6 +137,7 @@ export function SlotCard({
           slotId={slot.id}
           tags={slot.topics}
           topicOptions={topicOptions}
+          label={adminLabel}
         />
       ) : null}
     </li>

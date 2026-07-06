@@ -9,7 +9,13 @@ import { clientGql } from "@/lib/clientGraphql";
 const UNPUBLISH = `mutation($id: String!){ unpublishTopic(topicId: $id){ id } }`;
 const ARCHIVE = `mutation($id: String!){ archiveTopicHearts(topicId: $id){ id } }`;
 
-export function AdminTopicActions({ topicId }: { topicId: string }) {
+export function AdminTopicActions({
+  topicId,
+  label = "Admin",
+}: {
+  topicId: string;
+  label?: string;
+}) {
   const router = useRouter();
   const { toast, toastError } = useToast();
   const [pending, startTransition] = useTransition();
@@ -42,7 +48,7 @@ export function AdminTopicActions({ topicId }: { topicId: string }) {
       style={{ gap: 8, borderTop: "1px solid var(--line)", paddingTop: 10 }}
     >
       <span className="faint" style={{ fontSize: 11 }}>
-        Admin:
+        {label}:
       </span>
       <button
         className="btn btn-ghost"

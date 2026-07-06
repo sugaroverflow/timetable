@@ -6,15 +6,16 @@ import { ACTION_LABELS } from "@/lib/activityLabels";
 import type { ActivityEvent } from "@/lib/feedTypes";
 import { gqlFetch } from "@/lib/graphql";
 import { displayRolesFromCookies } from "@/lib/previewRoles.server";
+import { parseTimetableSettings, roleLabel } from "@/lib/timetableSettings";
 
 type Data = {
-  timetable: { viewerRoles: string[] } | null;
+  timetable: { viewerRoles: string[]; settings: string } | null;
   activityTimeline: ActivityEvent[];
 };
 
 const QUERY = `
   query Activity($s: String!) {
-    timetable(idOrSlug: $s) { viewerRoles }
+    timetable(idOrSlug: $s) { viewerRoles settings }
     activityTimeline(idOrSlug: $s) {
       id action note actorName createdAt
     }
@@ -44,9 +45,11 @@ export default async function ActivityPage({
   const roles = await displayRolesFromCookies(
     (data.timetable?.viewerRoles ?? []) as Role[],
   );
+  const settings = parseTimetableSettings(data.timetable?.settings);
+  const adminLabel = roleLabel(settings.roleLabels, "admin");
 
   if (!isAdmin(roles)) {
-    return <div className="notice">Admins only.</div>;
+    return <div className="notice">{adminLabel}s only.</div>;
   }
 
   const uniqueActions = Array.from(
@@ -82,7 +85,9 @@ export default async function ActivityPage({
               </div>
               {event.note ? (
                 <div className="tl-note">
-                  <span className="tn-by">{event.actorName ?? "Admin"} (admin)</span>
+                  <span className="tn-by">
+                    {event.actorName ?? adminLabel} ({adminLabel.toLowerCase()})
+                  </span>
                   <br />{event.note}
                 </div>
               ) : null}

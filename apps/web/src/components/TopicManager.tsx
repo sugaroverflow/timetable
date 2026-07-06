@@ -85,7 +85,7 @@ export function TopicManager({
           )}
           {topic.status === "submitted" && !topic.feedback && (
             <span className="faint" style={{ fontSize: 13 }}>
-              In the moderation queue…
+              Pending review…
             </span>
           )}
           {topic.status === "submitted" && topic.feedback && (

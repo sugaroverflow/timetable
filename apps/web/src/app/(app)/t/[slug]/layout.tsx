@@ -2,7 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
-import { isAdmin, isElector, isHost, type Role } from "@timetable/shared";
+import { isAdmin, isHost, type Role } from "@timetable/shared";
 
 import { NavLink } from "@/components/NavLink";
 import { PreviewToggle } from "@/components/PreviewToggle";
@@ -151,23 +151,15 @@ export default async function TimetableLayout({
       ) : null}
 
       <nav className="nav" style={{ marginBottom: 18 }}>
-        <NavLink href={base} exact>
-          Overview
-        </NavLink>
         <NavLink href={`${base}/feed`}>Topic feed</NavLink>
         {isHost(roles) && (
-          <NavLink href={`${base}/topics`}>
-            My {roleLabel(settings.roleLabels, "host").toLowerCase()} topics
-          </NavLink>
-        )}
-        {(isElector(roles) || isHost(roles) || isAdmin(roles)) && (
-          <NavLink href={`${base}/calendar`}>Availability</NavLink>
+          <NavLink href={`${base}/topics`}>My Topics</NavLink>
         )}
         {(isHost(roles) || isAdmin(roles)) && (
           <NavLink href={`${base}/dashboard`}>Dashboard</NavLink>
         )}
         {isAdmin(roles) && (
-          <NavLink href={`${base}/moderation`}>Moderation</NavLink>
+          <NavLink href={`${base}/moderation`}>Pending Topics</NavLink>
         )}
         {isAdmin(roles) && (
           <NavLink href={`${base}/activity`}>Activity</NavLink>

@@ -119,7 +119,7 @@ h3 {
 }
 
 .timetable-cover {
-  height: 150px;
+  height: 75px;
   margin: -2px 0 18px;
   border-radius: var(--radius);
 }
@@ -179,14 +179,11 @@ h3 {
   box-shadow: var(--shadow);
 }
 
+/* Single-column everywhere (QA #42): .grid-2 keeps its name but no longer
+   splits into columns at any width. */
 .grid {
   display: grid;
   gap: 14px;
-}
-@media (min-width: 640px) {
-  .grid-2 {
-    grid-template-columns: repeat(2, 1fr);
-  }
 }
 
 /* Buttons */

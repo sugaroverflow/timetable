@@ -19,11 +19,13 @@ export function TopicCard({
   topic,
   perms,
   hostLabel = "Host",
+  adminLabel = "Admin",
   viewerHeartCount = null,
 }: {
   topic: FeedTopic;
   perms: FeedPerms;
   hostLabel?: string;
+  adminLabel?: string;
   viewerHeartCount?: number | null;
 }) {
   const publicComments = topic.comments.filter(
@@ -102,7 +104,9 @@ export function TopicCard({
         ) : null}
       </div>
 
-      {perms.canModerate ? <AdminTopicActions topicId={topic.id} /> : null}
+      {perms.canModerate ? (
+        <AdminTopicActions topicId={topic.id} label={adminLabel} />
+      ) : null}
     </article>
   );
 }
