@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { config } from "dotenv";
-import { eq, sql as drizzleSql } from "drizzle-orm";
+import { and, eq, ne, sql as drizzleSql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
@@ -1089,6 +1089,39 @@ async function main(): Promise<void> {
     await db.transaction(async (tx) => {
       if (resetDevDatabase) {
         await tx.execute(drizzleSql.raw(resetDatabaseSql()));
+      }
+
+      // Shadow cleanup: a sample person who signed in before this fixture
+      // existed got a user row keyed by their raw Clerk id with the same
+      // email. Left in place it violates the email unique constraint below
+      // (aborting the whole seed) and shadows the fixture at sign-in, since
+      // auth returns an existing row by id before consulting externalId.
+      // Delete such rows (their content cascades) — unless they own a
+      // timetable (ownerId is ON DELETE RESTRICT), which needs a human.
+      const ownerIds = new Set(
+        (await tx.select({ ownerId: timetables.ownerId }).from(timetables)).map(
+          (r) => r.ownerId,
+        ),
+      );
+      for (const user of rows.users) {
+        if (!user.email || !user.id) continue;
+        const clashes = await tx
+          .select({ id: users.id })
+          .from(users)
+          .where(and(eq(users.email, user.email), ne(users.id, user.id)));
+        for (const clash of clashes) {
+          if (ownerIds.has(clash.id)) {
+            throw new Error(
+              `Cannot seed user "${user.id}": existing user "${clash.id}" holds ` +
+                `email ${user.email} and owns a timetable. Transfer or delete ` +
+                `that timetable, or run with SEED_DEV_RESET_DATABASE=true.`,
+            );
+          }
+          console.warn(
+            `Removing shadow user "${clash.id}" holding sample email ${user.email}.`,
+          );
+          await tx.delete(users).where(eq(users.id, clash.id));
+        }
       }
 
       for (const user of rows.users) {
