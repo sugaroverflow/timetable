@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
+import { useToast } from "@/components/Toast";
 import { clientGql } from "@/lib/clientGraphql";
 import { Avatar } from "./Avatar";
 
@@ -30,6 +31,7 @@ export function SlotDiscussion({
   canPost?: boolean;
 }) {
   const router = useRouter();
+  const { toastError } = useToast();
   const [open, setOpen] = useState(false);
   const [comments, setComments] = useState<SlotComment[] | null>(null);
   const [body, setBody] = useState("");
@@ -63,7 +65,7 @@ export function SlotDiscussion({
       setComments(data.slotComments);
       startTransition(() => router.refresh());
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Could not post");
+      toastError(err instanceof Error ? err.message : "Could not post");
     }
   }
 

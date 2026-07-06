@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
+import { useToast } from "@/components/Toast";
 import { clientGql } from "@/lib/clientGraphql";
 
 const REPLY = `mutation Reply($id: String!, $body: String!) {
@@ -25,6 +26,7 @@ export function CommentActions({
   hidden: boolean;
 }) {
   const router = useRouter();
+  const { toast, toastError } = useToast();
   const [open, setOpen] = useState(false);
   const [body, setBody] = useState("");
   const [pending, startTransition] = useTransition();
@@ -37,18 +39,20 @@ export function CommentActions({
       await clientGql(REPLY, { id: commentId, body: text });
       setBody("");
       setOpen(false);
+      toast("Reply posted");
       startTransition(() => router.refresh());
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Could not reply");
+      toastError(err instanceof Error ? err.message : "Could not reply");
     }
   }
 
   async function toggleHidden() {
     try {
       await clientGql(HIDE, { id: commentId, hidden: !hidden });
+      toast(hidden ? "Comment unhidden" : "Comment hidden");
       startTransition(() => router.refresh());
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Could not update comment");
+      toastError(err instanceof Error ? err.message : "Could not update comment");
     }
   }
 

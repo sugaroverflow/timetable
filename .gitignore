@@ -41,3 +41,4 @@ packages/db/drizzle/meta/_journal.json.bak
 
 # Docker volume data (if mounted locally)
 .docker-data/
+*.local-backup

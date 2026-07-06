@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { ImageUploadField } from "@/components/ImageUploadField";
+import { useToast } from "@/components/Toast";
 import { clientGql } from "@/lib/clientGraphql";
 
 const MUTATION = `mutation($name: String, $bio: String, $image: String) {
@@ -20,6 +21,7 @@ export function ProfileForm({
   image: string | null;
 }) {
   const router = useRouter();
+  const { toast, toastError } = useToast();
   const [name, setName] = useState(initialName ?? "");
   const [bio, setBio] = useState(initialBio ?? "");
   const [image, setImage] = useState(initialImage ?? "");
@@ -37,9 +39,10 @@ export function ProfileForm({
         image: image.trim() || null,
       });
       setSaved(true);
+      toast("Profile saved");
       startTransition(() => router.refresh());
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Could not save profile");
+      toastError(err instanceof Error ? err.message : "Could not save profile");
     }
   }
 

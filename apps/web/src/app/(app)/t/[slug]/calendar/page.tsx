@@ -3,12 +3,14 @@ import { isAdmin, isElector, isHost, type Role } from "@timetable/shared";
 
 import { env } from "@/env";
 import { AudienceFilter } from "@/components/AudienceFilter";
+import { EmptyState } from "@/components/EmptyState";
 import { LocationFilter } from "@/components/LocationFilter";
 import { SlotAdminForm } from "@/components/SlotAdminForm";
 import { SlotCard, type CalendarPerms } from "@/components/SlotCard";
 import { WeekdayPatternControl } from "@/components/WeekdayPatternControl";
 import type { CalendarSlot, TopicOption } from "@/lib/calendarTypes";
 import { gqlFetch } from "@/lib/graphql";
+import { displayRolesFromCookies } from "@/lib/previewRoles.server";
 
 type Data = {
   timetable: { viewerRoles: string[] } | null;
@@ -56,7 +58,9 @@ export default async function CalendarPage({
     s: slug,
     audience: audience ?? null,
   });
-  const roles = (data.timetable?.viewerRoles ?? []) as Role[];
+  const roles = await displayRolesFromCookies(
+    (data.timetable?.viewerRoles ?? []) as Role[],
+  );
 
   const perms: CalendarPerms = {
     canSetAvailability: isElector(roles),
@@ -76,6 +80,10 @@ export default async function CalendarPage({
     ? data.calendar.filter((s) => s.location === location)
     : data.calendar;
 
+  // Every slot carries the full audience in perUser (host/admin only), so
+  // the audience size is the same across slots.
+  const audienceCount = data.calendar[0]?.perUser?.length ?? null;
+
   return (
     <div className="stack">
       <div className="toolbar">
@@ -93,6 +101,11 @@ export default async function CalendarPage({
           <LocationFilter value={location ?? ""} locations={locations} />
         ) : null}
         <span className="spacer" />
+        {perms.canSeeHostOnly && audienceCount !== null ? (
+          <span className="faint" style={{ fontSize: 12 }}>
+            {audienceCount} elector{audienceCount === 1 ? "" : "s"} in view
+          </span>
+        ) : null}
         <a className="btn btn-ghost" href={icsUrl}>
           Subscribe (ICS)
         </a>
@@ -101,12 +114,34 @@ export default async function CalendarPage({
       {perms.canAdmin ? <SlotAdminForm slug={slug} /> : null}
       {perms.canSetAvailability ? <WeekdayPatternControl slug={slug} /> : null}
 
-      {visibleSlots.length === 0 ? (
-        <div className="notice">
-          {data.calendar.length === 0
-            ? `No timeslots yet${perms.canAdmin ? " — add one above." : "."}`
-            : "No slots match this filter."}
+      {data.calendar.length > 0 ? (
+        <div className="legend">
+          <span>
+            <i className="i-g" /> Available
+          </span>
+          <span>
+            <i className="i-y" /> Maybe
+          </span>
+          <span>
+            <i className="i-r" /> Can’t
+          </span>
         </div>
+      ) : null}
+
+      {visibleSlots.length === 0 ? (
+        data.calendar.length === 0 ? (
+          <EmptyState
+            icon="▦"
+            title="No timeslots yet"
+            hint={perms.canAdmin ? "Add one above to get started." : undefined}
+          />
+        ) : (
+          <EmptyState
+            icon="▦"
+            title="No slots match"
+            hint="Try a different location."
+          />
+        )
       ) : (
         <ul className="list">
           {visibleSlots.map((slot) => (

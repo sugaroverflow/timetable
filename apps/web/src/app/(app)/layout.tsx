@@ -3,6 +3,8 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import Image from "next/image";
 import Link from "next/link";
 
+import { ToastProvider } from "@/components/Toast";
+
 export default async function AppLayout({
   children,
 }: {
@@ -15,7 +17,7 @@ export default async function AppLayout({
   const email = user?.primaryEmailAddress?.emailAddress ?? null;
 
   return (
-    <>
+    <ToastProvider>
       <header className="topbar">
         <Link className="brand" href={userId ? "/timetables" : "/"}>
           <Image
@@ -43,6 +45,6 @@ export default async function AppLayout({
         )}
       </header>
       {children}
-    </>
+    </ToastProvider>
   );
 }

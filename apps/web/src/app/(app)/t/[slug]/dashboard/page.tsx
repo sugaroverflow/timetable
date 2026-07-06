@@ -3,6 +3,7 @@ import { isAdmin, isHost, type Role } from "@timetable/shared";
 import { DashboardActivityFilter } from "@/components/DashboardActivityFilter";
 import { HostFilter } from "@/components/HostFilter";
 import { gqlFetch } from "@/lib/graphql";
+import { displayRolesFromCookies } from "@/lib/previewRoles.server";
 
 const ACTIVITY_FILTERS = new Set([
   "all",
@@ -107,7 +108,9 @@ export default async function DashboardPage({
     host: host || null,
     activity,
   });
-  const roles = (data.timetable?.viewerRoles ?? []) as Role[];
+  const roles = await displayRolesFromCookies(
+    (data.timetable?.viewerRoles ?? []) as Role[],
+  );
 
   if (!isHost(roles) && !isAdmin(roles)) {
     return <div className="notice">Hosts and admins only.</div>;

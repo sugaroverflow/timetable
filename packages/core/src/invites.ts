@@ -6,7 +6,9 @@ import {
   db,
   timetableInvites,
   timetableMemberships,
+  timetables,
   users,
+  type NotificationSettings,
 } from "@timetable/db";
 import type { AssignableRole, Role } from "@timetable/shared";
 
@@ -19,6 +21,48 @@ const INVITE_TTL_DAYS = 30;
 
 function mergeRoles(existing: readonly Role[], incoming: readonly Role[]): Role[] {
   return Array.from(new Set<Role>([...existing, ...incoming]));
+}
+
+/**
+ * The timetable's digest defaults, or null when none is actually enabled.
+ * All-false defaults are indistinguishable from the {} a user starts with,
+ * so seeding them would only burn the "never customized" guard and block a
+ * later timetable's real defaults from applying.
+ */
+async function getDigestDefaults(
+  timetableId: string,
+): Promise<NotificationSettings | null> {
+  const [tt] = await db
+    .select({ settings: timetables.settings })
+    .from(timetables)
+    .where(eq(timetables.id, timetableId))
+    .limit(1);
+  const defaults = tt?.settings?.digestDefaults;
+  if (!defaults || !Object.values(defaults).some(Boolean)) return null;
+  return defaults;
+}
+
+/**
+ * Seed digest defaults onto a newly added member — but only if they have
+ * never saved their own (settings still `{}`). A user's notification settings
+ * are global, so joining a second timetable must never overwrite choices
+ * they've already made.
+ */
+async function seedDigestDefaults(
+  userId: string,
+  defaults: NotificationSettings,
+): Promise<void> {
+  const [user] = await db
+    .select({ notificationSettings: users.notificationSettings })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (!user || Object.keys(user.notificationSettings ?? {}).length > 0) return;
+
+  await db
+    .update(users)
+    .set({ notificationSettings: defaults })
+    .where(eq(users.id, userId));
 }
 
 /**
@@ -37,6 +81,7 @@ export async function inviteEmails(
   const uniqueEmails = Array.from(
     new Set(emails.map((e) => e.trim().toLowerCase()).filter(Boolean)),
   );
+  const digestDefaults = await getDigestDefaults(timetableId);
 
   for (const email of uniqueEmails) {
     const [existingUser] = await db
@@ -72,6 +117,9 @@ export async function inviteEmails(
           timetableId,
           roles,
         });
+        if (digestDefaults) {
+          await seedDigestDefaults(existingUser.id, digestDefaults);
+        }
         outcomes.push({ email, status: "added" });
       }
       continue;
@@ -128,6 +176,8 @@ export async function claimInvitesForUser(
     );
 
   let claimed = 0;
+  // Invites may span timetables; fetch each timetable's defaults once.
+  const defaultsByTimetable = new Map<string, NotificationSettings | null>();
   for (const invite of pending) {
     const [membership] = await db
       .select()
@@ -154,6 +204,14 @@ export async function claimInvitesForUser(
         timetableId: invite.timetableId,
         roles: invite.roles,
       });
+      if (!defaultsByTimetable.has(invite.timetableId)) {
+        defaultsByTimetable.set(
+          invite.timetableId,
+          await getDigestDefaults(invite.timetableId),
+        );
+      }
+      const defaults = defaultsByTimetable.get(invite.timetableId);
+      if (defaults) await seedDigestDefaults(userId, defaults);
     }
 
     await db

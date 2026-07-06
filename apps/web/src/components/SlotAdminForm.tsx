@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
+import { useToast } from "@/components/Toast";
 import { clientGql } from "@/lib/clientGraphql";
 
 const SINGLE = `mutation($s: String!, $a: String!, $b: String!, $loc: String) {
@@ -14,6 +15,7 @@ const WEEKLY = `mutation($s: String!, $a: String!, $b: String!, $loc: String, $c
 
 export function SlotAdminForm({ slug }: { slug: string }) {
   const router = useRouter();
+  const { toast, toastError } = useToast();
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [location, setLocation] = useState("");
@@ -35,9 +37,10 @@ export function SlotAdminForm({ slug }: { slug: string }) {
       setEnd("");
       setLocation("");
       setWeeks(1);
+      toast(weeks > 1 ? `${weeks} weekly slots created` : "Slot created");
       startTransition(() => router.refresh());
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Could not create slot");
+      toastError(err instanceof Error ? err.message : "Could not create slot");
     }
   }
 

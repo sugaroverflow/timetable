@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
+import { useToast } from "@/components/Toast";
 import { clientGql } from "@/lib/clientGraphql";
 
 const MUTATION = `mutation($s: String!, $name: String, $desc: String, $privacy: String, $cd: String) {
@@ -23,6 +24,7 @@ export function TimetableProfileForm({
   customDomain: string | null;
 }) {
   const router = useRouter();
+  const { toast, toastError } = useToast();
   const [name, setName] = useState(initialName);
   const [description, setDescription] = useState(initialDescription ?? "");
   const [privacy, setPrivacy] = useState(initialPrivacy);
@@ -42,9 +44,10 @@ export function TimetableProfileForm({
         cd: customDomain,
       });
       setSaved(true);
+      toast("Timetable profile saved");
       startTransition(() => router.refresh());
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Could not save");
+      toastError(err instanceof Error ? err.message : "Could not save");
     }
   }
 

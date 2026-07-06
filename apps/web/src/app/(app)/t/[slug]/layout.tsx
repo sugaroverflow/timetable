@@ -1,12 +1,15 @@
 import { auth } from "@clerk/nextjs/server";
+import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
 import { isAdmin, isElector, isHost, type Role } from "@timetable/shared";
 
 import { NavLink } from "@/components/NavLink";
+import { PreviewToggle } from "@/components/PreviewToggle";
 import { RolePills } from "@/components/RolePills";
 import { TimetableSwitcher } from "@/components/TimetableSwitcher";
 import { gqlFetch } from "@/lib/graphql";
+import { displayRoles, PREVIEW_COOKIE } from "@/lib/previewRoles";
 import {
   parseTimetableSettings,
   roleLabel,
@@ -79,7 +82,11 @@ export default async function TimetableLayout({
     notFound();
   }
 
-  const roles = timetable.viewerRoles as Role[];
+  const actualRoles = timetable.viewerRoles as Role[];
+  const previewOn =
+    (await cookies()).get(PREVIEW_COOKIE)?.value === "1" &&
+    (isHost(actualRoles) || isAdmin(actualRoles));
+  const roles = displayRoles(actualRoles, previewOn);
   const settings = parseTimetableSettings(timetable.settings);
   const base = `/t/${slug}`;
 
@@ -100,6 +107,13 @@ export default async function TimetableLayout({
           </span>
         )}
         <div className="row" style={{ gap: 8, alignItems: "center" }}>
+          {isHost(actualRoles) || isAdmin(actualRoles) ? (
+            <PreviewToggle
+              on={previewOn}
+              slug={slug}
+              electorLabel={roleLabel(settings.roleLabels, "elector")}
+            />
+          ) : null}
           {isAuthed ? (
             <RolePills roles={roles} labels={settings.roleLabels} />
           ) : null}
@@ -148,6 +162,9 @@ export default async function TimetableLayout({
         )}
         {(isElector(roles) || isHost(roles) || isAdmin(roles)) && (
           <NavLink href={`${base}/calendar`}>Availability</NavLink>
+        )}
+        {(isHost(roles) || isAdmin(roles)) && (
+          <NavLink href={`${base}/dashboard`}>Dashboard</NavLink>
         )}
         {isAdmin(roles) && (
           <NavLink href={`${base}/moderation`}>Moderation</NavLink>

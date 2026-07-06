@@ -2,15 +2,21 @@ import Link from "next/link";
 
 import { isAdmin, isElector, isHost, type Role } from "@timetable/shared";
 
+import { EmptyState } from "@/components/EmptyState";
 import { FeedSortControl } from "@/components/FeedSortControl";
 import { HostFilter } from "@/components/HostFilter";
 import { TopicCard, type FeedPerms } from "@/components/TopicCard";
 import type { FeedTopic } from "@/lib/feedTypes";
 import { gqlFetch } from "@/lib/graphql";
+import { displayRolesFromCookies } from "@/lib/previewRoles.server";
 import { parseTimetableSettings } from "@/lib/timetableSettings";
 
 type Data = {
-  timetable: { viewerRoles: string[]; settings: string } | null;
+  timetable: {
+    viewerRoles: string[];
+    settings: string;
+    viewerHeartedPublishedCount: number | null;
+  } | null;
   topicFeed: FeedTopic[];
   timetableHosts: { id: string; name: string | null }[];
 };
@@ -21,11 +27,11 @@ const COMMENT_FIELDS = `
 
 const QUERY = `
   query Feed($s: String!, $sort: String, $host: String, $limit: Int, $offset: Int) {
-    timetable(idOrSlug: $s) { viewerRoles settings }
+    timetable(idOrSlug: $s) { viewerRoles settings viewerHeartedPublishedCount }
     timetableHosts(idOrSlug: $s) { id name }
     topicFeed(idOrSlug: $s, sort: $sort, hostId: $host, limit: $limit, offset: $offset) {
       id timetableId hostId hostName hostImage title bodyHtml coverImageUrl status
-      heartCount weightedScore viewerHasHearted viewerWeight commentCount
+      heartCount weightedScore viewerHasHearted commentCount
       publishedAt createdAt
       comments { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} } } }
       weightedBreakdown { electorId electorName weight }
@@ -74,7 +80,9 @@ export default async function FeedPage({
     limit: PAGE_SIZE + 1,
     offset,
   });
-  const roles = (data.timetable?.viewerRoles ?? []) as Role[];
+  const roles = await displayRolesFromCookies(
+    (data.timetable?.viewerRoles ?? []) as Role[],
+  );
   const settings = parseTimetableSettings(data.timetable?.settings);
   const topics = data.topicFeed.slice(0, PAGE_SIZE);
   const hasNext = data.topicFeed.length > PAGE_SIZE;
@@ -108,11 +116,11 @@ export default async function FeedPage({
       ) : null}
 
       {topics.length === 0 ? (
-        <div className="notice">
-          No published topics yet. Hosts can draft and submit topics from{" "}
-          <strong>My topics</strong>; admins publish them from the moderation
-          queue.
-        </div>
+        <EmptyState
+          icon="◇"
+          title="No published topics yet"
+          hint="Hosts draft and submit topics from My topics; admins publish them from the moderation queue."
+        />
       ) : (
         topics.map((topic) => (
           <TopicCard
@@ -120,6 +128,7 @@ export default async function FeedPage({
             topic={topic}
             perms={perms}
             hostLabel={settings.roleLabels?.host}
+            viewerHeartCount={data.timetable?.viewerHeartedPublishedCount ?? null}
           />
         ))
       )}

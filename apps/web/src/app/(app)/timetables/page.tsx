@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { CreateTimetableForm } from "@/components/CreateTimetableForm";
+import { EmptyState } from "@/components/EmptyState";
 import { RolePills } from "@/components/RolePills";
 import { gqlFetch } from "@/lib/graphql";
 import { parseTimetableSettings } from "@/lib/timetableSettings";
@@ -56,9 +57,11 @@ export default async function TimetablesPage() {
       <div className="grid grid-2">
         <div className="stack">
           {memberships.length === 0 ? (
-            <div className="notice">
-              You&rsquo;re not in any timetables yet. Create one to get started.
-            </div>
+            <EmptyState
+              icon="▦"
+              title="No timetables yet"
+              hint="Create one to get started, or ask an admin to invite you."
+            />
           ) : (
             <ul className="list">
               {memberships.map((m) => (

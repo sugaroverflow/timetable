@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
+import { useToast } from "@/components/Toast";
 import type { TopicOption } from "@/lib/calendarTypes";
 import { clientGql } from "@/lib/clientGraphql";
 
@@ -20,15 +21,21 @@ export function SlotAdminControls({
   topicOptions: TopicOption[];
 }) {
   const router = useRouter();
+  const { toast, toastError } = useToast();
   const [pending, startTransition] = useTransition();
   const [topicId, setTopicId] = useState("");
 
-  async function run(query: string, variables: Record<string, unknown>) {
+  async function run(
+    query: string,
+    variables: Record<string, unknown>,
+    successMessage: string,
+  ) {
     try {
       await clientGql(query, variables);
+      toast(successMessage);
       startTransition(() => router.refresh());
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Action failed");
+      toastError(err instanceof Error ? err.message : "Action failed");
     }
   }
 
@@ -47,7 +54,7 @@ export function SlotAdminControls({
           className="pill"
           title="Remove tag"
           disabled={pending}
-          onClick={() => run(UNTAG, { s: slotId, t: tag.id })}
+          onClick={() => run(UNTAG, { s: slotId, t: tag.id }, "Tag removed")}
         >
           {tag.title} ✕
         </button>
@@ -70,7 +77,7 @@ export function SlotAdminControls({
         className="btn"
         disabled={pending || !topicId}
         onClick={() => {
-          if (topicId) run(TAG, { s: slotId, t: topicId });
+          if (topicId) run(TAG, { s: slotId, t: topicId }, "Topic tagged");
           setTopicId("");
         }}
       >
@@ -81,7 +88,8 @@ export function SlotAdminControls({
         className="btn btn-ghost"
         disabled={pending}
         onClick={() => {
-          if (confirm("Delete this timeslot?")) run(DELETE, { s: slotId });
+          if (confirm("Delete this timeslot?"))
+            run(DELETE, { s: slotId }, "Slot deleted");
         }}
       >
         Delete slot

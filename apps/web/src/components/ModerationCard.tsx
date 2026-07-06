@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
+import { useToast } from "@/components/Toast";
+import { TopicEditForm } from "@/components/TopicEditForm";
 import { clientGql } from "@/lib/clientGraphql";
 import type { ManagedTopic } from "@/lib/feedTypes";
 
@@ -12,9 +14,11 @@ const MUTATION = `mutation Moderate($id: String!, $action: String!, $note: Strin
 
 export function ModerationCard({ topic, slug }: { topic: ManagedTopic; slug: string }) {
   const router = useRouter();
+  const { toast, toastError } = useToast();
   const [pending, startTransition] = useTransition();
   const [note, setNote] = useState("");
   const [showNote, setShowNote] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   async function act(action: "publish" | "reject" | "request_changes") {
     if (action === "request_changes" && !note.trim()) {
@@ -29,9 +33,16 @@ export function ModerationCard({ topic, slug }: { topic: ManagedTopic; slug: str
       });
       setNote("");
       setShowNote(false);
+      toast(
+        action === "publish"
+          ? "Topic published"
+          : action === "reject"
+            ? "Topic rejected"
+            : "Feedback sent to host",
+      );
       startTransition(() => router.refresh());
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Moderation failed");
+      toastError(err instanceof Error ? err.message : "Moderation failed");
     }
   }
 
@@ -70,7 +81,14 @@ export function ModerationCard({ topic, slug }: { topic: ManagedTopic; slug: str
         >
           {topic.feedback ? "Update feedback" : "Request changes"}
         </button>
-        <a href={`/t/${slug}/topics`} className="btn">Edit</a>
+        <button
+          className="btn"
+          type="button"
+          disabled={pending}
+          onClick={() => setEditing((v) => !v)}
+        >
+          {editing ? "Cancel edit" : "Edit"}
+        </button>
         <button
           className="btn btn-ghost"
           type="button"
@@ -80,6 +98,13 @@ export function ModerationCard({ topic, slug }: { topic: ManagedTopic; slug: str
           Reject
         </button>
       </div>
+      {editing ? (
+        <TopicEditForm
+          topic={topic}
+          slug={slug}
+          onDone={() => setEditing(false)}
+        />
+      ) : null}
       {showNote ? (
         <form
           className="inline-form"

@@ -13,6 +13,7 @@ import {
   type TopicStatus,
 } from "@timetable/db";
 
+import { coerceDate } from "./dates";
 import { buildFeed } from "./topics";
 
 export const ELECTOR_ACTIVITY_FILTERS = [
@@ -63,9 +64,10 @@ export type DashboardData = {
 
 type Stat = { count: number; latestAt: Date | null };
 
-function latestDate(...dates: (Date | null | undefined)[]): Date | null {
+function latestDate(...dates: (Date | string | null | undefined)[]): Date | null {
   let latest: Date | null = null;
-  for (const date of dates) {
+  for (const raw of dates) {
+    const date = coerceDate(raw);
     if (!date) continue;
     if (!latest || date.getTime() > latest.getTime()) latest = date;
   }

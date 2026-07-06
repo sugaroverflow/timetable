@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { useToast } from "@/components/Toast";
 import { clientApi } from "@/lib/clientApi";
 
 const ASSIGNABLE = ["admin", "host", "elector"] as const;
@@ -34,6 +35,7 @@ export function MemberRolesEditor({
   roleLabels?: { admin?: string; host?: string; elector?: string };
 }) {
   const router = useRouter();
+  const { toast, toastError } = useToast();
   const isOwner = initialRoles.includes("owner");
   const [roles, setRoles] = useState<string[]>(initialRoles);
   const [busy, setBusy] = useState(false);
@@ -58,7 +60,11 @@ export function MemberRolesEditor({
     setBusy(false);
     if (res.ok) {
       setSaved(true);
+      toast("Roles updated");
       router.refresh();
+    } else {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      toastError(body.error ?? "Could not update roles");
     }
   }
 

@@ -1,8 +1,11 @@
 import { isAdmin, type Role } from "@timetable/shared";
 
 import { ActivityFilter } from "@/components/ActivityFilter";
+import { EmptyState } from "@/components/EmptyState";
+import { ACTION_LABELS } from "@/lib/activityLabels";
 import type { ActivityEvent } from "@/lib/feedTypes";
 import { gqlFetch } from "@/lib/graphql";
+import { displayRolesFromCookies } from "@/lib/previewRoles.server";
 
 type Data = {
   timetable: { viewerRoles: string[] } | null;
@@ -17,16 +20,6 @@ const QUERY = `
     }
   }
 `;
-
-const ACTION_LABELS: Record<string, string> = {
-  "topic.submit": "submitted a topic",
-  "topic.publish": "published a topic",
-  "topic.reject": "rejected a topic",
-  "topic.unpublish": "unpublished a topic",
-  "topic.request_changes": "requested changes",
-  "hearts.archive": "archived hearts on a topic",
-  "comment.hide": "hid a comment",
-};
 
 function describe(event: ActivityEvent): string {
   return ACTION_LABELS[event.action] ?? event.action;
@@ -48,7 +41,9 @@ export default async function ActivityPage({
   const { slug } = await params;
   const { action } = await searchParams;
   const data = await gqlFetch<Data>(QUERY, { s: slug });
-  const roles = (data.timetable?.viewerRoles ?? []) as Role[];
+  const roles = await displayRolesFromCookies(
+    (data.timetable?.viewerRoles ?? []) as Role[],
+  );
 
   if (!isAdmin(roles)) {
     return <div className="notice">Admins only.</div>;
@@ -72,7 +67,11 @@ export default async function ActivityPage({
         <ActivityFilter value={action ?? ""} actions={uniqueActions} />
       )}
       {visibleEvents.length === 0 ? (
-        <div className="notice">No activity yet.</div>
+        <EmptyState
+          icon="≣"
+          title="No activity yet"
+          hint="Moderation and lifecycle actions will appear here."
+        />
       ) : (
         <div className="timeline">
           {visibleEvents.map((event) => (

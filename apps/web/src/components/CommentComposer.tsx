@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
+import { useToast } from "@/components/Toast";
 import { clientGql } from "@/lib/clientGraphql";
 
 const MUTATION = `mutation AddComment($id: String!, $body: String!, $visibility: String) {
@@ -17,6 +18,7 @@ export function CommentComposer({
   canHostOnly: boolean;
 }) {
   const router = useRouter();
+  const { toast, toastError } = useToast();
   const [body, setBody] = useState("");
   const [hostOnly, setHostOnly] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -32,9 +34,10 @@ export function CommentComposer({
         visibility: hostOnly ? "host_only" : "public",
       });
       setBody("");
+      toast(hostOnly ? "Host-only note added" : "Comment added");
       startTransition(() => router.refresh());
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Could not post comment");
+      toastError(err instanceof Error ? err.message : "Could not post comment");
     }
   }
 

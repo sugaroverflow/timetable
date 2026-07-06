@@ -9,6 +9,7 @@ import {
   buildCalendar,
   buildFeed,
   claimInvitesForUser,
+  countViewerPublishedHearts,
   createSlots,
   createTopic,
   deleteSlot,
@@ -34,6 +35,7 @@ import {
   listSlotComments,
   listSubmittedTopics,
   listTimetableHosts,
+  logActivity,
   moderateTopic,
   setAvailability,
   setCommentHidden,
@@ -159,6 +161,16 @@ const TimetableType = builder.objectRef<GqlTimetable>("Timetable").implement({
     settings: t.field({
       type: "String",
       resolve: (tt) => JSON.stringify(tt.settings ?? {}),
+    }),
+    /**
+     * Published topics the signed-in viewer currently hearts — their vote
+     * weight is 1/count. Null for anonymous viewers. Viewer-scoped, so safe
+     * for any member (unlike the host-only weighted breakdowns).
+     */
+    viewerHeartedPublishedCount: t.int({
+      nullable: true,
+      resolve: (tt, _args, ctx) =>
+        ctx.user ? countViewerPublishedHearts(tt.id, ctx.user.id) : null,
     }),
     createdAt: t.string({ resolve: (tt) => tt.createdAt.toISOString() }),
   }),
@@ -549,6 +561,14 @@ builder.mutationType({
               : undefined,
         });
         if (!updated) notFound("Topic not found");
+        if (!ownerHost) {
+          await logActivity({
+            timetableId: topic.timetableId,
+            actorId: user.id,
+            action: "topic.edit",
+            payload: { topicId: topic.id, title: updated.title },
+          });
+        }
         return updated;
       },
     }),
@@ -863,6 +883,9 @@ builder.mutationType({
         themePrimary: t.arg.string({ required: false }),
         themeSecondary: t.arg.string({ required: false }),
         coverImageUrl: t.arg.string({ required: false }),
+        digestNewTopics: t.arg.boolean({ required: false }),
+        digestReplies: t.arg.boolean({ required: false }),
+        digestActivity: t.arg.boolean({ required: false }),
       },
       resolve: async (_p, args, ctx) => {
         const user = await requireUser(ctx);
@@ -907,6 +930,25 @@ builder.mutationType({
 
         if (args.coverImageUrl != null) {
           patch.coverImageUrl = args.coverImageUrl.trim() || null;
+        }
+
+        if (
+          args.digestNewTopics != null ||
+          args.digestReplies != null ||
+          args.digestActivity != null
+        ) {
+          patch.digestDefaults = {
+            ...(current.digestDefaults ?? {}),
+            ...(args.digestNewTopics != null
+              ? { digestNewTopics: args.digestNewTopics }
+              : {}),
+            ...(args.digestReplies != null
+              ? { digestReplies: args.digestReplies }
+              : {}),
+            ...(args.digestActivity != null
+              ? { digestActivity: args.digestActivity }
+              : {}),
+          };
         }
 
         const updated = await updateTimetableSettings(

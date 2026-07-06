@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 
+import { useToast } from "@/components/Toast";
 import { clientGql } from "@/lib/clientGraphql";
 
 const UNPUBLISH = `mutation($id: String!){ unpublishTopic(topicId: $id){ id } }`;
@@ -10,14 +11,16 @@ const ARCHIVE = `mutation($id: String!){ archiveTopicHearts(topicId: $id){ id } 
 
 export function AdminTopicActions({ topicId }: { topicId: string }) {
   const router = useRouter();
+  const { toast, toastError } = useToast();
   const [pending, startTransition] = useTransition();
 
   async function unpublish() {
     try {
       await clientGql(UNPUBLISH, { id: topicId });
+      toast("Topic unpublished");
       startTransition(() => router.refresh());
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Action failed");
+      toastError(err instanceof Error ? err.message : "Action failed");
     }
   }
 
@@ -26,9 +29,10 @@ export function AdminTopicActions({ topicId }: { topicId: string }) {
       return;
     try {
       await clientGql(ARCHIVE, { id: topicId });
+      toast("Hearts archived");
       startTransition(() => router.refresh());
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Action failed");
+      toastError(err instanceof Error ? err.message : "Action failed");
     }
   }
 
