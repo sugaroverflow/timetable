@@ -56,8 +56,12 @@ export function canSeeHostOnly(viewer: Viewer): boolean {
   return isHost(viewer.roles) || isAdmin(viewer.roles);
 }
 
+/** Hosts propose topics; admins can also create them (QA #42) and may
+ * keep ownership or reassign to a host afterwards. */
 export function canProposeTopics(viewer: Viewer): boolean {
-  return isAuthenticated(viewer) && isHost(viewer.roles);
+  return (
+    isAuthenticated(viewer) && (isHost(viewer.roles) || isAdmin(viewer.roles))
+  );
 }
 
 export function canModerate(viewer: Viewer): boolean {

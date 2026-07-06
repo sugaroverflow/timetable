@@ -6,6 +6,7 @@ export const ACTION_LABELS: Record<string, string> = {
   "topic.unpublish": "unpublished a topic",
   "topic.request_changes": "requested changes",
   "topic.edit": "edited a topic",
+  "topic.reassign": "reassigned a topic's owner",
   "hearts.archive": "archived hearts on a topic",
   "comment.hide": "hid a comment",
 };

@@ -79,6 +79,16 @@ export function renderDigest(digest: UserDigest): {
     parts.push("</ul>");
   }
 
+  if (digest.assignedTopics.length > 0) {
+    parts.push("<h3>You have a topic</h3><ul>");
+    for (const a of digest.assignedTopics) {
+      parts.push(
+        `<li>${esc(a.topicTitle)} <em>(${esc(a.timetableName)})</em> was assigned to you</li>`,
+      );
+    }
+    parts.push("</ul>");
+  }
+
   return {
     subject: "Your Timetable digest",
     html: parts.join("\n"),

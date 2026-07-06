@@ -28,6 +28,7 @@ export async function loadMoreFeed(
         hostLabel={page.settings.roleLabels?.host}
         adminLabel={roleLabel(page.settings.roleLabels, "admin")}
         viewerHeartCount={page.viewerHeartCount}
+        hosts={page.hosts}
       />
     )),
     hasNext: page.hasNext,

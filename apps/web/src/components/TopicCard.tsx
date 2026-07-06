@@ -29,6 +29,7 @@ export function TopicCard({
   hostLabel = "Host",
   adminLabel = "Admin",
   viewerHeartCount = null,
+  hosts = [],
 }: {
   topic: FeedTopic;
   perms: FeedPerms;
@@ -38,6 +39,7 @@ export function TopicCard({
   hostLabel?: string;
   adminLabel?: string;
   viewerHeartCount?: number | null;
+  hosts?: { id: string; name: string | null }[];
 }) {
   const publicComments = topic.comments.filter(
     (c) => c.visibility !== "host_only",
@@ -151,6 +153,8 @@ export function TopicCard({
           }}
           slug={slug}
           label={adminLabel}
+          hosts={hosts}
+          currentHostId={topic.hostId}
         />
       ) : null}
     </article>

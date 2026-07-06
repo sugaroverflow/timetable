@@ -1,4 +1,4 @@
-import { isHost, type Role } from "@timetable/shared";
+import { isAdmin, isHost, type Role } from "@timetable/shared";
 
 import { CreateTopicForm } from "@/components/CreateTopicForm";
 import { TopicManager } from "@/components/TopicManager";
@@ -11,11 +11,16 @@ type Data = {
   hostDashboard: ManagedTopic[];
 };
 
+const COMMENT_FIELDS = `
+  id parentId authorId authorName authorImage body visibility hidden createdAt
+`;
+
 const QUERY = `
   query HostDashboard($s: String!) {
     timetable(idOrSlug: $s) { viewerRoles }
     hostDashboard(idOrSlug: $s) {
       id title status bodyMd coverImageUrl updatedAt feedback
+      hostOnlyComments { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} } } }
     }
   }
 `;
@@ -31,10 +36,10 @@ export default async function MyTopicsPage({
     (data.timetable?.viewerRoles ?? []) as Role[],
   );
 
-  if (!isHost(roles)) {
+  if (!isHost(roles) && !isAdmin(roles)) {
     return (
       <div className="notice">
-        You need the host role in this timetable to propose topics.
+        You need the host or admin role in this timetable to propose topics.
       </div>
     );
   }

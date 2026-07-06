@@ -77,6 +77,7 @@ export default async function FeedPage({
               hostLabel={page.settings.roleLabels?.host}
               adminLabel={adminLabel}
               viewerHeartCount={page.viewerHeartCount}
+              hosts={page.hosts}
             />
           ))}
         </InfiniteFeed>

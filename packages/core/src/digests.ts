@@ -1,6 +1,7 @@
 import { and, eq, gt, inArray, ne, sql } from "drizzle-orm";
 
 import {
+  activityEvents,
   comments,
   db,
   hearts,
@@ -26,6 +27,7 @@ export type UserDigest = {
   newTopics: { title: string; timetableName: string }[];
   replies: { topicTitle: string; by: string | null; snippet: string }[];
   hostActivity: { topicTitle: string; kind: "heart" | "comment"; count: number }[];
+  assignedTopics: { topicTitle: string; timetableName: string }[];
 };
 
 /** Users who have opted into at least one digest channel and have an email. */
@@ -179,6 +181,33 @@ export async function computeUserDigest(
     }
   }
 
+  // Topics an admin assigned to this user ("you have a topic") — always
+  // included for digest recipients; ownership changes matter regardless of
+  // which channels they picked.
+  const assignedTopics: UserDigest["assignedTopics"] = [];
+  {
+    const rows = await db
+      .select({
+        payload: activityEvents.payload,
+        timetableId: activityEvents.timetableId,
+      })
+      .from(activityEvents)
+      .where(
+        and(
+          eq(activityEvents.action, "topic.reassign"),
+          gt(activityEvents.createdAt, since),
+          sql`${activityEvents.payload}->>'newHostId' = ${recipient.id}`,
+        ),
+      );
+    for (const r of rows) {
+      const payload = r.payload as { title?: string } | null;
+      assignedTopics.push({
+        topicTitle: payload?.title ?? "A topic",
+        timetableName: timetableName.get(r.timetableId) ?? "",
+      });
+    }
+  }
+
   return {
     userId: recipient.id,
     email: recipient.email ?? "",
@@ -186,6 +215,7 @@ export async function computeUserDigest(
     newTopics,
     replies,
     hostActivity,
+    assignedTopics,
   };
 }
 
@@ -193,6 +223,7 @@ export function isDigestEmpty(digest: UserDigest): boolean {
   return (
     digest.newTopics.length === 0 &&
     digest.replies.length === 0 &&
-    digest.hostActivity.length === 0
+    digest.hostActivity.length === 0 &&
+    digest.assignedTopics.length === 0
   );
 }

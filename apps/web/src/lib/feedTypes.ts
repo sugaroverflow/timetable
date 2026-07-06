@@ -56,6 +56,8 @@ export type ManagedTopic = {
   updatedAt: string;
   hostName: string | null;
   feedback: string | null;
+  /** Threaded admin↔host feedback; fetched where the UI renders it. */
+  hostOnlyComments?: FeedComment[];
 };
 
 export type ActivityEvent = {

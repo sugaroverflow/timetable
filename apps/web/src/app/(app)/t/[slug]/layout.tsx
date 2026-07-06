@@ -152,7 +152,7 @@ export default async function TimetableLayout({
 
       <nav className="nav" style={{ marginBottom: 18 }}>
         <NavLink href={`${base}/feed`}>Topic feed</NavLink>
-        {isHost(roles) && (
+        {(isHost(roles) || isAdmin(roles)) && (
           <NavLink href={`${base}/topics`}>My Topics</NavLink>
         )}
         {(isHost(roles) || isAdmin(roles)) && (

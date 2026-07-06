@@ -81,6 +81,32 @@ async function setStatus(
   return updated ?? null;
 }
 
+/** Admin assigns/reassigns a topic's owner. The topic then shows up in the
+ * new owner's My Topics automatically (that view queries by hostId). */
+export async function reassignTopic(
+  topic: Topic,
+  newHostId: string,
+  actorId: string,
+): Promise<Topic | null> {
+  const [updated] = await db
+    .update(topics)
+    .set({ hostId: newHostId, updatedAt: new Date() })
+    .where(eq(topics.id, topic.id))
+    .returning();
+  await logActivity({
+    timetableId: topic.timetableId,
+    actorId,
+    action: "topic.reassign",
+    payload: {
+      topicId: topic.id,
+      title: topic.title,
+      previousHostId: topic.hostId,
+      newHostId,
+    },
+  });
+  return updated ?? null;
+}
+
 /** Host submits a draft for moderation. */
 export async function submitTopic(
   topic: Topic,

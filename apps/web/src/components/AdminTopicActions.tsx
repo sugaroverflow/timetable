@@ -10,11 +10,14 @@ import { TopicEditForm } from "./TopicEditForm";
 
 const UNPUBLISH = `mutation($id: String!){ unpublishTopic(topicId: $id){ id } }`;
 const ARCHIVE = `mutation($id: String!){ archiveTopicHearts(topicId: $id){ id } }`;
+const REASSIGN = `mutation($id: String!, $host: String!){ reassignTopic(topicId: $id, hostId: $host){ id } }`;
 
 export function AdminTopicActions({
   topic,
   slug,
   label = "Admin",
+  hosts = [],
+  currentHostId,
 }: {
   topic: {
     id: string;
@@ -24,12 +27,15 @@ export function AdminTopicActions({
   };
   slug: string;
   label?: string;
+  hosts?: { id: string; name: string | null }[];
+  currentHostId?: string;
 }) {
   const topicId = topic.id;
   const router = useRouter();
   const { toast, toastError } = useToast();
   const [pending, startTransition] = useTransition();
   const [editing, setEditing] = useState(false);
+  const [newHost, setNewHost] = useState("");
 
   async function unpublish() {
     try {
@@ -52,6 +58,20 @@ export function AdminTopicActions({
       toastError(err instanceof Error ? err.message : "Action failed");
     }
   }
+
+  async function reassign() {
+    if (!newHost) return;
+    try {
+      await clientGql(REASSIGN, { id: topicId, host: newHost });
+      toast("Topic reassigned");
+      setNewHost("");
+      startTransition(() => router.refresh());
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : "Action failed");
+    }
+  }
+
+  const reassignOptions = hosts.filter((h) => h.id !== currentHostId);
 
   return (
     <div className="stack" style={{ gap: 8 }}>
@@ -85,6 +105,31 @@ export function AdminTopicActions({
         >
           Archive hearts
         </button>
+        {reassignOptions.length > 0 ? (
+          <>
+            <select
+              aria-label="Reassign topic owner"
+              value={newHost}
+              onChange={(e) => setNewHost(e.target.value)}
+              style={{ width: "auto", fontSize: 12, padding: "6px 8px" }}
+            >
+              <option value="">Reassign owner…</option>
+              {reassignOptions.map((h) => (
+                <option key={h.id} value={h.id}>
+                  {h.name ?? h.id}
+                </option>
+              ))}
+            </select>
+            <button
+              className="btn btn-ghost"
+              type="button"
+              disabled={pending || !newHost}
+              onClick={reassign}
+            >
+              Assign
+            </button>
+          </>
+        ) : null}
       </div>
       {editing ? (
         <TopicEditForm

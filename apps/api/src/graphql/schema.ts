@@ -39,6 +39,7 @@ import {
   logActivity,
   markFeedSeen,
   moderateTopic,
+  reassignTopic,
   setAvailability,
   setCommentHidden,
   setWeekdayAvailability,
@@ -295,6 +296,18 @@ const ManagedTopicType = builder.objectRef<Topic>("ManagedTopic").implement({
     feedback: t.string({
       nullable: true,
       resolve: (tp) => getLatestHostOnlyComment(tp.id),
+    }),
+    /** Full host-only thread (admin feedback + host replies). ManagedTopic
+     * is only ever served to the owning host or admins, so this is safe. */
+    hostOnlyComments: t.field({
+      type: [CommentType],
+      resolve: async (tp) => {
+        const tree = await listCommentTree(tp.id, {
+          includeHostOnly: true,
+          includeHidden: false,
+        });
+        return tree.filter((c) => c.visibility === "host_only");
+      },
     }),
     coverImageUrl: t.exposeString("coverImageUrl", { nullable: true }),
   }),
@@ -597,6 +610,32 @@ builder.mutationType({
             payload: { topicId: topic.id, title: updated.title },
           });
         }
+        return updated;
+      },
+    }),
+
+    /** Admin assigns/reassigns a topic's owner to another host or admin. */
+    reassignTopic: t.field({
+      type: ManagedTopicType,
+      args: {
+        topicId: t.arg.string({ required: true }),
+        hostId: t.arg.string({ required: true }),
+      },
+      resolve: async (_p, args, ctx) => {
+        const user = await requireUser(ctx);
+        const { topic, viewer } = await loadTopicAndViewer(ctx, args.topicId);
+        if (!isAdmin(viewer.roles)) forbidden();
+        const targetRoles = await getViewerRoles(
+          args.hostId,
+          topic.timetableId,
+        );
+        if (!(isHost(targetRoles) || isAdmin(targetRoles))) {
+          throw new GraphQLError(
+            "New owner must hold the host or admin role in this timetable",
+          );
+        }
+        const updated = await reassignTopic(topic, args.hostId, user.id);
+        if (!updated) notFound("Topic not found");
         return updated;
       },
     }),
