@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { useToast } from "@/components/Toast";
 import { clientGql } from "@/lib/clientGraphql";
-import { themeVars } from "@/lib/timetableSettings";
+import { themeVars, type DigestSettings } from "@/lib/timetableSettings";
 
 const MUTATION = `mutation Settings(
   $s: String!, $ra: String, $rh: String, $re: String, $tp: String, $ts: String, $cover: String,
@@ -30,11 +30,7 @@ export type SettingsValues = {
   roleLabels?: { admin?: string; host?: string; elector?: string };
   theme?: { primary?: string; secondary?: string };
   coverImageUrl?: string | null;
-  digestDefaults?: {
-    digestNewTopics?: boolean;
-    digestReplies?: boolean;
-    digestActivity?: boolean;
-  };
+  digestDefaults?: DigestSettings;
 };
 
 function applyThemeVars(primary: string, secondary: string) {
@@ -60,39 +56,41 @@ export function SettingsForm({
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
 
-  const initialPrimary = current.theme?.primary ?? "#2f54eb";
-  const initialSecondary = current.theme?.secondary ?? "#5b7bff";
+  // Single source for both the initial state and what Discard restores.
+  const initial = {
+    admin: current.roleLabels?.admin ?? "Admin",
+    host: current.roleLabels?.host ?? "Host",
+    elector: current.roleLabels?.elector ?? "Elector",
+    primary: current.theme?.primary ?? "#2f54eb",
+    secondary: current.theme?.secondary ?? "#5b7bff",
+    cover: current.coverImageUrl ?? "",
+    digestTopics: current.digestDefaults?.digestNewTopics ?? false,
+    digestReplies: current.digestDefaults?.digestReplies ?? false,
+    digestActivity: current.digestDefaults?.digestActivity ?? false,
+  };
 
-  const [admin, setAdmin] = useState(current.roleLabels?.admin ?? "Admin");
-  const [host, setHost] = useState(current.roleLabels?.host ?? "Host");
-  const [elector, setElector] = useState(
-    current.roleLabels?.elector ?? "Elector",
-  );
-  const [primary, setPrimary] = useState(initialPrimary);
-  const [secondary, setSecondary] = useState(initialSecondary);
-  const [cover, setCover] = useState(current.coverImageUrl ?? "");
+  const [admin, setAdmin] = useState(initial.admin);
+  const [host, setHost] = useState(initial.host);
+  const [elector, setElector] = useState(initial.elector);
+  const [primary, setPrimary] = useState(initial.primary);
+  const [secondary, setSecondary] = useState(initial.secondary);
+  const [cover, setCover] = useState(initial.cover);
   const [uploadingCover, setUploadingCover] = useState(false);
-  const [digestTopics, setDigestTopics] = useState(
-    current.digestDefaults?.digestNewTopics ?? false,
-  );
-  const [digestReplies, setDigestReplies] = useState(
-    current.digestDefaults?.digestReplies ?? false,
-  );
-  const [digestActivity, setDigestActivity] = useState(
-    current.digestDefaults?.digestActivity ?? false,
-  );
+  const [digestTopics, setDigestTopics] = useState(initial.digestTopics);
+  const [digestReplies, setDigestReplies] = useState(initial.digestReplies);
+  const [digestActivity, setDigestActivity] = useState(initial.digestActivity);
 
   function discard() {
-    setAdmin(current.roleLabels?.admin ?? "Admin");
-    setHost(current.roleLabels?.host ?? "Host");
-    setElector(current.roleLabels?.elector ?? "Elector");
-    setPrimary(initialPrimary);
-    setSecondary(initialSecondary);
-    setCover(current.coverImageUrl ?? "");
-    setDigestTopics(current.digestDefaults?.digestNewTopics ?? false);
-    setDigestReplies(current.digestDefaults?.digestReplies ?? false);
-    setDigestActivity(current.digestDefaults?.digestActivity ?? false);
-    applyThemeVars(initialPrimary, initialSecondary);
+    setAdmin(initial.admin);
+    setHost(initial.host);
+    setElector(initial.elector);
+    setPrimary(initial.primary);
+    setSecondary(initial.secondary);
+    setCover(initial.cover);
+    setDigestTopics(initial.digestTopics);
+    setDigestReplies(initial.digestReplies);
+    setDigestActivity(initial.digestActivity);
+    applyThemeVars(initial.primary, initial.secondary);
     setSaved(false);
   }
 

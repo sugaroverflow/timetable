@@ -9,7 +9,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-import { users } from "./auth";
+import { users, type NotificationSettings } from "./auth";
 import { inviteStatusEnum, privacyEnum, roleEnum } from "./enums";
 
 /**
@@ -21,11 +21,7 @@ export type TimetableSettings = {
   theme?: { primary?: string; secondary?: string };
   coverImageUrl?: string | null;
   /** Digest settings seeded onto new members who haven't customized theirs. */
-  digestDefaults?: {
-    digestNewTopics?: boolean;
-    digestReplies?: boolean;
-    digestActivity?: boolean;
-  };
+  digestDefaults?: NotificationSettings;
 };
 
 export const timetables = pgTable("timetables", {

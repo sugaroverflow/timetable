@@ -6,15 +6,18 @@ export type RoleLabels = {
   elector?: string;
 };
 
+/** Mirrors NotificationSettings in @timetable/db (web doesn't depend on db). */
+export type DigestSettings = {
+  digestNewTopics?: boolean;
+  digestReplies?: boolean;
+  digestActivity?: boolean;
+};
+
 export type TimetableSettings = {
   roleLabels?: RoleLabels;
   theme?: { primary?: string; secondary?: string };
   coverImageUrl?: string | null;
-  digestDefaults?: {
-    digestNewTopics?: boolean;
-    digestReplies?: boolean;
-    digestActivity?: boolean;
-  };
+  digestDefaults?: DigestSettings;
 };
 
 export function parseTimetableSettings(raw: string | null | undefined) {

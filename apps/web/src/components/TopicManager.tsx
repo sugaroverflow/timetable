@@ -3,16 +3,13 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
-import { ImageUploadField } from "@/components/ImageUploadField";
 import { useToast } from "@/components/Toast";
+import { TopicEditForm } from "@/components/TopicEditForm";
 import { clientGql } from "@/lib/clientGraphql";
 import type { ManagedTopic } from "@/lib/feedTypes";
 
 const SUBMIT = `mutation($id: String!){ submitTopic(topicId: $id){ id } }`;
 const UNPUBLISH = `mutation($id: String!){ unpublishTopic(topicId: $id){ id } }`;
-const UPDATE = `mutation($id: String!, $title: String!, $body: String!, $cover: String){
-  updateTopic(topicId: $id, title: $title, bodyMd: $body, coverImageUrl: $cover){ id }
-}`;
 
 export function TopicManager({
   topic,
@@ -25,10 +22,6 @@ export function TopicManager({
   const { toast, toastError } = useToast();
   const [pending, startTransition] = useTransition();
   const [editing, setEditing] = useState(false);
-  const [title, setTitle] = useState(topic.title);
-  const [body, setBody] = useState(topic.bodyMd);
-  const [cover, setCover] = useState(topic.coverImageUrl ?? "");
-  const [uploadingCover, setUploadingCover] = useState(false);
 
   async function run(
     query: string,
@@ -42,21 +35,6 @@ export function TopicManager({
     } catch (err) {
       toastError(err instanceof Error ? err.message : "Action failed");
     }
-  }
-
-  async function saveEdit(e: React.FormEvent) {
-    e.preventDefault();
-    await run(
-      UPDATE,
-      {
-        id: topic.id,
-        title: title.trim(),
-        body,
-        cover: cover.trim() || null,
-      },
-      "Topic updated",
-    );
-    setEditing(false);
   }
 
   return (
@@ -76,35 +54,13 @@ export function TopicManager({
       ) : null}
 
       {editing ? (
-        <form onSubmit={saveEdit} className="stack" style={{ marginTop: 10 }}>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} />
-          <textarea value={body} onChange={(e) => setBody(e.target.value)} />
-          <ImageUploadField
-            id={`topic-cover-${topic.id}`}
-            label="Cover image URL"
-            value={cover}
-            onChange={setCover}
-            purpose="topic-cover"
-            timetableIdOrSlug={slug}
-            onUploadingChange={setUploadingCover}
+        <div style={{ marginTop: 10 }}>
+          <TopicEditForm
+            topic={topic}
+            slug={slug}
+            onDone={() => setEditing(false)}
           />
-          <div className="row">
-            <button
-              className="btn btn-primary"
-              type="submit"
-              disabled={pending || uploadingCover}
-            >
-              {uploadingCover ? "Uploading…" : "Save"}
-            </button>
-            <button
-              className="btn btn-ghost"
-              type="button"
-              onClick={() => setEditing(false)}
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
+        </div>
       ) : (
         <div className="row wrap" style={{ marginTop: 10 }}>
           {(topic.status === "draft" || topic.status === "unpublished") && (

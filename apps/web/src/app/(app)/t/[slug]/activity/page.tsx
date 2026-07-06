@@ -2,6 +2,7 @@ import { isAdmin, type Role } from "@timetable/shared";
 
 import { ActivityFilter } from "@/components/ActivityFilter";
 import { EmptyState } from "@/components/EmptyState";
+import { ACTION_LABELS } from "@/lib/activityLabels";
 import type { ActivityEvent } from "@/lib/feedTypes";
 import { gqlFetch } from "@/lib/graphql";
 import { displayRolesFromCookies } from "@/lib/previewRoles.server";
@@ -19,17 +20,6 @@ const QUERY = `
     }
   }
 `;
-
-const ACTION_LABELS: Record<string, string> = {
-  "topic.submit": "submitted a topic",
-  "topic.publish": "published a topic",
-  "topic.reject": "rejected a topic",
-  "topic.unpublish": "unpublished a topic",
-  "topic.request_changes": "requested changes",
-  "topic.edit": "edited a topic",
-  "hearts.archive": "archived hearts on a topic",
-  "comment.hide": "hid a comment",
-};
 
 function describe(event: ActivityEvent): string {
   return ACTION_LABELS[event.action] ?? event.action;

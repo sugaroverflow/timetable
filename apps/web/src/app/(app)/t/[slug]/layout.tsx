@@ -110,6 +110,7 @@ export default async function TimetableLayout({
           {isHost(actualRoles) || isAdmin(actualRoles) ? (
             <PreviewToggle
               on={previewOn}
+              slug={slug}
               electorLabel={roleLabel(settings.roleLabels, "elector")}
             />
           ) : null}
