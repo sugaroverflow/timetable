@@ -92,7 +92,7 @@ export async function getUserFromRequest(
     // Fall back to a bare row if the Clerk lookup fails.
   }
 
-  if (externalId && !env.isProd) {
+  if (externalId && env.devSeedUserMapping) {
     const externalUser = await loadLocalUser(externalId);
     if (externalUser) {
       if (email) await claimInvitesForUser(externalUser.id, email);

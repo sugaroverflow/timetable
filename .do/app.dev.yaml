@@ -42,6 +42,9 @@ services:
       - { key: RATE_LIMIT_KEY_PREFIX, value: "timetable:dev:api", scope: RUN_TIME }
       - { key: GRAPHQL_MAX_COST, value: "500", scope: RUN_TIME }
       - { key: CLERK_SECRET_KEY, value: "${CLERK_SECRET_KEY}", scope: RUN_TIME, type: SECRET }
+      # Dev-only: map Clerk test users (externalId=dev_sample_*) to the seeded
+      # fixture users even though this is a production build. Never in app.yaml.
+      - { key: DEV_SEED_USER_MAPPING, value: "true", scope: RUN_TIME }
       - { key: CRON_SECRET, value: "${CRON_SECRET}", scope: RUN_TIME, type: SECRET }
       - { key: RESEND_API_KEY, value: "${RESEND_API_KEY}", scope: RUN_TIME, type: SECRET }
       - { key: EMAIL_FROM, value: "${EMAIL_FROM}", scope: RUN_TIME }
