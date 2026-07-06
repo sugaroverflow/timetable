@@ -306,6 +306,35 @@ textarea {
   color: var(--primary);
   border-color: transparent;
 }
+.pill-new {
+  background: var(--primary-soft);
+  color: var(--primary);
+  border-color: transparent;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Highlight for topics published/active since the viewer's last visit */
+.topic-new {
+  border-left: 3px solid var(--primary);
+}
+
+/* "View N replies" / "View all N comments" disclosure */
+.thread-toggle {
+  border: none;
+  background: none;
+  padding: 4px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  text-align: left;
+}
+.thread-toggle:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
 
 .muted {
   color: var(--muted);

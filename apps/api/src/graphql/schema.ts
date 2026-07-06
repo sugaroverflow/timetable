@@ -21,6 +21,7 @@ import {
   getReadableTimetable,
   getSlotById,
   getTimetableById,
+  getFeedLastSeen,
   getTimetableByDomain,
   getTopicById,
   getUserById,
@@ -36,6 +37,7 @@ import {
   listSubmittedTopics,
   listTimetableHosts,
   logActivity,
+  markFeedSeen,
   moderateTopic,
   setAvailability,
   setCommentHidden,
@@ -370,6 +372,20 @@ builder.queryType({
         )) as string[],
     }),
 
+    /** The viewer's feed watermark for the "new since last visit"
+     * highlight; null for anonymous visitors and first-time viewers. */
+    myFeedLastSeenAt: t.string({
+      nullable: true,
+      args: { idOrSlug: t.arg.string({ required: true }) },
+      resolve: async (_p, args, ctx) => {
+        if (!ctx.user) return null;
+        const readable = await getReadableTimetable(ctx.user.id, args.idOrSlug);
+        if (!readable) return null;
+        const seen = await getFeedLastSeen(ctx.user.id, readable.timetable.id);
+        return seen ? seen.toISOString() : null;
+      },
+    }),
+
     timetableMembers: t.field({
       type: [MemberType],
       args: { timetableId: t.arg.string({ required: true }) },
@@ -516,6 +532,18 @@ async function loadTopicAndViewer(ctx: ApiContext, topicId: string) {
 
 builder.mutationType({
   fields: (t) => ({
+    /** Bumps the viewer's feed watermark to now (no-op for non-members). */
+    markFeedSeen: t.boolean({
+      args: { idOrSlug: t.arg.string({ required: true }) },
+      resolve: async (_p, args, ctx) => {
+        const user = await requireUser(ctx);
+        const readable = await getReadableTimetable(user.id, args.idOrSlug);
+        if (!readable) notFound("Timetable not found");
+        await markFeedSeen(user.id, readable.timetable.id);
+        return true;
+      },
+    }),
+
     createTopic: t.field({
       type: ManagedTopicType,
       args: {

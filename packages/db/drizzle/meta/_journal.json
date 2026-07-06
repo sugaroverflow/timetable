@@ -50,6 +50,13 @@
       "when": 1782250152250,
       "tag": "0006_dry_manta",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1783380010523,
+      "tag": "0007_sudden_logan",
+      "breakpoints": true
     }
   ]
 }

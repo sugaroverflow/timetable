@@ -4,10 +4,12 @@ import { EmptyState } from "@/components/EmptyState";
 import { FeedSortControl } from "@/components/FeedSortControl";
 import { HostFilter } from "@/components/HostFilter";
 import { InfiniteFeed } from "@/components/InfiniteFeed";
+import { MarkFeedSeen } from "@/components/MarkFeedSeen";
 import { TopicCard } from "@/components/TopicCard";
 import {
   FEED_PAGE_SIZE,
   fetchFeedPage,
+  isTopicNew,
   normalizeFeedSort,
 } from "@/lib/feedPage";
 import { roleLabel } from "@/lib/timetableSettings";
@@ -32,6 +34,7 @@ export default async function FeedPage({
 
   return (
     <div className="stack">
+      {page.isMember ? <MarkFeedSeen slug={slug} /> : null}
       <div className="toolbar">
         <label htmlFor="sort">Sort</label>
         <FeedSortControl value={sort} />
@@ -68,6 +71,9 @@ export default async function FeedPage({
               key={topic.id}
               topic={topic}
               perms={page.perms}
+              slug={slug}
+              viewerId={page.viewerId}
+              isNew={isTopicNew(topic, page.lastSeenAt)}
               hostLabel={page.settings.roleLabels?.host}
               adminLabel={adminLabel}
               viewerHeartCount={page.viewerHeartCount}

@@ -1,7 +1,7 @@
 "use server";
 
 import { TopicCard } from "@/components/TopicCard";
-import { fetchFeedPage } from "@/lib/feedPage";
+import { fetchFeedPage, isTopicNew } from "@/lib/feedPage";
 import { roleLabel } from "@/lib/timetableSettings";
 
 /**
@@ -22,6 +22,9 @@ export async function loadMoreFeed(
         key={topic.id}
         topic={topic}
         perms={page.perms}
+        slug={slug}
+        viewerId={page.viewerId}
+        isNew={isTopicNew(topic, page.lastSeenAt)}
         hostLabel={page.settings.roleLabels?.host}
         adminLabel={roleLabel(page.settings.roleLabels, "admin")}
         viewerHeartCount={page.viewerHeartCount}

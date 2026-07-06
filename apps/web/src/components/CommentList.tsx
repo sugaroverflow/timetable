@@ -1,7 +1,20 @@
+"use client";
+
+import { useState } from "react";
+
 import type { FeedComment } from "@/lib/feedTypes";
 
 import { Avatar } from "./Avatar";
 import { CommentActions } from "./CommentActions";
+
+const VISIBLE_TOP_LEVEL = 3;
+
+function countNested(comments: FeedComment[]): number {
+  return comments.reduce(
+    (sum, c) => sum + 1 + countNested(c.replies ?? []),
+    0,
+  );
+}
 
 function CommentItem({
   comment,
@@ -13,6 +26,9 @@ function CommentItem({
   canModerate: boolean;
 }) {
   const replies = comment.replies ?? [];
+  const [showReplies, setShowReplies] = useState(false);
+  const replyCount = countNested(replies);
+
   return (
     <div className={`comment ${comment.hidden ? "hidden" : ""}`}>
       <Avatar name={comment.authorName} small />
@@ -38,16 +54,26 @@ function CommentItem({
           hidden={comment.hidden}
         />
         {replies.length > 0 ? (
-          <div className="replies">
-            {replies.map((r) => (
-              <CommentItem
-                key={r.id}
-                comment={r}
-                canReply={canReply}
-                canModerate={canModerate}
-              />
-            ))}
-          </div>
+          showReplies ? (
+            <div className="replies">
+              {replies.map((r) => (
+                <CommentItem
+                  key={r.id}
+                  comment={r}
+                  canReply={canReply}
+                  canModerate={canModerate}
+                />
+              ))}
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="thread-toggle"
+              onClick={() => setShowReplies(true)}
+            >
+              View {replyCount} {replyCount === 1 ? "reply" : "replies"}
+            </button>
+          )
         ) : null}
       </div>
     </div>
@@ -63,10 +89,18 @@ export function CommentList({
   canReply: boolean;
   canModerate: boolean;
 }) {
+  const [showAll, setShowAll] = useState(false);
   if (!comments.length) return null;
+
+  const visible =
+    showAll || comments.length <= VISIBLE_TOP_LEVEL + 1
+      ? comments
+      : comments.slice(0, VISIBLE_TOP_LEVEL);
+  const hiddenCount = comments.length - visible.length;
+
   return (
     <div className="comments">
-      {comments.map((c) => (
+      {visible.map((c) => (
         <CommentItem
           key={c.id}
           comment={c}
@@ -74,6 +108,15 @@ export function CommentList({
           canModerate={canModerate}
         />
       ))}
+      {hiddenCount > 0 ? (
+        <button
+          type="button"
+          className="thread-toggle"
+          onClick={() => setShowAll(true)}
+        >
+          View all {comments.length} comments
+        </button>
+      ) : null}
     </div>
   );
 }

@@ -23,6 +23,8 @@ type Data = {
     settings: string;
     viewerHeartedPublishedCount: number | null;
   } | null;
+  me: { id: string } | null;
+  myFeedLastSeenAt: string | null;
   topicFeed: FeedTopic[];
   timetableHosts: { id: string; name: string | null }[];
 };
@@ -34,9 +36,11 @@ const COMMENT_FIELDS = `
 const QUERY = `
   query Feed($s: String!, $sort: String, $host: String, $limit: Int, $offset: Int) {
     timetable(idOrSlug: $s) { viewerRoles settings viewerHeartedPublishedCount }
+    me { id }
+    myFeedLastSeenAt(idOrSlug: $s)
     timetableHosts(idOrSlug: $s) { id name }
     topicFeed(idOrSlug: $s, sort: $sort, hostId: $host, limit: $limit, offset: $offset) {
-      id timetableId hostId hostName hostImage title bodyHtml coverImageUrl status
+      id timetableId hostId hostName hostImage title bodyMd bodyHtml coverImageUrl status
       heartCount weightedScore viewerHasHearted commentCount
       publishedAt createdAt
       comments { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} } } }
@@ -45,12 +49,27 @@ const QUERY = `
   }
 `;
 
+/** True when the topic was published — or picked up new comments — after
+ * the viewer's last feed visit. Never-seen (null) shows no highlights. */
+export function isTopicNew(topic: FeedTopic, lastSeenAt: string | null): boolean {
+  if (!lastSeenAt) return false;
+  const seen = Date.parse(lastSeenAt);
+  if (topic.publishedAt && Date.parse(topic.publishedAt) > seen) return true;
+  const newer = (comments: FeedTopic["comments"]): boolean =>
+    comments.some(
+      (c) => Date.parse(c.createdAt) > seen || newer(c.replies ?? []),
+    );
+  return newer(topic.comments);
+}
+
 export type FeedPage = {
   topics: FeedTopic[];
   hasNext: boolean;
   perms: FeedPerms;
   settings: TimetableSettings;
   viewerHeartCount: number | null;
+  viewerId: string | null;
+  lastSeenAt: string | null;
   isMember: boolean;
   hosts: { id: string; name: string | null }[];
 };
@@ -88,6 +107,8 @@ export async function fetchFeedPage(
     },
     settings: parseTimetableSettings(data.timetable?.settings),
     viewerHeartCount: data.timetable?.viewerHeartedPublishedCount ?? null,
+    viewerId: data.me?.id ?? null,
+    lastSeenAt: data.myFeedLastSeenAt,
     isMember: roles.length > 0,
     hosts: data.timetableHosts,
   };

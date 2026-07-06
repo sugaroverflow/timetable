@@ -32,6 +32,7 @@ export type FeedTopic = {
   hostName: string | null;
   hostImage: string | null;
   title: string;
+  bodyMd: string;
   bodyHtml: string;
   coverImageUrl: string | null;
   status: TopicStatus;

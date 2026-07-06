@@ -58,6 +58,9 @@ export const timetableMemberships = pgTable(
       .notNull()
       .references(() => timetables.id, { onDelete: "cascade" }),
     roles: roleEnum().array().notNull(),
+    // Watermark for the feed's "new since your last visit" highlight;
+    // null until the member first views the feed.
+    lastSeenFeedAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
