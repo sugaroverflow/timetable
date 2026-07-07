@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { Avatar } from "@/components/Avatar";
 import { EmptyState } from "@/components/EmptyState";
 import { FeedSortControl } from "@/components/FeedSortControl";
 import { HostFilter } from "@/components/HostFilter";
@@ -12,30 +13,60 @@ import {
   isTopicNew,
   normalizeFeedSort,
 } from "@/lib/feedPage";
-import { roleLabel } from "@/lib/timetableSettings";
+import { gqlFetch } from "@/lib/graphql";
+import { pluralLabel, roleLabel } from "@/lib/timetableSettings";
 
 import { loadMoreFeed } from "./actions";
+
+type HostCard = {
+  userId: string;
+  name: string | null;
+  bioHtml: string | null;
+} | null;
+
+const HOST_CARD_QUERY = `
+  query FeedHostCard($s: String!, $u: String!) {
+    person(idOrSlug: $s, userId: $u) { userId name bioHtml }
+  }
+`;
 
 export default async function FeedPage({
   params,
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ sort?: string; host?: string; hearted?: string }>;
+  searchParams: Promise<{
+    sort?: string;
+    host?: string;
+    hearted?: string;
+    seed?: string;
+  }>;
 }) {
   const { slug } = await params;
   const {
     sort: sortParam,
     host: hostParam,
     hearted: heartedParam,
+    seed: seedParam,
   } = await searchParams;
   const sort = normalizeFeedSort(sortParam);
   const host = hostParam ?? "";
   const hearted = heartedParam === "me";
+  const seed = seedParam ?? "";
 
-  const page = await fetchFeedPage(slug, sort, host, 0, hearted);
+  const page = await fetchFeedPage(slug, sort, host, 0, hearted, seed);
   const hostLabel = roleLabel(page.settings.roleLabels, "host");
   const adminLabel = roleLabel(page.settings.roleLabels, "admin");
+
+  // Filtering to one host puts their profile card above the topics (QA #59).
+  let hostCard: HostCard = null;
+  if (host) {
+    const data = await gqlFetch<{ person: HostCard }>(HOST_CARD_QUERY, {
+      s: slug,
+      u: host,
+    });
+    hostCard = data.person;
+  }
 
   return (
     <div className="stack">
@@ -50,7 +81,11 @@ export default async function FeedPage({
         <label htmlFor="sort">Sort</label>
         <FeedSortControl value={sort} />
         {page.hosts.length > 0 ? (
-          <HostFilter value={host} hosts={page.hosts} />
+          <HostFilter
+            value={host}
+            hosts={page.hosts}
+            allLabel={`All ${pluralLabel(hostLabel)}`}
+          />
         ) : null}
       </div>
 
@@ -58,6 +93,26 @@ export default async function FeedPage({
         <div className="notice">
           You&rsquo;re viewing a public feed. <Link href="/sign-in">Sign in</Link>{" "}
           to heart and comment.
+        </div>
+      ) : null}
+
+      {hostCard ? (
+        <div className="card stack host-filter-card">
+          <div className="row" style={{ alignItems: "center" }}>
+            <Avatar name={hostCard.name} large />
+            <div>
+              <strong>{hostCard.name ?? hostLabel}</strong>
+              <div className="faint" style={{ fontSize: 12 }}>
+                {hostLabel} · topics below
+              </div>
+            </div>
+          </div>
+          {hostCard.bioHtml ? (
+            <div
+              className="topic-body"
+              dangerouslySetInnerHTML={{ __html: hostCard.bioHtml }}
+            />
+          ) : null}
         </div>
       ) : null}
 
@@ -71,15 +126,16 @@ export default async function FeedPage({
         <EmptyState
           icon="◇"
           title="No published topics yet"
-          hint={`${hostLabel}s draft and submit topics from My Topics; ${adminLabel.toLowerCase()}s publish them from Pending Topics.`}
+          hint={`${pluralLabel(hostLabel)} draft and submit topics from My Topics; ${pluralLabel(adminLabel).toLowerCase()} publish them from Pending Topics.`}
         />
       ) : (
         <InfiniteFeed
-          key={`${sort}|${host}|${hearted}`}
+          key={`${sort}|${host}|${hearted}|${seed}`}
           slug={slug}
           sort={sort}
           host={host}
           hearted={hearted}
+          seed={seed}
           pageSize={FEED_PAGE_SIZE}
           initialHasNext={page.hasNext}
           loadMore={loadMoreFeed}

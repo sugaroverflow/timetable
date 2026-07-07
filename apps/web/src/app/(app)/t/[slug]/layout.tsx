@@ -8,12 +8,17 @@ import { NavLink } from "@/components/NavLink";
 import { PreviewToggle } from "@/components/PreviewToggle";
 import { RolePills } from "@/components/RolePills";
 import { Sidebar } from "@/components/Sidebar";
+import {
+  TimetableSwitcher,
+  type SwitcherItem,
+} from "@/components/TimetableSwitcher";
 import { gqlFetch } from "@/lib/graphql";
 import { displayRoles, PREVIEW_COOKIE } from "@/lib/previewRoles";
 import {
+  buildThemeCss,
   parseTimetableSettings,
+  privacyBadge,
   roleLabel,
-  themeStyle,
 } from "@/lib/timetableSettings";
 
 type TimetableResult = {
@@ -39,6 +44,26 @@ const TIMETABLE_QUERY = `
       viewerRoles
       settings
     }
+  }
+`;
+
+type MineResult = {
+  myTimetables: {
+    timetable: { slug: string; name: string; privacy: string; settings: string };
+  }[];
+};
+
+const MINE_QUERY = `
+  query SidebarSwitcher {
+    myTimetables {
+      timetable { slug name privacy settings }
+    }
+  }
+`;
+
+const UNREAD_QUERY = `
+  query Unread($s: String!) {
+    notificationsUnread(idOrSlug: $s)
   }
 `;
 
@@ -71,22 +96,33 @@ export default async function TimetableLayout({
   const roles = displayRoles(actualRoles, previewOn);
   const settings = parseTimetableSettings(timetable.settings);
   const base = `/t/${slug}`;
+  const privacy = privacyBadge(timetable.privacy);
 
-  const privacyConfig = {
-    public: { dot: "var(--green)", label: "Public" },
-    hosts_only: { dot: "var(--green)", label: "Hosts only" },
-    no_comments: { dot: "var(--green)", label: "No comments" },
-    private: { dot: "var(--yellow)", label: "Private" },
-    deactivated: { dot: "var(--faint)", label: "Deactivated" },
-  };
-  const privacy =
-    privacyConfig[timetable.privacy as keyof typeof privacyConfig] ?? {
-      dot: "var(--faint)",
-      label: timetable.privacy,
-    };
+  let switcherItems: SwitcherItem[] = [];
+  let unread = 0;
+  if (isAuthed) {
+    const [mine, unreadData] = await Promise.all([
+      gqlFetch<MineResult>(MINE_QUERY),
+      roles.length > 0
+        ? gqlFetch<{ notificationsUnread: number }>(UNREAD_QUERY, { s: slug })
+        : Promise.resolve({ notificationsUnread: 0 }),
+    ]);
+    switcherItems = mine.myTimetables.map((m) => ({
+      slug: m.timetable.slug,
+      name: m.timetable.name,
+      privacy: m.timetable.privacy,
+      iconUrl: parseTimetableSettings(m.timetable.settings).iconUrl ?? null,
+    }));
+    unread = unreadData.notificationsUnread;
+  }
+
+  const themeCss = buildThemeCss(settings);
 
   return (
-    <main className="container" style={themeStyle(settings)}>
+    <main className="container">
+      {/* The timetable's theme applies globally (topbar included) while
+       * this layout is mounted; dark overrides ride the same tag. */}
+      {themeCss ? <style dangerouslySetInnerHTML={{ __html: themeCss }} /> : null}
       <div className="shell">
         <Sidebar>
           <div className="sidebar-head">
@@ -116,8 +152,17 @@ export default async function TimetableLayout({
               </NavLink>
             )}
             {roles.length > 0 && (
+              <NavLink href={`${base}/notifications`}>
+                Notifications
+                {unread > 0 ? (
+                  <span className="nav-badge">{unread > 99 ? "99+" : unread}</span>
+                ) : null}
+              </NavLink>
+            )}
+            {roles.length > 0 && (
               <NavLink href={`${base}/people`}>People</NavLink>
             )}
+            {isAuthed && <NavLink href="/profile">Profile</NavLink>}
             {(isHost(roles) || isAdmin(roles)) && (
               <NavLink href={`${base}/dashboard`}>Dashboard</NavLink>
             )}
@@ -139,6 +184,21 @@ export default async function TimetableLayout({
                 slug={slug}
                 electorLabel={roleLabel(settings.roleLabels, "elector")}
               />
+            </div>
+          ) : null}
+
+          <a
+            className="sidebar-bug-link faint"
+            href="https://github.com/sugaroverflow/timetable/issues/new"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            ⚑ Report a bug
+          </a>
+
+          {switcherItems.length > 0 ? (
+            <div className="sidebar-foot">
+              <TimetableSwitcher items={switcherItems} currentSlug={slug} />
             </div>
           ) : null}
         </Sidebar>

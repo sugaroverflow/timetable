@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { ImageUploadField } from "@/components/ImageUploadField";
+import { RichTextEditor } from "@/components/RichTextEditor";
 import { useToast } from "@/components/Toast";
 import { clientGql } from "@/lib/clientGraphql";
 import type { ManagedTopic } from "@/lib/feedTypes";
@@ -59,25 +60,19 @@ export function TopicEditForm({
           onChange={(e) => setTitle(e.target.value)}
         />
       </div>
-      <div className="field">
-        <label htmlFor={`topic-edit-body-${topic.id}`}>
-          Description (markdown)
-        </label>
-        <textarea
-          id={`topic-edit-body-${topic.id}`}
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-        />
-      </div>
       <ImageUploadField
         id={`topic-edit-cover-${topic.id}`}
-        label="Cover image URL"
+        label="Cover image"
         value={cover}
         onChange={setCover}
         purpose="topic-cover"
         timetableIdOrSlug={slug}
         onUploadingChange={setUploadingCover}
       />
+      <div className="field">
+        <label htmlFor={`topic-edit-body-${topic.id}`}>Description</label>
+        <RichTextEditor value={body} onChange={setBody} minHeight={280} />
+      </div>
       <div className="row">
         <button
           className="btn btn-primary"

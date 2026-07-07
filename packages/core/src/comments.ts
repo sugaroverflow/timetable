@@ -32,6 +32,7 @@ async function logCommentActivity(
       title: topic.title,
       snippet: comment.body.slice(0, 140),
       visibility: comment.visibility,
+      commentId: comment.id,
     },
   });
 }

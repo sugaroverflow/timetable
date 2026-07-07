@@ -16,9 +16,28 @@ import { inviteStatusEnum, privacyEnum, roleEnum } from "./enums";
  * Per-timetable settings persisted as JSON: custom role labels, theme colors,
  * default digest options, etc. Kept loose in Phase 0; typed in @timetable/shared.
  */
+/** Per-timetable theme (QA #59 full theming). All colours are #rrggbb.
+ * `dark` overrides apply when the viewer uses dark mode; unset dark values
+ * fall back to the built-in dark palette. `font` picks a curated pairing. */
+export type ThemeSettings = {
+  primary?: string;
+  secondary?: string;
+  background?: string;
+  topbar?: string;
+  text?: string;
+  font?: string;
+  dark?: {
+    primary?: string;
+    secondary?: string;
+    background?: string;
+    topbar?: string;
+    text?: string;
+  };
+};
+
 export type TimetableSettings = {
   roleLabels?: { admin?: string; host?: string; elector?: string };
-  theme?: { primary?: string; secondary?: string };
+  theme?: ThemeSettings;
   coverImageUrl?: string | null;
   /** Small square icon shown in the topbar timetable menu. */
   iconUrl?: string | null;
@@ -66,6 +85,9 @@ export const timetableMemberships = pgTable(
     // Watermark for the feed's "new since your last visit" highlight;
     // null until the member first views the feed.
     lastSeenFeedAt: timestamp({ withTimezone: true }),
+    // Watermark for the notifications pane's unread badge (QA #59);
+    // null until the member first opens Notifications.
+    lastSeenNotificationsAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },

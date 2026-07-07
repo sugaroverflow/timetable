@@ -43,6 +43,7 @@ export type FeedTopic = {
   viewerHasHearted: boolean;
   commentCount: number;
   publishedAt: string | null;
+  contentUpdatedAt: string | null;
   createdAt: string;
   comments: FeedComment[];
   weightedBreakdown: WeightedHeart[] | null;
@@ -58,8 +59,10 @@ export type ManagedTopic = {
   bodyHtml: string;
   coverImageUrl: string | null;
   updatedAt: string;
-  hostName: string | null;
+  hostName?: string | null;
   feedback: string | null;
+  /** Public thread — My Topics renders feed-identical cards (QA #59). */
+  comments?: FeedComment[];
   /** Threaded admin↔host feedback; fetched where the UI renders it. */
   hostOnlyComments?: FeedComment[];
 };
@@ -70,9 +73,15 @@ export type ActivityEvent = {
   note: string | null;
   actorId: string | null;
   actorName: string | null;
+  actorImage: string | null;
+  actorRoles: string[];
   createdAt: string;
   topicTitle: string | null;
   topicSlug: string | null;
   topicHostSlug: string | null;
+  topicHostName: string | null;
   snippet: string | null;
+  commentId: string | null;
+  invitedEmail: string | null;
+  invitedRoles: string[];
 };

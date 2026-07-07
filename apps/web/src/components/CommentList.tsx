@@ -33,7 +33,10 @@ function CommentItem({
   const replyCount = countNested(replies);
 
   return (
-    <div className={`comment ${comment.hidden ? "hidden" : ""}`}>
+    <div
+      id={`comment-${comment.id}`}
+      className={`comment ${comment.hidden ? "hidden" : ""}`}
+    >
       <Avatar name={comment.authorName} small />
       <div className="comment-main">
         <div className="c-bubble">

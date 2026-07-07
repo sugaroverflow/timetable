@@ -38,10 +38,14 @@ import {
   listMembers,
   listMembershipsForUser,
   listSlotComments,
+  listDraftTopics,
   listSubmittedTopics,
   listTimetableHosts,
   logActivity,
+  countUnreadNotifications,
+  listNotifications,
   markFeedSeen,
+  markNotificationsSeen,
   moderateTopic,
   reassignTopic,
   setAvailability,
@@ -132,6 +136,57 @@ function forbidden(message = "Forbidden"): never {
 
 function notFound(message = "Not found"): never {
   throw new GraphQLError(message, { extensions: { code: "NOT_FOUND" } });
+}
+
+function badRequest(message = "Bad request"): never {
+  throw new GraphQLError(message, { extensions: { code: "BAD_REQUEST" } });
+}
+
+const THEME_FONTS = new Set([
+  "default",
+  "editorial",
+  "humanist",
+  "modern",
+  "technical",
+]);
+const HEX_COLOUR = /^#[0-9a-fA-F]{6}$/;
+
+/** Validate a client-sent theme (QA #59): known keys only, colours must be
+ * #rrggbb, font from the curated list. Returns null when invalid. */
+function parseThemeJson(
+  raw: string,
+): NonNullable<TimetableSettings["theme"]> | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== "object" || parsed === null) return null;
+  const source = parsed as Record<string, unknown>;
+  const colour = (v: unknown) =>
+    typeof v === "string" && HEX_COLOUR.test(v) ? v : undefined;
+
+  const theme: NonNullable<TimetableSettings["theme"]> = {};
+  theme.primary = colour(source.primary);
+  theme.secondary = colour(source.secondary);
+  theme.background = colour(source.background);
+  theme.topbar = colour(source.topbar);
+  theme.text = colour(source.text);
+  if (typeof source.font === "string" && THEME_FONTS.has(source.font)) {
+    theme.font = source.font;
+  }
+  if (typeof source.dark === "object" && source.dark !== null) {
+    const d = source.dark as Record<string, unknown>;
+    theme.dark = {
+      primary: colour(d.primary),
+      secondary: colour(d.secondary),
+      background: colour(d.background),
+      topbar: colour(d.topbar),
+      text: colour(d.text),
+    };
+  }
+  return theme;
 }
 
 async function requireUser(ctx: ApiContext): Promise<SessionUser> {
@@ -226,6 +281,16 @@ const MemberType = builder.objectRef<GqlMember>("Member").implement({
   }),
 });
 
+const PersonTopicType = builder
+  .objectRef<{ id: string; title: string; slug: string | null }>("PersonTopic")
+  .implement({
+    fields: (t) => ({
+      id: t.exposeID("id"),
+      title: t.exposeString("title"),
+      slug: t.exposeString("slug", { nullable: true }),
+    }),
+  });
+
 const PersonType = builder.objectRef<Person>("Person").implement({
   fields: (t) => ({
     userId: t.exposeID("userId"),
@@ -239,6 +304,11 @@ const PersonType = builder.objectRef<Person>("Person").implement({
       resolve: (p) => (p.bio ? renderMarkdown(p.bio) : null),
     }),
     bio: t.exposeString("bio", { nullable: true }),
+    /** Published topics this person hosts (QA #59 — People page cards). */
+    publishedTopics: t.field({
+      type: [PersonTopicType],
+      resolve: (p) => p.publishedTopics ?? [],
+    }),
   }),
 });
 
@@ -291,6 +361,10 @@ const TopicType = builder.objectRef<GqlTopic>("Topic").implement({
       nullable: true,
       resolve: (tp) => tp.publishedAt?.toISOString() ?? null,
     }),
+    contentUpdatedAt: t.string({
+      nullable: true,
+      resolve: (tp) => tp.contentUpdatedAt?.toISOString() ?? null,
+    }),
     createdAt: t.string({ resolve: (tp) => tp.createdAt.toISOString() }),
     // Weighted score is host/admin-only.
     weightedScore: t.float({
@@ -342,6 +416,16 @@ const ManagedTopicType = builder.objectRef<Topic>("ManagedTopic").implement({
       nullable: true,
       resolve: (tp) => getLatestHostOnlyComment(tp.id),
     }),
+    /** Public comment thread — lets My Topics render feed-identical cards
+     * (QA #59). */
+    comments: t.field({
+      type: [CommentType],
+      resolve: (tp) =>
+        listCommentTree(tp.id, {
+          includeHostOnly: false,
+          includeHidden: false,
+        }),
+    }),
     /** Full host-only thread (admin feedback + host replies). ManagedTopic
      * is only ever served to the owning host or admins, so this is safe. */
     hostOnlyComments: t.field({
@@ -365,6 +449,8 @@ const ActivityType = builder.objectRef<ActivityEntry>("ActivityEvent").implement
     note: t.exposeString("note", { nullable: true }),
     actorId: t.exposeString("actorId", { nullable: true }),
     actorName: t.exposeString("actorName", { nullable: true }),
+    actorImage: t.exposeString("actorImage", { nullable: true }),
+    actorRoles: t.exposeStringList("actorRoles"),
     createdAt: t.string({ resolve: (a) => a.createdAt.toISOString() }),
     // Enrichment (QA #42): which topic the event refers to, and what was
     // said/done — all sourced from the event payload + a slug join.
@@ -374,12 +460,44 @@ const ActivityType = builder.objectRef<ActivityEntry>("ActivityEvent").implement
     }),
     topicSlug: t.exposeString("topicSlug", { nullable: true }),
     topicHostSlug: t.exposeString("topicHostSlug", { nullable: true }),
+    topicHostName: t.exposeString("topicHostName", { nullable: true }),
     snippet: t.string({
       nullable: true,
       resolve: (a) => (a.payload["snippet"] as string | undefined) ?? null,
     }),
+    /** For comment events: anchors the timeline link to the comment. */
+    commentId: t.string({
+      nullable: true,
+      resolve: (a) => (a.payload["commentId"] as string | undefined) ?? null,
+    }),
+    /** For member.invite events (QA #59). */
+    invitedEmail: t.string({
+      nullable: true,
+      resolve: (a) => (a.payload["invitedEmail"] as string | undefined) ?? null,
+    }),
+    invitedRoles: t.stringList({
+      resolve: (a) => (a.payload["invitedRoles"] as string[] | undefined) ?? [],
+    }),
   }),
 });
+
+const NotificationType = builder
+  .objectRef<import("@timetable/core").NotificationItem>("Notification")
+  .implement({
+    fields: (t) => ({
+      commentId: t.exposeID("commentId"),
+      kind: t.exposeString("kind"),
+      authorId: t.exposeID("authorId"),
+      authorName: t.exposeString("authorName", { nullable: true }),
+      body: t.exposeString("body"),
+      visibility: t.exposeString("visibility"),
+      createdAt: t.string({ resolve: (n) => n.createdAt.toISOString() }),
+      topicId: t.exposeID("topicId"),
+      topicTitle: t.exposeString("topicTitle"),
+      topicSlug: t.exposeString("topicSlug", { nullable: true }),
+      topicHostSlug: t.exposeString("topicHostSlug", { nullable: true }),
+    }),
+  });
 
 const HeartResult = builder
   .objectRef<{ topicId: string; hearted: boolean }>("HeartResult")
@@ -518,6 +636,30 @@ builder.queryType({
       },
     }),
 
+    /** Comments on the viewer's topics + replies to their comments
+     * (QA #59 notifications pane). Members only. */
+    notifications: t.field({
+      type: [NotificationType],
+      args: { idOrSlug: t.arg.string({ required: true }) },
+      resolve: async (_p, args, ctx) => {
+        if (!ctx.user) return [];
+        const readable = await getReadableTimetable(ctx.user.id, args.idOrSlug);
+        if (!readable || readable.roles.length === 0) return [];
+        return listNotifications(readable.timetable.id, ctx.user.id);
+      },
+    }),
+
+    /** Unread-notification count for the sidebar badge. */
+    notificationsUnread: t.int({
+      args: { idOrSlug: t.arg.string({ required: true }) },
+      resolve: async (_p, args, ctx) => {
+        if (!ctx.user) return 0;
+        const readable = await getReadableTimetable(ctx.user.id, args.idOrSlug);
+        if (!readable || readable.roles.length === 0) return 0;
+        return countUnreadNotifications(readable.timetable.id, ctx.user.id);
+      },
+    }),
+
     timetableMembers: t.field({
       type: [MemberType],
       args: { timetableId: t.arg.string({ required: true }) },
@@ -541,6 +683,7 @@ builder.queryType({
         hostId: t.arg.string({ required: false }),
         heartedByMe: t.arg.boolean({ required: false }),
         sort: t.arg.string({ required: false }),
+        seed: t.arg.string({ required: false }),
         limit: t.arg.int({ required: false }),
         offset: t.arg.int({ required: false }),
       },
@@ -557,7 +700,10 @@ builder.queryType({
           readable.timetable.privacy as Privacy,
           viewer,
         );
-        const sort = (args.sort ?? "hearts") as "hearts" | "comments" | "recent";
+        const validSorts = new Set(["hearts", "comments", "recent", "random"]);
+        const sort = (
+          args.sort && validSorts.has(args.sort) ? args.sort : "hearts"
+        ) as "hearts" | "comments" | "recent" | "random";
         const feed = await buildFeed(
           readable.timetable.id,
           ctx.user?.id ?? null,
@@ -565,6 +711,7 @@ builder.queryType({
             hostId: args.hostId ?? undefined,
             heartedByViewer: Boolean(args.heartedByMe),
             sort,
+            seed: args.seed ?? undefined,
             limit: args.limit ?? 50,
             offset: args.offset ?? undefined,
           },
@@ -606,12 +753,31 @@ builder.queryType({
       },
     }),
 
+    /** Every host's drafts, read-only (admin only, QA #59 — forgotten
+     * drafts stay visible on Pending Topics). */
+    draftTopics: t.field({
+      type: [ManagedTopicType],
+      args: { idOrSlug: t.arg.string({ required: true }) },
+      resolve: async (_p, args, ctx) => {
+        const readable = await getReadableTimetable(
+          ctx.user?.id ?? null,
+          args.idOrSlug,
+        );
+        if (!readable) return [];
+        const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
+        if (!canModerate(viewer)) return [];
+        return listDraftTopics(readable.timetable.id);
+      },
+    }),
+
     /** Activity timeline (admin only). */
     activityTimeline: t.field({
       type: [ActivityType],
       args: {
         idOrSlug: t.arg.string({ required: true }),
         actorId: t.arg.string({ required: false }),
+        from: t.arg.string({ required: false }),
+        to: t.arg.string({ required: false }),
       },
       resolve: async (_p, args, ctx) => {
         const readable = await getReadableTimetable(
@@ -621,8 +787,18 @@ builder.queryType({
         if (!readable) return [];
         const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
         if (!canModerate(viewer)) return [];
+        const parseDay = (value: string | null | undefined, endOfDay: boolean) => {
+          if (!value) return undefined;
+          const parsed = Date.parse(value);
+          if (Number.isNaN(parsed)) return undefined;
+          const date = new Date(parsed);
+          if (endOfDay) date.setUTCHours(23, 59, 59, 999);
+          return date;
+        };
         return listActivity(readable.timetable.id, {
           actorId: args.actorId ?? undefined,
+          from: parseDay(args.from, false),
+          to: parseDay(args.to, true),
         });
       },
     }),
@@ -688,6 +864,7 @@ builder.queryType({
           coverImageUrl: topic.coverImageUrl,
           status: topic.status,
           publishedAt: topic.publishedAt,
+          contentUpdatedAt: topic.contentUpdatedAt,
           createdAt: topic.createdAt,
           heartCount: 0,
           weightedScore: 0,
@@ -758,6 +935,18 @@ builder.mutationType({
         const readable = await getReadableTimetable(user.id, args.idOrSlug);
         if (!readable) notFound("Timetable not found");
         await markFeedSeen(user.id, readable.timetable.id);
+        return true;
+      },
+    }),
+
+    /** Resets the notifications badge (QA #59). */
+    markNotificationsSeen: t.boolean({
+      args: { idOrSlug: t.arg.string({ required: true }) },
+      resolve: async (_p, args, ctx) => {
+        const user = await requireUser(ctx);
+        const readable = await getReadableTimetable(user.id, args.idOrSlug);
+        if (!readable) notFound("Timetable not found");
+        await markNotificationsSeen(readable.timetable.id, user.id);
         return true;
       },
     }),
@@ -1202,6 +1391,9 @@ builder.mutationType({
         roleLabelElector: t.arg.string({ required: false }),
         themePrimary: t.arg.string({ required: false }),
         themeSecondary: t.arg.string({ required: false }),
+        /** Full theme object (QA #59) — JSON, validated server-side.
+         * Wins over the individual theme args when both are sent. */
+        themeJson: t.arg.string({ required: false }),
         coverImageUrl: t.arg.string({ required: false }),
         iconUrl: t.arg.string({ required: false }),
         digestNewTopics: t.arg.boolean({ required: false }),
@@ -1247,6 +1439,12 @@ builder.mutationType({
               ? { secondary: args.themeSecondary }
               : {}),
           };
+        }
+
+        if (args.themeJson != null) {
+          const parsed = parseThemeJson(args.themeJson);
+          if (!parsed) badRequest("Invalid theme");
+          patch.theme = parsed;
         }
 
         if (args.coverImageUrl != null) {

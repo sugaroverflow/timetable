@@ -6,46 +6,56 @@ import { useRouter } from "next/navigation";
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { useToast } from "@/components/Toast";
 import { clientGql } from "@/lib/clientGraphql";
-import { themeVars, type DigestSettings } from "@/lib/timetableSettings";
+import {
+  FONT_PAIRINGS,
+  themeVars,
+  type DigestSettings,
+  type ThemeSettings,
+} from "@/lib/timetableSettings";
 
-const MUTATION = `mutation Settings(
-  $s: String!, $ra: String, $rh: String, $re: String, $tp: String, $ts: String, $cover: String,
-  $icon: String, $dnt: Boolean, $dr: Boolean, $da: Boolean
-) {
+const MUTATION = `mutation Theme($s: String!, $theme: String, $cover: String, $icon: String) {
   updateTimetableSettings(
     idOrSlug: $s
-    roleLabelAdmin: $ra
-    roleLabelHost: $rh
-    roleLabelElector: $re
-    themePrimary: $tp
-    themeSecondary: $ts
+    themeJson: $theme
     coverImageUrl: $cover
     iconUrl: $icon
-    digestNewTopics: $dnt
-    digestReplies: $dr
-    digestActivity: $da
   ) { id }
 }`;
 
 export type SettingsValues = {
   roleLabels?: { admin?: string; host?: string; elector?: string };
-  theme?: { primary?: string; secondary?: string };
+  theme?: ThemeSettings;
   coverImageUrl?: string | null;
   iconUrl?: string | null;
   digestDefaults?: DigestSettings;
 };
 
-function applyThemeVars(primary: string, secondary: string) {
-  // The timetable shell (<main>) carries the saved theme as inline CSS vars,
-  // which shadow anything set on <html> — write the preview where it wins.
+function applyPreview(theme: ThemeSettings) {
+  // The timetable shell (<main>) carries inline CSS vars that shadow the
+  // theme <style> tag — write the preview where it wins. Preview reflects
+  // the viewer's current light/dark mode.
+  const mode =
+    document.documentElement.dataset.theme === "dark" ? "dark" : "light";
   const target =
     document.querySelector<HTMLElement>("main.container") ??
     document.documentElement;
-  for (const [name, value] of Object.entries(themeVars(primary, secondary))) {
+  // Clear earlier previews so removed values fall back to the stylesheet.
+  for (const name of Array.from(target.style)) {
+    if (name.startsWith("--")) target.style.removeProperty(name);
+  }
+  for (const [name, value] of Object.entries(themeVars(theme, mode))) {
     target.style.setProperty(name, value);
   }
 }
 
+const DARK_DEFAULTS = {
+  background: "#14171e",
+  topbar: "#1d222c",
+  text: "#e7eaf1",
+};
+
+/** Theme section of Settings (QA #59): every base colour, an optional dark
+ * palette, font pairing, cover image, and icon — with live preview. */
 export function SettingsForm({
   slug,
   current,
@@ -60,43 +70,84 @@ export function SettingsForm({
 
   // Single source for both the initial state and what Discard restores.
   const initial = {
-    admin: current.roleLabels?.admin ?? "Admin",
-    host: current.roleLabels?.host ?? "Host",
-    elector: current.roleLabels?.elector ?? "Elector",
     primary: current.theme?.primary ?? "#2f54eb",
     secondary: current.theme?.secondary ?? "#5b7bff",
+    background: current.theme?.background ?? "#eceef3",
+    topbar: current.theme?.topbar ?? "#ffffff",
+    text: current.theme?.text ?? "#1b2330",
+    font: current.theme?.font ?? "default",
+    darkBackground: current.theme?.dark?.background ?? DARK_DEFAULTS.background,
+    darkTopbar: current.theme?.dark?.topbar ?? DARK_DEFAULTS.topbar,
+    darkText: current.theme?.dark?.text ?? DARK_DEFAULTS.text,
     cover: current.coverImageUrl ?? "",
     icon: current.iconUrl ?? "",
-    digestTopics: current.digestDefaults?.digestNewTopics ?? false,
-    digestReplies: current.digestDefaults?.digestReplies ?? false,
-    digestActivity: current.digestDefaults?.digestActivity ?? false,
   };
 
-  const [admin, setAdmin] = useState(initial.admin);
-  const [host, setHost] = useState(initial.host);
-  const [elector, setElector] = useState(initial.elector);
   const [primary, setPrimary] = useState(initial.primary);
   const [secondary, setSecondary] = useState(initial.secondary);
+  const [background, setBackground] = useState(initial.background);
+  const [topbar, setTopbar] = useState(initial.topbar);
+  const [text, setText] = useState(initial.text);
+  const [font, setFont] = useState(initial.font);
+  const [darkBackground, setDarkBackground] = useState(initial.darkBackground);
+  const [darkTopbar, setDarkTopbar] = useState(initial.darkTopbar);
+  const [darkText, setDarkText] = useState(initial.darkText);
   const [cover, setCover] = useState(initial.cover);
   const [icon, setIcon] = useState(initial.icon);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [uploadingIcon, setUploadingIcon] = useState(false);
-  const [digestTopics, setDigestTopics] = useState(initial.digestTopics);
-  const [digestReplies, setDigestReplies] = useState(initial.digestReplies);
-  const [digestActivity, setDigestActivity] = useState(initial.digestActivity);
+
+  type State = typeof initial;
+
+  function toTheme(state: State): ThemeSettings {
+    return {
+      primary: state.primary,
+      secondary: state.secondary,
+      background: state.background,
+      topbar: state.topbar,
+      text: state.text,
+      font: state.font,
+      dark: {
+        background: state.darkBackground,
+        topbar: state.darkTopbar,
+        text: state.darkText,
+      },
+    };
+  }
+
+  function currentState(): State {
+    return {
+      primary,
+      secondary,
+      background,
+      topbar,
+      text,
+      font,
+      darkBackground,
+      darkTopbar,
+      darkText,
+      cover,
+      icon,
+    };
+  }
+
+  function preview(patch: Partial<State>) {
+    applyPreview(toTheme({ ...currentState(), ...patch }));
+  }
 
   function discard() {
-    setAdmin(initial.admin);
-    setHost(initial.host);
-    setElector(initial.elector);
     setPrimary(initial.primary);
     setSecondary(initial.secondary);
+    setBackground(initial.background);
+    setTopbar(initial.topbar);
+    setText(initial.text);
+    setFont(initial.font);
+    setDarkBackground(initial.darkBackground);
+    setDarkTopbar(initial.darkTopbar);
+    setDarkText(initial.darkText);
     setCover(initial.cover);
     setIcon(initial.icon);
-    setDigestTopics(initial.digestTopics);
-    setDigestReplies(initial.digestReplies);
-    setDigestActivity(initial.digestActivity);
-    applyThemeVars(initial.primary, initial.secondary);
+    applyPreview(toTheme(initial));
     setSaved(false);
   }
 
@@ -106,89 +157,88 @@ export function SettingsForm({
     try {
       await clientGql(MUTATION, {
         s: slug,
-        ra: admin,
-        rh: host,
-        re: elector,
-        tp: primary,
-        ts: secondary,
+        theme: JSON.stringify(toTheme(currentState())),
         cover: cover.trim() || null,
         icon: icon.trim() || null,
-        dnt: digestTopics,
-        dr: digestReplies,
-        da: digestActivity,
       });
       setSaved(true);
-      toast("Settings saved");
+      toast("Theme saved");
       startTransition(() => router.refresh());
     } catch (err) {
-      toastError(err instanceof Error ? err.message : "Could not save settings");
+      toastError(err instanceof Error ? err.message : "Could not save theme");
     }
   }
 
+  const colourField = (
+    id: string,
+    label: string,
+    value: string,
+    set: (v: string) => void,
+    previewKey: keyof State,
+  ) => (
+    <div className="field" style={{ marginBottom: 0 }}>
+      <label htmlFor={id}>{label}</label>
+      <input
+        id={id}
+        type="color"
+        value={value}
+        onChange={(e) => {
+          set(e.target.value);
+          preview({ [previewKey]: e.target.value });
+        }}
+        style={{ width: 64, padding: 2, height: 38 }}
+      />
+    </div>
+  );
+
   return (
     <form onSubmit={submit} className="card">
-      <h2 style={{ marginTop: 0, fontSize: 18 }}>Labels &amp; theme</h2>
-
-      <div className="field">
-        <label htmlFor="ra">Admin label</label>
-        <input
-          id="ra"
-          value={admin}
-          onChange={(e) => setAdmin(e.target.value)}
-        />
-      </div>
-      <div className="field">
-        <label htmlFor="rh">Host label</label>
-        <input id="rh" value={host} onChange={(e) => setHost(e.target.value)} />
-      </div>
-      <div className="field">
-        <label htmlFor="re">Elector label</label>
-        <input
-          id="re"
-          value={elector}
-          onChange={(e) => setElector(e.target.value)}
-        />
-      </div>
-
-      <p className="preview-roles">
-        A <b>{host || "Host"}</b> proposes topics; an{" "}
-        <b>{elector || "Elector"}</b> hearts and comments; an{" "}
-        <b>{admin || "Admin"}</b> moderates and runs settings.
+      <h2 style={{ marginTop: 0, fontSize: 18 }}>Theme</h2>
+      <p className="faint" style={{ marginTop: 0, fontSize: 12 }}>
+        Colours preview live — Save to keep them, Discard to revert.
       </p>
 
       <div className="row wrap">
-        <div className="field" style={{ marginBottom: 0 }}>
-          <label htmlFor="tp">Primary color</label>
-          <input
-            id="tp"
-            type="color"
-            value={primary}
-            onChange={(e) => {
-              setPrimary(e.target.value);
-              applyThemeVars(e.target.value, secondary);
-            }}
-            style={{ width: 64, padding: 2, height: 38 }}
-          />
-        </div>
-        <div className="field" style={{ marginBottom: 0 }}>
-          <label htmlFor="ts">Secondary color</label>
-          <input
-            id="ts"
-            type="color"
-            value={secondary}
-            onChange={(e) => {
-              setSecondary(e.target.value);
-              applyThemeVars(primary, e.target.value);
-            }}
-            style={{ width: 64, padding: 2, height: 38 }}
-          />
-        </div>
+        {colourField("tp", "Primary", primary, setPrimary, "primary")}
+        {colourField("ts", "Secondary", secondary, setSecondary, "secondary")}
+        {colourField("tb", "Background", background, setBackground, "background")}
+        {colourField("tt", "Top bar", topbar, setTopbar, "topbar")}
+        {colourField("tx", "Text", text, setText, "text")}
+      </div>
+
+      <div className="field" style={{ marginTop: 12 }}>
+        <label htmlFor="tf">Fonts</label>
+        <select
+          id="tf"
+          value={font}
+          onChange={(e) => {
+            setFont(e.target.value);
+            preview({ font: e.target.value });
+          }}
+        >
+          {Object.entries(FONT_PAIRINGS).map(([key, pairing]) => (
+            <option key={key} value={key}>
+              {pairing.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <h3 style={{ fontSize: 15, margin: "18px 0 2px" }}>Dark mode palette</h3>
+      <p className="faint" style={{ marginTop: 0, fontSize: 12 }}>
+        Used when a member switches to dark mode (toggle in the top bar).
+        Primary and secondary carry over automatically.
+      </p>
+      <div className="row wrap">
+        {colourField("db", "Background", darkBackground, setDarkBackground, "darkBackground")}
+        {colourField("dt", "Top bar", darkTopbar, setDarkTopbar, "darkTopbar")}
+        {colourField("dx", "Text", darkText, setDarkText, "darkText")}
       </div>
 
       <div style={{ marginTop: 12 }}>
         <ImageUploadField
           id="cover"
-          label="Cover image URL"
+          label="Cover image"
           value={cover}
           onChange={setCover}
           purpose="timetable-cover"
@@ -200,7 +250,7 @@ export function SettingsForm({
       <div style={{ marginTop: 12 }}>
         <ImageUploadField
           id="icon"
-          label="Icon URL (square, shown in the timetable menu)"
+          label="Icon (square, shown in the switcher and top bar)"
           value={icon}
           onChange={setIcon}
           purpose="timetable-icon"
@@ -209,52 +259,19 @@ export function SettingsForm({
         />
       </div>
 
-      <h3 style={{ fontSize: 15, margin: "18px 0 2px" }}>Default digest</h3>
-      <p className="faint" style={{ marginTop: 0, fontSize: 12 }}>
-        New members start with these. Each person can change their own from
-        their profile.
-      </p>
-      <label className="row" style={{ marginBottom: 8 }}>
-        <input
-          type="checkbox"
-          checked={digestTopics}
-          onChange={(e) => setDigestTopics(e.target.checked)}
-          style={{ width: "auto" }}
-        />
-        New topics
-      </label>
-      <label className="row" style={{ marginBottom: 8 }}>
-        <input
-          type="checkbox"
-          checked={digestReplies}
-          onChange={(e) => setDigestReplies(e.target.checked)}
-          style={{ width: "auto" }}
-        />
-        Replies to their comments
-      </label>
-      <label className="row" style={{ marginBottom: 12 }}>
-        <input
-          type="checkbox"
-          checked={digestActivity}
-          onChange={(e) => setDigestActivity(e.target.checked)}
-          style={{ width: "auto" }}
-        />
-        Activity on their topics (hosts)
-      </label>
-
       <div className="row" style={{ marginTop: 12 }}>
         <button
           className="btn btn-primary"
           type="submit"
           disabled={pending || uploadingCover || uploadingIcon}
         >
-          {uploadingCover
+          {uploadingCover || uploadingIcon
             ? "Uploading…"
             : pending
               ? "Saving…"
               : saved
                 ? "Saved"
-                : "Save settings"}
+                : "Save theme"}
         </button>
         <button
           className="btn btn-ghost"

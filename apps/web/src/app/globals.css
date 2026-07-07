@@ -26,6 +26,36 @@
   --sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --serif: "Fraunces", Georgia, serif;
   --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --wash: #f4f5f8;
+  --topbar: rgba(255, 255, 255, 0.92);
+}
+
+/* Built-in dark palette (QA #59). A timetable's theme may override these
+ * via its generated style tag; the toggle sets html[data-theme]. */
+html[data-theme="dark"] {
+  --bg: #14171e;
+  --card: #1d222c;
+  --ink: #e7eaf1;
+  --muted: #9aa4b4;
+  --faint: #6d7684;
+  --line: #2a303c;
+  --line-strong: #3a4252;
+  --primary-soft: #24304d;
+  --heart: #f16a84;
+  --green-soft: #1c2b21;
+  --host-wash: #262038;
+  --host-line: #453a68;
+  --host-ink: #ab99ea;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-pop: 0 8px 28px rgba(0, 0, 0, 0.5);
+  --wash: #262b35;
+  --topbar: rgba(29, 34, 44, 0.92);
+}
+html[data-theme="dark"] .pill-owner,
+html[data-theme="dark"] .pill-admin {
+  background: #3a2230;
+  color: #f0a3b8;
+  border-color: #5a3548;
 }
 
 * {
@@ -82,7 +112,7 @@ h3 {
   align-items: center;
   gap: 16px;
   padding: 12px 20px;
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--topbar);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--line);
 }
@@ -200,7 +230,7 @@ h3 {
   color: var(--ink);
 }
 .btn:hover {
-  background: #f6f7fa;
+  background: var(--wash);
   text-decoration: none;
 }
 .btn-primary {
@@ -240,7 +270,7 @@ select {
   padding: 9px 11px;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
-  background: #fff;
+  background: var(--card);
 }
 textarea {
   min-height: 80px;
@@ -262,7 +292,7 @@ textarea {
   background-size: cover;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background-color: #f6f7fa;
+  background-color: var(--wash);
 }
 .media-status {
   min-height: 20px;
@@ -284,7 +314,7 @@ textarea {
   font-weight: 600;
   border: 1px solid var(--line-strong);
   color: var(--muted);
-  background: #fff;
+  background: var(--card);
 }
 .pill-owner {
   background: #fdeef0;
@@ -339,6 +369,13 @@ textarea {
   flex-direction: column;
   gap: 8px;
 }
+/* Guard against min-content blowout from wide topic/comment content. */
+.shell-content {
+  min-width: 0;
+}
+.topic-body {
+  overflow-wrap: anywhere;
+}
 .sidebar-title {
   font-family: var(--serif);
   font-weight: 700;
@@ -356,6 +393,27 @@ textarea {
   border-top: 1px solid var(--line);
   padding-top: 12px;
 }
+.sidebar-bug-link {
+  font-size: 12px;
+  text-decoration: none;
+}
+.nav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--heart);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+.sidebar-bug-link:hover {
+  text-decoration: underline;
+}
 .sidebar-toggle {
   display: none;
   align-self: flex-start;
@@ -363,7 +421,10 @@ textarea {
 }
 @media (max-width: 860px) {
   .shell {
-    grid-template-columns: 1fr;
+    /* minmax(0, 1fr), not 1fr: a bare 1fr track's min-size is min-content,
+       so one long unbreakable string (URL in a comment, wide table) pushes
+       the whole column past the viewport and cards render cut off. */
+    grid-template-columns: minmax(0, 1fr);
     gap: 0;
   }
   .sidebar-toggle {
@@ -426,7 +487,7 @@ textarea {
   color: var(--ink);
 }
 .tt-menu-item:hover {
-  background: #f4f5f8;
+  background: var(--wash);
   text-decoration: none;
 }
 .tt-menu-new {
@@ -450,6 +511,58 @@ textarea {
   color: var(--primary, #557);
   font-size: 12px;
   font-weight: 700;
+}
+
+/* Sidebar timetable switcher (QA #59 — moved from topbar) */
+.tt-switcher {
+  position: relative;
+}
+.tt-switcher-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+.tt-switcher-trigger .tt-menu-name {
+  flex: 1;
+}
+.tt-switcher-hint {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--faint);
+}
+.tt-switcher-list {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 50;
+  min-width: 240px;
+  background: var(--card);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+}
+.tt-menu-item-current {
+  background: var(--primary-soft, #eef);
+}
+.tt-switcher-privacy {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--faint);
 }
 
 /* Bio popup (QA #42) */
@@ -558,7 +671,7 @@ textarea {
   padding: 12px 14px;
   font-size: 13px;
   color: var(--faint);
-  background: #fff;
+  background: var(--card);
 }
 
 .list {
@@ -586,6 +699,74 @@ textarea {
   width: 26px;
   height: 26px;
   font-size: 11px;
+}
+.avatar-lg {
+  width: 56px;
+  height: 56px;
+  font-size: 20px;
+}
+
+/* Rich text editor (QA #59 — TipTap) */
+.rte {
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+}
+.rte-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 6px;
+  border-bottom: 1px solid var(--line);
+}
+.rte-btn {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 6px;
+  min-width: 30px;
+  padding: 4px 7px;
+  font-size: 13px;
+}
+.rte-btn:hover {
+  background: var(--wash);
+}
+.rte-btn-active {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+.rte-content .tiptap {
+  padding: 10px 12px;
+  min-height: inherit;
+  outline: none;
+  font-size: 14px;
+}
+.rte-content .tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--faint);
+  pointer-events: none;
+  height: 0;
+}
+.rte-content .tiptap img {
+  max-width: 100%;
+}
+
+/* People page (QA #59) */
+.people-heading {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--faint);
+  margin: 10px 0 0;
+}
+.person-topics ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+}
+.person-topics li {
+  margin: 2px 0;
 }
 
 /* Topic card */
@@ -806,7 +987,7 @@ textarea {
   height: 30px;
   border-radius: 8px;
   border: 1px solid var(--line-strong);
-  background: #fff;
+  background: var(--card);
   font-size: 14px;
   display: grid;
   place-items: center;
@@ -890,7 +1071,7 @@ textarea {
   align-items: center;
   gap: 14px;
   padding: 10px 12px;
-  background: #fff;
+  background: var(--card);
   border: 1px solid var(--host-line);
   border-radius: 10px;
   margin-bottom: 10px;
@@ -1014,11 +1195,11 @@ textarea {
   text-align: left;
   cursor: pointer;
 }
-.slot-expand:hover { background: #f6f7fa; }
+.slot-expand:hover { background: var(--wash); }
 
 /* Host chat thread bubbles */
 .hc { display: flex; gap: 9px; padding: 7px 0; }
-.hc-bubble { background: #fff; border: 1px solid var(--host-line); border-radius: 11px; padding: 7px 11px; font-size: 13.5px; }
+.hc-bubble { background: var(--card); border: 1px solid var(--host-line); border-radius: 11px; padding: 7px 11px; font-size: 13.5px; }
 .hc-name { font-weight: 600; font-size: 12.5px; color: var(--host-ink); margin-bottom: 2px; }
 
 /* Small button variant */
@@ -1051,11 +1232,13 @@ textarea {
 .tl-item.act-hide::before { border-color: var(--red); }
 .tl-when { font-family: var(--mono); font-size: 11px; color: var(--faint); }
 .tl-text { font-size: 14px; margin-top: 2px; }
-.tl-note { margin-top: 6px; padding: 8px 11px; background: #f6f7fa; border: 1px solid var(--line); border-radius: 9px; font-size: 13px; color: #3a4350; }
+.tl-note { margin-top: 6px; padding: 8px 11px; background: var(--wash); border: 1px solid var(--line); border-radius: 9px; font-size: 13px; color: var(--muted); }
 .tl-note .tn-by { font-weight: 600; font-size: 12px; color: var(--muted); }
+.tl-week { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--faint); margin: 6px 0 10px; }
+.tl-day { font-size: 13px; font-weight: 600; color: var(--muted); margin: 2px 0 10px; }
 
 /* Moderation backstage banner */
-.backstage { background: #f1f2f6; border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 13px 15px; margin-bottom: 16px; font-size: 13px; color: var(--muted); display: flex; gap: 10px; align-items: center; }
+.backstage { background: var(--wash); border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 13px 15px; margin-bottom: 16px; font-size: 13px; color: var(--muted); display: flex; gap: 10px; align-items: center; }
 
 /* Topic card action bar */
 .card-actions { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-top: 1px solid var(--line); }
@@ -1097,7 +1280,7 @@ textarea {
   border: 1px solid var(--line-strong);
   border-radius: 9px;
   overflow: hidden;
-  background: #fff;
+  background: var(--card);
 }
 .avseg button {
   padding: 6px 12px;
@@ -1169,7 +1352,7 @@ textarea {
 .preview-roles {
   margin: 4px 0 14px;
   padding: 11px 13px;
-  background: #f6f7fa;
+  background: var(--wash);
   border: 1px solid var(--line);
   border-radius: 10px;
   font-size: 13px;

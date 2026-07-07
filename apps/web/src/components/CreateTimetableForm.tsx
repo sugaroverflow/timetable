@@ -1,6 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
+
+import { slugify } from "@timetable/shared";
 
 import {
   createTimetableAction,
@@ -14,6 +16,10 @@ export function CreateTimetableForm() {
     createTimetableAction,
     initialState,
   );
+  const [name, setName] = useState("");
+  const [slug, setSlug] = useState("");
+  const [slugTouched, setSlugTouched] = useState(false);
+  const effectiveSlug = slugTouched ? slug : name ? slugify(name) : "";
 
   return (
     <form action={action} className="card">
@@ -24,7 +30,34 @@ export function CreateTimetableForm() {
 
       <div className="field">
         <label htmlFor="name">Name</label>
-        <input id="name" name="name" required placeholder="Newspeak House 2026" />
+        <input
+          id="name"
+          name="name"
+          required
+          placeholder="Newspeak House 2026"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+      </div>
+
+      <div className="field">
+        <label htmlFor="slug">URL</label>
+        <input
+          id="slug"
+          name="slug"
+          placeholder={name ? slugify(name) : "auto-generated from the name"}
+          value={slugTouched ? slug : effectiveSlug}
+          onChange={(e) => {
+            setSlugTouched(true);
+            // Allow trailing hyphens while typing; full slugify happens server-side.
+            setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, "-"));
+          }}
+        />
+        <p className="faint" style={{ fontSize: 12, margin: "4px 0 0" }}>
+          {effectiveSlug
+            ? `Your timetable will live at /t/${effectiveSlug}`
+            : "Lowercase letters, numbers, and hyphens. Set once — it can't be changed later."}
+        </p>
       </div>
 
       <div className="field">

@@ -12,6 +12,8 @@ import {
 } from "@timetable/db";
 import type { AssignableRole, Role } from "@timetable/shared";
 
+import { logActivity } from "./activity";
+
 export type InviteOutcome = {
   email: string;
   status: "added" | "membership_updated" | "invited";
@@ -83,6 +85,14 @@ export async function inviteEmails(
   );
   const digestDefaults = await getDigestDefaults(timetableId);
 
+  const logInvite = (email: string) =>
+    logActivity({
+      timetableId,
+      actorId: invitedByUserId,
+      action: "member.invite",
+      payload: { invitedEmail: email, invitedRoles: roles },
+    });
+
   for (const email of uniqueEmails) {
     const [existingUser] = await db
       .select({ id: users.id })
@@ -110,6 +120,7 @@ export async function inviteEmails(
             updatedAt: new Date(),
           })
           .where(eq(timetableMemberships.id, membership.id));
+        await logInvite(email);
         outcomes.push({ email, status: "membership_updated" });
       } else {
         await db.insert(timetableMemberships).values({
@@ -120,6 +131,7 @@ export async function inviteEmails(
         if (digestDefaults) {
           await seedDigestDefaults(existingUser.id, digestDefaults);
         }
+        await logInvite(email);
         outcomes.push({ email, status: "added" });
       }
       continue;
@@ -150,6 +162,7 @@ export async function inviteEmails(
           expiresAt,
         },
       });
+    await logInvite(email);
     outcomes.push({ email, status: "invited" });
   }
 
@@ -212,6 +225,14 @@ export async function claimInvitesForUser(
       }
       const defaults = defaultsByTimetable.get(invite.timetableId);
       if (defaults) await seedDigestDefaults(userId, defaults);
+      // Claiming an invite is the user's first sign-in here (QA #59 —
+      // "logged in for the first time" on the activity log).
+      await logActivity({
+        timetableId: invite.timetableId,
+        actorId: userId,
+        action: "member.first_login",
+        payload: { invitedEmail: normalized },
+      });
     }
 
     await db

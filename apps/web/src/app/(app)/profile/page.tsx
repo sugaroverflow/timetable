@@ -37,10 +37,10 @@ export default async function ProfilePage() {
   return (
     <main className="container">
       <div className="page-head" style={{ marginBottom: 18 }}>
-        <h1>Your account</h1>
+        <h1>Profile</h1>
         <p>{data.me.email}</p>
       </div>
-      <div className="grid grid-2">
+      <div className="stack">
         <ProfileForm name={data.me.name} bio={data.me.bio} image={data.me.image} />
         <DigestSettingsForm current={digest} />
       </div>

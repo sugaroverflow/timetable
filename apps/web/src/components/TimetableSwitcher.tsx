@@ -4,13 +4,16 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-export type TimetableMenuItem = {
+import { privacyBadge } from "@/lib/timetableSettings";
+
+export type SwitcherItem = {
   slug: string;
   name: string;
   iconUrl: string | null;
+  privacy: string;
 };
 
-function ItemIcon({ item }: { item: TimetableMenuItem }) {
+function ItemIcon({ item }: { item: SwitcherItem }) {
   if (item.iconUrl) {
     // eslint-disable-next-line @next/next/no-img-element
     return <img className="tt-menu-icon" src={item.iconUrl} alt="" />;
@@ -23,17 +26,22 @@ function ItemIcon({ item }: { item: TimetableMenuItem }) {
 }
 
 /**
- * Airtable-style timetable switcher in the global topbar (QA #42). The
- * trigger shows the current timetable (doubling as "home" — it links back
- * to the feed); the menu lists every timetable and ends with "New
- * timetable". Selecting one always lands on its feed.
+ * Timetable switcher in the sidebar footer (QA #59 — moved out of the
+ * topbar, cf. the account switcher in Twitter's sidebar). Each entry shows
+ * the timetable's icon, name, and visibility; the menu opens upward and
+ * ends with "New timetable". Selecting one always lands on its feed.
  */
-export function TimetableMenu({ items }: { items: TimetableMenuItem[] }) {
+export function TimetableSwitcher({
+  items,
+  currentSlug,
+}: {
+  items: SwitcherItem[];
+  currentSlug: string;
+}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  const currentSlug = /^\/t\/([^/]+)/.exec(pathname ?? "")?.[1] ?? null;
   const current = items.find((i) => i.slug === currentSlug) ?? null;
 
   useEffect(() => {
@@ -61,57 +69,39 @@ export function TimetableMenu({ items }: { items: TimetableMenuItem[] }) {
   }
 
   return (
-    <div className="tt-menu" ref={rootRef}>
-      <button
-        type="button"
-        className="tt-menu-trigger"
-        aria-expanded={open}
-        aria-haspopup="menu"
-        onClick={() => setOpen((v) => !v)}
-      >
-        {current ? (
-          <>
-            <ItemIcon item={current} />
-            <span className="tt-menu-name">{current.name}</span>
-          </>
-        ) : (
-          <span className="tt-menu-name">Timetables</span>
-        )}
-        <span aria-hidden style={{ fontSize: 10 }}>
-          ▾
-        </span>
-      </button>
+    <div className="tt-switcher" ref={rootRef}>
       {open ? (
-        <div className="tt-menu-list" role="menu">
-          {current ? (
-            <Link
-              role="menuitem"
-              className="tt-menu-item"
-              href={`/t/${current.slug}/feed`}
-            >
-              <ItemIcon item={current} />
-              <span>
-                {current.name}
-                <span className="faint" style={{ display: "block", fontSize: 11 }}>
-                  Go to topic feed
-                </span>
-              </span>
-            </Link>
-          ) : null}
-          {items
-            .filter((i) => i.slug !== currentSlug)
-            .map((item) => (
+        <div className="tt-switcher-list" role="menu">
+          {items.map((item) => {
+            const privacy = privacyBadge(item.privacy);
+            return (
               <Link
                 key={item.slug}
                 role="menuitem"
-                className="tt-menu-item"
+                className={`tt-menu-item${
+                  item.slug === currentSlug ? " tt-menu-item-current" : ""
+                }`}
                 href={`/t/${item.slug}/feed`}
               >
                 <ItemIcon item={item} />
-                <span>{item.name}</span>
+                <span>
+                  {item.name}
+                  <span className="tt-switcher-privacy">
+                    <span
+                      className="privacy-dot"
+                      style={{ background: privacy.dot }}
+                    />
+                    {privacy.label}
+                  </span>
+                </span>
               </Link>
-            ))}
-          <Link role="menuitem" className="tt-menu-item tt-menu-new" href="/timetables/new">
+            );
+          })}
+          <Link
+            role="menuitem"
+            className="tt-menu-item tt-menu-new"
+            href="/timetables/new"
+          >
             <span className="tt-menu-icon tt-menu-icon-fallback" aria-hidden>
               ＋
             </span>
@@ -119,6 +109,22 @@ export function TimetableMenu({ items }: { items: TimetableMenuItem[] }) {
           </Link>
         </div>
       ) : null}
+      <button
+        type="button"
+        className="tt-switcher-trigger"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        onClick={() => setOpen((v) => !v)}
+      >
+        {current ? <ItemIcon item={current} /> : null}
+        <span className="tt-menu-name">
+          {current?.name ?? "Timetables"}
+          <span className="tt-switcher-hint">Switch timetable</span>
+        </span>
+        <span aria-hidden style={{ fontSize: 10 }}>
+          ⇅
+        </span>
+      </button>
     </div>
   );
 }

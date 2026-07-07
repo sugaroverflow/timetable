@@ -10,13 +10,22 @@ import { parseTimetableSettings, roleLabel } from "@/lib/timetableSettings";
 type Data = {
   timetable: { viewerRoles: string[]; settings: string } | null;
   moderationQueue: ManagedTopic[];
+  draftTopics: ManagedTopic[];
 };
+
+const COMMENT_FIELDS = `
+  id parentId authorId authorName authorImage body visibility hidden createdAt
+`;
 
 const QUERY = `
   query Moderation($s: String!) {
     timetable(idOrSlug: $s) { viewerRoles settings }
     moderationQueue(idOrSlug: $s) {
       id title slug hostSlug hostName status bodyMd bodyHtml coverImageUrl updatedAt feedback
+      hostOnlyComments { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} } } }
+    }
+    draftTopics(idOrSlug: $s) {
+      id title slug hostSlug hostName updatedAt
     }
   }
 `;
@@ -33,6 +42,7 @@ export default async function ModerationPage({
   );
   const settings = parseTimetableSettings(data.timetable?.settings);
   const adminLabel = roleLabel(settings.roleLabels, "admin");
+  const hostLabel = roleLabel(settings.roleLabels, "host");
 
   if (!isAdmin(roles)) {
     return <div className="notice">{adminLabel}s only.</div>;
@@ -42,13 +52,9 @@ export default async function ModerationPage({
     <div className="stack">
       <div className="page-head">
         <h2 style={{ fontSize: 18, margin: 0 }}>Pending topics</h2>
-        <p>Review submitted topics and publish, request changes, or reject.</p>
+        <p>Review submitted topics: publish, request changes, or edit.</p>
       </div>
-      <div className="backstage">
-        <span style={{ fontSize: 17 }}>🛠</span>
-        Backstage — actions here are logged to the activity log and visible to
-        all {adminLabel.toLowerCase()}s.
-      </div>
+      <h3 className="people-heading">Ready to publish</h3>
       {data.moderationQueue.length === 0 ? (
         <EmptyState
           icon="✓"
@@ -58,7 +64,37 @@ export default async function ModerationPage({
       ) : (
         <ul className="list">
           {data.moderationQueue.map((topic) => (
-            <ModerationCard key={topic.id} topic={topic} slug={slug} />
+            <ModerationCard
+              key={topic.id}
+              topic={topic}
+              slug={slug}
+              hostLabel={hostLabel}
+            />
+          ))}
+        </ul>
+      )}
+
+      {/* Every host's drafts, read-only — forgotten drafts stay visible
+       * (QA #59). */}
+      <h3 className="people-heading">Drafts</h3>
+      {data.draftTopics.length === 0 ? (
+        <p className="faint" style={{ fontSize: 13, margin: 0 }}>
+          No drafts right now.
+        </p>
+      ) : (
+        <ul className="list">
+          {data.draftTopics.map((topic) => (
+            <li key={topic.id} className="card">
+              <div className="row wrap" style={{ alignItems: "baseline" }}>
+                <strong>{topic.title}</strong>
+                <span className="faint" style={{ fontSize: 12 }}>
+                  {topic.hostName ?? hostLabel} · last edited{" "}
+                  {new Date(topic.updatedAt).toLocaleDateString()}
+                </span>
+                <span style={{ flex: 1 }} />
+                <span className="status-badge status-draft">draft</span>
+              </div>
+            </li>
           ))}
         </ul>
       )}

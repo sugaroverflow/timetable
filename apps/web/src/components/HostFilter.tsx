@@ -5,9 +5,11 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 export function HostFilter({
   value,
   hosts,
+  allLabel = "All hosts",
 }: {
   value: string;
   hosts: { id: string; name: string | null }[];
+  allLabel?: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -27,7 +29,7 @@ export function HostFilter({
       value={value}
       onChange={(e) => change(e.target.value)}
     >
-      <option value="">All hosts</option>
+      <option value="">{allLabel}</option>
       {hosts.map((h) => (
         <option key={h.id} value={h.id}>
           {h.name ?? "Host"}

@@ -9,6 +9,7 @@ import { clientGql } from "@/lib/clientGraphql";
 import { TopicEditForm } from "./TopicEditForm";
 
 const UNPUBLISH = `mutation($id: String!){ unpublishTopic(topicId: $id){ id } }`;
+const PUBLISH = `mutation($id: String!){ moderateTopic(topicId: $id, action: "publish"){ id } }`;
 const REASSIGN = `mutation($id: String!, $host: String!){ reassignTopic(topicId: $id, hostId: $host){ id } }`;
 
 export function AdminTopicActions({
@@ -23,6 +24,7 @@ export function AdminTopicActions({
     title: string;
     bodyMd: string;
     coverImageUrl: string | null;
+    status?: string;
   };
   slug: string;
   label?: string;
@@ -36,10 +38,12 @@ export function AdminTopicActions({
   const [editing, setEditing] = useState(false);
   const [newHost, setNewHost] = useState("");
 
-  async function unpublish() {
+  const published = topic.status == null || topic.status === "published";
+
+  async function togglePublished() {
     try {
-      await clientGql(UNPUBLISH, { id: topicId });
-      toast("Topic unpublished");
+      await clientGql(published ? UNPUBLISH : PUBLISH, { id: topicId });
+      toast(published ? "Topic unpublished" : "Topic published");
       startTransition(() => router.refresh());
     } catch (err) {
       toastError(err instanceof Error ? err.message : "Action failed");
@@ -80,9 +84,9 @@ export function AdminTopicActions({
           className="btn btn-ghost"
           type="button"
           disabled={pending}
-          onClick={unpublish}
+          onClick={togglePublished}
         >
-          Unpublish
+          {published ? "Unpublish" : "Publish"}
         </button>
         {reassignOptions.length > 0 ? (
           <>

@@ -13,9 +13,15 @@
   "dependencies": {
     "@clerk/nextjs": "^7.5.7",
     "@timetable/shared": "*",
+    "@tiptap/extension-image": "^2.27.2",
+    "@tiptap/extension-link": "^2.27.2",
+    "@tiptap/extension-placeholder": "^2.27.2",
+    "@tiptap/react": "^2.27.2",
+    "@tiptap/starter-kit": "^2.27.2",
     "next": "^16.2.9",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "tiptap-markdown": "^0.8.10"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.5",

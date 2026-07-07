@@ -2,45 +2,14 @@ import { notFound } from "next/navigation";
 
 import { isAdmin, type Role } from "@timetable/shared";
 
+import Link from "next/link";
+
 import { HeartsCutoffForm } from "@/components/HeartsCutoffForm";
 import { InviteForm } from "@/components/InviteForm";
-import { MemberRolesPicker } from "@/components/MemberRolesPicker";
 import { SettingsForm, type SettingsValues } from "@/components/SettingsForm";
 import { TimetableProfileForm } from "@/components/TimetableProfileForm";
 import { gqlFetch } from "@/lib/graphql";
 import { displayRolesFromCookies } from "@/lib/previewRoles.server";
-
-type Data = {
-  timetable: {
-    id: string;
-    name: string;
-    viewerRoles: string[];
-  } | null;
-  timetableMembers: {
-    membershipId: string;
-    userId: string;
-    roles: string[];
-    name: string | null;
-    email: string | null;
-  }[];
-};
-
-const QUERY = `
-  query Settings($idOrSlug: String!, $timetableId: String!) {
-    timetable(idOrSlug: $idOrSlug) {
-      id
-      name
-      viewerRoles
-    }
-    timetableMembers(timetableId: $timetableId) {
-      membershipId
-      userId
-      roles
-      name
-      email
-    }
-  }
-`;
 
 export default async function SettingsPage({
   params,
@@ -84,11 +53,6 @@ export default async function SettingsPage({
     settings = {};
   }
 
-  const data = await gqlFetch<Data>(QUERY, {
-    idOrSlug: slug,
-    timetableId: first.timetable.id,
-  });
-
   return (
     <div className="stack">
       <div className="grid grid-2">
@@ -98,6 +62,8 @@ export default async function SettingsPage({
           description={first.timetable.description}
           privacy={first.timetable.privacy}
           customDomain={first.timetable.customDomain}
+          roleLabels={settings.roleLabels}
+          digestDefaults={settings.digestDefaults}
         />
         <SettingsForm slug={slug} current={settings} />
       </div>
@@ -110,13 +76,11 @@ export default async function SettingsPage({
         <div className="stack">
           <div className="page-head">
             <h2 style={{ fontSize: 18, margin: 0 }}>Members</h2>
-            <p>Select a member to edit their roles.</p>
+            <p>
+              Roles and bios are edited from the{" "}
+              <Link href={`/t/${slug}/people`}>People page</Link>.
+            </p>
           </div>
-          <MemberRolesPicker
-            slug={slug}
-            members={data.timetableMembers}
-            roleLabels={settings.roleLabels}
-          />
         </div>
       </div>
     </div>
