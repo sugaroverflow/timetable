@@ -356,6 +356,13 @@ textarea {
   border-top: 1px solid var(--line);
   padding-top: 12px;
 }
+.sidebar-bug-link {
+  font-size: 12px;
+  text-decoration: none;
+}
+.sidebar-bug-link:hover {
+  text-decoration: underline;
+}
 .sidebar-toggle {
   display: none;
   align-self: flex-start;

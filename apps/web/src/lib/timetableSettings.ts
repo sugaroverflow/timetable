@@ -30,6 +30,12 @@ export function parseTimetableSettings(raw: string | null | undefined) {
   }
 }
 
+/** Naive plural for role labels: collective nouns like "Faculty" (and
+ * labels already ending in s) stay as-is, everything else gets an "s". */
+export function pluralLabel(label: string): string {
+  return /[sxy]$/i.test(label) ? label : `${label}s`;
+}
+
 export function roleLabel(
   labels: RoleLabels | undefined,
   role: string,

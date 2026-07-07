@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { Avatar } from "@/components/Avatar";
+import { HostOnlyPanel } from "@/components/HostOnlyPanel";
 import { useToast } from "@/components/Toast";
 import { TopicEditForm } from "@/components/TopicEditForm";
 import { clientGql } from "@/lib/clientGraphql";
@@ -15,7 +16,15 @@ const MUTATION = `mutation Moderate($id: String!, $action: String!, $note: Strin
   moderateTopic(topicId: $id, action: $action, note: $note) { id status }
 }`;
 
-export function ModerationCard({ topic, slug }: { topic: ManagedTopic; slug: string }) {
+export function ModerationCard({
+  topic,
+  slug,
+  hostLabel = "Host",
+}: {
+  topic: ManagedTopic;
+  slug: string;
+  hostLabel?: string;
+}) {
   const router = useRouter();
   const { toast, toastError } = useToast();
   const [pending, startTransition] = useTransition();
@@ -23,7 +32,7 @@ export function ModerationCard({ topic, slug }: { topic: ManagedTopic; slug: str
   const [showNote, setShowNote] = useState(false);
   const [editing, setEditing] = useState(false);
 
-  async function act(action: "publish" | "reject" | "request_changes") {
+  async function act(action: "publish" | "request_changes") {
     if (action === "request_changes" && !note.trim()) {
       setShowNote(true);
       return;
@@ -39,9 +48,7 @@ export function ModerationCard({ topic, slug }: { topic: ManagedTopic; slug: str
       toast(
         action === "publish"
           ? "Topic published"
-          : action === "reject"
-            ? "Topic rejected"
-            : "Feedback sent to host",
+          : `Feedback sent to ${hostLabel.toLowerCase()}`,
       );
       startTransition(() => router.refresh());
     } catch (err) {
@@ -78,7 +85,7 @@ export function ModerationCard({ topic, slug }: { topic: ManagedTopic; slug: str
       {topic.feedback ? (
         <div className="mod-feedback-box">
           <div className="mfb-head">↩ Changes requested</div>
-          <div>Admin feedback: &ldquo;{topic.feedback}&rdquo;</div>
+          <div>&ldquo;{topic.feedback}&rdquo;</div>
         </div>
       ) : null}
       {topic.coverImageUrl ? (
@@ -92,6 +99,15 @@ export function ModerationCard({ topic, slug }: { topic: ManagedTopic; slug: str
         className="topic-body"
         dangerouslySetInnerHTML={{ __html: topic.bodyHtml }}
       />
+      {(topic.hostOnlyComments?.length ?? 0) > 0 ? (
+        <HostOnlyPanel
+          topicId={topic.id}
+          comments={topic.hostOnlyComments ?? []}
+          canModerate={true}
+          slug={slug}
+          hostLabel={hostLabel}
+        />
+      ) : null}
       <div className="row wrap">
         <button
           className="btn btn-primary"
@@ -116,14 +132,6 @@ export function ModerationCard({ topic, slug }: { topic: ManagedTopic; slug: str
           onClick={() => setEditing((v) => !v)}
         >
           {editing ? "Cancel edit" : "Edit"}
-        </button>
-        <button
-          className="btn btn-ghost"
-          type="button"
-          disabled={pending}
-          onClick={() => act("reject")}
-        >
-          Reject
         </button>
       </div>
       {editing ? (

@@ -12,7 +12,7 @@ import {
   isTopicNew,
   normalizeFeedSort,
 } from "@/lib/feedPage";
-import { roleLabel } from "@/lib/timetableSettings";
+import { pluralLabel, roleLabel } from "@/lib/timetableSettings";
 
 import { loadMoreFeed } from "./actions";
 
@@ -50,7 +50,11 @@ export default async function FeedPage({
         <label htmlFor="sort">Sort</label>
         <FeedSortControl value={sort} />
         {page.hosts.length > 0 ? (
-          <HostFilter value={host} hosts={page.hosts} />
+          <HostFilter
+            value={host}
+            hosts={page.hosts}
+            allLabel={`All ${pluralLabel(hostLabel)}`}
+          />
         ) : null}
       </div>
 
@@ -71,7 +75,7 @@ export default async function FeedPage({
         <EmptyState
           icon="◇"
           title="No published topics yet"
-          hint={`${hostLabel}s draft and submit topics from My Topics; ${adminLabel.toLowerCase()}s publish them from Pending Topics.`}
+          hint={`${pluralLabel(hostLabel)} draft and submit topics from My Topics; ${pluralLabel(adminLabel).toLowerCase()} publish them from Pending Topics.`}
         />
       ) : (
         <InfiniteFeed

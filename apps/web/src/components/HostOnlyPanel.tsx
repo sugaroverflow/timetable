@@ -21,11 +21,13 @@ export function HostOnlyPanel({
   comments,
   canModerate,
   slug,
+  hostLabel = "Host",
 }: {
   topicId: string;
   comments: FeedComment[];
   canModerate: boolean;
   slug?: string;
+  hostLabel?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const count = countNested(comments);
@@ -38,8 +40,8 @@ export function HostOnlyPanel({
         aria-expanded={expanded}
       >
         {expanded
-          ? "Hide host-only comments ▾"
-          : `🔒 Host-only comments (${count}) ▸`}
+          ? `Hide ${hostLabel}-only comments ▾`
+          : `🔒 ${hostLabel}-only comments (${count}) ▸`}
       </button>
       {expanded && (
         <div className="host-thread">
@@ -49,7 +51,11 @@ export function HostOnlyPanel({
             canModerate={canModerate}
             slug={slug}
           />
-          <CommentComposer topicId={topicId} visibility="host_only" />
+          <CommentComposer
+            topicId={topicId}
+            visibility="host_only"
+            hostLabel={hostLabel}
+          />
         </div>
       )}
     </div>

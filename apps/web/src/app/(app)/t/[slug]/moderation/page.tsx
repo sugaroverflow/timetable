@@ -12,11 +12,16 @@ type Data = {
   moderationQueue: ManagedTopic[];
 };
 
+const COMMENT_FIELDS = `
+  id parentId authorId authorName authorImage body visibility hidden createdAt
+`;
+
 const QUERY = `
   query Moderation($s: String!) {
     timetable(idOrSlug: $s) { viewerRoles settings }
     moderationQueue(idOrSlug: $s) {
       id title slug hostSlug hostName status bodyMd bodyHtml coverImageUrl updatedAt feedback
+      hostOnlyComments { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} } } }
     }
   }
 `;
@@ -33,6 +38,7 @@ export default async function ModerationPage({
   );
   const settings = parseTimetableSettings(data.timetable?.settings);
   const adminLabel = roleLabel(settings.roleLabels, "admin");
+  const hostLabel = roleLabel(settings.roleLabels, "host");
 
   if (!isAdmin(roles)) {
     return <div className="notice">{adminLabel}s only.</div>;
@@ -44,11 +50,6 @@ export default async function ModerationPage({
         <h2 style={{ fontSize: 18, margin: 0 }}>Pending topics</h2>
         <p>Review submitted topics and publish, request changes, or reject.</p>
       </div>
-      <div className="backstage">
-        <span style={{ fontSize: 17 }}>🛠</span>
-        Backstage — actions here are logged to the activity log and visible to
-        all {adminLabel.toLowerCase()}s.
-      </div>
       {data.moderationQueue.length === 0 ? (
         <EmptyState
           icon="✓"
@@ -58,7 +59,12 @@ export default async function ModerationPage({
       ) : (
         <ul className="list">
           {data.moderationQueue.map((topic) => (
-            <ModerationCard key={topic.id} topic={topic} slug={slug} />
+            <ModerationCard
+              key={topic.id}
+              topic={topic}
+              slug={slug}
+              hostLabel={hostLabel}
+            />
           ))}
         </ul>
       )}

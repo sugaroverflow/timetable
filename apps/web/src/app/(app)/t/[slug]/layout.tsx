@@ -141,6 +141,15 @@ export default async function TimetableLayout({
               />
             </div>
           ) : null}
+
+          <a
+            className="sidebar-bug-link faint"
+            href="https://github.com/sugaroverflow/timetable/issues/new"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            ⚑ Report a bug
+          </a>
         </Sidebar>
 
         <div className="shell-content">

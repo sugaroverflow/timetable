@@ -15,9 +15,11 @@ const MUTATION = `mutation AddComment($id: String!, $body: String!, $visibility:
 export function CommentComposer({
   topicId,
   visibility = "public",
+  hostLabel = "Host",
 }: {
   topicId: string;
   visibility?: "public" | "host_only";
+  hostLabel?: string;
 }) {
   const router = useRouter();
   const { toast, toastError } = useToast();
@@ -32,7 +34,7 @@ export function CommentComposer({
     try {
       await clientGql(MUTATION, { id: topicId, body: text, visibility });
       setBody("");
-      toast(hostOnly ? "Host-only note added" : "Comment added");
+      toast(hostOnly ? `${hostLabel}-only note added` : "Comment added");
       startTransition(() => router.refresh());
     } catch (err) {
       toastError(err instanceof Error ? err.message : "Could not post comment");
@@ -44,8 +46,10 @@ export function CommentComposer({
       <textarea
         value={body}
         onChange={(e) => setBody(e.target.value)}
-        placeholder={hostOnly ? "Add a host-only note…" : "Add a comment…"}
-        aria-label={hostOnly ? "Host-only comment" : "Comment"}
+        placeholder={
+          hostOnly ? `Add a ${hostLabel}-only note…` : "Add a comment…"
+        }
+        aria-label={hostOnly ? `${hostLabel}-only comment` : "Comment"}
         data-topic-composer={hostOnly ? undefined : topicId}
       />
       <button className="btn btn-primary" type="submit" disabled={pending}>

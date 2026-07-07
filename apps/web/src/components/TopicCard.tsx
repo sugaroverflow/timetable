@@ -146,6 +146,7 @@ export function TopicCard({
           comments={hostComments}
           canModerate={perms.canModerate}
           slug={slug}
+          hostLabel={hostLabel}
         />
       ) : null}
 
@@ -170,6 +171,7 @@ export function TopicCard({
             title: topic.title,
             bodyMd: topic.bodyMd,
             coverImageUrl: topic.coverImageUrl,
+            status: topic.status,
           }}
           slug={slug}
           label={adminLabel}
