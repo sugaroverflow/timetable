@@ -20,6 +20,8 @@ export type TimetableSettings = {
   roleLabels?: { admin?: string; host?: string; elector?: string };
   theme?: { primary?: string; secondary?: string };
   coverImageUrl?: string | null;
+  /** Small square icon shown in the topbar timetable menu. */
+  iconUrl?: string | null;
   /** Digest settings seeded onto new members who haven't customized theirs. */
   digestDefaults?: NotificationSettings;
 };

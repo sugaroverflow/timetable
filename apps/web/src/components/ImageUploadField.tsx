@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 
 import { clientApi } from "@/lib/clientApi";
 
-type UploadPurpose = "profile-image" | "topic-cover" | "timetable-cover";
+type UploadPurpose = "profile-image" | "topic-cover" | "timetable-cover" | "timetable-icon";
 
 type SignedUpload = {
   publicUrl: string;

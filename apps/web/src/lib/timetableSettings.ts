@@ -17,6 +17,7 @@ export type TimetableSettings = {
   roleLabels?: RoleLabels;
   theme?: { primary?: string; secondary?: string };
   coverImageUrl?: string | null;
+  iconUrl?: string | null;
   digestDefaults?: DigestSettings;
 };
 

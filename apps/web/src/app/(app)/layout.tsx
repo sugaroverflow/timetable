@@ -3,7 +3,22 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import Image from "next/image";
 import Link from "next/link";
 
+import { TimetableMenu, type TimetableMenuItem } from "@/components/TimetableMenu";
 import { ToastProvider } from "@/components/Toast";
+import { gqlFetch } from "@/lib/graphql";
+import { parseTimetableSettings } from "@/lib/timetableSettings";
+
+type MenuData = {
+  myTimetables: { timetable: { slug: string; name: string; settings: string } }[];
+};
+
+const MENU_QUERY = `
+  query TopbarMenu {
+    myTimetables {
+      timetable { slug name settings }
+    }
+  }
+`;
 
 export default async function AppLayout({
   children,
@@ -15,6 +30,16 @@ export default async function AppLayout({
   const { userId } = await auth();
   const user = userId ? await currentUser() : null;
   const email = user?.primaryEmailAddress?.emailAddress ?? null;
+
+  let menuItems: TimetableMenuItem[] = [];
+  if (userId) {
+    const data = await gqlFetch<MenuData>(MENU_QUERY);
+    menuItems = data.myTimetables.map((m) => ({
+      slug: m.timetable.slug,
+      name: m.timetable.name,
+      iconUrl: parseTimetableSettings(m.timetable.settings).iconUrl ?? null,
+    }));
+  }
 
   return (
     <ToastProvider>
@@ -30,6 +55,7 @@ export default async function AppLayout({
           />
           <span>Timetable</span>
         </Link>
+        {userId ? <TimetableMenu items={menuItems} /> : null}
         <div className="spacer" />
         {userId ? (
           <>

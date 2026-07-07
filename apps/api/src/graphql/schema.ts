@@ -21,6 +21,7 @@ import {
   getSlotById,
   getTimetableById,
   getFeedLastSeen,
+  getLastVisitedTimetableSlug,
   getOrCreateUserSlug,
   getTimetableByDomain,
   getTopicById,
@@ -409,6 +410,14 @@ builder.queryType({
           ctx.user?.id ?? null,
           args.timetableId,
         )) as string[],
+    }),
+
+    /** Slug of the timetable the viewer last engaged with (for the
+     * signed-in landing redirect and brand link). */
+    myLastVisitedTimetableSlug: t.string({
+      nullable: true,
+      resolve: async (_p, _args, ctx) =>
+        ctx.user ? getLastVisitedTimetableSlug(ctx.user.id) : null,
     }),
 
     /** The viewer's feed watermark for the "new since last visit"
@@ -1068,6 +1077,7 @@ builder.mutationType({
         themePrimary: t.arg.string({ required: false }),
         themeSecondary: t.arg.string({ required: false }),
         coverImageUrl: t.arg.string({ required: false }),
+        iconUrl: t.arg.string({ required: false }),
         digestNewTopics: t.arg.boolean({ required: false }),
         digestReplies: t.arg.boolean({ required: false }),
         digestActivity: t.arg.boolean({ required: false }),
@@ -1115,6 +1125,10 @@ builder.mutationType({
 
         if (args.coverImageUrl != null) {
           patch.coverImageUrl = args.coverImageUrl.trim() || null;
+        }
+
+        if (args.iconUrl != null) {
+          patch.iconUrl = args.iconUrl.trim() || null;
         }
 
         if (
