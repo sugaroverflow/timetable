@@ -71,9 +71,15 @@ export type ActivityEvent = {
   note: string | null;
   actorId: string | null;
   actorName: string | null;
+  actorImage: string | null;
+  actorRoles: string[];
   createdAt: string;
   topicTitle: string | null;
   topicSlug: string | null;
   topicHostSlug: string | null;
+  topicHostName: string | null;
   snippet: string | null;
+  commentId: string | null;
+  invitedEmail: string | null;
+  invitedRoles: string[];
 };

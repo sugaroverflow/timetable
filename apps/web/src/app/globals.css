@@ -1134,6 +1134,8 @@ textarea {
 .tl-text { font-size: 14px; margin-top: 2px; }
 .tl-note { margin-top: 6px; padding: 8px 11px; background: #f6f7fa; border: 1px solid var(--line); border-radius: 9px; font-size: 13px; color: #3a4350; }
 .tl-note .tn-by { font-weight: 600; font-size: 12px; color: var(--muted); }
+.tl-week { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--faint); margin: 6px 0 10px; }
+.tl-day { font-size: 13px; font-weight: 600; color: var(--muted); margin: 2px 0 10px; }
 
 /* Moderation backstage banner */
 .backstage { background: #f1f2f6; border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 13px 15px; margin-bottom: 16px; font-size: 13px; color: var(--muted); display: flex; gap: 10px; align-items: center; }

@@ -385,6 +385,8 @@ const ActivityType = builder.objectRef<ActivityEntry>("ActivityEvent").implement
     note: t.exposeString("note", { nullable: true }),
     actorId: t.exposeString("actorId", { nullable: true }),
     actorName: t.exposeString("actorName", { nullable: true }),
+    actorImage: t.exposeString("actorImage", { nullable: true }),
+    actorRoles: t.exposeStringList("actorRoles"),
     createdAt: t.string({ resolve: (a) => a.createdAt.toISOString() }),
     // Enrichment (QA #42): which topic the event refers to, and what was
     // said/done — all sourced from the event payload + a slug join.
@@ -394,9 +396,23 @@ const ActivityType = builder.objectRef<ActivityEntry>("ActivityEvent").implement
     }),
     topicSlug: t.exposeString("topicSlug", { nullable: true }),
     topicHostSlug: t.exposeString("topicHostSlug", { nullable: true }),
+    topicHostName: t.exposeString("topicHostName", { nullable: true }),
     snippet: t.string({
       nullable: true,
       resolve: (a) => (a.payload["snippet"] as string | undefined) ?? null,
+    }),
+    /** For comment events: anchors the timeline link to the comment. */
+    commentId: t.string({
+      nullable: true,
+      resolve: (a) => (a.payload["commentId"] as string | undefined) ?? null,
+    }),
+    /** For member.invite events (QA #59). */
+    invitedEmail: t.string({
+      nullable: true,
+      resolve: (a) => (a.payload["invitedEmail"] as string | undefined) ?? null,
+    }),
+    invitedRoles: t.stringList({
+      resolve: (a) => (a.payload["invitedRoles"] as string[] | undefined) ?? [],
     }),
   }),
 });
@@ -654,6 +670,8 @@ builder.queryType({
       args: {
         idOrSlug: t.arg.string({ required: true }),
         actorId: t.arg.string({ required: false }),
+        from: t.arg.string({ required: false }),
+        to: t.arg.string({ required: false }),
       },
       resolve: async (_p, args, ctx) => {
         const readable = await getReadableTimetable(
@@ -663,8 +681,18 @@ builder.queryType({
         if (!readable) return [];
         const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
         if (!canModerate(viewer)) return [];
+        const parseDay = (value: string | null | undefined, endOfDay: boolean) => {
+          if (!value) return undefined;
+          const parsed = Date.parse(value);
+          if (Number.isNaN(parsed)) return undefined;
+          const date = new Date(parsed);
+          if (endOfDay) date.setUTCHours(23, 59, 59, 999);
+          return date;
+        };
         return listActivity(readable.timetable.id, {
           actorId: args.actorId ?? undefined,
+          from: parseDay(args.from, false),
+          to: parseDay(args.to, true),
         });
       },
     }),
