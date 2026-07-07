@@ -64,6 +64,13 @@
       "when": 1783381557528,
       "tag": "0008_moaning_scalphunter",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1783382550371,
+      "tag": "0009_aspiring_zombie",
+      "breakpoints": true
     }
   ]
 }

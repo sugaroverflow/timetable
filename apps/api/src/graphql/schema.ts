@@ -5,7 +5,6 @@ import {
   addComment,
   addReply,
   addSlotComment,
-  archiveTopicHearts,
   buildCalendar,
   buildFeed,
   claimInvitesForUser,
@@ -44,6 +43,7 @@ import {
   reassignTopic,
   setAvailability,
   setCommentHidden,
+  setHeartsCountFrom,
   setWeekdayAvailability,
   submitTopic,
   tagSlotTopic,
@@ -162,6 +162,10 @@ const TimetableType = builder.objectRef<GqlTimetable>("Timetable").implement({
     description: t.exposeString("description", { nullable: true }),
     privacy: t.exposeString("privacy"),
     customDomain: t.exposeString("customDomain", { nullable: true }),
+    heartsCountFrom: t.string({
+      nullable: true,
+      resolve: (tt) => tt.heartsCountFrom?.toISOString() ?? null,
+    }),
     viewerRoles: t.exposeStringList("viewerRoles"),
     settings: t.field({
       type: "String",
@@ -1021,16 +1025,35 @@ builder.mutationType({
       },
     }),
 
-    /** Admin: archive (reset) all hearts on a topic. */
-    archiveTopicHearts: t.field({
-      type: ManagedTopicType,
-      args: { topicId: t.arg.string({ required: true }) },
+    /** Admin: set (or clear, with null) the timetable's heart-count cutoff —
+     * hearts created before it stop counting everywhere. Replaces the old
+     * per-topic "archive hearts" reset (QA #42). */
+    setHeartsCountFrom: t.field({
+      type: TimetableType,
+      args: {
+        idOrSlug: t.arg.string({ required: true }),
+        countFrom: t.arg.string({ required: false }),
+      },
       resolve: async (_p, args, ctx) => {
         const user = await requireUser(ctx);
-        const { topic, viewer } = await loadTopicAndViewer(ctx, args.topicId);
+        const readable = await getReadableTimetable(user.id, args.idOrSlug);
+        if (!readable) notFound("Timetable not found");
+        const viewer = { userId: user.id, roles: readable.roles };
         if (!canModerate(viewer)) forbidden("Admins only");
-        await archiveTopicHearts(topic, user.id);
-        return (await getTopicById(topic.id)) ?? topic;
+        let countFrom: Date | null = null;
+        if (args.countFrom) {
+          countFrom = new Date(args.countFrom);
+          if (Number.isNaN(countFrom.getTime())) {
+            throw new GraphQLError("countFrom must be an ISO date-time");
+          }
+        }
+        await setHeartsCountFrom(readable.timetable.id, countFrom, user.id);
+        const updated = await getReadableTimetable(user.id, args.idOrSlug);
+        if (!updated) notFound("Timetable not found");
+        return {
+          ...updated.timetable,
+          viewerRoles: updated.roles as string[],
+        };
       },
     }),
 
@@ -1488,6 +1511,10 @@ const TopicLeaderboardEntryType = builder
       hostSlug: t.exposeString("hostSlug", { nullable: true }),
       weightedScore: t.exposeFloat("weightedScore"),
       heartCount: t.exposeInt("heartCount"),
+      lastHeartAt: t.string({
+        nullable: true,
+        resolve: (e) => e.lastHeartAt?.toISOString() ?? null,
+      }),
     }),
   });
 

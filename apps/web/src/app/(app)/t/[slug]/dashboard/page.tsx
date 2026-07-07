@@ -37,6 +37,7 @@ type Dashboard = {
     hostSlug: string | null;
     weightedScore: number;
     heartCount: number;
+    lastHeartAt: string | null;
   }[];
   hostLeaderboard: {
     hostId: string;
@@ -78,7 +79,7 @@ const QUERY = `
     dashboard(idOrSlug: $s, hostId: $host, electorActivity: $activity) {
       totalHearts electorCount hostCount slotCount
       topicCounts { draft submitted published unpublished archived }
-      topicLeaderboard { id title slug hostName hostSlug weightedScore heartCount }
+      topicLeaderboard { id title slug hostName hostSlug weightedScore heartCount lastHeartAt }
       hostLeaderboard { hostId hostName weightedScore }
       electorActivity {
         electorId electorName heartCount commentCount availabilityCount
@@ -187,7 +188,14 @@ export default async function DashboardPage({
                     })()}{" "}
                     <span className="faint">· {t.hostName ?? "Host"}</span>
                   </span>
-                  <span className="mono">{t.weightedScore.toFixed(2)}</span>
+                  <span className="mono" style={{ textAlign: "right" }}>
+                    {t.weightedScore.toFixed(2)}
+                    {t.lastHeartAt ? (
+                      <span className="faint" style={{ display: "block", fontSize: 11 }}>
+                        last ♥ {new Date(t.lastHeartAt).toLocaleDateString()}
+                      </span>
+                    ) : null}
+                  </span>
                 </li>
               ))}
             </ul>

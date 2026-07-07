@@ -35,6 +35,9 @@ export const timetables = pgTable("timetables", {
     .$type<TimetableSettings>()
     .notNull()
     .default({}),
+  // Heart-count cutoff (QA #42): hearts created before this timestamp are
+  // ignored wherever counts/weights are computed. Null = count everything.
+  heartsCountFrom: timestamp({ withTimezone: true }),
   ownerId: text()
     .notNull()
     .references(() => users.id, { onDelete: "restrict" }),

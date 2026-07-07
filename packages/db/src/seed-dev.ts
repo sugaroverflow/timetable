@@ -851,20 +851,18 @@ function buildRows(fixture: Fixture): {
     ownerId,
   );
 
+  // Hearts on archived topics simply don't count (the topic isn't
+  // published); the old per-row archivedAt marking is gone — "archiving"
+  // is now the timetable-level heartsCountFrom cutoff.
   const heartRows: NewHeart[] = [];
   let heartIndex = 0;
   for (const row of fixture.hearts) {
-    const topic = fixture.topics.find((candidate) => candidate.label === row.topic);
-    const archivedAt =
-      topic?.status === "archived" ? new Date("2026-05-03T12:00:00.000Z") : null;
-
     for (const personLabel of row.people) {
       heartRows.push({
         id: stableUuid("heart", `${row.topic}:${personLabel}`),
         topicId: topicIds.get(row.topic) ?? "",
         userId: userIds.get(personLabel) ?? "",
         createdAt: addMinutes(HEART_TIME, heartIndex),
-        archivedAt,
       });
       heartIndex += 1;
     }

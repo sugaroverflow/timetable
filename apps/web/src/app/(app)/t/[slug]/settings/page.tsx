@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { isAdmin, type Role } from "@timetable/shared";
 
+import { HeartsCutoffForm } from "@/components/HeartsCutoffForm";
 import { InviteForm } from "@/components/InviteForm";
 import { MemberRolesPicker } from "@/components/MemberRolesPicker";
 import { SettingsForm, type SettingsValues } from "@/components/SettingsForm";
@@ -55,12 +56,13 @@ export default async function SettingsPage({
           description: string | null;
           privacy: string;
           customDomain: string | null;
+          heartsCountFrom: string | null;
           viewerRoles: string[];
           settings: string;
         }
       | null;
   }>(
-    `query($idOrSlug: String!) { timetable(idOrSlug: $idOrSlug) { id name description privacy customDomain viewerRoles settings } }`,
+    `query($idOrSlug: String!) { timetable(idOrSlug: $idOrSlug) { id name description privacy customDomain heartsCountFrom viewerRoles settings } }`,
     { idOrSlug: slug },
   );
   if (!first.timetable) notFound();
@@ -97,6 +99,8 @@ export default async function SettingsPage({
         />
         <SettingsForm slug={slug} current={settings} />
       </div>
+
+      <HeartsCutoffForm slug={slug} current={first.timetable.heartsCountFrom} />
 
       <div className="grid grid-2">
         <InviteForm timetableId={first.timetable.id} />

@@ -8,6 +8,7 @@ export const ACTION_LABELS: Record<string, string> = {
   "topic.edit": "edited a topic",
   "topic.reassign": "reassigned a topic's owner",
   "hearts.archive": "archived hearts on a topic",
+  "hearts.cutoff": "changed the hearts cutoff",
   "comment.hide": "hid a comment",
   "heart.add": "hearted a topic",
   "heart.remove": "removed their heart from a topic",

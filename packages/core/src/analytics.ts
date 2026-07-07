@@ -1,4 +1,4 @@
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, gte, isNull, sql } from "drizzle-orm";
 
 import {
   availability,
@@ -14,6 +14,7 @@ import {
 } from "@timetable/db";
 
 import { coerceDate } from "./dates";
+import { getHeartsCountFrom } from "./topics";
 import { buildFeed } from "./topics";
 
 export const ELECTOR_ACTIVITY_FILTERS = [
@@ -41,6 +42,7 @@ export type DashboardData = {
     hostSlug: string | null;
     weightedScore: number;
     heartCount: number;
+    lastHeartAt: Date | null;
   }[];
   hostLeaderboard: {
     hostId: string;
@@ -162,6 +164,7 @@ export async function getDashboard(
     hostSlug: t.hostSlug,
     weightedScore: t.weightedScore,
     heartCount: t.heartCount,
+    lastHeartAt: null as Date | null,
   }));
 
   const hostAgg = new Map<
@@ -187,6 +190,10 @@ export async function getDashboard(
   ];
   if (opts.hostId) activityTopicConds.push(eq(topics.hostId, opts.hostId));
 
+  const cutoff = await getHeartsCountFrom(timetableId);
+  const heartCountConds = [...activityTopicConds];
+  if (cutoff) heartCountConds.push(gte(hearts.createdAt, cutoff));
+
   const heartRows = await db
     .select({
       electorId: hearts.userId,
@@ -195,8 +202,26 @@ export async function getDashboard(
     })
     .from(hearts)
     .innerJoin(topics, eq(topics.id, hearts.topicId))
-    .where(and(...activityTopicConds, isNull(hearts.archivedAt)))
+    .where(and(...heartCountConds))
     .groupBy(hearts.userId);
+
+  // Latest counted heart per topic (QA #42: heart timestamps on the
+  // dashboard).
+  const lastHeartRows = await db
+    .select({
+      topicId: hearts.topicId,
+      lastAt: sql<Date | null>`max(${hearts.createdAt})`,
+    })
+    .from(hearts)
+    .innerJoin(topics, eq(topics.id, hearts.topicId))
+    .where(and(...heartCountConds))
+    .groupBy(hearts.topicId);
+  const lastHeartByTopic = new Map(
+    lastHeartRows.map((r) => [r.topicId, coerceDate(r.lastAt)]),
+  );
+  for (const t of topicLeaderboard) {
+    t.lastHeartAt = lastHeartByTopic.get(t.id) ?? null;
+  }
 
   const commentRows = await db
     .select({

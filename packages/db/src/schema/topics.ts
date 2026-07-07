@@ -57,7 +57,6 @@ export const hearts = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
-    archivedAt: timestamp({ withTimezone: true }),
   },
   (t) => [
     uniqueIndex("hearts_topic_user_uq").on(t.topicId, t.userId),

@@ -5,7 +5,9 @@ import { db, hearts, topics } from "@timetable/db";
 import { logActivity } from "./activity";
 
 /** Toggle an elector's heart on a published topic. Returns the new state.
- * Hearts are logged to the activity feed (QA #42). */
+ * Hearts are logged to the activity feed (QA #42). Whether a heart *counts*
+ * is a separate question — hearts created before the timetable's
+ * heartsCountFrom cutoff are ignored by the counting queries. */
 export async function toggleHeart(
   topicId: string,
   userId: string,
@@ -26,35 +28,32 @@ export async function toggleHeart(
   }
 
   const [existing] = await db
-    .select({ id: hearts.id, archivedAt: hearts.archivedAt })
+    .select({ id: hearts.id })
     .from(hearts)
     .where(and(eq(hearts.topicId, topicId), eq(hearts.userId, userId)))
     .limit(1);
 
-  // Only an active (non-archived) heart counts as "hearted". Toggling it off
-  // removes it.
-  const active = existing && existing.archivedAt === null;
-  if (active) {
+  if (existing) {
     await db.delete(hearts).where(eq(hearts.id, existing.id));
   } else {
-    // No active heart: create one, or reactivate an archived row in place
-    // (the unique (topicId, userId) constraint means we can't blindly insert
-    // a second row). Re-hearting after an admin reset is a fresh vote.
+    // Re-hearting after removing (or after a cutoff) is a fresh vote with a
+    // fresh createdAt. onConflictDoUpdate guards the rare double-submit race
+    // against the unique (topicId, userId) index.
     await db
       .insert(hearts)
       .values({ topicId, userId })
       .onConflictDoUpdate({
         target: [hearts.topicId, hearts.userId],
-        set: { archivedAt: null, createdAt: new Date() },
+        set: { createdAt: new Date() },
       });
   }
 
   await logActivity({
     timetableId: topic.timetableId,
     actorId: userId,
-    action: active ? "heart.remove" : "heart.add",
+    action: existing ? "heart.remove" : "heart.add",
     payload: { topicId, title: topic.title },
   });
 
-  return { hearted: !active };
+  return { hearted: !existing };
 }
