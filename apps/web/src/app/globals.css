@@ -459,6 +459,58 @@ textarea {
   font-weight: 700;
 }
 
+/* Sidebar timetable switcher (QA #59 — moved from topbar) */
+.tt-switcher {
+  position: relative;
+}
+.tt-switcher-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+.tt-switcher-trigger .tt-menu-name {
+  flex: 1;
+}
+.tt-switcher-hint {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--faint);
+}
+.tt-switcher-list {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 50;
+  min-width: 240px;
+  background: var(--card);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+}
+.tt-menu-item-current {
+  background: var(--primary-soft, #eef);
+}
+.tt-switcher-privacy {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--faint);
+}
+
 /* Bio popup (QA #42) */
 .person-trigger {
   border: none;

@@ -8,10 +8,15 @@ import { NavLink } from "@/components/NavLink";
 import { PreviewToggle } from "@/components/PreviewToggle";
 import { RolePills } from "@/components/RolePills";
 import { Sidebar } from "@/components/Sidebar";
+import {
+  TimetableSwitcher,
+  type SwitcherItem,
+} from "@/components/TimetableSwitcher";
 import { gqlFetch } from "@/lib/graphql";
 import { displayRoles, PREVIEW_COOKIE } from "@/lib/previewRoles";
 import {
   parseTimetableSettings,
+  privacyBadge,
   roleLabel,
   themeStyle,
 } from "@/lib/timetableSettings";
@@ -38,6 +43,20 @@ const TIMETABLE_QUERY = `
       customDomain
       viewerRoles
       settings
+    }
+  }
+`;
+
+type MineResult = {
+  myTimetables: {
+    timetable: { slug: string; name: string; privacy: string; settings: string };
+  }[];
+};
+
+const MINE_QUERY = `
+  query SidebarSwitcher {
+    myTimetables {
+      timetable { slug name privacy settings }
     }
   }
 `;
@@ -71,19 +90,18 @@ export default async function TimetableLayout({
   const roles = displayRoles(actualRoles, previewOn);
   const settings = parseTimetableSettings(timetable.settings);
   const base = `/t/${slug}`;
+  const privacy = privacyBadge(timetable.privacy);
 
-  const privacyConfig = {
-    public: { dot: "var(--green)", label: "Public" },
-    hosts_only: { dot: "var(--green)", label: "Hosts only" },
-    no_comments: { dot: "var(--green)", label: "No comments" },
-    private: { dot: "var(--yellow)", label: "Private" },
-    deactivated: { dot: "var(--faint)", label: "Deactivated" },
-  };
-  const privacy =
-    privacyConfig[timetable.privacy as keyof typeof privacyConfig] ?? {
-      dot: "var(--faint)",
-      label: timetable.privacy,
-    };
+  let switcherItems: SwitcherItem[] = [];
+  if (isAuthed) {
+    const mine = await gqlFetch<MineResult>(MINE_QUERY);
+    switcherItems = mine.myTimetables.map((m) => ({
+      slug: m.timetable.slug,
+      name: m.timetable.name,
+      privacy: m.timetable.privacy,
+      iconUrl: parseTimetableSettings(m.timetable.settings).iconUrl ?? null,
+    }));
+  }
 
   return (
     <main className="container" style={themeStyle(settings)}>
@@ -118,6 +136,7 @@ export default async function TimetableLayout({
             {roles.length > 0 && (
               <NavLink href={`${base}/people`}>People</NavLink>
             )}
+            {isAuthed && <NavLink href="/profile">Profile</NavLink>}
             {(isHost(roles) || isAdmin(roles)) && (
               <NavLink href={`${base}/dashboard`}>Dashboard</NavLink>
             )}
@@ -150,6 +169,12 @@ export default async function TimetableLayout({
           >
             ⚑ Report a bug
           </a>
+
+          {switcherItems.length > 0 ? (
+            <div className="sidebar-foot">
+              <TimetableSwitcher items={switcherItems} currentSlug={slug} />
+            </div>
+          ) : null}
         </Sidebar>
 
         <div className="shell-content">

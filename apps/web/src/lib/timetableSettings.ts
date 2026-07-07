@@ -30,6 +30,19 @@ export function parseTimetableSettings(raw: string | null | undefined) {
   }
 }
 
+/** Privacy → sidebar pill colour/label, shared by the timetable shell and
+ * the sidebar switcher. */
+export function privacyBadge(privacy: string): { dot: string; label: string } {
+  const config: Record<string, { dot: string; label: string }> = {
+    public: { dot: "var(--green)", label: "Public" },
+    hosts_only: { dot: "var(--green)", label: "Hosts only" },
+    no_comments: { dot: "var(--green)", label: "No comments" },
+    private: { dot: "var(--yellow)", label: "Private" },
+    deactivated: { dot: "var(--faint)", label: "Deactivated" },
+  };
+  return config[privacy] ?? { dot: "var(--faint)", label: privacy };
+}
+
 /** Naive plural for role labels: collective nouns like "Faculty" (and
  * labels already ending in s) stay as-is, everything else gets an "s". */
 export function pluralLabel(label: string): string {

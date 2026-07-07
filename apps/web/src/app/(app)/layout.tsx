@@ -1,9 +1,8 @@
 import { UserButton } from "@clerk/nextjs";
 import { auth, currentUser } from "@clerk/nextjs/server";
-import Image from "next/image";
 import Link from "next/link";
 
-import { TimetableMenu, type TimetableMenuItem } from "@/components/TimetableMenu";
+import { TopbarBrand, type BrandItem } from "@/components/TopbarBrand";
 import { ToastProvider } from "@/components/Toast";
 import { gqlFetch } from "@/lib/graphql";
 import { parseTimetableSettings } from "@/lib/timetableSettings";
@@ -31,10 +30,10 @@ export default async function AppLayout({
   const user = userId ? await currentUser() : null;
   const email = user?.primaryEmailAddress?.emailAddress ?? null;
 
-  let menuItems: TimetableMenuItem[] = [];
+  let brandItems: BrandItem[] = [];
   if (userId) {
     const data = await gqlFetch<MenuData>(MENU_QUERY);
-    menuItems = data.myTimetables.map((m) => ({
+    brandItems = data.myTimetables.map((m) => ({
       slug: m.timetable.slug,
       name: m.timetable.name,
       iconUrl: parseTimetableSettings(m.timetable.settings).iconUrl ?? null,
@@ -44,18 +43,10 @@ export default async function AppLayout({
   return (
     <ToastProvider>
       <header className="topbar">
-        <Link className="brand" href={userId ? "/timetables" : "/"}>
-          <Image
-            className="brand-logo"
-            src="/assets/timetable.love-logo-transparent.png"
-            alt=""
-            width={30}
-            height={30}
-            priority
-          />
-          <span>Timetable</span>
-        </Link>
-        {userId ? <TimetableMenu items={menuItems} /> : null}
+        <TopbarBrand
+          items={brandItems}
+          fallbackHref={userId ? "/timetables" : "/"}
+        />
         <div className="spacer" />
         {userId ? (
           <>
