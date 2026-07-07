@@ -62,7 +62,7 @@ export function ModerationCard({
     <li className="card stack">
       {/* Same header treatment as the feed card: avatar + title + author. */}
       <div className="row" style={{ alignItems: "flex-start" }}>
-        <Avatar name={topic.hostName} />
+        <Avatar name={topic.hostName ?? null} />
         <div>
           <h3 className="topic-title">
             {permalink ? (

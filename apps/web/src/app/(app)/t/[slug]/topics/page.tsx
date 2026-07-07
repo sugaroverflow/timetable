@@ -5,9 +5,10 @@ import { TopicManager } from "@/components/TopicManager";
 import type { ManagedTopic } from "@/lib/feedTypes";
 import { gqlFetch } from "@/lib/graphql";
 import { displayRolesFromCookies } from "@/lib/previewRoles.server";
+import { parseTimetableSettings, roleLabel } from "@/lib/timetableSettings";
 
 type Data = {
-  timetable: { viewerRoles: string[] } | null;
+  timetable: { viewerRoles: string[]; settings: string } | null;
   hostDashboard: ManagedTopic[];
 };
 
@@ -17,9 +18,10 @@ const COMMENT_FIELDS = `
 
 const QUERY = `
   query HostDashboard($s: String!) {
-    timetable(idOrSlug: $s) { viewerRoles }
+    timetable(idOrSlug: $s) { viewerRoles settings }
     hostDashboard(idOrSlug: $s) {
-      id title status bodyMd coverImageUrl updatedAt feedback
+      id title slug hostSlug status bodyMd bodyHtml coverImageUrl updatedAt feedback
+      comments { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} } } }
       hostOnlyComments { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} } } }
     }
   }
@@ -35,6 +37,8 @@ export default async function MyTopicsPage({
   const roles = await displayRolesFromCookies(
     (data.timetable?.viewerRoles ?? []) as Role[],
   );
+  const settings = parseTimetableSettings(data.timetable?.settings);
+  const hostLabel = roleLabel(settings.roleLabels, "host");
 
   if (!isHost(roles) && !isAdmin(roles)) {
     return (
@@ -58,7 +62,12 @@ export default async function MyTopicsPage({
         ) : (
           <ul className="list">
             {data.hostDashboard.map((topic) => (
-              <TopicManager key={topic.id} topic={topic} slug={slug} />
+              <TopicManager
+                key={topic.id}
+                topic={topic}
+                slug={slug}
+                hostLabel={hostLabel}
+              />
             ))}
           </ul>
         )}

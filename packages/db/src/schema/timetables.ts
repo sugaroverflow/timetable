@@ -85,6 +85,9 @@ export const timetableMemberships = pgTable(
     // Watermark for the feed's "new since your last visit" highlight;
     // null until the member first views the feed.
     lastSeenFeedAt: timestamp({ withTimezone: true }),
+    // Watermark for the notifications pane's unread badge (QA #59);
+    // null until the member first opens Notifications.
+    lastSeenNotificationsAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },

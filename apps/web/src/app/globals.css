@@ -390,6 +390,20 @@ textarea {
   font-size: 12px;
   text-decoration: none;
 }
+.nav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--heart);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
 .sidebar-bug-link:hover {
   text-decoration: underline;
 }

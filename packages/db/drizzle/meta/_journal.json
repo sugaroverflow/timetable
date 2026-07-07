@@ -85,6 +85,13 @@
       "when": 1783437962895,
       "tag": "0011_qa59_topic_content_updated",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1783440136290,
+      "tag": "0012_qa59_notifications_seen",
+      "breakpoints": true
     }
   ]
 }

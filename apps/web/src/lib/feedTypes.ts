@@ -59,8 +59,10 @@ export type ManagedTopic = {
   bodyHtml: string;
   coverImageUrl: string | null;
   updatedAt: string;
-  hostName: string | null;
+  hostName?: string | null;
   feedback: string | null;
+  /** Public thread — My Topics renders feed-identical cards (QA #59). */
+  comments?: FeedComment[];
   /** Threaded admin↔host feedback; fetched where the UI renders it. */
   hostOnlyComments?: FeedComment[];
 };

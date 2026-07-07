@@ -42,7 +42,10 @@ import {
   listSubmittedTopics,
   listTimetableHosts,
   logActivity,
+  countUnreadNotifications,
+  listNotifications,
   markFeedSeen,
+  markNotificationsSeen,
   moderateTopic,
   reassignTopic,
   setAvailability,
@@ -413,6 +416,16 @@ const ManagedTopicType = builder.objectRef<Topic>("ManagedTopic").implement({
       nullable: true,
       resolve: (tp) => getLatestHostOnlyComment(tp.id),
     }),
+    /** Public comment thread — lets My Topics render feed-identical cards
+     * (QA #59). */
+    comments: t.field({
+      type: [CommentType],
+      resolve: (tp) =>
+        listCommentTree(tp.id, {
+          includeHostOnly: false,
+          includeHidden: false,
+        }),
+    }),
     /** Full host-only thread (admin feedback + host replies). ManagedTopic
      * is only ever served to the owning host or admins, so this is safe. */
     hostOnlyComments: t.field({
@@ -467,6 +480,24 @@ const ActivityType = builder.objectRef<ActivityEntry>("ActivityEvent").implement
     }),
   }),
 });
+
+const NotificationType = builder
+  .objectRef<import("@timetable/core").NotificationItem>("Notification")
+  .implement({
+    fields: (t) => ({
+      commentId: t.exposeID("commentId"),
+      kind: t.exposeString("kind"),
+      authorId: t.exposeID("authorId"),
+      authorName: t.exposeString("authorName", { nullable: true }),
+      body: t.exposeString("body"),
+      visibility: t.exposeString("visibility"),
+      createdAt: t.string({ resolve: (n) => n.createdAt.toISOString() }),
+      topicId: t.exposeID("topicId"),
+      topicTitle: t.exposeString("topicTitle"),
+      topicSlug: t.exposeString("topicSlug", { nullable: true }),
+      topicHostSlug: t.exposeString("topicHostSlug", { nullable: true }),
+    }),
+  });
 
 const HeartResult = builder
   .objectRef<{ topicId: string; hearted: boolean }>("HeartResult")
@@ -602,6 +633,30 @@ builder.queryType({
         if (!readable) return null;
         const seen = await getFeedLastSeen(ctx.user.id, readable.timetable.id);
         return seen ? seen.toISOString() : null;
+      },
+    }),
+
+    /** Comments on the viewer's topics + replies to their comments
+     * (QA #59 notifications pane). Members only. */
+    notifications: t.field({
+      type: [NotificationType],
+      args: { idOrSlug: t.arg.string({ required: true }) },
+      resolve: async (_p, args, ctx) => {
+        if (!ctx.user) return [];
+        const readable = await getReadableTimetable(ctx.user.id, args.idOrSlug);
+        if (!readable || readable.roles.length === 0) return [];
+        return listNotifications(readable.timetable.id, ctx.user.id);
+      },
+    }),
+
+    /** Unread-notification count for the sidebar badge. */
+    notificationsUnread: t.int({
+      args: { idOrSlug: t.arg.string({ required: true }) },
+      resolve: async (_p, args, ctx) => {
+        if (!ctx.user) return 0;
+        const readable = await getReadableTimetable(ctx.user.id, args.idOrSlug);
+        if (!readable || readable.roles.length === 0) return 0;
+        return countUnreadNotifications(readable.timetable.id, ctx.user.id);
       },
     }),
 
@@ -880,6 +935,18 @@ builder.mutationType({
         const readable = await getReadableTimetable(user.id, args.idOrSlug);
         if (!readable) notFound("Timetable not found");
         await markFeedSeen(user.id, readable.timetable.id);
+        return true;
+      },
+    }),
+
+    /** Resets the notifications badge (QA #59). */
+    markNotificationsSeen: t.boolean({
+      args: { idOrSlug: t.arg.string({ required: true }) },
+      resolve: async (_p, args, ctx) => {
+        const user = await requireUser(ctx);
+        const readable = await getReadableTimetable(user.id, args.idOrSlug);
+        if (!readable) notFound("Timetable not found");
+        await markNotificationsSeen(readable.timetable.id, user.id);
         return true;
       },
     }),

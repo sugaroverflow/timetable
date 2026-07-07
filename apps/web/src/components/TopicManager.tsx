@@ -1,24 +1,31 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { CommentComposer } from "@/components/CommentComposer";
 import { CommentList } from "@/components/CommentList";
+import { HostOnlyPanel } from "@/components/HostOnlyPanel";
 import { useToast } from "@/components/Toast";
 import { TopicEditForm } from "@/components/TopicEditForm";
 import { clientGql } from "@/lib/clientGraphql";
 import type { ManagedTopic } from "@/lib/feedTypes";
+import { topicPath } from "@/lib/topicPath";
 
 const SUBMIT = `mutation($id: String!){ submitTopic(topicId: $id){ id } }`;
 const UNPUBLISH = `mutation($id: String!){ unpublishTopic(topicId: $id){ id } }`;
 
+/** A topic on My Topics — renders like a feed card (cover, description,
+ * comments, {host}-only thread; QA #59) with the manage controls below. */
 export function TopicManager({
   topic,
   slug,
+  hostLabel = "Host",
 }: {
   topic: ManagedTopic;
   slug: string;
+  hostLabel?: string;
 }) {
   const router = useRouter();
   const { toast, toastError } = useToast();
@@ -39,39 +46,76 @@ export function TopicManager({
     }
   }
 
+  const permalink =
+    topic.status === "published"
+      ? topicPath(slug, topic.hostSlug ?? null, topic.slug ?? null)
+      : null;
+  const publicComments = topic.comments ?? [];
+  const hostComments = topic.hostOnlyComments ?? [];
+
   return (
-    <li className="card">
+    <li className="card stack">
       <div className="row wrap" style={{ justifyContent: "space-between" }}>
-        <strong>{topic.title}</strong>
+        <h3 className="topic-title" style={{ margin: 0 }}>
+          {permalink ? (
+            <Link href={permalink} className="topic-title-link">
+              {topic.title}
+            </Link>
+          ) : (
+            topic.title
+          )}
+        </h3>
         <span className={`status-badge status-${topic.status}`}>
           {topic.status}
         </span>
       </div>
 
-      {(topic.hostOnlyComments?.length ?? 0) > 0 ? (
-        <div className="mod-feedback-box" style={{ marginTop: 10 }}>
-          <div className="mfb-head">
-            {topic.feedback ? "↩ Changes requested" : "🔒 Feedback thread"}
-          </div>
-          <CommentList
-            comments={topic.hostOnlyComments ?? []}
-            canReply={true}
-            canModerate={false}
-          />
-          <CommentComposer topicId={topic.id} visibility="host_only" />
-        </div>
+      {topic.coverImageUrl ? (
+        <div
+          className="topic-cover"
+          style={{ backgroundImage: `url(${topic.coverImageUrl})` }}
+          aria-label={`${topic.title} cover image`}
+        />
+      ) : null}
+
+      <div
+        className="topic-body"
+        dangerouslySetInnerHTML={{ __html: topic.bodyHtml }}
+      />
+
+      {publicComments.length > 0 ? (
+        <CommentList
+          comments={publicComments}
+          canReply={true}
+          canModerate={false}
+          slug={slug}
+        />
+      ) : null}
+      {topic.status === "published" ? (
+        <CommentComposer topicId={topic.id} />
+      ) : null}
+
+      {hostComments.length > 0 ? (
+        <HostOnlyPanel
+          topicId={topic.id}
+          comments={hostComments}
+          canModerate={false}
+          slug={slug}
+          hostLabel={hostLabel}
+        />
       ) : null}
 
       {editing ? (
-        <div style={{ marginTop: 10 }}>
-          <TopicEditForm
-            topic={topic}
-            slug={slug}
-            onDone={() => setEditing(false)}
-          />
-        </div>
+        <TopicEditForm
+          topic={topic}
+          slug={slug}
+          onDone={() => setEditing(false)}
+        />
       ) : (
-        <div className="row wrap" style={{ marginTop: 10 }}>
+        <div
+          className="row wrap"
+          style={{ borderTop: "1px solid var(--line)", paddingTop: 10 }}
+        >
           {(topic.status === "draft" || topic.status === "unpublished") && (
             <button
               className="btn btn-primary"

@@ -61,6 +61,12 @@ const MINE_QUERY = `
   }
 `;
 
+const UNREAD_QUERY = `
+  query Unread($s: String!) {
+    notificationsUnread(idOrSlug: $s)
+  }
+`;
+
 export default async function TimetableLayout({
   children,
   params,
@@ -93,14 +99,21 @@ export default async function TimetableLayout({
   const privacy = privacyBadge(timetable.privacy);
 
   let switcherItems: SwitcherItem[] = [];
+  let unread = 0;
   if (isAuthed) {
-    const mine = await gqlFetch<MineResult>(MINE_QUERY);
+    const [mine, unreadData] = await Promise.all([
+      gqlFetch<MineResult>(MINE_QUERY),
+      roles.length > 0
+        ? gqlFetch<{ notificationsUnread: number }>(UNREAD_QUERY, { s: slug })
+        : Promise.resolve({ notificationsUnread: 0 }),
+    ]);
     switcherItems = mine.myTimetables.map((m) => ({
       slug: m.timetable.slug,
       name: m.timetable.name,
       privacy: m.timetable.privacy,
       iconUrl: parseTimetableSettings(m.timetable.settings).iconUrl ?? null,
     }));
+    unread = unreadData.notificationsUnread;
   }
 
   const themeCss = buildThemeCss(settings);
@@ -136,6 +149,14 @@ export default async function TimetableLayout({
             {isElector(roles) && (
               <NavLink href={`${base}/feed?hearted=me`}>
                 My hearted topics
+              </NavLink>
+            )}
+            {roles.length > 0 && (
+              <NavLink href={`${base}/notifications`}>
+                Notifications
+                {unread > 0 ? (
+                  <span className="nav-badge">{unread > 99 ? "99+" : unread}</span>
+                ) : null}
               </NavLink>
             )}
             {roles.length > 0 && (
