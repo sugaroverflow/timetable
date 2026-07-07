@@ -6,6 +6,7 @@ import type { FeedComment } from "@/lib/feedTypes";
 
 import { Avatar } from "./Avatar";
 import { CommentActions } from "./CommentActions";
+import { PersonChip } from "./PersonChip";
 
 const VISIBLE_TOP_LEVEL = 3;
 
@@ -20,10 +21,12 @@ function CommentItem({
   comment,
   canReply,
   canModerate,
+  slug,
 }: {
   comment: FeedComment;
   canReply: boolean;
   canModerate: boolean;
+  slug?: string;
 }) {
   const replies = comment.replies ?? [];
   const [showReplies, setShowReplies] = useState(false);
@@ -34,7 +37,15 @@ function CommentItem({
       <Avatar name={comment.authorName} small />
       <div className="comment-main">
         <div className="c-bubble">
-          <span className="c-name">{comment.authorName ?? "Someone"}</span>
+          <span className="c-name">
+            {slug ? (
+              <PersonChip slug={slug} userId={comment.authorId}>
+                {comment.authorName ?? "Someone"}
+              </PersonChip>
+            ) : (
+              (comment.authorName ?? "Someone")
+            )}
+          </span>
           {comment.visibility === "host_only" ? (
             <span className="pill pill-host" style={{ marginLeft: 6, fontSize: 10 }}>
               hosts
@@ -62,6 +73,7 @@ function CommentItem({
                   comment={r}
                   canReply={canReply}
                   canModerate={canModerate}
+                  slug={slug}
                 />
               ))}
             </div>
@@ -84,10 +96,12 @@ export function CommentList({
   comments,
   canReply,
   canModerate,
+  slug,
 }: {
   comments: FeedComment[];
   canReply: boolean;
   canModerate: boolean;
+  slug?: string;
 }) {
   const [showAll, setShowAll] = useState(false);
   if (!comments.length) return null;
@@ -106,6 +120,7 @@ export function CommentList({
           comment={c}
           canReply={canReply}
           canModerate={canModerate}
+          slug={slug}
         />
       ))}
       {hiddenCount > 0 ? (

@@ -20,10 +20,12 @@ export function HostOnlyPanel({
   topicId,
   comments,
   canModerate,
+  slug,
 }: {
   topicId: string;
   comments: FeedComment[];
   canModerate: boolean;
+  slug?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const count = countNested(comments);
@@ -45,6 +47,7 @@ export function HostOnlyPanel({
             comments={comments}
             canReply={true}
             canModerate={canModerate}
+            slug={slug}
           />
           <CommentComposer topicId={topicId} visibility="host_only" />
         </div>

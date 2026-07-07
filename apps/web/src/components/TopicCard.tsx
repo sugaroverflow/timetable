@@ -12,6 +12,7 @@ import { HeartButton } from "./HeartButton";
 import { HostInsightsPanel } from "./HostInsightsPanel";
 import { HostOnlyPanel } from "./HostOnlyPanel";
 import { HostTopicActions } from "./HostTopicActions";
+import { PersonChip } from "./PersonChip";
 
 export type FeedPerms = {
   canHeart: boolean;
@@ -56,7 +57,9 @@ export function TopicCard({
   return (
     <article className={`card stack${isNew ? " topic-new" : ""}`}>
       <div className="row" style={{ alignItems: "flex-start" }}>
-        <Avatar name={topic.hostName} />
+        <PersonChip slug={slug} userId={topic.hostId}>
+          <Avatar name={topic.hostName} />
+        </PersonChip>
         <div>
           <h3 className="topic-title">
             {permalink ? (
@@ -68,7 +71,10 @@ export function TopicCard({
             )}
           </h3>
           <div className="faint" style={{ fontSize: 12 }}>
-            by {topic.hostName ?? hostLabel}
+            by{" "}
+            <PersonChip slug={slug} userId={topic.hostId}>
+              {topic.hostName ?? hostLabel}
+            </PersonChip>
           </div>
         </div>
         {isNew ? (
@@ -121,6 +127,7 @@ export function TopicCard({
         comments={publicComments}
         canReply={perms.canComment}
         canModerate={perms.canModerate}
+        slug={slug}
       />
 
       {perms.canComment ? <CommentComposer topicId={topic.id} /> : null}
@@ -138,6 +145,7 @@ export function TopicCard({
           topicId={topic.id}
           comments={hostComments}
           canModerate={perms.canModerate}
+          slug={slug}
         />
       ) : null}
 

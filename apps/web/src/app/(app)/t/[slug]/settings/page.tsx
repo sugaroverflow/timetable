@@ -18,6 +18,7 @@ type Data = {
   } | null;
   timetableMembers: {
     membershipId: string;
+    userId: string;
     roles: string[];
     name: string | null;
     email: string | null;
@@ -33,6 +34,7 @@ const QUERY = `
     }
     timetableMembers(timetableId: $timetableId) {
       membershipId
+      userId
       roles
       name
       email
@@ -111,6 +113,7 @@ export default async function SettingsPage({
             <p>Select a member to edit their roles.</p>
           </div>
           <MemberRolesPicker
+            slug={slug}
             members={data.timetableMembers}
             roleLabels={settings.roleLabels}
           />

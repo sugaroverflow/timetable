@@ -23,6 +23,8 @@ import {
   getFeedLastSeen,
   getLastVisitedTimetableSlug,
   getOrCreateUserSlug,
+  getPerson,
+  listPeople,
   getTimetableByDomain,
   getTopicById,
   getTopicBySlug,
@@ -64,6 +66,7 @@ import {
   type DashboardData,
   type ElectorActivityFilter,
   type FeedTopic,
+  type Person,
   type WeightedHeartEntry,
 } from "@timetable/core";
 import type {
@@ -212,6 +215,22 @@ const MemberType = builder.objectRef<GqlMember>("Member").implement({
     name: t.string({ nullable: true, resolve: (m) => m.user.name }),
     email: t.string({ nullable: true, resolve: (m) => m.user.email }),
     image: t.string({ nullable: true, resolve: (m) => m.user.image }),
+  }),
+});
+
+const PersonType = builder.objectRef<Person>("Person").implement({
+  fields: (t) => ({
+    userId: t.exposeID("userId"),
+    name: t.exposeString("name", { nullable: true }),
+    image: t.exposeString("image", { nullable: true }),
+    slug: t.exposeString("slug", { nullable: true }),
+    roles: t.exposeStringList("roles"),
+    /** Markdown bios (QA #42), rendered with the shared pipeline. */
+    bioHtml: t.string({
+      nullable: true,
+      resolve: (p) => (p.bio ? renderMarkdown(p.bio) : null),
+    }),
+    bio: t.exposeString("bio", { nullable: true }),
   }),
 });
 
@@ -410,6 +429,39 @@ builder.queryType({
           ctx.user?.id ?? null,
           args.timetableId,
         )) as string[],
+    }),
+
+    /** Members with public profile fields (People page). Anyone who can
+     * read the timetable can see it — bios follow timetable visibility. */
+    timetablePeople: t.field({
+      type: [PersonType],
+      args: { idOrSlug: t.arg.string({ required: true }) },
+      resolve: async (_p, args, ctx) => {
+        const readable = await getReadableTimetable(
+          ctx.user?.id ?? null,
+          args.idOrSlug,
+        );
+        if (!readable) return [];
+        return listPeople(readable.timetable.id);
+      },
+    }),
+
+    /** One member's public profile — powers the bio modal. */
+    person: t.field({
+      type: PersonType,
+      nullable: true,
+      args: {
+        idOrSlug: t.arg.string({ required: true }),
+        userId: t.arg.string({ required: true }),
+      },
+      resolve: async (_p, args, ctx) => {
+        const readable = await getReadableTimetable(
+          ctx.user?.id ?? null,
+          args.idOrSlug,
+        );
+        if (!readable) return null;
+        return getPerson(readable.timetable.id, args.userId);
+      },
     }),
 
     /** Slug of the timetable the viewer last engaged with (for the
@@ -1031,6 +1083,35 @@ builder.mutationType({
         });
         if (!updated) notFound("Timetable not found");
         return { ...updated, viewerRoles: readable.roles as string[] };
+      },
+    }),
+
+    /** Admin: edit any member's bio (QA #42 — bios are editable from the
+     * Members section in Settings). Logged to the activity feed. */
+    updateMemberBio: t.field({
+      type: PersonType,
+      nullable: true,
+      args: {
+        idOrSlug: t.arg.string({ required: true }),
+        userId: t.arg.string({ required: true }),
+        bio: t.arg.string({ required: true }),
+      },
+      resolve: async (_p, args, ctx) => {
+        const user = await requireUser(ctx);
+        const readable = await getReadableTimetable(user.id, args.idOrSlug);
+        if (!readable) notFound("Timetable not found");
+        const viewer = { userId: user.id, roles: readable.roles };
+        if (!canManageMembers(viewer)) forbidden("Admins only");
+        const target = await getPerson(readable.timetable.id, args.userId);
+        if (!target) notFound("Member not found");
+        await updateUserProfile(args.userId, { bio: args.bio.trim() || null });
+        await logActivity({
+          timetableId: readable.timetable.id,
+          actorId: user.id,
+          action: "member.bio_edit",
+          payload: { userId: args.userId, name: target.name },
+        });
+        return getPerson(readable.timetable.id, args.userId);
       },
     }),
 

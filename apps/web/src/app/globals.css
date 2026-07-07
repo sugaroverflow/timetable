@@ -452,6 +452,37 @@ textarea {
   font-weight: 700;
 }
 
+/* Bio popup (QA #42) */
+.person-trigger {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.person-trigger:hover {
+  text-decoration: underline;
+}
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(20, 22, 30, 0.45);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+.person-modal {
+  width: min(440px, 100%);
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
 .topic-title-link {
   color: inherit;
 }
