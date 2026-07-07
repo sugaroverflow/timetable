@@ -9,4 +9,8 @@ export const ACTION_LABELS: Record<string, string> = {
   "topic.reassign": "reassigned a topic's owner",
   "hearts.archive": "archived hearts on a topic",
   "comment.hide": "hid a comment",
+  "heart.add": "hearted a topic",
+  "heart.remove": "removed their heart from a topic",
+  "comment.add": "commented on a topic",
+  "comment.reply": "replied to a comment",
 };

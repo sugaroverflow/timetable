@@ -40,7 +40,7 @@ const QUERY = `
     myFeedLastSeenAt(idOrSlug: $s)
     timetableHosts(idOrSlug: $s) { id name }
     topicFeed(idOrSlug: $s, sort: $sort, hostId: $host, limit: $limit, offset: $offset) {
-      id timetableId hostId hostName hostImage title bodyMd bodyHtml coverImageUrl status
+      id timetableId hostId hostName hostImage hostSlug title slug bodyMd bodyHtml coverImageUrl status
       heartCount weightedScore viewerHasHearted commentCount
       publishedAt createdAt
       comments { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} } } }

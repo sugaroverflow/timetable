@@ -36,7 +36,9 @@ export type DashboardData = {
   topicLeaderboard: {
     id: string;
     title: string;
+    slug: string | null;
     hostName: string | null;
+    hostSlug: string | null;
     weightedScore: number;
     heartCount: number;
   }[];
@@ -53,7 +55,12 @@ export type DashboardData = {
     availabilityCount: number;
     latestActivityAt: Date | null;
   }[];
-  unallocatedTopics: { id: string; title: string }[];
+  unallocatedTopics: {
+    id: string;
+    title: string;
+    slug: string | null;
+    hostSlug: string | null;
+  }[];
   conflicts: {
     slotId: string;
     startsAt: Date;
@@ -145,10 +152,14 @@ export async function getDashboard(
   });
   const totalHearts = feed.reduce((sum, t) => sum + t.heartCount, 0);
 
-  const topicLeaderboard = feed.slice(0, 10).map((t) => ({
+  // All published topics, not a top-10 — QA #42 wants the dashboard to show
+  // every host and every topic, each linked to its permalink.
+  const topicLeaderboard = feed.map((t) => ({
     id: t.id,
     title: t.title,
+    slug: t.slug,
     hostName: t.hostName,
+    hostSlug: t.hostSlug,
     weightedScore: t.weightedScore,
     heartCount: t.heartCount,
   }));
@@ -289,7 +300,7 @@ export async function getDashboard(
   const taggedTopicIds = new Set(tagRows.map((r) => r.topicId));
   const unallocatedTopics = feed
     .filter((t) => !taggedTopicIds.has(t.id))
-    .map((t) => ({ id: t.id, title: t.title }));
+    .map((t) => ({ id: t.id, title: t.title, slug: t.slug, hostSlug: t.hostSlug }));
 
   // Slots with more than one tagged topic = conflicts.
   const bySlot = new Map<

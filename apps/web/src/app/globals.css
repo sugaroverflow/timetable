@@ -320,6 +320,13 @@ textarea {
   border-left: 3px solid var(--primary);
 }
 
+.topic-title-link {
+  color: inherit;
+}
+.topic-title-link:hover {
+  text-decoration: underline;
+}
+
 /* "View N replies" / "View all N comments" disclosure */
 .thread-toggle {
   border: none;

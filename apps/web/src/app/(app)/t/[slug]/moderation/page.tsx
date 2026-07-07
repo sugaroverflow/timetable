@@ -16,7 +16,7 @@ const QUERY = `
   query Moderation($s: String!) {
     timetable(idOrSlug: $s) { viewerRoles settings }
     moderationQueue(idOrSlug: $s) {
-      id title status bodyMd bodyHtml coverImageUrl updatedAt feedback
+      id title slug hostSlug hostName status bodyMd bodyHtml coverImageUrl updatedAt feedback
     }
   }
 `;

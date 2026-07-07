@@ -1,4 +1,7 @@
+import Link from "next/link";
+
 import type { FeedTopic } from "@/lib/feedTypes";
+import { topicPath } from "@/lib/topicPath";
 
 import { AdminTopicActions } from "./AdminTopicActions";
 import { Avatar } from "./Avatar";
@@ -48,13 +51,22 @@ export function TopicCard({
     (c) => c.visibility === "host_only",
   );
   const isOwner = viewerId != null && viewerId === topic.hostId;
+  const permalink = topicPath(slug, topic.hostSlug, topic.slug);
 
   return (
     <article className={`card stack${isNew ? " topic-new" : ""}`}>
       <div className="row" style={{ alignItems: "flex-start" }}>
         <Avatar name={topic.hostName} />
         <div>
-          <h3 className="topic-title">{topic.title}</h3>
+          <h3 className="topic-title">
+            {permalink ? (
+              <Link href={permalink} className="topic-title-link">
+                {topic.title}
+              </Link>
+            ) : (
+              topic.title
+            )}
+          </h3>
           <div className="faint" style={{ fontSize: 12 }}>
             by {topic.hostName ?? hostLabel}
           </div>

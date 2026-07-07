@@ -9,6 +9,8 @@ import {
   type User,
 } from "@timetable/db";
 
+import { ensureUserSlug } from "./slugs";
+
 /** Return the user's ICS subscription token, creating one on first use. */
 export async function getOrCreateIcsToken(
   userId: string,
@@ -47,10 +49,16 @@ export async function updateUserProfile(
   userId: string,
   patch: { name?: string; bio?: string | null; image?: string | null },
 ): Promise<User | null> {
+  // Keep the (cosmetic) permalink slug in step with renames.
+  const slug =
+    patch.name !== undefined
+      ? await ensureUserSlug(patch.name, { excludeUserId: userId })
+      : undefined;
   const [user] = await db
     .update(users)
     .set({
       ...(patch.name !== undefined ? { name: patch.name } : {}),
+      ...(slug !== undefined ? { slug } : {}),
       ...(patch.bio !== undefined ? { bio: patch.bio } : {}),
       ...(patch.image !== undefined ? { image: patch.image } : {}),
     })

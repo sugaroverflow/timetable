@@ -2,14 +2,12 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-import { ACTION_LABELS } from "@/lib/activityLabels";
-
-export function ActivityFilter({
+export function ActorFilter({
   value,
-  actions,
+  actors,
 }: {
   value: string;
-  actions: string[];
+  actors: { id: string; name: string | null }[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -17,24 +15,24 @@ export function ActivityFilter({
 
   function change(next: string) {
     const params = new URLSearchParams(searchParams.toString());
-    if (next) params.set("action", next);
-    else params.delete("action");
+    if (next) params.set("actor", next);
+    else params.delete("actor");
     router.push(`${pathname}?${params.toString()}`);
   }
 
   return (
     <>
-      <label htmlFor="activity-filter">Action</label>
+      <label htmlFor="actor-filter">User</label>
       <select
-        id="activity-filter"
-        aria-label="Filter by action type"
+        id="actor-filter"
+        aria-label="Filter by user"
         value={value}
         onChange={(e) => change(e.target.value)}
       >
-        <option value="">All actions</option>
-        {actions.map((action) => (
-          <option key={action} value={action}>
-            {ACTION_LABELS[action] ?? action}
+        <option value="">All users</option>
+        {actors.map((actor) => (
+          <option key={actor.id} value={actor.id}>
+            {actor.name ?? actor.id}
           </option>
         ))}
       </select>

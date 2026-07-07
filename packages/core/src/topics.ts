@@ -13,6 +13,7 @@ import { computeElectorWeights, topicWeightedScore } from "@timetable/shared";
 
 import { logActivity } from "./activity";
 import { coerceDate } from "./dates";
+import { ensureTopicSlug } from "./slugs";
 
 export async function getTopicById(topicId: string): Promise<Topic | null> {
   const [topic] = await db
@@ -23,17 +24,32 @@ export async function getTopicById(topicId: string): Promise<Topic | null> {
   return topic ?? null;
 }
 
+/** Permalink resolution: a topic by its per-timetable slug. */
+export async function getTopicBySlug(
+  timetableId: string,
+  slug: string,
+): Promise<Topic | null> {
+  const [topic] = await db
+    .select()
+    .from(topics)
+    .where(and(eq(topics.timetableId, timetableId), eq(topics.slug, slug)))
+    .limit(1);
+  return topic ?? null;
+}
+
 export async function createTopic(
   timetableId: string,
   hostId: string,
   input: { title: string; bodyMd?: string; coverImageUrl?: string | null },
 ): Promise<Topic> {
+  const slug = await ensureTopicSlug(timetableId, input.title);
   const [topic] = await db
     .insert(topics)
     .values({
       timetableId,
       hostId,
       title: input.title,
+      slug,
       bodyMd: input.bodyMd ?? "",
       coverImageUrl: input.coverImageUrl ?? null,
       status: "draft",
@@ -47,10 +63,22 @@ export async function updateTopic(
   topicId: string,
   input: { title?: string; bodyMd?: string; coverImageUrl?: string | null },
 ): Promise<Topic | null> {
+  // The slug follows title edits until first publish, then freezes so
+  // permalinks in digests/links never break.
+  let slug: string | undefined;
+  if (input.title !== undefined) {
+    const current = await getTopicById(topicId);
+    if (current && current.publishedAt === null && input.title !== current.title) {
+      slug = await ensureTopicSlug(current.timetableId, input.title, {
+        excludeTopicId: topicId,
+      });
+    }
+  }
   const [updated] = await db
     .update(topics)
     .set({
       ...(input.title !== undefined ? { title: input.title } : {}),
+      ...(slug !== undefined ? { slug } : {}),
       ...(input.bodyMd !== undefined ? { bodyMd: input.bodyMd } : {}),
       ...(input.coverImageUrl !== undefined
         ? { coverImageUrl: input.coverImageUrl }
@@ -268,7 +296,9 @@ export type FeedTopic = {
   hostId: string;
   hostName: string | null;
   hostImage: string | null;
+  hostSlug: string | null;
   title: string;
+  slug: string | null;
   bodyMd: string;
   coverImageUrl: string | null;
   status: TopicStatus;
@@ -292,6 +322,7 @@ export async function buildFeed(
   viewerUserId: string | null,
   opts: {
     hostId?: string;
+    topicId?: string;
     sort?: FeedSort;
     limit?: number;
     offset?: number;
@@ -336,12 +367,14 @@ export async function buildFeed(
     eq(topics.status, "published"),
   ];
   if (opts.hostId) displayConds.push(eq(topics.hostId, opts.hostId));
+  if (opts.topicId) displayConds.push(eq(topics.id, opts.topicId));
 
   const rows = await db
     .select({
       topic: topics,
       hostName: users.name,
       hostImage: users.image,
+      hostSlug: users.slug,
     })
     .from(topics)
     .innerJoin(users, eq(users.id, topics.hostId))
@@ -378,7 +411,7 @@ export async function buildFeed(
     }
   }
 
-  const feed: FeedTopic[] = rows.map(({ topic, hostName, hostImage }) => {
+  const feed: FeedTopic[] = rows.map(({ topic, hostName, hostImage, hostSlug }) => {
     const topicHearts = (heartsByTopic.get(topic.id) ?? []).map(
       (electorId) => ({ topicId: topic.id, electorId }),
     );
@@ -388,7 +421,9 @@ export async function buildFeed(
       hostId: topic.hostId,
       hostName,
       hostImage,
+      hostSlug,
       title: topic.title,
+      slug: topic.slug,
       bodyMd: topic.bodyMd,
       coverImageUrl: topic.coverImageUrl,
       status: topic.status,

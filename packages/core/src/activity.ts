@@ -1,6 +1,7 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 
-import { activityEvents, db, users } from "@timetable/db";
+import { activityEvents, db, topics, users } from "@timetable/db";
 
 export type ActivityInput = {
   timetableId: string;
@@ -26,13 +27,21 @@ export type ActivityEntry = {
   payload: Record<string, unknown>;
   note: string | null;
   createdAt: Date;
+  actorId: string | null;
   actorName: string | null;
+  /** Resolved from payload.topicId so the timeline can link the topic. */
+  topicSlug: string | null;
+  topicHostSlug: string | null;
 };
 
 export async function listActivity(
   timetableId: string,
-  limit = 100,
+  opts: { actorId?: string; limit?: number } = {},
 ): Promise<ActivityEntry[]> {
+  const hostUsers = alias(users, "host_users");
+  const conds = [eq(activityEvents.timetableId, timetableId)];
+  if (opts.actorId) conds.push(eq(activityEvents.actorId, opts.actorId));
+
   const rows = await db
     .select({
       id: activityEvents.id,
@@ -40,13 +49,21 @@ export async function listActivity(
       payload: activityEvents.payload,
       note: activityEvents.note,
       createdAt: activityEvents.createdAt,
+      actorId: activityEvents.actorId,
       actorName: users.name,
+      topicSlug: topics.slug,
+      topicHostSlug: hostUsers.slug,
     })
     .from(activityEvents)
     .leftJoin(users, eq(users.id, activityEvents.actorId))
-    .where(eq(activityEvents.timetableId, timetableId))
+    .leftJoin(
+      topics,
+      sql`${topics.id}::text = ${activityEvents.payload}->>'topicId'`,
+    )
+    .leftJoin(hostUsers, eq(hostUsers.id, topics.hostId))
+    .where(and(...conds))
     .orderBy(desc(activityEvents.createdAt))
-    .limit(limit);
+    .limit(opts.limit ?? 100);
 
   return rows.map((r) => ({
     id: r.id,
@@ -54,6 +71,9 @@ export async function listActivity(
     payload: r.payload,
     note: r.note,
     createdAt: r.createdAt,
+    actorId: r.actorId,
     actorName: r.actorName,
+    topicSlug: r.topicSlug,
+    topicHostSlug: r.topicHostSlug,
   }));
 }

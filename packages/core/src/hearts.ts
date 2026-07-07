@@ -2,13 +2,20 @@ import { and, eq } from "drizzle-orm";
 
 import { db, hearts, topics } from "@timetable/db";
 
-/** Toggle an elector's heart on a published topic. Returns the new state. */
+import { logActivity } from "./activity";
+
+/** Toggle an elector's heart on a published topic. Returns the new state.
+ * Hearts are logged to the activity feed (QA #42). */
 export async function toggleHeart(
   topicId: string,
   userId: string,
 ): Promise<{ hearted: boolean }> {
   const [topic] = await db
-    .select({ status: topics.status })
+    .select({
+      status: topics.status,
+      title: topics.title,
+      timetableId: topics.timetableId,
+    })
     .from(topics)
     .where(eq(topics.id, topicId))
     .limit(1);
@@ -26,20 +33,28 @@ export async function toggleHeart(
 
   // Only an active (non-archived) heart counts as "hearted". Toggling it off
   // removes it.
-  if (existing && existing.archivedAt === null) {
+  const active = existing && existing.archivedAt === null;
+  if (active) {
     await db.delete(hearts).where(eq(hearts.id, existing.id));
-    return { hearted: false };
+  } else {
+    // No active heart: create one, or reactivate an archived row in place
+    // (the unique (topicId, userId) constraint means we can't blindly insert
+    // a second row). Re-hearting after an admin reset is a fresh vote.
+    await db
+      .insert(hearts)
+      .values({ topicId, userId })
+      .onConflictDoUpdate({
+        target: [hearts.topicId, hearts.userId],
+        set: { archivedAt: null, createdAt: new Date() },
+      });
   }
 
-  // No active heart: create one, or reactivate an archived row in place (the
-  // unique (topicId, userId) constraint means we can't blindly insert a second
-  // row). Re-hearting after an admin reset is a fresh vote.
-  await db
-    .insert(hearts)
-    .values({ topicId, userId })
-    .onConflictDoUpdate({
-      target: [hearts.topicId, hearts.userId],
-      set: { archivedAt: null, createdAt: new Date() },
-    });
-  return { hearted: true };
+  await logActivity({
+    timetableId: topic.timetableId,
+    actorId: userId,
+    action: active ? "heart.remove" : "heart.add",
+    payload: { topicId, title: topic.title },
+  });
+
+  return { hearted: !active };
 }

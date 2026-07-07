@@ -11,3 +11,4 @@ export * from "./calendar";
 export * from "./analytics";
 export * from "./digests";
 export * from "./dates";
+export * from "./slugs";

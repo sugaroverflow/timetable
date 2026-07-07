@@ -770,9 +770,23 @@ function buildRows(fixture: Fixture): {
     ]),
   );
 
+  // Deterministic, unique user slugs from display names ("-2" on collision).
+  const seenUserSlugs = new Map<string, number>();
+  const userSlugFor = (name: string): string => {
+    const base =
+      name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "") || "user";
+    const n = (seenUserSlugs.get(base) ?? 0) + 1;
+    seenUserSlugs.set(base, n);
+    return n === 1 ? base : `${base}-${n}`;
+  };
+
   const userRows: NewUser[] = fixture.people.map((person, index) => ({
     id: localIdFor(person),
     name: person.displayName,
+    slug: userSlugFor(person.displayName),
     email: person.clerkId ? `${person.label.toLowerCase()}@real.clerk` : fakeEmailFor(person.label),
     emailVerified: BASE_TIME,
     image: null,
@@ -818,6 +832,8 @@ function buildRows(fixture: Fixture): {
       timetableId,
       hostId: userIds.get(topic.host) ?? "",
       title: topic.title,
+      // Fixture labels are unique, so stripping the prefix stays unique.
+      slug: topic.label.replace(/^topic-/, ""),
       bodyMd: topic.bodyMd,
       coverImageUrl: topic.coverImageUrl,
       status: topic.status,
