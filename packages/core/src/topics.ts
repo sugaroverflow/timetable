@@ -85,6 +85,9 @@ export async function updateTopic(
         ? { coverImageUrl: input.coverImageUrl }
         : {}),
       updatedAt: new Date(),
+      // Content edits make the topic "new" again (QA #59) — status changes
+      // elsewhere never touch this.
+      contentUpdatedAt: new Date(),
     })
     .where(eq(topics.id, topicId))
     .returning();
@@ -245,6 +248,18 @@ export async function listSubmittedTopics(
     .orderBy(desc(topics.updatedAt));
 }
 
+/** Every host's drafts — surfaced read-only to admins so forgotten drafts
+ * don't go unnoticed (QA #59). */
+export async function listDraftTopics(timetableId: string): Promise<Topic[]> {
+  return db
+    .select()
+    .from(topics)
+    .where(
+      and(eq(topics.timetableId, timetableId), eq(topics.status, "draft")),
+    )
+    .orderBy(desc(topics.updatedAt));
+}
+
 /** The timetable's heart-count cutoff: hearts created before it are ignored
  * (QA #42 — "archiving" is setting this date). Null = count everything. */
 export async function getHeartsCountFrom(
@@ -302,7 +317,7 @@ export async function countViewerPublishedHearts(
   return row?.n ?? 0;
 }
 
-export type FeedSort = "hearts" | "comments" | "recent";
+export type FeedSort = "hearts" | "comments" | "recent" | "random";
 
 export type FeedTopic = {
   id: string;
@@ -317,6 +332,7 @@ export type FeedTopic = {
   coverImageUrl: string | null;
   status: TopicStatus;
   publishedAt: Date | null;
+  contentUpdatedAt: Date | null;
   createdAt: Date;
   heartCount: number;
   weightedScore: number;
@@ -324,6 +340,18 @@ export type FeedTopic = {
   commentCount: number;
   latestCommentAt: Date | null;
 };
+
+/** Deterministic per-seed rank for random sort — stable within a seed so
+ * infinite-scroll pages never repeat or overlap. */
+function seededRank(seed: string, id: string): number {
+  const s = `${seed}:${id}`;
+  let hash = 0;
+  for (let i = 0; i < s.length; i++) {
+    hash = (hash << 5) - hash + s.charCodeAt(i);
+    hash |= 0;
+  }
+  return hash;
+}
 
 /**
  * Build the published-topic feed for a timetable.
@@ -340,6 +368,8 @@ export async function buildFeed(
     /** Only topics the viewer currently hearts (QA #42 "My hearted topics"). */
     heartedByViewer?: boolean;
     sort?: FeedSort;
+    /** Shuffle seed for sort=random (QA #59). */
+    seed?: string;
     limit?: number;
     offset?: number;
   } = {},
@@ -444,6 +474,7 @@ export async function buildFeed(
       coverImageUrl: topic.coverImageUrl,
       status: topic.status,
       publishedAt: topic.publishedAt,
+      contentUpdatedAt: topic.contentUpdatedAt,
       createdAt: topic.createdAt,
       heartCount: topicHearts.length,
       weightedScore: topicWeightedScore(topicHearts, weights),
@@ -461,6 +492,13 @@ export async function buildFeed(
       : feed;
 
   const sort = opts.sort ?? "hearts";
+  const seed = opts.seed ?? "";
+  // "Newest" counts content edits, not just publication (QA #59).
+  const recency = (t: FeedTopic) =>
+    Math.max(
+      t.publishedAt?.getTime() ?? t.createdAt.getTime(),
+      t.contentUpdatedAt?.getTime() ?? 0,
+    );
   visibleFeed.sort((a, b) => {
     if (sort === "comments") {
       const at = a.latestCommentAt?.getTime() ?? 0;
@@ -469,9 +507,10 @@ export async function buildFeed(
       return b.commentCount - a.commentCount;
     }
     if (sort === "recent") {
-      const at = a.publishedAt?.getTime() ?? a.createdAt.getTime();
-      const bt = b.publishedAt?.getTime() ?? b.createdAt.getTime();
-      return bt - at;
+      return recency(b) - recency(a);
+    }
+    if (sort === "random") {
+      return seededRank(seed, a.id) - seededRank(seed, b.id);
     }
     return b.weightedScore - a.weightedScore;
   });

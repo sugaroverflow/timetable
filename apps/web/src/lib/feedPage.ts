@@ -11,7 +11,7 @@ import {
 
 export const FEED_PAGE_SIZE = 20;
 
-const SORTS = new Set(["hearts", "comments", "recent"]);
+const SORTS = new Set(["hearts", "comments", "recent", "random"]);
 
 export function normalizeFeedSort(sort: string | undefined): string {
   return sort && SORTS.has(sort) ? sort : "hearts";
@@ -34,27 +34,31 @@ const COMMENT_FIELDS = `
 `;
 
 const QUERY = `
-  query Feed($s: String!, $sort: String, $host: String, $hearted: Boolean, $limit: Int, $offset: Int) {
+  query Feed($s: String!, $sort: String, $seed: String, $host: String, $hearted: Boolean, $limit: Int, $offset: Int) {
     timetable(idOrSlug: $s) { viewerRoles settings viewerHeartedPublishedCount }
     me { id }
     myFeedLastSeenAt(idOrSlug: $s)
     timetableHosts(idOrSlug: $s) { id name }
-    topicFeed(idOrSlug: $s, sort: $sort, hostId: $host, heartedByMe: $hearted, limit: $limit, offset: $offset) {
+    topicFeed(idOrSlug: $s, sort: $sort, seed: $seed, hostId: $host, heartedByMe: $hearted, limit: $limit, offset: $offset) {
       id timetableId hostId hostName hostImage hostSlug title slug bodyMd bodyHtml coverImageUrl status
       heartCount weightedScore viewerHasHearted commentCount
-      publishedAt createdAt
+      publishedAt contentUpdatedAt createdAt
       comments { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} } } }
       weightedBreakdown { electorId electorName weight }
     }
   }
 `;
 
-/** True when the topic was published — or picked up new comments — after
- * the viewer's last feed visit. Never-seen (null) shows no highlights. */
+/** True when the topic was published, edited, or picked up new comments
+ * after the viewer's last feed visit. Never-seen (null) shows no
+ * highlights. */
 export function isTopicNew(topic: FeedTopic, lastSeenAt: string | null): boolean {
   if (!lastSeenAt) return false;
   const seen = Date.parse(lastSeenAt);
   if (topic.publishedAt && Date.parse(topic.publishedAt) > seen) return true;
+  if (topic.contentUpdatedAt && Date.parse(topic.contentUpdatedAt) > seen) {
+    return true;
+  }
   const newer = (comments: FeedTopic["comments"]): boolean =>
     comments.some(
       (c) => Date.parse(c.createdAt) > seen || newer(c.replies ?? []),
@@ -85,10 +89,12 @@ export async function fetchFeedPage(
   host: string,
   offset: number,
   hearted = false,
+  seed = "",
 ): Promise<FeedPage> {
   const data = await gqlFetch<Data>(QUERY, {
     s: slug,
     sort: normalizeFeedSort(sort),
+    seed: seed || null,
     host: host || null,
     hearted,
     limit: FEED_PAGE_SIZE + 1,

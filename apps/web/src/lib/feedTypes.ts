@@ -43,6 +43,7 @@ export type FeedTopic = {
   viewerHasHearted: boolean;
   commentCount: number;
   publishedAt: string | null;
+  contentUpdatedAt: string | null;
   createdAt: string;
   comments: FeedComment[];
   weightedBreakdown: WeightedHeart[] | null;

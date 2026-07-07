@@ -6,6 +6,11 @@ import { DashboardActivityFilter } from "@/components/DashboardActivityFilter";
 import { HostFilter } from "@/components/HostFilter";
 import { gqlFetch } from "@/lib/graphql";
 import { displayRolesFromCookies } from "@/lib/previewRoles.server";
+import {
+  parseTimetableSettings,
+  pluralLabel,
+  roleLabel,
+} from "@/lib/timetableSettings";
 import { topicPath } from "@/lib/topicPath";
 
 const ACTIVITY_FILTERS = new Set([
@@ -67,14 +72,14 @@ type Dashboard = {
 };
 
 type Data = {
-  timetable: { viewerRoles: string[] } | null;
+  timetable: { viewerRoles: string[]; settings: string } | null;
   timetableHosts: { id: string; name: string | null }[];
   dashboard: Dashboard | null;
 };
 
 const QUERY = `
   query Dashboard($s: String!, $host: String, $activity: String) {
-    timetable(idOrSlug: $s) { viewerRoles }
+    timetable(idOrSlug: $s) { viewerRoles settings }
     timetableHosts(idOrSlug: $s) { id name }
     dashboard(idOrSlug: $s, hostId: $host, electorActivity: $activity) {
       totalHearts electorCount hostCount slotCount
@@ -128,6 +133,9 @@ export default async function DashboardPage({
   }
   const d = data.dashboard;
   if (!d) return <div className="notice">No dashboard data.</div>;
+  const settings = parseTimetableSettings(data.timetable?.settings);
+  const hostLabel = roleLabel(settings.roleLabels, "host");
+  const hostsPlural = pluralLabel(hostLabel);
 
   return (
     <div className="stack">
@@ -137,8 +145,12 @@ export default async function DashboardPage({
       </div>
 
       <div className="toolbar">
-        <label>Host</label>
-        <HostFilter value={host} hosts={data.timetableHosts} />
+        <label>{hostLabel}</label>
+        <HostFilter
+          value={host}
+          hosts={data.timetableHosts}
+          allLabel={`All ${hostsPlural}`}
+        />
         <label>Elector activity</label>
         <DashboardActivityFilter value={activity} />
       </div>
@@ -186,7 +198,7 @@ export default async function DashboardPage({
                       const href = topicPath(slug, t.hostSlug, t.slug);
                       return href ? <Link href={href}>{t.title}</Link> : t.title;
                     })()}{" "}
-                    <span className="faint">· {t.hostName ?? "Host"}</span>
+                    <span className="faint">· {t.hostName ?? hostLabel}</span>
                   </span>
                   <span className="mono" style={{ textAlign: "right" }}>
                     {t.weightedScore.toFixed(2)}
@@ -203,7 +215,9 @@ export default async function DashboardPage({
         </div>
 
         <div className="card">
-          <h3 style={{ marginTop: 0, fontSize: 15 }}>All hosts by weighted votes</h3>
+          <h3 style={{ marginTop: 0, fontSize: 15 }}>
+            All {hostsPlural} by weighted votes
+          </h3>
           {d.hostLeaderboard.length === 0 ? (
             <p className="faint" style={{ fontSize: 13 }}>
               No data yet.

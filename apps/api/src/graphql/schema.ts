@@ -38,6 +38,7 @@ import {
   listMembers,
   listMembershipsForUser,
   listSlotComments,
+  listDraftTopics,
   listSubmittedTopics,
   listTimetableHosts,
   logActivity,
@@ -306,6 +307,10 @@ const TopicType = builder.objectRef<GqlTopic>("Topic").implement({
       nullable: true,
       resolve: (tp) => tp.publishedAt?.toISOString() ?? null,
     }),
+    contentUpdatedAt: t.string({
+      nullable: true,
+      resolve: (tp) => tp.contentUpdatedAt?.toISOString() ?? null,
+    }),
     createdAt: t.string({ resolve: (tp) => tp.createdAt.toISOString() }),
     // Weighted score is host/admin-only.
     weightedScore: t.float({
@@ -556,6 +561,7 @@ builder.queryType({
         hostId: t.arg.string({ required: false }),
         heartedByMe: t.arg.boolean({ required: false }),
         sort: t.arg.string({ required: false }),
+        seed: t.arg.string({ required: false }),
         limit: t.arg.int({ required: false }),
         offset: t.arg.int({ required: false }),
       },
@@ -572,7 +578,10 @@ builder.queryType({
           readable.timetable.privacy as Privacy,
           viewer,
         );
-        const sort = (args.sort ?? "hearts") as "hearts" | "comments" | "recent";
+        const validSorts = new Set(["hearts", "comments", "recent", "random"]);
+        const sort = (
+          args.sort && validSorts.has(args.sort) ? args.sort : "hearts"
+        ) as "hearts" | "comments" | "recent" | "random";
         const feed = await buildFeed(
           readable.timetable.id,
           ctx.user?.id ?? null,
@@ -580,6 +589,7 @@ builder.queryType({
             hostId: args.hostId ?? undefined,
             heartedByViewer: Boolean(args.heartedByMe),
             sort,
+            seed: args.seed ?? undefined,
             limit: args.limit ?? 50,
             offset: args.offset ?? undefined,
           },
@@ -618,6 +628,23 @@ builder.queryType({
         const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
         if (!canModerate(viewer)) return [];
         return listSubmittedTopics(readable.timetable.id);
+      },
+    }),
+
+    /** Every host's drafts, read-only (admin only, QA #59 — forgotten
+     * drafts stay visible on Pending Topics). */
+    draftTopics: t.field({
+      type: [ManagedTopicType],
+      args: { idOrSlug: t.arg.string({ required: true }) },
+      resolve: async (_p, args, ctx) => {
+        const readable = await getReadableTimetable(
+          ctx.user?.id ?? null,
+          args.idOrSlug,
+        );
+        if (!readable) return [];
+        const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
+        if (!canModerate(viewer)) return [];
+        return listDraftTopics(readable.timetable.id);
       },
     }),
 
@@ -703,6 +730,7 @@ builder.queryType({
           coverImageUrl: topic.coverImageUrl,
           status: topic.status,
           publishedAt: topic.publishedAt,
+          contentUpdatedAt: topic.contentUpdatedAt,
           createdAt: topic.createdAt,
           heartCount: 0,
           weightedScore: 0,

@@ -36,6 +36,10 @@ export const topics = pgTable(
     coverImageUrl: text(),
     status: topicStatusEnum().notNull().default("draft"),
     publishedAt: timestamp({ withTimezone: true }),
+    // Bumped only by host/admin edits to title/body/cover — never by status
+    // churn. Drives "newest" sorting and the new-since-last-visit highlight
+    // (QA #59: an edited topic counts as new; no email is triggered).
+    contentUpdatedAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },

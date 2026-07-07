@@ -1,0 +1,1 @@
+ALTER TABLE "topics" ADD COLUMN "content_updated_at" timestamp with time zone;
