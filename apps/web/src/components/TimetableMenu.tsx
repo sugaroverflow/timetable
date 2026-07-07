@@ -52,10 +52,13 @@ export function TimetableMenu({ items }: { items: TimetableMenuItem[] }) {
     };
   }, [open]);
 
-  // Close when navigating.
-  useEffect(() => {
+  // Close after navigation — state adjustment during render (not an
+  // effect), per react-hooks/set-state-in-effect.
+  const [lastPathname, setLastPathname] = useState(pathname);
+  if (pathname !== lastPathname) {
+    setLastPathname(pathname);
     setOpen(false);
-  }, [pathname]);
+  }
 
   return (
     <div className="tt-menu" ref={rootRef}>
