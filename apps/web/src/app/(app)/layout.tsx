@@ -2,6 +2,7 @@ import { UserButton } from "@clerk/nextjs";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import Link from "next/link";
 
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { TopbarBrand, type BrandItem } from "@/components/TopbarBrand";
 import { ToastProvider } from "@/components/Toast";
 import { gqlFetch } from "@/lib/graphql";
@@ -48,6 +49,7 @@ export default async function AppLayout({
           fallbackHref={userId ? "/timetables" : "/"}
         />
         <div className="spacer" />
+        <ThemeToggle />
         {userId ? (
           <>
             <Link className="muted" href="/profile" style={{ fontSize: 13 }}>

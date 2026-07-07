@@ -62,6 +62,8 @@ export default async function SettingsPage({
           description={first.timetable.description}
           privacy={first.timetable.privacy}
           customDomain={first.timetable.customDomain}
+          roleLabels={settings.roleLabels}
+          digestDefaults={settings.digestDefaults}
         />
         <SettingsForm slug={slug} current={settings} />
       </div>

@@ -135,6 +135,57 @@ function notFound(message = "Not found"): never {
   throw new GraphQLError(message, { extensions: { code: "NOT_FOUND" } });
 }
 
+function badRequest(message = "Bad request"): never {
+  throw new GraphQLError(message, { extensions: { code: "BAD_REQUEST" } });
+}
+
+const THEME_FONTS = new Set([
+  "default",
+  "editorial",
+  "humanist",
+  "modern",
+  "technical",
+]);
+const HEX_COLOUR = /^#[0-9a-fA-F]{6}$/;
+
+/** Validate a client-sent theme (QA #59): known keys only, colours must be
+ * #rrggbb, font from the curated list. Returns null when invalid. */
+function parseThemeJson(
+  raw: string,
+): NonNullable<TimetableSettings["theme"]> | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== "object" || parsed === null) return null;
+  const source = parsed as Record<string, unknown>;
+  const colour = (v: unknown) =>
+    typeof v === "string" && HEX_COLOUR.test(v) ? v : undefined;
+
+  const theme: NonNullable<TimetableSettings["theme"]> = {};
+  theme.primary = colour(source.primary);
+  theme.secondary = colour(source.secondary);
+  theme.background = colour(source.background);
+  theme.topbar = colour(source.topbar);
+  theme.text = colour(source.text);
+  if (typeof source.font === "string" && THEME_FONTS.has(source.font)) {
+    theme.font = source.font;
+  }
+  if (typeof source.dark === "object" && source.dark !== null) {
+    const d = source.dark as Record<string, unknown>;
+    theme.dark = {
+      primary: colour(d.primary),
+      secondary: colour(d.secondary),
+      background: colour(d.background),
+      topbar: colour(d.topbar),
+      text: colour(d.text),
+    };
+  }
+  return theme;
+}
+
 async function requireUser(ctx: ApiContext): Promise<SessionUser> {
   if (!ctx.user) unauthenticated();
   return ctx.user;
@@ -1273,6 +1324,9 @@ builder.mutationType({
         roleLabelElector: t.arg.string({ required: false }),
         themePrimary: t.arg.string({ required: false }),
         themeSecondary: t.arg.string({ required: false }),
+        /** Full theme object (QA #59) — JSON, validated server-side.
+         * Wins over the individual theme args when both are sent. */
+        themeJson: t.arg.string({ required: false }),
         coverImageUrl: t.arg.string({ required: false }),
         iconUrl: t.arg.string({ required: false }),
         digestNewTopics: t.arg.boolean({ required: false }),
@@ -1318,6 +1372,12 @@ builder.mutationType({
               ? { secondary: args.themeSecondary }
               : {}),
           };
+        }
+
+        if (args.themeJson != null) {
+          const parsed = parseThemeJson(args.themeJson);
+          if (!parsed) badRequest("Invalid theme");
+          patch.theme = parsed;
         }
 
         if (args.coverImageUrl != null) {

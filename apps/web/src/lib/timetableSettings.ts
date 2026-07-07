@@ -13,9 +13,26 @@ export type DigestSettings = {
   digestActivity?: boolean;
 };
 
+/** Mirrors ThemeSettings in @timetable/db. */
+export type ThemeSettings = {
+  primary?: string;
+  secondary?: string;
+  background?: string;
+  topbar?: string;
+  text?: string;
+  font?: string;
+  dark?: {
+    primary?: string;
+    secondary?: string;
+    background?: string;
+    topbar?: string;
+    text?: string;
+  };
+};
+
 export type TimetableSettings = {
   roleLabels?: RoleLabels;
-  theme?: { primary?: string; secondary?: string };
+  theme?: ThemeSettings;
   coverImageUrl?: string | null;
   iconUrl?: string | null;
   digestDefaults?: DigestSettings;
@@ -60,16 +77,63 @@ export function roleLabel(
   return role;
 }
 
+/** Curated font pairings (QA #59). Keys are persisted in settings; values
+ * feed --serif (headings) and --sans (body). All stacks resolve to fonts the
+ * app already loads or system fonts, so switching costs nothing. */
+export const FONT_PAIRINGS: Record<
+  string,
+  { label: string; serif: string; sans: string }
+> = {
+  default: {
+    label: "Fraunces + Inter (default)",
+    serif: '"Fraunces", Georgia, serif',
+    sans: '"Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+  },
+  editorial: {
+    label: "Georgia + Helvetica",
+    serif: "Georgia, 'Times New Roman', serif",
+    sans: "'Helvetica Neue', Helvetica, Arial, sans-serif",
+  },
+  humanist: {
+    label: "Palatino + Verdana",
+    serif: "Palatino, 'Palatino Linotype', 'Book Antiqua', serif",
+    sans: "Verdana, Geneva, sans-serif",
+  },
+  modern: {
+    label: "All sans (Inter)",
+    serif: '"Inter", system-ui, sans-serif',
+    sans: '"Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+  },
+  technical: {
+    label: "Monospace headings (IBM Plex Mono)",
+    serif: '"IBM Plex Mono", ui-monospace, Menlo, monospace',
+    sans: '"Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+  },
+};
+
 /**
  * The single theme→CSS-variable mapping, used for both server render
- * (themeStyle) and the settings page's live preview. Primary drives the
- * accent colours; secondary drives the host-only panel colours.
+ * (buildThemeCss) and the settings page's live preview. Primary drives the
+ * accent colours; secondary drives the host-only panel colours; background,
+ * topbar, and text override the base tokens.
  */
 export function themeVars(
-  primary: string | undefined,
-  secondary: string | undefined,
+  theme: ThemeSettings | undefined,
+  mode: "light" | "dark" = "light",
 ): Record<string, string> {
   const vars: Record<string, string> = {};
+  if (!theme) return vars;
+  const dark = mode === "dark";
+  // Accents carry into dark mode (with optional dark overrides); base
+  // colours (background/topbar/text) apply in dark mode only when a dark
+  // override is set — light values would wreck the built-in dark palette.
+  const primary = dark ? (theme.dark?.primary ?? theme.primary) : theme.primary;
+  const secondary = dark
+    ? (theme.dark?.secondary ?? theme.secondary)
+    : theme.secondary;
+  const background = dark ? theme.dark?.background : theme.background;
+  const topbar = dark ? theme.dark?.topbar : theme.topbar;
+  const text = dark ? theme.dark?.text : theme.text;
   if (primary) {
     vars["--primary"] = primary;
     vars["--primary-soft"] = primary + "1a";
@@ -80,12 +144,33 @@ export function themeVars(
     vars["--host-wash"] = secondary + "15";
     vars["--host-line"] = secondary + "40";
   }
+  if (background) vars["--bg"] = background;
+  if (topbar) vars["--topbar"] = topbar;
+  if (text) vars["--ink"] = text;
+  const font = theme.font ? FONT_PAIRINGS[theme.font] : undefined;
+  if (font) {
+    vars["--serif"] = font.serif;
+    vars["--sans"] = font.sans;
+  }
   return vars;
 }
 
+function cssBlock(selector: string, vars: Record<string, string>): string {
+  const body = Object.entries(vars)
+    .map(([k, v]) => `${k}:${v};`)
+    .join("");
+  return body ? `${selector}{${body}}` : "";
+}
+
+/** Server-rendered <style> content applying a timetable's theme globally
+ * (topbar included), with dark-mode overrides under html[data-theme]. */
+export function buildThemeCss(settings: TimetableSettings): string {
+  return (
+    cssBlock(":root", themeVars(settings.theme, "light")) +
+    cssBlock('html[data-theme="dark"]', themeVars(settings.theme, "dark"))
+  );
+}
+
 export function themeStyle(settings: TimetableSettings): CSSProperties {
-  return themeVars(
-    settings.theme?.primary,
-    settings.theme?.secondary,
-  ) as CSSProperties;
+  return themeVars(settings.theme, "light") as CSSProperties;
 }

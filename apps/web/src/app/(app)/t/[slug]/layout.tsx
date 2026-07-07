@@ -15,10 +15,10 @@ import {
 import { gqlFetch } from "@/lib/graphql";
 import { displayRoles, PREVIEW_COOKIE } from "@/lib/previewRoles";
 import {
+  buildThemeCss,
   parseTimetableSettings,
   privacyBadge,
   roleLabel,
-  themeStyle,
 } from "@/lib/timetableSettings";
 
 type TimetableResult = {
@@ -103,8 +103,13 @@ export default async function TimetableLayout({
     }));
   }
 
+  const themeCss = buildThemeCss(settings);
+
   return (
-    <main className="container" style={themeStyle(settings)}>
+    <main className="container">
+      {/* The timetable's theme applies globally (topbar included) while
+       * this layout is mounted; dark overrides ride the same tag. */}
+      {themeCss ? <style dangerouslySetInnerHTML={{ __html: themeCss }} /> : null}
       <div className="shell">
         <Sidebar>
           <div className="sidebar-head">
