@@ -1,10 +1,19 @@
 import { pgEnum } from "drizzle-orm/pg-core";
 
-/** Timetable visibility. Enforced in the service/authorization layer. */
+/** Timetable visibility (QA #42 granularity). Enforced in the
+ * service/authorization layer:
+ * - public: all topics, comments, and bios visible to everyone
+ * - hosts_only: topics + host bios visible to the public; no comments
+ * - no_comments: topics + all bios visible to the public; no comments
+ * - private: members only
+ * - deactivated: admins only
+ * Non-member signed-in users are treated like anonymous visitors. */
 export const privacyEnum = pgEnum("timetable_privacy", [
   "deactivated",
   "private",
   "public",
+  "hosts_only",
+  "no_comments",
 ]);
 
 /** Roles are scoped to a single timetable via membership, never global. */

@@ -60,7 +60,7 @@ const COMMENT_VISIBILITY_VALUES = [
   "host_only",
 ] as const satisfies readonly CommentVisibility[];
 
-const TIMETABLE_PRIVACY_VALUES = ["deactivated", "private", "public"] as const;
+const TIMETABLE_PRIVACY_VALUES = ["deactivated", "private", "public", "hosts_only", "no_comments"] as const;
 type TimetablePrivacy = (typeof TIMETABLE_PRIVACY_VALUES)[number];
 
 const AVAILABILITY_STATE_VALUES = ['green', 'yellow', 'red'] as const satisfies readonly AvailabilityState[];
@@ -254,7 +254,7 @@ function parseTimetable(markdown: string): TimetableFixture {
   const description = fieldFromBlock(block, "Description") || null;
   const privacyRaw = fieldFromBlock(block, "Privacy", { required: true });
   const privacy =
-    /\*\*(deactivated|private|public)\*\*/.exec(privacyRaw)?.[1] ??
+    /\*\*(deactivated|private|public|hosts_only|no_comments)\*\*/.exec(privacyRaw)?.[1] ??
     privacyRaw.trim();
 
   if (!hasValue(TIMETABLE_PRIVACY_VALUES, privacy)) {

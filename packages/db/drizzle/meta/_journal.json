@@ -71,6 +71,13 @@
       "when": 1783382550371,
       "tag": "0009_aspiring_zombie",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1783383765273,
+      "tag": "0010_vengeful_pixie",
+      "breakpoints": true
     }
   ]
 }

@@ -82,10 +82,14 @@ import {
   canManageMembers,
   canModerate,
   canProposeTopics,
+  canSeeComments,
   canSeeHostOnly,
+  canSeePersonProfile,
   isAdmin,
   isElector,
   isHost,
+  type Privacy,
+  type Role as SharedRole,
 } from "@timetable/shared";
 
 import type { SessionUser } from "../auth/clerk";
@@ -104,7 +108,11 @@ type GqlMember = {
   roles: string[];
   user: { id: string; name: string | null; email: string | null; image: string | null };
 };
-type GqlTopic = FeedTopic & { canSeeHostOnly: boolean; canModerate: boolean };
+type GqlTopic = FeedTopic & {
+  canSeeHostOnly: boolean;
+  canModerate: boolean;
+  canSeeComments: boolean;
+};
 
 // ---------------------------------------------------------------------------
 // Builder + auth helpers
@@ -276,7 +284,9 @@ const TopicType = builder.objectRef<GqlTopic>("Topic").implement({
     status: t.exposeString("status"),
     heartCount: t.exposeInt("heartCount"),
     viewerHasHearted: t.exposeBoolean("viewerHasHearted"),
-    commentCount: t.exposeInt("commentCount"),
+    commentCount: t.int({
+      resolve: (tp) => (tp.canSeeComments ? tp.commentCount : 0),
+    }),
     publishedAt: t.string({
       nullable: true,
       resolve: (tp) => tp.publishedAt?.toISOString() ?? null,
@@ -298,11 +308,13 @@ const TopicType = builder.objectRef<GqlTopic>("Topic").implement({
     }),
     comments: t.field({
       type: [CommentType],
-      resolve: (tp) =>
-        listCommentTree(tp.id, {
+      resolve: (tp) => {
+        if (!tp.canSeeComments) return [];
+        return listCommentTree(tp.id, {
           includeHostOnly: tp.canSeeHostOnly,
           includeHidden: tp.canModerate,
-        }),
+        });
+      },
     }),
   }),
 });
@@ -442,7 +454,15 @@ builder.queryType({
           args.idOrSlug,
         );
         if (!readable) return [];
-        return listPeople(readable.timetable.id);
+        const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
+        const people = await listPeople(readable.timetable.id);
+        return people.filter((p) =>
+          canSeePersonProfile(
+            readable.timetable.privacy as Privacy,
+            viewer,
+            p.roles as SharedRole[],
+          ),
+        );
       },
     }),
 
@@ -460,7 +480,19 @@ builder.queryType({
           args.idOrSlug,
         );
         if (!readable) return null;
-        return getPerson(readable.timetable.id, args.userId);
+        const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
+        const person = await getPerson(readable.timetable.id, args.userId);
+        if (
+          person &&
+          !canSeePersonProfile(
+            readable.timetable.privacy as Privacy,
+            viewer,
+            person.roles as SharedRole[],
+          )
+        ) {
+          return null;
+        }
+        return person;
       },
     }),
 
@@ -507,6 +539,7 @@ builder.queryType({
       args: {
         idOrSlug: t.arg.string({ required: true }),
         hostId: t.arg.string({ required: false }),
+        heartedByMe: t.arg.boolean({ required: false }),
         sort: t.arg.string({ required: false }),
         limit: t.arg.int({ required: false }),
         offset: t.arg.int({ required: false }),
@@ -520,12 +553,17 @@ builder.queryType({
         const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
         const hostOnly = canSeeHostOnly(viewer);
         const moderate = canModerate(viewer);
+        const seeComments = canSeeComments(
+          readable.timetable.privacy as Privacy,
+          viewer,
+        );
         const sort = (args.sort ?? "hearts") as "hearts" | "comments" | "recent";
         const feed = await buildFeed(
           readable.timetable.id,
           ctx.user?.id ?? null,
           {
             hostId: args.hostId ?? undefined,
+            heartedByViewer: Boolean(args.heartedByMe),
             sort,
             limit: args.limit ?? 50,
             offset: args.offset ?? undefined,
@@ -535,6 +573,7 @@ builder.queryType({
           ...tp,
           canSeeHostOnly: hostOnly,
           canModerate: moderate,
+          canSeeComments: seeComments,
         }));
       },
     }),
@@ -612,6 +651,10 @@ builder.queryType({
         const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
         const hostOnly = canSeeHostOnly(viewer);
         const moderate = canModerate(viewer);
+        const seeComments = canSeeComments(
+          readable.timetable.privacy as Privacy,
+          viewer,
+        );
 
         if (topic.status === "published") {
           const [feedTopic] = await buildFeed(
@@ -624,6 +667,7 @@ builder.queryType({
             ...feedTopic,
             canSeeHostOnly: hostOnly,
             canModerate: moderate,
+            canSeeComments: seeComments,
           };
         }
 
@@ -652,6 +696,7 @@ builder.queryType({
           latestCommentAt: null,
           canSeeHostOnly: hostOnly,
           canModerate: moderate,
+          canSeeComments: seeComments,
         };
       },
     }),

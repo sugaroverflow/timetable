@@ -78,7 +78,15 @@ export function TimetableProfileForm({
           onChange={(e) => setPrivacy(e.target.value)}
         >
           <option value="private">Private — members only</option>
-          <option value="public">Public — anyone can read</option>
+          <option value="public">
+            Public — all topics, comments, and bios
+          </option>
+          <option value="hosts_only">
+            Hosts only — topics and host bios public, no comments
+          </option>
+          <option value="no_comments">
+            No comments — topics and all bios public, no comments
+          </option>
           <option value="deactivated">Deactivated — admins only</option>
         </select>
       </div>

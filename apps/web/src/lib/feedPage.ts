@@ -34,12 +34,12 @@ const COMMENT_FIELDS = `
 `;
 
 const QUERY = `
-  query Feed($s: String!, $sort: String, $host: String, $limit: Int, $offset: Int) {
+  query Feed($s: String!, $sort: String, $host: String, $hearted: Boolean, $limit: Int, $offset: Int) {
     timetable(idOrSlug: $s) { viewerRoles settings viewerHeartedPublishedCount }
     me { id }
     myFeedLastSeenAt(idOrSlug: $s)
     timetableHosts(idOrSlug: $s) { id name }
-    topicFeed(idOrSlug: $s, sort: $sort, hostId: $host, limit: $limit, offset: $offset) {
+    topicFeed(idOrSlug: $s, sort: $sort, hostId: $host, heartedByMe: $hearted, limit: $limit, offset: $offset) {
       id timetableId hostId hostName hostImage hostSlug title slug bodyMd bodyHtml coverImageUrl status
       heartCount weightedScore viewerHasHearted commentCount
       publishedAt createdAt
@@ -84,11 +84,13 @@ export async function fetchFeedPage(
   sort: string,
   host: string,
   offset: number,
+  hearted = false,
 ): Promise<FeedPage> {
   const data = await gqlFetch<Data>(QUERY, {
     s: slug,
     sort: normalizeFeedSort(sort),
     host: host || null,
+    hearted,
     limit: FEED_PAGE_SIZE + 1,
     offset: Math.max(0, offset),
   });

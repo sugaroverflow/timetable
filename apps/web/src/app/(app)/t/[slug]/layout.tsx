@@ -2,7 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
-import { isAdmin, isHost, type Role } from "@timetable/shared";
+import { isAdmin, isElector, isHost, type Role } from "@timetable/shared";
 
 import { NavLink } from "@/components/NavLink";
 import { PreviewToggle } from "@/components/PreviewToggle";
@@ -74,6 +74,8 @@ export default async function TimetableLayout({
 
   const privacyConfig = {
     public: { dot: "var(--green)", label: "Public" },
+    hosts_only: { dot: "var(--green)", label: "Hosts only" },
+    no_comments: { dot: "var(--green)", label: "No comments" },
     private: { dot: "var(--yellow)", label: "Private" },
     deactivated: { dot: "var(--faint)", label: "Deactivated" },
   };
@@ -107,6 +109,11 @@ export default async function TimetableLayout({
             <NavLink href={`${base}/feed`}>Topic feed</NavLink>
             {(isHost(roles) || isAdmin(roles)) && (
               <NavLink href={`${base}/topics`}>My Topics</NavLink>
+            )}
+            {isElector(roles) && (
+              <NavLink href={`${base}/feed?hearted=me`}>
+                My hearted topics
+              </NavLink>
             )}
             {roles.length > 0 && (
               <NavLink href={`${base}/people`}>People</NavLink>

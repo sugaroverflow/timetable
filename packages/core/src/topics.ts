@@ -337,6 +337,8 @@ export async function buildFeed(
   opts: {
     hostId?: string;
     topicId?: string;
+    /** Only topics the viewer currently hearts (QA #42 "My hearted topics"). */
+    heartedByViewer?: boolean;
     sort?: FeedSort;
     limit?: number;
     offset?: number;
@@ -453,8 +455,13 @@ export async function buildFeed(
     };
   });
 
+  const visibleFeed =
+    opts.heartedByViewer && viewerUserId
+      ? feed.filter((t) => t.viewerHasHearted)
+      : feed;
+
   const sort = opts.sort ?? "hearts";
-  feed.sort((a, b) => {
+  visibleFeed.sort((a, b) => {
     if (sort === "comments") {
       const at = a.latestCommentAt?.getTime() ?? 0;
       const bt = b.latestCommentAt?.getTime() ?? 0;
@@ -470,10 +477,10 @@ export async function buildFeed(
   });
 
   const offset = Math.max(0, opts.offset ?? 0);
-  if (opts.limit === undefined) return feed.slice(offset);
+  if (opts.limit === undefined) return visibleFeed.slice(offset);
 
   const limit = Math.max(1, Math.min(opts.limit, 50));
-  return feed.slice(offset, offset + limit);
+  return visibleFeed.slice(offset, offset + limit);
 }
 
 export type WeightedHeartEntry = {

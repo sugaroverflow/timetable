@@ -7,6 +7,7 @@ type LoadMore = (
   sort: string,
   host: string,
   offset: number,
+  hearted?: boolean,
 ) => Promise<{ cards: React.ReactNode; hasNext: boolean }>;
 
 /**
@@ -18,6 +19,7 @@ export function InfiniteFeed({
   slug,
   sort,
   host,
+  hearted = false,
   pageSize,
   initialHasNext,
   loadMore,
@@ -26,6 +28,7 @@ export function InfiniteFeed({
   slug: string;
   sort: string;
   host: string;
+  hearted?: boolean;
   pageSize: number;
   initialHasNext: boolean;
   loadMore: LoadMore;
@@ -43,7 +46,7 @@ export function InfiniteFeed({
     loadingRef.current = true;
     setFailed(false);
     try {
-      const res = await loadMore(slug, sort, host, offsetRef.current);
+      const res = await loadMore(slug, sort, host, offsetRef.current, hearted);
       offsetRef.current += pageSize;
       setPages((prev) => [...prev, res.cards]);
       setHasNext(res.hasNext);
@@ -52,7 +55,7 @@ export function InfiniteFeed({
     } finally {
       loadingRef.current = false;
     }
-  }, [loadMore, slug, sort, host, pageSize]);
+  }, [loadMore, slug, sort, host, hearted, pageSize]);
 
   useEffect(() => {
     const el = sentinelRef.current;

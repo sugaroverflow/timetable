@@ -1,7 +1,13 @@
 export const ROLES = ["owner", "admin", "host", "elector"] as const;
 export type Role = (typeof ROLES)[number];
 
-export const PRIVACY_LEVELS = ["deactivated", "private", "public"] as const;
+export const PRIVACY_LEVELS = [
+  "deactivated",
+  "private",
+  "public",
+  "hosts_only",
+  "no_comments",
+] as const;
 export type Privacy = (typeof PRIVACY_LEVELS)[number];
 
 /** Roles an admin is allowed to assign to others (not "owner"). */
