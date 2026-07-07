@@ -646,6 +646,28 @@ textarea {
   height: 26px;
   font-size: 11px;
 }
+.avatar-lg {
+  width: 56px;
+  height: 56px;
+  font-size: 20px;
+}
+
+/* People page (QA #59) */
+.people-heading {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--faint);
+  margin: 10px 0 0;
+}
+.person-topics ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+}
+.person-topics li {
+  margin: 2px 0;
+}
 
 /* Topic card */
 .topic-title {

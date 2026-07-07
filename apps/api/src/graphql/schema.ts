@@ -226,6 +226,16 @@ const MemberType = builder.objectRef<GqlMember>("Member").implement({
   }),
 });
 
+const PersonTopicType = builder
+  .objectRef<{ id: string; title: string; slug: string | null }>("PersonTopic")
+  .implement({
+    fields: (t) => ({
+      id: t.exposeID("id"),
+      title: t.exposeString("title"),
+      slug: t.exposeString("slug", { nullable: true }),
+    }),
+  });
+
 const PersonType = builder.objectRef<Person>("Person").implement({
   fields: (t) => ({
     userId: t.exposeID("userId"),
@@ -239,6 +249,11 @@ const PersonType = builder.objectRef<Person>("Person").implement({
       resolve: (p) => (p.bio ? renderMarkdown(p.bio) : null),
     }),
     bio: t.exposeString("bio", { nullable: true }),
+    /** Published topics this person hosts (QA #59 — People page cards). */
+    publishedTopics: t.field({
+      type: [PersonTopicType],
+      resolve: (p) => p.publishedTopics ?? [],
+    }),
   }),
 });
 

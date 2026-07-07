@@ -110,7 +110,7 @@ export function MemberRolesEditor({
   }
 
   return (
-    <li className="card">
+    <div className="member-editor">
       <div className="row wrap" style={{ justifyContent: "space-between" }}>
         <div>
           <strong>{name ?? email ?? "Unknown user"}</strong>
@@ -197,6 +197,6 @@ export function MemberRolesEditor({
           </button>
         )}
       </div>
-    </li>
+    </div>
   );
 }

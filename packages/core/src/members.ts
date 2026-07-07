@@ -4,6 +4,7 @@ import {
   db,
   timetableMemberships,
   timetables,
+  topics,
   users,
   type Timetable,
   type TimetableMembership,
@@ -138,6 +139,12 @@ export async function markFeedSeen(
     );
 }
 
+export type PersonTopic = {
+  id: string;
+  title: string;
+  slug: string | null;
+};
+
 export type Person = {
   userId: string;
   name: string | null;
@@ -145,10 +152,13 @@ export type Person = {
   slug: string | null;
   bio: string | null;
   roles: Role[];
+  publishedTopics?: PersonTopic[];
 };
 
 /** Members with their public profile fields (no emails) — powers the
- * People page and the bio modal. Caller gates on timetable readability. */
+ * People page and the bio modal. Caller gates on timetable readability.
+ * Each person carries their published topics (QA #59 — host cards list
+ * topic titles). */
 export async function listPeople(timetableId: string): Promise<Person[]> {
   const rows = await db
     .select({
@@ -162,7 +172,29 @@ export async function listPeople(timetableId: string): Promise<Person[]> {
     .from(timetableMemberships)
     .innerJoin(users, eq(users.id, timetableMemberships.userId))
     .where(eq(timetableMemberships.timetableId, timetableId));
-  return rows.sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
+
+  const published = await db
+    .select({
+      id: topics.id,
+      title: topics.title,
+      slug: topics.slug,
+      hostId: topics.hostId,
+    })
+    .from(topics)
+    .where(
+      and(eq(topics.timetableId, timetableId), eq(topics.status, "published")),
+    )
+    .orderBy(topics.title);
+  const byHost = new Map<string, PersonTopic[]>();
+  for (const t of published) {
+    const list = byHost.get(t.hostId) ?? [];
+    list.push({ id: t.id, title: t.title, slug: t.slug });
+    byHost.set(t.hostId, list);
+  }
+
+  return rows
+    .map((row) => ({ ...row, publishedTopics: byHost.get(row.userId) ?? [] }))
+    .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
 }
 
 /** One member's public profile (for the bio modal). */

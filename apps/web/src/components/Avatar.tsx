@@ -31,14 +31,17 @@ function initials(name: string): string {
 export function Avatar({
   name,
   small = false,
+  large = false,
 }: {
   name: string | null;
   small?: boolean;
+  large?: boolean;
 }) {
   const label = name ?? "?";
+  const sizeClass = small ? " avatar-sm" : large ? " avatar-lg" : "";
   return (
     <span
-      className={small ? "avatar avatar-sm" : "avatar"}
+      className={`avatar${sizeClass}`}
       style={{ background: colorFor(label) }}
       title={label}
     >
