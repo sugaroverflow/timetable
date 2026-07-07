@@ -18,13 +18,24 @@ dashboard analytics.
 
 Core workflows:
 
-- Hosts propose and submit topics.
-- Admins moderate topics, manage members, create slots, and tag topics to slots.
-- Electors heart topics, comment, and mark availability.
-- Hosts and admins use weighted-heart scores, elector activity filters,
-  availability breakdowns, and conflict alerts to plan the final schedule.
+- Hosts draft topics in a rich-text (TipTap) editor and submit them for review.
+- Admins moderate from Pending Topics (with every host's drafts visible),
+  create and reassign topics, manage members from the People page, create
+  slots, and tag topics to slots.
+- Electors heart topics (weighted votes), comment in threaded discussions,
+  collect "My hearted topics", and mark availability.
+- Hosts and admins use weighted-heart scores, a hearts cutoff, elector
+  activity filters, availability breakdowns, and conflict alerts to plan the
+  final schedule.
+- Every member has a markdown bio shown in a popup and on the People page;
+  topics get stable permalinks (`/t/{timetable}/{host}/{topic}`).
+- A notifications pane collects comments on your topics and replies to you.
+- Each timetable is themeable: colours, fonts, dark-mode palette, custom role
+  labels, icon, and cover image — with per-user light/dark mode.
+- Five visibility levels from fully public to deactivated.
 - Users can subscribe to a timetable's slots through an ICS calendar feed.
-- Profile images, topic covers, and timetable covers can be pasted as URLs or uploaded directly to object storage.
+- Profile images, topic covers, icons, and timetable covers can be pasted as
+  URLs or uploaded directly to object storage.
 
 ## Quick Start
 
@@ -141,22 +152,34 @@ Hosted post-deploy checks and rate-limit smoke commands live in
 
 ## Status
 
-Phases 0-4 are substantially implemented. Phase 4 remains partial: email digest
-delivery requires a verified Resend sender identity before it works in production.
-The tracked app includes:
+Phases 0-4 are substantially implemented, plus two product-owner QA rounds
+(issue #42 → PR #56, issue #59 → PR #60) covering navigation, profiles,
+theming, and moderation UX. The tracked app includes:
 
-- dashboard analytics with host-scoped elector activity filters
-- conflict alerts, topic-to-slot tagging, and ICS calendar export
-- digest computation, a protected digest job endpoint, scheduled GitHub Actions
-  caller, and Resend environment plumbing
+- sidebar navigation with a timetable switcher, per-timetable icons, and an
+  in-app notifications pane with unread badge
+- topic permalinks, infinite scroll, feed sorts (hearts / latest comments /
+  newest-including-edits / seeded random), and "new since last visit"
+  highlights
+- TipTap rich-text topic editing with markdown as the source of truth
+- full theming: colour tokens, font pairings, per-user dark mode, and a
+  timetable dark palette
+- People page with role grouping, markdown bios, and admin member editing
+- five-level visibility (public / hosts only / no comments / private /
+  deactivated) enforced server-side
+- dashboard analytics with host-scoped elector activity filters, hearts
+  cutoff, conflict alerts, topic-to-slot tagging, and ICS calendar export
+- digest computation, a protected digest job endpoint, scheduled GitHub
+  Actions caller, and Resend environment plumbing
 - custom-domain routing hooks and separate DigitalOcean dev/prod app specs
 - API hardening with GraphQL depth/cost limits, structured request/error
   logging, and database-backed hosted rate limiting
-- S3-compatible uploads for profile images, topic covers, and timetable covers
+- S3-compatible uploads for profile images, topic covers, icons, and
+  timetable covers
 
 Remaining major gaps include verified production email delivery, multi-channel
 notifications, hosted media bucket/CDN configuration, production DNS/Clerk
-verification, authenticated browser coverage, traffic-based tuning, and
-feed/dashboard scalability work.
+verification, custom-domain routing completion, authenticated browser test
+coverage, traffic-based tuning, and feed/dashboard scalability work.
 
 See [Product](docs/PRODUCT.md) for the full implementation status, go-live checklist, and known gaps.
