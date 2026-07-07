@@ -5,7 +5,7 @@ import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { Markdown } from "tiptap-markdown";
 
 /** WYSIWYG editor for topic descriptions (QA #59). Off-the-shelf TipTap;
@@ -44,10 +44,11 @@ export function RichTextEditor({
   });
 
   // External value change (Discard / cleared after submit): reset content.
-  if (editor && value !== lastEmitted.current) {
+  useEffect(() => {
+    if (!editor || value === lastEmitted.current) return;
     lastEmitted.current = value;
     editor.commands.setContent(value);
-  }
+  }, [editor, value]);
 
   if (!editor) {
     return <div className="rte" style={{ minHeight }} aria-busy="true" />;

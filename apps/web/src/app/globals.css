@@ -369,6 +369,13 @@ textarea {
   flex-direction: column;
   gap: 8px;
 }
+/* Guard against min-content blowout from wide topic/comment content. */
+.shell-content {
+  min-width: 0;
+}
+.topic-body {
+  overflow-wrap: anywhere;
+}
 .sidebar-title {
   font-family: var(--serif);
   font-weight: 700;
@@ -414,7 +421,10 @@ textarea {
 }
 @media (max-width: 860px) {
   .shell {
-    grid-template-columns: 1fr;
+    /* minmax(0, 1fr), not 1fr: a bare 1fr track's min-size is min-content,
+       so one long unbreakable string (URL in a comment, wide table) pushes
+       the whole column past the viewport and cards render cut off. */
+    grid-template-columns: minmax(0, 1fr);
     gap: 0;
   }
   .sidebar-toggle {

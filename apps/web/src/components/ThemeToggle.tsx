@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 type Mode = "system" | "light" | "dark";
 
@@ -12,23 +12,31 @@ function apply(mode: Mode) {
   document.documentElement.dataset.theme = dark ? "dark" : "light";
 }
 
-/** Per-user light/dark toggle (QA #59). The choice lives in localStorage;
- * a beforeInteractive script in the root layout applies it pre-hydration
- * so there is no flash. */
-export function ThemeToggle() {
-  const [mode, setMode] = useState<Mode>("system");
+// Tiny external store around localStorage so the toggle re-renders without
+// effect-driven setState (react-hooks/set-state-in-effect).
+const listeners = new Set<() => void>();
+function subscribe(cb: () => void): () => void {
+  listeners.add(cb);
+  return () => listeners.delete(cb);
+}
+function getMode(): Mode {
+  const stored = window.localStorage.getItem("theme-mode");
+  return stored === "light" || stored === "dark" ? stored : "system";
+}
+function setMode(mode: Mode) {
+  window.localStorage.setItem("theme-mode", mode);
+  apply(mode);
+  for (const cb of listeners) cb();
+}
 
-  useEffect(() => {
-    const stored = window.localStorage.getItem("theme-mode") as Mode | null;
-    if (stored === "light" || stored === "dark") setMode(stored);
-  }, []);
+/** Per-user light/dark toggle (QA #59). The choice lives in localStorage;
+ * a pre-paint script in the root layout applies it before hydration so
+ * there is no flash. */
+export function ThemeToggle() {
+  const mode = useSyncExternalStore(subscribe, getMode, () => "system" as Mode);
 
   function cycle() {
-    const next: Mode =
-      mode === "system" ? "dark" : mode === "dark" ? "light" : "system";
-    setMode(next);
-    window.localStorage.setItem("theme-mode", next);
-    apply(next);
+    setMode(mode === "system" ? "dark" : mode === "dark" ? "light" : "system");
   }
 
   const icon = mode === "dark" ? "☾" : mode === "light" ? "☀" : "◑";

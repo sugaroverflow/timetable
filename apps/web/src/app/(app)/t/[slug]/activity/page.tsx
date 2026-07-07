@@ -113,9 +113,19 @@ export default async function ActivityPage({
       (!role || primaryRole(e.actorRoles) === role),
   );
 
-  // Group into weeks, then days (QA #59). Events arrive newest-first.
-  let lastWeekKey = "";
-  let lastDayKey = "";
+  // Group into weeks, then days (QA #59). Events arrive newest-first; a
+  // heading shows whenever the week/day differs from the previous event's.
+  const grouped = visibleEvents.map((event, i) => {
+    const created = new Date(event.createdAt);
+    const prevEvent = i > 0 ? visibleEvents[i - 1] : undefined;
+    const prev = prevEvent ? new Date(prevEvent.createdAt) : null;
+    const showWeek =
+      !prev ||
+      weekStart(created).toDateString() !== weekStart(prev).toDateString();
+    const showDay =
+      showWeek || !prev || created.toDateString() !== prev.toDateString();
+    return { event, created, showWeek, showDay };
+  });
 
   return (
     <div className="stack">
@@ -137,14 +147,7 @@ export default async function ActivityPage({
         />
       ) : (
         <div className="timeline">
-          {visibleEvents.map((event) => {
-            const created = new Date(event.createdAt);
-            const weekKey = weekStart(created).toDateString();
-            const dayKey = created.toDateString();
-            const showWeek = weekKey !== lastWeekKey;
-            const showDay = showWeek || dayKey !== lastDayKey;
-            lastWeekKey = weekKey;
-            lastDayKey = dayKey;
+          {grouped.map(({ event, created, showWeek, showDay }) => {
             const actorRole = primaryRole(event.actorRoles);
             const href = topicPath(slug, event.topicHostSlug, event.topicSlug);
             const commentHref =
