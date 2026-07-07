@@ -682,6 +682,52 @@ textarea {
   font-size: 20px;
 }
 
+/* Rich text editor (QA #59 — TipTap) */
+.rte {
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+}
+.rte-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 6px;
+  border-bottom: 1px solid var(--line);
+}
+.rte-btn {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 6px;
+  min-width: 30px;
+  padding: 4px 7px;
+  font-size: 13px;
+}
+.rte-btn:hover {
+  background: var(--wash);
+}
+.rte-btn-active {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+.rte-content .tiptap {
+  padding: 10px 12px;
+  min-height: inherit;
+  outline: none;
+  font-size: 14px;
+}
+.rte-content .tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--faint);
+  pointer-events: none;
+  height: 0;
+}
+.rte-content .tiptap img {
+  max-width: 100%;
+}
+
 /* People page (QA #59) */
 .people-heading {
   font-size: 14px;

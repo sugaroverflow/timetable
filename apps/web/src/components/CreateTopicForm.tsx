@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { ImageUploadField } from "@/components/ImageUploadField";
+import { RichTextEditor } from "@/components/RichTextEditor";
 import { useToast } from "@/components/Toast";
 import { clientGql } from "@/lib/clientGraphql";
 
@@ -52,24 +53,23 @@ export function CreateTopicForm({ slug }: { slug: string }) {
           placeholder="Cryptocurrencies"
         />
       </div>
-      <div className="field">
-        <label htmlFor="topic-body">Description (markdown)</label>
-        <textarea
-          id="topic-body"
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          placeholder="What is this session about?"
-        />
-      </div>
       <ImageUploadField
         id="topic-cover"
-        label="Cover image URL"
+        label="Cover image"
         value={cover}
         onChange={setCover}
         purpose="topic-cover"
         timetableIdOrSlug={slug}
         onUploadingChange={setUploadingCover}
       />
+      <div className="field" style={{ marginTop: 12 }}>
+        <label htmlFor="topic-body">Description</label>
+        <RichTextEditor
+          value={body}
+          onChange={setBody}
+          placeholder="What is this session about?"
+        />
+      </div>
       <button
         className="btn btn-primary"
         type="submit"
