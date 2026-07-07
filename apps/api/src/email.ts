@@ -42,6 +42,15 @@ const esc = (s: string) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] ?? c,
   );
 
+/** Digest links use the first configured web origin as their base. */
+const linkBase = (process.env.WEB_ORIGIN ?? "http://localhost:3000")
+  .split(",")[0]!
+  .trim()
+  .replace(/\/$/, "");
+
+const linked = (label: string, path: string | null): string =>
+  path ? `<a href="${esc(`${linkBase}${path}`)}">${esc(label)}</a>` : esc(label);
+
 export function renderDigest(digest: UserDigest): {
   subject: string;
   html: string;
@@ -52,7 +61,7 @@ export function renderDigest(digest: UserDigest): {
     parts.push("<h3>New topics</h3><ul>");
     for (const t of digest.newTopics) {
       parts.push(
-        `<li>${esc(t.title)} <em>(${esc(t.timetableName)})</em></li>`,
+        `<li>${linked(t.title, t.path)} <em>(${esc(t.timetableName)})</em></li>`,
       );
     }
     parts.push("</ul>");
@@ -74,7 +83,19 @@ export function renderDigest(digest: UserDigest): {
     parts.push("<h3>Activity on your topics</h3><ul>");
     for (const a of digest.hostActivity) {
       const label = a.kind === "heart" ? "new heart(s)" : "new comment(s)";
-      parts.push(`<li>${esc(a.topicTitle)}: ${a.count} ${label}</li>`);
+      parts.push(
+        `<li>${linked(a.topicTitle, a.path)}: ${a.count} ${label}</li>`,
+      );
+    }
+    parts.push("</ul>");
+  }
+
+  if (digest.assignedTopics.length > 0) {
+    parts.push("<h3>You have a topic</h3><ul>");
+    for (const a of digest.assignedTopics) {
+      parts.push(
+        `<li>${linked(a.topicTitle, a.path)} <em>(${esc(a.timetableName)})</em> was assigned to you</li>`,
+      );
     }
     parts.push("</ul>");
   }

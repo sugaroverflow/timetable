@@ -20,6 +20,8 @@ export type TimetableSettings = {
   roleLabels?: { admin?: string; host?: string; elector?: string };
   theme?: { primary?: string; secondary?: string };
   coverImageUrl?: string | null;
+  /** Small square icon shown in the topbar timetable menu. */
+  iconUrl?: string | null;
   /** Digest settings seeded onto new members who haven't customized theirs. */
   digestDefaults?: NotificationSettings;
 };
@@ -35,6 +37,9 @@ export const timetables = pgTable("timetables", {
     .$type<TimetableSettings>()
     .notNull()
     .default({}),
+  // Heart-count cutoff (QA #42): hearts created before this timestamp are
+  // ignored wherever counts/weights are computed. Null = count everything.
+  heartsCountFrom: timestamp({ withTimezone: true }),
   ownerId: text()
     .notNull()
     .references(() => users.id, { onDelete: "restrict" }),
@@ -58,6 +63,9 @@ export const timetableMemberships = pgTable(
       .notNull()
       .references(() => timetables.id, { onDelete: "cascade" }),
     roles: roleEnum().array().notNull(),
+    // Watermark for the feed's "new since your last visit" highlight;
+    // null until the member first views the feed.
+    lastSeenFeedAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },

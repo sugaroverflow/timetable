@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
+import { CommentComposer } from "@/components/CommentComposer";
+import { CommentList } from "@/components/CommentList";
 import { useToast } from "@/components/Toast";
 import { TopicEditForm } from "@/components/TopicEditForm";
 import { clientGql } from "@/lib/clientGraphql";
@@ -46,10 +48,17 @@ export function TopicManager({
         </span>
       </div>
 
-      {topic.feedback ? (
+      {(topic.hostOnlyComments?.length ?? 0) > 0 ? (
         <div className="mod-feedback-box" style={{ marginTop: 10 }}>
-          <div className="mfb-head">↩ Changes requested</div>
-          <div>Admin feedback: &ldquo;{topic.feedback}&rdquo;</div>
+          <div className="mfb-head">
+            {topic.feedback ? "↩ Changes requested" : "🔒 Feedback thread"}
+          </div>
+          <CommentList
+            comments={topic.hostOnlyComments ?? []}
+            canReply={true}
+            canModerate={false}
+          />
+          <CommentComposer topicId={topic.id} visibility="host_only" />
         </div>
       ) : null}
 
@@ -85,7 +94,7 @@ export function TopicManager({
           )}
           {topic.status === "submitted" && !topic.feedback && (
             <span className="faint" style={{ fontSize: 13 }}>
-              In the moderation queue…
+              Pending review…
             </span>
           )}
           {topic.status === "submitted" && topic.feedback && (

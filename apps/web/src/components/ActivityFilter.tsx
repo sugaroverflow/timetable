@@ -23,7 +23,7 @@ export function ActivityFilter({
   }
 
   return (
-    <div className="toolbar">
+    <>
       <label htmlFor="activity-filter">Action</label>
       <select
         id="activity-filter"
@@ -38,6 +38,6 @@ export function ActivityFilter({
           </option>
         ))}
       </select>
-    </div>
+    </>
   );
 }

@@ -1,9 +1,10 @@
-import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 
 import {
   comments,
   db,
   hearts,
+  timetables,
   topics,
   users,
   type Topic,
@@ -13,6 +14,7 @@ import { computeElectorWeights, topicWeightedScore } from "@timetable/shared";
 
 import { logActivity } from "./activity";
 import { coerceDate } from "./dates";
+import { ensureTopicSlug } from "./slugs";
 
 export async function getTopicById(topicId: string): Promise<Topic | null> {
   const [topic] = await db
@@ -23,17 +25,32 @@ export async function getTopicById(topicId: string): Promise<Topic | null> {
   return topic ?? null;
 }
 
+/** Permalink resolution: a topic by its per-timetable slug. */
+export async function getTopicBySlug(
+  timetableId: string,
+  slug: string,
+): Promise<Topic | null> {
+  const [topic] = await db
+    .select()
+    .from(topics)
+    .where(and(eq(topics.timetableId, timetableId), eq(topics.slug, slug)))
+    .limit(1);
+  return topic ?? null;
+}
+
 export async function createTopic(
   timetableId: string,
   hostId: string,
   input: { title: string; bodyMd?: string; coverImageUrl?: string | null },
 ): Promise<Topic> {
+  const slug = await ensureTopicSlug(timetableId, input.title);
   const [topic] = await db
     .insert(topics)
     .values({
       timetableId,
       hostId,
       title: input.title,
+      slug,
       bodyMd: input.bodyMd ?? "",
       coverImageUrl: input.coverImageUrl ?? null,
       status: "draft",
@@ -47,10 +64,22 @@ export async function updateTopic(
   topicId: string,
   input: { title?: string; bodyMd?: string; coverImageUrl?: string | null },
 ): Promise<Topic | null> {
+  // The slug follows title edits until first publish, then freezes so
+  // permalinks in digests/links never break.
+  let slug: string | undefined;
+  if (input.title !== undefined) {
+    const current = await getTopicById(topicId);
+    if (current && current.publishedAt === null && input.title !== current.title) {
+      slug = await ensureTopicSlug(current.timetableId, input.title, {
+        excludeTopicId: topicId,
+      });
+    }
+  }
   const [updated] = await db
     .update(topics)
     .set({
       ...(input.title !== undefined ? { title: input.title } : {}),
+      ...(slug !== undefined ? { slug } : {}),
       ...(input.bodyMd !== undefined ? { bodyMd: input.bodyMd } : {}),
       ...(input.coverImageUrl !== undefined
         ? { coverImageUrl: input.coverImageUrl }
@@ -78,6 +107,32 @@ async function setStatus(
     })
     .where(eq(topics.id, topicId))
     .returning();
+  return updated ?? null;
+}
+
+/** Admin assigns/reassigns a topic's owner. The topic then shows up in the
+ * new owner's My Topics automatically (that view queries by hostId). */
+export async function reassignTopic(
+  topic: Topic,
+  newHostId: string,
+  actorId: string,
+): Promise<Topic | null> {
+  const [updated] = await db
+    .update(topics)
+    .set({ hostId: newHostId, updatedAt: new Date() })
+    .where(eq(topics.id, topic.id))
+    .returning();
+  await logActivity({
+    timetableId: topic.timetableId,
+    actorId,
+    action: "topic.reassign",
+    payload: {
+      topicId: topic.id,
+      title: topic.title,
+      previousHostId: topic.hostId,
+      newHostId,
+    },
+  });
   return updated ?? null;
 }
 
@@ -190,47 +245,60 @@ export async function listSubmittedTopics(
     .orderBy(desc(topics.updatedAt));
 }
 
-/** Admin: archive (reset) all active hearts on a topic. Returns the count. */
-export async function archiveTopicHearts(
-  topic: Topic,
+/** The timetable's heart-count cutoff: hearts created before it are ignored
+ * (QA #42 — "archiving" is setting this date). Null = count everything. */
+export async function getHeartsCountFrom(
+  timetableId: string,
+): Promise<Date | null> {
+  const [row] = await db
+    .select({ heartsCountFrom: timetables.heartsCountFrom })
+    .from(timetables)
+    .where(eq(timetables.id, timetableId))
+    .limit(1);
+  return row?.heartsCountFrom ?? null;
+}
+
+/** Admin: set (or clear) the heart-count cutoff for a timetable. */
+export async function setHeartsCountFrom(
+  timetableId: string,
+  countFrom: Date | null,
   actorId: string,
-): Promise<number> {
-  const archived = await db
-    .update(hearts)
-    .set({ archivedAt: new Date() })
-    .where(and(eq(hearts.topicId, topic.id), isNull(hearts.archivedAt)))
-    .returning({ id: hearts.id });
-
+): Promise<void> {
+  await db
+    .update(timetables)
+    .set({ heartsCountFrom: countFrom, updatedAt: new Date() })
+    .where(eq(timetables.id, timetableId));
   await logActivity({
-    timetableId: topic.timetableId,
+    timetableId,
     actorId,
-    action: "hearts.archive",
-    payload: { topicId: topic.id, title: topic.title, count: archived.length },
+    action: "hearts.cutoff",
+    payload: { countFrom: countFrom ? countFrom.toISOString() : null },
+    note: countFrom
+      ? `Hearts now count from ${countFrom.toISOString()}`
+      : "Hearts cutoff cleared — all hearts count",
   });
-
-  return archived.length;
 }
 
 /**
- * Number of published topics this user currently hearts (non-archived).
+ * Number of published topics this user currently hearts (post-cutoff).
  * The user's per-heart vote weight is 1/count — shown to them in the feed.
  */
 export async function countViewerPublishedHearts(
   timetableId: string,
   userId: string,
 ): Promise<number> {
+  const cutoff = await getHeartsCountFrom(timetableId);
+  const conds = [
+    eq(topics.timetableId, timetableId),
+    eq(topics.status, "published"),
+    eq(hearts.userId, userId),
+  ];
+  if (cutoff) conds.push(gte(hearts.createdAt, cutoff));
   const [row] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(hearts)
     .innerJoin(topics, eq(topics.id, hearts.topicId))
-    .where(
-      and(
-        eq(topics.timetableId, timetableId),
-        eq(topics.status, "published"),
-        eq(hearts.userId, userId),
-        isNull(hearts.archivedAt),
-      ),
-    );
+    .where(and(...conds));
   return row?.n ?? 0;
 }
 
@@ -242,7 +310,9 @@ export type FeedTopic = {
   hostId: string;
   hostName: string | null;
   hostImage: string | null;
+  hostSlug: string | null;
   title: string;
+  slug: string | null;
   bodyMd: string;
   coverImageUrl: string | null;
   status: TopicStatus;
@@ -266,6 +336,9 @@ export async function buildFeed(
   viewerUserId: string | null,
   opts: {
     hostId?: string;
+    topicId?: string;
+    /** Only topics the viewer currently hearts (QA #42 "My hearted topics"). */
+    heartedByViewer?: boolean;
     sort?: FeedSort;
     limit?: number;
     offset?: number;
@@ -282,18 +355,18 @@ export async function buildFeed(
 
   if (publishedIdSet.size === 0) return [];
 
-  // All (non-archived) hearts on published topics in the timetable.
+  // All post-cutoff hearts on published topics in the timetable.
+  const cutoff = await getHeartsCountFrom(timetableId);
+  const heartConds = [
+    eq(topics.timetableId, timetableId),
+    eq(topics.status, "published"),
+  ];
+  if (cutoff) heartConds.push(gte(hearts.createdAt, cutoff));
   const heartRows = await db
     .select({ topicId: hearts.topicId, electorId: hearts.userId })
     .from(hearts)
     .innerJoin(topics, eq(topics.id, hearts.topicId))
-    .where(
-      and(
-        eq(topics.timetableId, timetableId),
-        eq(topics.status, "published"),
-        isNull(hearts.archivedAt),
-      ),
-    );
+    .where(and(...heartConds));
 
   const weights = computeElectorWeights(heartRows, publishedIdSet);
 
@@ -310,12 +383,14 @@ export async function buildFeed(
     eq(topics.status, "published"),
   ];
   if (opts.hostId) displayConds.push(eq(topics.hostId, opts.hostId));
+  if (opts.topicId) displayConds.push(eq(topics.id, opts.topicId));
 
   const rows = await db
     .select({
       topic: topics,
       hostName: users.name,
       hostImage: users.image,
+      hostSlug: users.slug,
     })
     .from(topics)
     .innerJoin(users, eq(users.id, topics.hostId))
@@ -352,7 +427,7 @@ export async function buildFeed(
     }
   }
 
-  const feed: FeedTopic[] = rows.map(({ topic, hostName, hostImage }) => {
+  const feed: FeedTopic[] = rows.map(({ topic, hostName, hostImage, hostSlug }) => {
     const topicHearts = (heartsByTopic.get(topic.id) ?? []).map(
       (electorId) => ({ topicId: topic.id, electorId }),
     );
@@ -362,7 +437,9 @@ export async function buildFeed(
       hostId: topic.hostId,
       hostName,
       hostImage,
+      hostSlug,
       title: topic.title,
+      slug: topic.slug,
       bodyMd: topic.bodyMd,
       coverImageUrl: topic.coverImageUrl,
       status: topic.status,
@@ -378,8 +455,13 @@ export async function buildFeed(
     };
   });
 
+  const visibleFeed =
+    opts.heartedByViewer && viewerUserId
+      ? feed.filter((t) => t.viewerHasHearted)
+      : feed;
+
   const sort = opts.sort ?? "hearts";
-  feed.sort((a, b) => {
+  visibleFeed.sort((a, b) => {
     if (sort === "comments") {
       const at = a.latestCommentAt?.getTime() ?? 0;
       const bt = b.latestCommentAt?.getTime() ?? 0;
@@ -395,10 +477,10 @@ export async function buildFeed(
   });
 
   const offset = Math.max(0, opts.offset ?? 0);
-  if (opts.limit === undefined) return feed.slice(offset);
+  if (opts.limit === undefined) return visibleFeed.slice(offset);
 
   const limit = Math.max(1, Math.min(opts.limit, 50));
-  return feed.slice(offset, offset + limit);
+  return visibleFeed.slice(offset, offset + limit);
 }
 
 export type WeightedHeartEntry = {
@@ -420,17 +502,17 @@ export async function getWeightedBreakdown(
     );
   const publishedIdSet = new Set(allPublished.map((r) => r.id));
 
+  const cutoff = await getHeartsCountFrom(timetableId);
+  const heartConds = [
+    eq(topics.timetableId, timetableId),
+    eq(topics.status, "published"),
+  ];
+  if (cutoff) heartConds.push(gte(hearts.createdAt, cutoff));
   const heartRows = await db
     .select({ topicId: hearts.topicId, electorId: hearts.userId })
     .from(hearts)
     .innerJoin(topics, eq(topics.id, hearts.topicId))
-    .where(
-      and(
-        eq(topics.timetableId, timetableId),
-        eq(topics.status, "published"),
-        isNull(hearts.archivedAt),
-      ),
-    );
+    .where(and(...heartConds));
   const weights = computeElectorWeights(heartRows, publishedIdSet);
 
   const topicHeartUserIds = heartRows

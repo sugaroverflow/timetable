@@ -10,29 +10,27 @@ const MUTATION = `mutation AddComment($id: String!, $body: String!, $visibility:
   addComment(topicId: $id, body: $body, visibility: $visibility) { id }
 }`;
 
+/** Comment box fixed to one visibility: the public thread and the host-only
+ * thread each get their own composer (QA #42 — no "hosts only" checkbox). */
 export function CommentComposer({
   topicId,
-  canHostOnly,
+  visibility = "public",
 }: {
   topicId: string;
-  canHostOnly: boolean;
+  visibility?: "public" | "host_only";
 }) {
   const router = useRouter();
   const { toast, toastError } = useToast();
   const [body, setBody] = useState("");
-  const [hostOnly, setHostOnly] = useState(false);
   const [pending, startTransition] = useTransition();
+  const hostOnly = visibility === "host_only";
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const text = body.trim();
     if (!text) return;
     try {
-      await clientGql(MUTATION, {
-        id: topicId,
-        body: text,
-        visibility: hostOnly ? "host_only" : "public",
-      });
+      await clientGql(MUTATION, { id: topicId, body: text, visibility });
       setBody("");
       toast(hostOnly ? "Host-only note added" : "Comment added");
       startTransition(() => router.refresh());
@@ -47,28 +45,12 @@ export function CommentComposer({
         value={body}
         onChange={(e) => setBody(e.target.value)}
         placeholder={hostOnly ? "Add a host-only note…" : "Add a comment…"}
-        aria-label="Comment"
-        data-topic-composer={topicId}
+        aria-label={hostOnly ? "Host-only comment" : "Comment"}
+        data-topic-composer={hostOnly ? undefined : topicId}
       />
-      <div className="stack" style={{ gap: 6 }}>
-        <button className="btn btn-primary" type="submit" disabled={pending}>
-          Post
-        </button>
-        {canHostOnly ? (
-          <label
-            className="faint"
-            style={{ fontSize: 11, display: "flex", gap: 4, alignItems: "center" }}
-          >
-            <input
-              type="checkbox"
-              checked={hostOnly}
-              onChange={(e) => setHostOnly(e.target.checked)}
-              style={{ width: "auto" }}
-            />
-            Hosts only
-          </label>
-        ) : null}
-      </div>
+      <button className="btn btn-primary" type="submit" disabled={pending}>
+        Post
+      </button>
     </form>
   );
 }

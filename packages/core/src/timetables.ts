@@ -127,6 +127,31 @@ export async function listMembershipsForUser(
   }));
 }
 
+/** The slug of the timetable the user most recently engaged with —
+ * max lastSeenFeedAt across memberships, falling back to the most recently
+ * created membership. Null when the user has no timetables. Used for the
+ * signed-in landing redirect and the brand-logo link (QA #42). */
+export async function getLastVisitedTimetableSlug(
+  userId: string,
+): Promise<string | null> {
+  const rows = await db
+    .select({
+      slug: timetables.slug,
+      lastSeenFeedAt: timetableMemberships.lastSeenFeedAt,
+      createdAt: timetableMemberships.createdAt,
+    })
+    .from(timetableMemberships)
+    .innerJoin(timetables, eq(timetables.id, timetableMemberships.timetableId))
+    .where(eq(timetableMemberships.userId, userId));
+  if (rows.length === 0) return null;
+  rows.sort(
+    (a, b) =>
+      (b.lastSeenFeedAt?.getTime() ?? 0) - (a.lastSeenFeedAt?.getTime() ?? 0) ||
+      b.createdAt.getTime() - a.createdAt.getTime(),
+  );
+  return rows[0]?.slug ?? null;
+}
+
 export async function getViewerRoles(
   userId: string | null,
   timetableId: string,

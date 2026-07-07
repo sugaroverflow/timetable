@@ -10,7 +10,7 @@ import { themeVars, type DigestSettings } from "@/lib/timetableSettings";
 
 const MUTATION = `mutation Settings(
   $s: String!, $ra: String, $rh: String, $re: String, $tp: String, $ts: String, $cover: String,
-  $dnt: Boolean, $dr: Boolean, $da: Boolean
+  $icon: String, $dnt: Boolean, $dr: Boolean, $da: Boolean
 ) {
   updateTimetableSettings(
     idOrSlug: $s
@@ -20,6 +20,7 @@ const MUTATION = `mutation Settings(
     themePrimary: $tp
     themeSecondary: $ts
     coverImageUrl: $cover
+    iconUrl: $icon
     digestNewTopics: $dnt
     digestReplies: $dr
     digestActivity: $da
@@ -30,6 +31,7 @@ export type SettingsValues = {
   roleLabels?: { admin?: string; host?: string; elector?: string };
   theme?: { primary?: string; secondary?: string };
   coverImageUrl?: string | null;
+  iconUrl?: string | null;
   digestDefaults?: DigestSettings;
 };
 
@@ -64,6 +66,7 @@ export function SettingsForm({
     primary: current.theme?.primary ?? "#2f54eb",
     secondary: current.theme?.secondary ?? "#5b7bff",
     cover: current.coverImageUrl ?? "",
+    icon: current.iconUrl ?? "",
     digestTopics: current.digestDefaults?.digestNewTopics ?? false,
     digestReplies: current.digestDefaults?.digestReplies ?? false,
     digestActivity: current.digestDefaults?.digestActivity ?? false,
@@ -75,7 +78,9 @@ export function SettingsForm({
   const [primary, setPrimary] = useState(initial.primary);
   const [secondary, setSecondary] = useState(initial.secondary);
   const [cover, setCover] = useState(initial.cover);
+  const [icon, setIcon] = useState(initial.icon);
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [uploadingIcon, setUploadingIcon] = useState(false);
   const [digestTopics, setDigestTopics] = useState(initial.digestTopics);
   const [digestReplies, setDigestReplies] = useState(initial.digestReplies);
   const [digestActivity, setDigestActivity] = useState(initial.digestActivity);
@@ -87,6 +92,7 @@ export function SettingsForm({
     setPrimary(initial.primary);
     setSecondary(initial.secondary);
     setCover(initial.cover);
+    setIcon(initial.icon);
     setDigestTopics(initial.digestTopics);
     setDigestReplies(initial.digestReplies);
     setDigestActivity(initial.digestActivity);
@@ -106,6 +112,7 @@ export function SettingsForm({
         tp: primary,
         ts: secondary,
         cover: cover.trim() || null,
+        icon: icon.trim() || null,
         dnt: digestTopics,
         dr: digestReplies,
         da: digestActivity,
@@ -190,6 +197,18 @@ export function SettingsForm({
         />
       </div>
 
+      <div style={{ marginTop: 12 }}>
+        <ImageUploadField
+          id="icon"
+          label="Icon URL (square, shown in the timetable menu)"
+          value={icon}
+          onChange={setIcon}
+          purpose="timetable-icon"
+          timetableIdOrSlug={slug}
+          onUploadingChange={setUploadingIcon}
+        />
+      </div>
+
       <h3 style={{ fontSize: 15, margin: "18px 0 2px" }}>Default digest</h3>
       <p className="faint" style={{ marginTop: 0, fontSize: 12 }}>
         New members start with these. Each person can change their own from
@@ -227,7 +246,7 @@ export function SettingsForm({
         <button
           className="btn btn-primary"
           type="submit"
-          disabled={pending || uploadingCover}
+          disabled={pending || uploadingCover || uploadingIcon}
         >
           {uploadingCover
             ? "Uploading…"

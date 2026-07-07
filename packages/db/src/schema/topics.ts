@@ -28,6 +28,10 @@ export const topics = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     title: text().notNull(),
+    // URL slug, unique per timetable. Generated from the title; may be
+    // regenerated on title edits until first publish, frozen afterwards so
+    // permalinks never break.
+    slug: text(),
     bodyMd: text().notNull().default(""),
     coverImageUrl: text(),
     status: topicStatusEnum().notNull().default("draft"),
@@ -38,6 +42,7 @@ export const topics = pgTable(
   (t) => [
     index("topics_timetable_status_idx").on(t.timetableId, t.status),
     index("topics_host_idx").on(t.hostId),
+    uniqueIndex("topics_timetable_slug_uq").on(t.timetableId, t.slug),
   ],
 );
 
@@ -52,7 +57,6 @@ export const hearts = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
-    archivedAt: timestamp({ withTimezone: true }),
   },
   (t) => [
     uniqueIndex("hearts_topic_user_uq").on(t.topicId, t.userId),

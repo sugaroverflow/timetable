@@ -1,4 +1,4 @@
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, gte, isNull, sql } from "drizzle-orm";
 
 import {
   availability,
@@ -14,6 +14,7 @@ import {
 } from "@timetable/db";
 
 import { coerceDate } from "./dates";
+import { getHeartsCountFrom } from "./topics";
 import { buildFeed } from "./topics";
 
 export const ELECTOR_ACTIVITY_FILTERS = [
@@ -36,9 +37,12 @@ export type DashboardData = {
   topicLeaderboard: {
     id: string;
     title: string;
+    slug: string | null;
     hostName: string | null;
+    hostSlug: string | null;
     weightedScore: number;
     heartCount: number;
+    lastHeartAt: Date | null;
   }[];
   hostLeaderboard: {
     hostId: string;
@@ -53,7 +57,12 @@ export type DashboardData = {
     availabilityCount: number;
     latestActivityAt: Date | null;
   }[];
-  unallocatedTopics: { id: string; title: string }[];
+  unallocatedTopics: {
+    id: string;
+    title: string;
+    slug: string | null;
+    hostSlug: string | null;
+  }[];
   conflicts: {
     slotId: string;
     startsAt: Date;
@@ -145,12 +154,17 @@ export async function getDashboard(
   });
   const totalHearts = feed.reduce((sum, t) => sum + t.heartCount, 0);
 
-  const topicLeaderboard = feed.slice(0, 10).map((t) => ({
+  // All published topics, not a top-10 — QA #42 wants the dashboard to show
+  // every host and every topic, each linked to its permalink.
+  const topicLeaderboard = feed.map((t) => ({
     id: t.id,
     title: t.title,
+    slug: t.slug,
     hostName: t.hostName,
+    hostSlug: t.hostSlug,
     weightedScore: t.weightedScore,
     heartCount: t.heartCount,
+    lastHeartAt: null as Date | null,
   }));
 
   const hostAgg = new Map<
@@ -176,6 +190,10 @@ export async function getDashboard(
   ];
   if (opts.hostId) activityTopicConds.push(eq(topics.hostId, opts.hostId));
 
+  const cutoff = await getHeartsCountFrom(timetableId);
+  const heartCountConds = [...activityTopicConds];
+  if (cutoff) heartCountConds.push(gte(hearts.createdAt, cutoff));
+
   const heartRows = await db
     .select({
       electorId: hearts.userId,
@@ -184,8 +202,26 @@ export async function getDashboard(
     })
     .from(hearts)
     .innerJoin(topics, eq(topics.id, hearts.topicId))
-    .where(and(...activityTopicConds, isNull(hearts.archivedAt)))
+    .where(and(...heartCountConds))
     .groupBy(hearts.userId);
+
+  // Latest counted heart per topic (QA #42: heart timestamps on the
+  // dashboard).
+  const lastHeartRows = await db
+    .select({
+      topicId: hearts.topicId,
+      lastAt: sql<Date | null>`max(${hearts.createdAt})`,
+    })
+    .from(hearts)
+    .innerJoin(topics, eq(topics.id, hearts.topicId))
+    .where(and(...heartCountConds))
+    .groupBy(hearts.topicId);
+  const lastHeartByTopic = new Map(
+    lastHeartRows.map((r) => [r.topicId, coerceDate(r.lastAt)]),
+  );
+  for (const t of topicLeaderboard) {
+    t.lastHeartAt = lastHeartByTopic.get(t.id) ?? null;
+  }
 
   const commentRows = await db
     .select({
@@ -289,7 +325,7 @@ export async function getDashboard(
   const taggedTopicIds = new Set(tagRows.map((r) => r.topicId));
   const unallocatedTopics = feed
     .filter((t) => !taggedTopicIds.has(t.id))
-    .map((t) => ({ id: t.id, title: t.title }));
+    .map((t) => ({ id: t.id, title: t.title, slug: t.slug, hostSlug: t.hostSlug }));
 
   // Slots with more than one tagged topic = conflicts.
   const bySlot = new Map<

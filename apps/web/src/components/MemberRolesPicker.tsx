@@ -6,12 +6,14 @@ import { MemberRolesEditor } from "@/components/MemberRolesEditor";
 
 type Member = {
   membershipId: string;
+  userId: string;
   name: string | null;
   email: string | null;
   roles: string[];
 };
 
 type Props = {
+  slug: string;
   members: Member[];
   roleLabels?: { admin?: string; host?: string; elector?: string };
 };
@@ -20,7 +22,7 @@ function displayName(m: Member): string {
   return m.name ?? m.email ?? "Unknown";
 }
 
-export function MemberRolesPicker({ members, roleLabels }: Props) {
+export function MemberRolesPicker({ slug, members, roleLabels }: Props) {
   const sorted = [...members].sort((a, b) =>
     displayName(a).localeCompare(displayName(b)),
   );
@@ -53,6 +55,8 @@ export function MemberRolesPicker({ members, roleLabels }: Props) {
             <MemberRolesEditor
               key={selected.membershipId}
               membershipId={selected.membershipId}
+              userId={selected.userId}
+              slug={slug}
               name={selected.name}
               email={selected.email}
               roles={selected.roles}

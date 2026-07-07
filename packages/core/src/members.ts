@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import {
   db,
@@ -102,4 +102,91 @@ export async function listMembers(
     roles: r.roles,
     user: { id: r.userId, name: r.name, email: r.email, image: r.image },
   }));
+}
+
+/** The viewer's feed watermark for the "new since last visit" highlight. */
+export async function getFeedLastSeen(
+  userId: string,
+  timetableId: string,
+): Promise<Date | null> {
+  const [row] = await db
+    .select({ lastSeenFeedAt: timetableMemberships.lastSeenFeedAt })
+    .from(timetableMemberships)
+    .where(
+      and(
+        eq(timetableMemberships.userId, userId),
+        eq(timetableMemberships.timetableId, timetableId),
+      ),
+    )
+    .limit(1);
+  return row?.lastSeenFeedAt ?? null;
+}
+
+/** Bumps the viewer's feed watermark to now. No-op for non-members. */
+export async function markFeedSeen(
+  userId: string,
+  timetableId: string,
+): Promise<void> {
+  await db
+    .update(timetableMemberships)
+    .set({ lastSeenFeedAt: new Date() })
+    .where(
+      and(
+        eq(timetableMemberships.userId, userId),
+        eq(timetableMemberships.timetableId, timetableId),
+      ),
+    );
+}
+
+export type Person = {
+  userId: string;
+  name: string | null;
+  image: string | null;
+  slug: string | null;
+  bio: string | null;
+  roles: Role[];
+};
+
+/** Members with their public profile fields (no emails) — powers the
+ * People page and the bio modal. Caller gates on timetable readability. */
+export async function listPeople(timetableId: string): Promise<Person[]> {
+  const rows = await db
+    .select({
+      userId: users.id,
+      name: users.name,
+      image: users.image,
+      slug: users.slug,
+      bio: users.bio,
+      roles: timetableMemberships.roles,
+    })
+    .from(timetableMemberships)
+    .innerJoin(users, eq(users.id, timetableMemberships.userId))
+    .where(eq(timetableMemberships.timetableId, timetableId));
+  return rows.sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
+}
+
+/** One member's public profile (for the bio modal). */
+export async function getPerson(
+  timetableId: string,
+  userId: string,
+): Promise<Person | null> {
+  const [row] = await db
+    .select({
+      userId: users.id,
+      name: users.name,
+      image: users.image,
+      slug: users.slug,
+      bio: users.bio,
+      roles: timetableMemberships.roles,
+    })
+    .from(timetableMemberships)
+    .innerJoin(users, eq(users.id, timetableMemberships.userId))
+    .where(
+      and(
+        eq(timetableMemberships.timetableId, timetableId),
+        eq(timetableMemberships.userId, userId),
+      ),
+    )
+    .limit(1);
+  return row ?? null;
 }

@@ -3,10 +3,38 @@ import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import {
   comments,
   db,
+  topics,
   users,
   type Comment,
   type CommentVisibility,
 } from "@timetable/db";
+
+import { logActivity } from "./activity";
+
+/** Comments are logged to the activity feed (QA #42); the snippet lets the
+ * timeline show what was said without a second lookup. */
+async function logCommentActivity(
+  comment: Comment,
+  action: "comment.add" | "comment.reply",
+): Promise<void> {
+  const [topic] = await db
+    .select({ id: topics.id, title: topics.title, timetableId: topics.timetableId })
+    .from(topics)
+    .where(eq(topics.id, comment.topicId))
+    .limit(1);
+  if (!topic) return;
+  await logActivity({
+    timetableId: topic.timetableId,
+    actorId: comment.authorId,
+    action,
+    payload: {
+      topicId: topic.id,
+      title: topic.title,
+      snippet: comment.body.slice(0, 140),
+      visibility: comment.visibility,
+    },
+  });
+}
 
 export async function getCommentById(id: string): Promise<Comment | null> {
   const [comment] = await db
@@ -28,6 +56,7 @@ export async function addComment(
     .values({ topicId, authorId, body, visibility })
     .returning();
   if (!comment) throw new Error("Failed to add comment");
+  await logCommentActivity(comment, "comment.add");
   return comment;
 }
 
@@ -48,6 +77,7 @@ export async function addReply(
     })
     .returning();
   if (!comment) throw new Error("Failed to add reply");
+  await logCommentActivity(comment, "comment.reply");
   return comment;
 }
 

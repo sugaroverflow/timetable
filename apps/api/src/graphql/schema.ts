@@ -5,7 +5,6 @@ import {
   addComment,
   addReply,
   addSlotComment,
-  archiveTopicHearts,
   buildCalendar,
   buildFeed,
   claimInvitesForUser,
@@ -21,8 +20,14 @@ import {
   getReadableTimetable,
   getSlotById,
   getTimetableById,
+  getFeedLastSeen,
+  getLastVisitedTimetableSlug,
+  getOrCreateUserSlug,
+  getPerson,
+  listPeople,
   getTimetableByDomain,
   getTopicById,
+  getTopicBySlug,
   getUserById,
   getUserNotificationSettings,
   getViewerRoles,
@@ -36,9 +41,12 @@ import {
   listSubmittedTopics,
   listTimetableHosts,
   logActivity,
+  markFeedSeen,
   moderateTopic,
+  reassignTopic,
   setAvailability,
   setCommentHidden,
+  setHeartsCountFrom,
   setWeekdayAvailability,
   submitTopic,
   tagSlotTopic,
@@ -58,6 +66,7 @@ import {
   type DashboardData,
   type ElectorActivityFilter,
   type FeedTopic,
+  type Person,
   type WeightedHeartEntry,
 } from "@timetable/core";
 import type {
@@ -73,10 +82,14 @@ import {
   canManageMembers,
   canModerate,
   canProposeTopics,
+  canSeeComments,
   canSeeHostOnly,
+  canSeePersonProfile,
   isAdmin,
   isElector,
   isHost,
+  type Privacy,
+  type Role as SharedRole,
 } from "@timetable/shared";
 
 import type { SessionUser } from "../auth/clerk";
@@ -95,7 +108,11 @@ type GqlMember = {
   roles: string[];
   user: { id: string; name: string | null; email: string | null; image: string | null };
 };
-type GqlTopic = FeedTopic & { canSeeHostOnly: boolean; canModerate: boolean };
+type GqlTopic = FeedTopic & {
+  canSeeHostOnly: boolean;
+  canModerate: boolean;
+  canSeeComments: boolean;
+};
 
 // ---------------------------------------------------------------------------
 // Builder + auth helpers
@@ -157,6 +174,10 @@ const TimetableType = builder.objectRef<GqlTimetable>("Timetable").implement({
     description: t.exposeString("description", { nullable: true }),
     privacy: t.exposeString("privacy"),
     customDomain: t.exposeString("customDomain", { nullable: true }),
+    heartsCountFrom: t.string({
+      nullable: true,
+      resolve: (tt) => tt.heartsCountFrom?.toISOString() ?? null,
+    }),
     viewerRoles: t.exposeStringList("viewerRoles"),
     settings: t.field({
       type: "String",
@@ -205,6 +226,22 @@ const MemberType = builder.objectRef<GqlMember>("Member").implement({
   }),
 });
 
+const PersonType = builder.objectRef<Person>("Person").implement({
+  fields: (t) => ({
+    userId: t.exposeID("userId"),
+    name: t.exposeString("name", { nullable: true }),
+    image: t.exposeString("image", { nullable: true }),
+    slug: t.exposeString("slug", { nullable: true }),
+    roles: t.exposeStringList("roles"),
+    /** Markdown bios (QA #42), rendered with the shared pipeline. */
+    bioHtml: t.string({
+      nullable: true,
+      resolve: (p) => (p.bio ? renderMarkdown(p.bio) : null),
+    }),
+    bio: t.exposeString("bio", { nullable: true }),
+  }),
+});
+
 const WeightedHeartType = builder
   .objectRef<WeightedHeartEntry>("WeightedHeart")
   .implement({
@@ -238,14 +275,18 @@ const TopicType = builder.objectRef<GqlTopic>("Topic").implement({
     hostId: t.exposeID("hostId"),
     hostName: t.exposeString("hostName", { nullable: true }),
     hostImage: t.exposeString("hostImage", { nullable: true }),
+    hostSlug: t.exposeString("hostSlug", { nullable: true }),
     title: t.exposeString("title"),
+    slug: t.exposeString("slug", { nullable: true }),
     bodyMd: t.exposeString("bodyMd"),
     bodyHtml: t.string({ resolve: (tp) => renderMarkdown(tp.bodyMd) }),
     coverImageUrl: t.exposeString("coverImageUrl", { nullable: true }),
     status: t.exposeString("status"),
     heartCount: t.exposeInt("heartCount"),
     viewerHasHearted: t.exposeBoolean("viewerHasHearted"),
-    commentCount: t.exposeInt("commentCount"),
+    commentCount: t.int({
+      resolve: (tp) => (tp.canSeeComments ? tp.commentCount : 0),
+    }),
     publishedAt: t.string({
       nullable: true,
       resolve: (tp) => tp.publishedAt?.toISOString() ?? null,
@@ -267,11 +308,13 @@ const TopicType = builder.objectRef<GqlTopic>("Topic").implement({
     }),
     comments: t.field({
       type: [CommentType],
-      resolve: (tp) =>
-        listCommentTree(tp.id, {
+      resolve: (tp) => {
+        if (!tp.canSeeComments) return [];
+        return listCommentTree(tp.id, {
           includeHostOnly: tp.canSeeHostOnly,
           includeHidden: tp.canModerate,
-        }),
+        });
+      },
     }),
   }),
 });
@@ -281,6 +324,11 @@ const ManagedTopicType = builder.objectRef<Topic>("ManagedTopic").implement({
     id: t.exposeID("id"),
     timetableId: t.exposeID("timetableId"),
     hostId: t.exposeID("hostId"),
+    slug: t.exposeString("slug", { nullable: true }),
+    hostSlug: t.string({
+      nullable: true,
+      resolve: (tp) => getOrCreateUserSlug(tp.hostId),
+    }),
     title: t.exposeString("title"),
     bodyMd: t.exposeString("bodyMd"),
     bodyHtml: t.string({ resolve: (tp) => renderMarkdown(tp.bodyMd) }),
@@ -294,6 +342,18 @@ const ManagedTopicType = builder.objectRef<Topic>("ManagedTopic").implement({
       nullable: true,
       resolve: (tp) => getLatestHostOnlyComment(tp.id),
     }),
+    /** Full host-only thread (admin feedback + host replies). ManagedTopic
+     * is only ever served to the owning host or admins, so this is safe. */
+    hostOnlyComments: t.field({
+      type: [CommentType],
+      resolve: async (tp) => {
+        const tree = await listCommentTree(tp.id, {
+          includeHostOnly: true,
+          includeHidden: false,
+        });
+        return tree.filter((c) => c.visibility === "host_only");
+      },
+    }),
     coverImageUrl: t.exposeString("coverImageUrl", { nullable: true }),
   }),
 });
@@ -303,8 +363,21 @@ const ActivityType = builder.objectRef<ActivityEntry>("ActivityEvent").implement
     id: t.exposeID("id"),
     action: t.exposeString("action"),
     note: t.exposeString("note", { nullable: true }),
+    actorId: t.exposeString("actorId", { nullable: true }),
     actorName: t.exposeString("actorName", { nullable: true }),
     createdAt: t.string({ resolve: (a) => a.createdAt.toISOString() }),
+    // Enrichment (QA #42): which topic the event refers to, and what was
+    // said/done — all sourced from the event payload + a slug join.
+    topicTitle: t.string({
+      nullable: true,
+      resolve: (a) => (a.payload["title"] as string | undefined) ?? null,
+    }),
+    topicSlug: t.exposeString("topicSlug", { nullable: true }),
+    topicHostSlug: t.exposeString("topicHostSlug", { nullable: true }),
+    snippet: t.string({
+      nullable: true,
+      resolve: (a) => (a.payload["snippet"] as string | undefined) ?? null,
+    }),
   }),
 });
 
@@ -370,6 +443,81 @@ builder.queryType({
         )) as string[],
     }),
 
+    /** Members with public profile fields (People page). Anyone who can
+     * read the timetable can see it — bios follow timetable visibility. */
+    timetablePeople: t.field({
+      type: [PersonType],
+      args: { idOrSlug: t.arg.string({ required: true }) },
+      resolve: async (_p, args, ctx) => {
+        const readable = await getReadableTimetable(
+          ctx.user?.id ?? null,
+          args.idOrSlug,
+        );
+        if (!readable) return [];
+        const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
+        const people = await listPeople(readable.timetable.id);
+        return people.filter((p) =>
+          canSeePersonProfile(
+            readable.timetable.privacy as Privacy,
+            viewer,
+            p.roles as SharedRole[],
+          ),
+        );
+      },
+    }),
+
+    /** One member's public profile — powers the bio modal. */
+    person: t.field({
+      type: PersonType,
+      nullable: true,
+      args: {
+        idOrSlug: t.arg.string({ required: true }),
+        userId: t.arg.string({ required: true }),
+      },
+      resolve: async (_p, args, ctx) => {
+        const readable = await getReadableTimetable(
+          ctx.user?.id ?? null,
+          args.idOrSlug,
+        );
+        if (!readable) return null;
+        const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
+        const person = await getPerson(readable.timetable.id, args.userId);
+        if (
+          person &&
+          !canSeePersonProfile(
+            readable.timetable.privacy as Privacy,
+            viewer,
+            person.roles as SharedRole[],
+          )
+        ) {
+          return null;
+        }
+        return person;
+      },
+    }),
+
+    /** Slug of the timetable the viewer last engaged with (for the
+     * signed-in landing redirect and brand link). */
+    myLastVisitedTimetableSlug: t.string({
+      nullable: true,
+      resolve: async (_p, _args, ctx) =>
+        ctx.user ? getLastVisitedTimetableSlug(ctx.user.id) : null,
+    }),
+
+    /** The viewer's feed watermark for the "new since last visit"
+     * highlight; null for anonymous visitors and first-time viewers. */
+    myFeedLastSeenAt: t.string({
+      nullable: true,
+      args: { idOrSlug: t.arg.string({ required: true }) },
+      resolve: async (_p, args, ctx) => {
+        if (!ctx.user) return null;
+        const readable = await getReadableTimetable(ctx.user.id, args.idOrSlug);
+        if (!readable) return null;
+        const seen = await getFeedLastSeen(ctx.user.id, readable.timetable.id);
+        return seen ? seen.toISOString() : null;
+      },
+    }),
+
     timetableMembers: t.field({
       type: [MemberType],
       args: { timetableId: t.arg.string({ required: true }) },
@@ -391,6 +539,7 @@ builder.queryType({
       args: {
         idOrSlug: t.arg.string({ required: true }),
         hostId: t.arg.string({ required: false }),
+        heartedByMe: t.arg.boolean({ required: false }),
         sort: t.arg.string({ required: false }),
         limit: t.arg.int({ required: false }),
         offset: t.arg.int({ required: false }),
@@ -404,12 +553,17 @@ builder.queryType({
         const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
         const hostOnly = canSeeHostOnly(viewer);
         const moderate = canModerate(viewer);
+        const seeComments = canSeeComments(
+          readable.timetable.privacy as Privacy,
+          viewer,
+        );
         const sort = (args.sort ?? "hearts") as "hearts" | "comments" | "recent";
         const feed = await buildFeed(
           readable.timetable.id,
           ctx.user?.id ?? null,
           {
             hostId: args.hostId ?? undefined,
+            heartedByViewer: Boolean(args.heartedByMe),
             sort,
             limit: args.limit ?? 50,
             offset: args.offset ?? undefined,
@@ -419,6 +573,7 @@ builder.queryType({
           ...tp,
           canSeeHostOnly: hostOnly,
           canModerate: moderate,
+          canSeeComments: seeComments,
         }));
       },
     }),
@@ -454,7 +609,10 @@ builder.queryType({
     /** Activity timeline (admin only). */
     activityTimeline: t.field({
       type: [ActivityType],
-      args: { idOrSlug: t.arg.string({ required: true }) },
+      args: {
+        idOrSlug: t.arg.string({ required: true }),
+        actorId: t.arg.string({ required: false }),
+      },
       resolve: async (_p, args, ctx) => {
         const readable = await getReadableTimetable(
           ctx.user?.id ?? null,
@@ -463,7 +621,83 @@ builder.queryType({
         if (!readable) return [];
         const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
         if (!canModerate(viewer)) return [];
-        return listActivity(readable.timetable.id);
+        return listActivity(readable.timetable.id, {
+          actorId: args.actorId ?? undefined,
+        });
+      },
+    }),
+
+    /** A single topic by its permalink slug. Published topics are visible to
+     * anyone who can read the timetable; drafts/submissions only to their
+     * owner or admins. */
+    topicPermalink: t.field({
+      type: TopicType,
+      nullable: true,
+      args: {
+        idOrSlug: t.arg.string({ required: true }),
+        topicSlug: t.arg.string({ required: true }),
+      },
+      resolve: async (_p, args, ctx) => {
+        const readable = await getReadableTimetable(
+          ctx.user?.id ?? null,
+          args.idOrSlug,
+        );
+        if (!readable) return null;
+        const topic = await getTopicBySlug(
+          readable.timetable.id,
+          args.topicSlug,
+        );
+        if (!topic) return null;
+        const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
+        const hostOnly = canSeeHostOnly(viewer);
+        const moderate = canModerate(viewer);
+        const seeComments = canSeeComments(
+          readable.timetable.privacy as Privacy,
+          viewer,
+        );
+
+        if (topic.status === "published") {
+          const [feedTopic] = await buildFeed(
+            readable.timetable.id,
+            ctx.user?.id ?? null,
+            { topicId: topic.id },
+          );
+          if (!feedTopic) return null;
+          return {
+            ...feedTopic,
+            canSeeHostOnly: hostOnly,
+            canModerate: moderate,
+            canSeeComments: seeComments,
+          };
+        }
+
+        // Not published: owner or admin only, with empty heart data.
+        const isOwner = ctx.user?.id === topic.hostId;
+        if (!isOwner && !moderate) return null;
+        const host = await getUserById(topic.hostId);
+        return {
+          id: topic.id,
+          timetableId: topic.timetableId,
+          hostId: topic.hostId,
+          hostName: host?.name ?? null,
+          hostImage: host?.image ?? null,
+          hostSlug: await getOrCreateUserSlug(topic.hostId),
+          title: topic.title,
+          slug: topic.slug,
+          bodyMd: topic.bodyMd,
+          coverImageUrl: topic.coverImageUrl,
+          status: topic.status,
+          publishedAt: topic.publishedAt,
+          createdAt: topic.createdAt,
+          heartCount: 0,
+          weightedScore: 0,
+          viewerHasHearted: false,
+          commentCount: 0,
+          latestCommentAt: null,
+          canSeeHostOnly: hostOnly,
+          canModerate: moderate,
+          canSeeComments: seeComments,
+        };
       },
     }),
 
@@ -516,6 +750,18 @@ async function loadTopicAndViewer(ctx: ApiContext, topicId: string) {
 
 builder.mutationType({
   fields: (t) => ({
+    /** Bumps the viewer's feed watermark to now (no-op for non-members). */
+    markFeedSeen: t.boolean({
+      args: { idOrSlug: t.arg.string({ required: true }) },
+      resolve: async (_p, args, ctx) => {
+        const user = await requireUser(ctx);
+        const readable = await getReadableTimetable(user.id, args.idOrSlug);
+        if (!readable) notFound("Timetable not found");
+        await markFeedSeen(user.id, readable.timetable.id);
+        return true;
+      },
+    }),
+
     createTopic: t.field({
       type: ManagedTopicType,
       args: {
@@ -569,6 +815,32 @@ builder.mutationType({
             payload: { topicId: topic.id, title: updated.title },
           });
         }
+        return updated;
+      },
+    }),
+
+    /** Admin assigns/reassigns a topic's owner to another host or admin. */
+    reassignTopic: t.field({
+      type: ManagedTopicType,
+      args: {
+        topicId: t.arg.string({ required: true }),
+        hostId: t.arg.string({ required: true }),
+      },
+      resolve: async (_p, args, ctx) => {
+        const user = await requireUser(ctx);
+        const { topic, viewer } = await loadTopicAndViewer(ctx, args.topicId);
+        if (!isAdmin(viewer.roles)) forbidden();
+        const targetRoles = await getViewerRoles(
+          args.hostId,
+          topic.timetableId,
+        );
+        if (!(isHost(targetRoles) || isAdmin(targetRoles))) {
+          throw new GraphQLError(
+            "New owner must hold the host or admin role in this timetable",
+          );
+        }
+        const updated = await reassignTopic(topic, args.hostId, user.id);
+        if (!updated) notFound("Topic not found");
         return updated;
       },
     }),
@@ -859,16 +1131,64 @@ builder.mutationType({
       },
     }),
 
-    /** Admin: archive (reset) all hearts on a topic. */
-    archiveTopicHearts: t.field({
-      type: ManagedTopicType,
-      args: { topicId: t.arg.string({ required: true }) },
+    /** Admin: edit any member's bio (QA #42 — bios are editable from the
+     * Members section in Settings). Logged to the activity feed. */
+    updateMemberBio: t.field({
+      type: PersonType,
+      nullable: true,
+      args: {
+        idOrSlug: t.arg.string({ required: true }),
+        userId: t.arg.string({ required: true }),
+        bio: t.arg.string({ required: true }),
+      },
       resolve: async (_p, args, ctx) => {
         const user = await requireUser(ctx);
-        const { topic, viewer } = await loadTopicAndViewer(ctx, args.topicId);
+        const readable = await getReadableTimetable(user.id, args.idOrSlug);
+        if (!readable) notFound("Timetable not found");
+        const viewer = { userId: user.id, roles: readable.roles };
+        if (!canManageMembers(viewer)) forbidden("Admins only");
+        const target = await getPerson(readable.timetable.id, args.userId);
+        if (!target) notFound("Member not found");
+        await updateUserProfile(args.userId, { bio: args.bio.trim() || null });
+        await logActivity({
+          timetableId: readable.timetable.id,
+          actorId: user.id,
+          action: "member.bio_edit",
+          payload: { userId: args.userId, name: target.name },
+        });
+        return getPerson(readable.timetable.id, args.userId);
+      },
+    }),
+
+    /** Admin: set (or clear, with null) the timetable's heart-count cutoff —
+     * hearts created before it stop counting everywhere. Replaces the old
+     * per-topic "archive hearts" reset (QA #42). */
+    setHeartsCountFrom: t.field({
+      type: TimetableType,
+      args: {
+        idOrSlug: t.arg.string({ required: true }),
+        countFrom: t.arg.string({ required: false }),
+      },
+      resolve: async (_p, args, ctx) => {
+        const user = await requireUser(ctx);
+        const readable = await getReadableTimetable(user.id, args.idOrSlug);
+        if (!readable) notFound("Timetable not found");
+        const viewer = { userId: user.id, roles: readable.roles };
         if (!canModerate(viewer)) forbidden("Admins only");
-        await archiveTopicHearts(topic, user.id);
-        return (await getTopicById(topic.id)) ?? topic;
+        let countFrom: Date | null = null;
+        if (args.countFrom) {
+          countFrom = new Date(args.countFrom);
+          if (Number.isNaN(countFrom.getTime())) {
+            throw new GraphQLError("countFrom must be an ISO date-time");
+          }
+        }
+        await setHeartsCountFrom(readable.timetable.id, countFrom, user.id);
+        const updated = await getReadableTimetable(user.id, args.idOrSlug);
+        if (!updated) notFound("Timetable not found");
+        return {
+          ...updated.timetable,
+          viewerRoles: updated.roles as string[],
+        };
       },
     }),
 
@@ -883,6 +1203,7 @@ builder.mutationType({
         themePrimary: t.arg.string({ required: false }),
         themeSecondary: t.arg.string({ required: false }),
         coverImageUrl: t.arg.string({ required: false }),
+        iconUrl: t.arg.string({ required: false }),
         digestNewTopics: t.arg.boolean({ required: false }),
         digestReplies: t.arg.boolean({ required: false }),
         digestActivity: t.arg.boolean({ required: false }),
@@ -930,6 +1251,10 @@ builder.mutationType({
 
         if (args.coverImageUrl != null) {
           patch.coverImageUrl = args.coverImageUrl.trim() || null;
+        }
+
+        if (args.iconUrl != null) {
+          patch.iconUrl = args.iconUrl.trim() || null;
         }
 
         if (
@@ -1321,9 +1646,15 @@ const TopicLeaderboardEntryType = builder
     fields: (t) => ({
       id: t.exposeID("id"),
       title: t.exposeString("title"),
+      slug: t.exposeString("slug", { nullable: true }),
       hostName: t.exposeString("hostName", { nullable: true }),
+      hostSlug: t.exposeString("hostSlug", { nullable: true }),
       weightedScore: t.exposeFloat("weightedScore"),
       heartCount: t.exposeInt("heartCount"),
+      lastHeartAt: t.string({
+        nullable: true,
+        resolve: (e) => e.lastHeartAt?.toISOString() ?? null,
+      }),
     }),
   });
 
@@ -1343,6 +1674,8 @@ const UnallocatedTopicType = builder
     fields: (t) => ({
       id: t.exposeID("id"),
       title: t.exposeString("title"),
+      slug: t.exposeString("slug", { nullable: true }),
+      hostSlug: t.exposeString("hostSlug", { nullable: true }),
     }),
   });
 

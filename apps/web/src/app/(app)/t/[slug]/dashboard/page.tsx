@@ -1,9 +1,12 @@
+import Link from "next/link";
+
 import { isAdmin, isHost, type Role } from "@timetable/shared";
 
 import { DashboardActivityFilter } from "@/components/DashboardActivityFilter";
 import { HostFilter } from "@/components/HostFilter";
 import { gqlFetch } from "@/lib/graphql";
 import { displayRolesFromCookies } from "@/lib/previewRoles.server";
+import { topicPath } from "@/lib/topicPath";
 
 const ACTIVITY_FILTERS = new Set([
   "all",
@@ -29,9 +32,12 @@ type Dashboard = {
   topicLeaderboard: {
     id: string;
     title: string;
+    slug: string | null;
     hostName: string | null;
+    hostSlug: string | null;
     weightedScore: number;
     heartCount: number;
+    lastHeartAt: string | null;
   }[];
   hostLeaderboard: {
     hostId: string;
@@ -46,7 +52,12 @@ type Dashboard = {
     availabilityCount: number;
     latestActivityAt: string | null;
   }[];
-  unallocatedTopics: { id: string; title: string }[];
+  unallocatedTopics: {
+    id: string;
+    title: string;
+    slug: string | null;
+    hostSlug: string | null;
+  }[];
   conflicts: {
     slotId: string;
     location: string;
@@ -68,13 +79,13 @@ const QUERY = `
     dashboard(idOrSlug: $s, hostId: $host, electorActivity: $activity) {
       totalHearts electorCount hostCount slotCount
       topicCounts { draft submitted published unpublished archived }
-      topicLeaderboard { id title hostName weightedScore heartCount }
+      topicLeaderboard { id title slug hostName hostSlug weightedScore heartCount lastHeartAt }
       hostLeaderboard { hostId hostName weightedScore }
       electorActivity {
         electorId electorName heartCount commentCount availabilityCount
         latestActivityAt
       }
-      unallocatedTopics { id title }
+      unallocatedTopics { id title slug hostSlug }
       conflicts { slotId location startsAt topics { id title } }
     }
   }
@@ -157,7 +168,7 @@ export default async function DashboardPage({
 
       <div className="grid grid-2">
         <div className="card">
-          <h3 style={{ marginTop: 0, fontSize: 15 }}>Top topics (weighted)</h3>
+          <h3 style={{ marginTop: 0, fontSize: 15 }}>All topics by weighted votes</h3>
           {d.topicLeaderboard.length === 0 ? (
             <p className="faint" style={{ fontSize: 13 }}>
               No published topics yet.
@@ -171,10 +182,20 @@ export default async function DashboardPage({
                   style={{ justifyContent: "space-between", fontSize: 14 }}
                 >
                   <span>
-                    {t.title}{" "}
+                    {(() => {
+                      const href = topicPath(slug, t.hostSlug, t.slug);
+                      return href ? <Link href={href}>{t.title}</Link> : t.title;
+                    })()}{" "}
                     <span className="faint">· {t.hostName ?? "Host"}</span>
                   </span>
-                  <span className="mono">{t.weightedScore.toFixed(2)}</span>
+                  <span className="mono" style={{ textAlign: "right" }}>
+                    {t.weightedScore.toFixed(2)}
+                    {t.lastHeartAt ? (
+                      <span className="faint" style={{ display: "block", fontSize: 11 }}>
+                        last ♥ {new Date(t.lastHeartAt).toLocaleDateString()}
+                      </span>
+                    ) : null}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -182,7 +203,7 @@ export default async function DashboardPage({
         </div>
 
         <div className="card">
-          <h3 style={{ marginTop: 0, fontSize: 15 }}>Hosts by weighted votes</h3>
+          <h3 style={{ marginTop: 0, fontSize: 15 }}>All hosts by weighted votes</h3>
           {d.hostLeaderboard.length === 0 ? (
             <p className="faint" style={{ fontSize: 13 }}>
               No data yet.
@@ -195,7 +216,11 @@ export default async function DashboardPage({
                   className="row"
                   style={{ justifyContent: "space-between", fontSize: 14 }}
                 >
-                  <span>{h.hostName ?? "Host"}</span>
+                  <span>
+                    <Link href={`/t/${slug}/feed?host=${h.hostId}`}>
+                      {h.hostName ?? "Host"}
+                    </Link>
+                  </span>
                   <span className="mono">{h.weightedScore.toFixed(2)}</span>
                 </li>
               ))}
@@ -266,7 +291,10 @@ export default async function DashboardPage({
           <ul className="list">
             {d.unallocatedTopics.map((t) => (
               <li key={t.id} style={{ fontSize: 14 }}>
-                {t.title}
+                {(() => {
+                  const href = topicPath(slug, t.hostSlug, t.slug);
+                  return href ? <Link href={href}>{t.title}</Link> : t.title;
+                })()}
               </li>
             ))}
           </ul>

@@ -11,9 +11,10 @@ import { WeekdayPatternControl } from "@/components/WeekdayPatternControl";
 import type { CalendarSlot, TopicOption } from "@/lib/calendarTypes";
 import { gqlFetch } from "@/lib/graphql";
 import { displayRolesFromCookies } from "@/lib/previewRoles.server";
+import { parseTimetableSettings, roleLabel } from "@/lib/timetableSettings";
 
 type Data = {
-  timetable: { viewerRoles: string[] } | null;
+  timetable: { viewerRoles: string[]; settings: string } | null;
   calendar: CalendarSlot[];
   topicFeed: TopicOption[];
   myIcsToken?: string | null;
@@ -28,7 +29,7 @@ const SLOT_FIELDS = `
 
 const QUERY = `
   query Calendar($s: String!, $audience: String) {
-    timetable(idOrSlug: $s) { viewerRoles }
+    timetable(idOrSlug: $s) { viewerRoles settings }
     calendar(idOrSlug: $s, audience: $audience) { ${SLOT_FIELDS} }
     topicFeed(idOrSlug: $s) { id title }
   }
@@ -36,7 +37,7 @@ const QUERY = `
 
 const QUERY_AUTHED = `
   query CalendarAuthed($s: String!, $audience: String) {
-    timetable(idOrSlug: $s) { viewerRoles }
+    timetable(idOrSlug: $s) { viewerRoles settings }
     calendar(idOrSlug: $s, audience: $audience) { ${SLOT_FIELDS} }
     topicFeed(idOrSlug: $s) { id title }
     myIcsToken
@@ -67,6 +68,8 @@ export default async function CalendarPage({
     canSeeHostOnly: isHost(roles) || isAdmin(roles),
     canAdmin: isAdmin(roles),
   };
+  const settings = parseTimetableSettings(data.timetable?.settings);
+  const adminLabel = roleLabel(settings.roleLabels, "admin");
 
   const icsUrl =
     `${env.apiUrl}/api/timetables/${slug}/calendar.ics` +
@@ -151,6 +154,7 @@ export default async function CalendarPage({
               slug={slug}
               perms={perms}
               topicOptions={data.topicFeed}
+              adminLabel={adminLabel}
             />
           ))}
         </ul>

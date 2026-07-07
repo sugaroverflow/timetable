@@ -19,6 +19,7 @@ export const uploadPurposes = [
   "profile-image",
   "topic-cover",
   "timetable-cover",
+  "timetable-icon",
 ] as const;
 
 export type UploadPurpose = (typeof uploadPurposes)[number];

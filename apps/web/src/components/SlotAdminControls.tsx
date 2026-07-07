@@ -15,10 +15,12 @@ export function SlotAdminControls({
   slotId,
   tags,
   topicOptions,
+  label = "Admin",
 }: {
   slotId: string;
   tags: { id: string; title: string }[];
   topicOptions: TopicOption[];
+  label?: string;
 }) {
   const router = useRouter();
   const { toast, toastError } = useToast();
@@ -45,7 +47,7 @@ export function SlotAdminControls({
       style={{ gap: 8, borderTop: "1px solid var(--line)", paddingTop: 10 }}
     >
       <span className="faint" style={{ fontSize: 11 }}>
-        Admin:
+        {label}:
       </span>
       {tags.map((tag) => (
         <button

@@ -31,7 +31,10 @@ export type FeedTopic = {
   hostId: string;
   hostName: string | null;
   hostImage: string | null;
+  hostSlug: string | null;
   title: string;
+  slug: string | null;
+  bodyMd: string;
   bodyHtml: string;
   coverImageUrl: string | null;
   status: TopicStatus;
@@ -48,6 +51,8 @@ export type FeedTopic = {
 export type ManagedTopic = {
   id: string;
   title: string;
+  slug?: string | null;
+  hostSlug?: string | null;
   status: TopicStatus;
   bodyMd: string;
   bodyHtml: string;
@@ -55,12 +60,19 @@ export type ManagedTopic = {
   updatedAt: string;
   hostName: string | null;
   feedback: string | null;
+  /** Threaded admin↔host feedback; fetched where the UI renders it. */
+  hostOnlyComments?: FeedComment[];
 };
 
 export type ActivityEvent = {
   id: string;
   action: string;
   note: string | null;
+  actorId: string | null;
   actorName: string | null;
   createdAt: string;
+  topicTitle: string | null;
+  topicSlug: string | null;
+  topicHostSlug: string | null;
+  snippet: string | null;
 };

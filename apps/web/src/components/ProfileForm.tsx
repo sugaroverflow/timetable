@@ -58,7 +58,7 @@ export function ProfileForm({
         />
       </div>
       <div className="field">
-        <label htmlFor="bio">About</label>
+        <label htmlFor="bio">About (markdown supported)</label>
         <textarea
           id="bio"
           value={bio}

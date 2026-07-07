@@ -1,156 +1,104 @@
 import Link from "next/link";
 
-import { isAdmin, isElector, isHost, type Role } from "@timetable/shared";
-
 import { EmptyState } from "@/components/EmptyState";
 import { FeedSortControl } from "@/components/FeedSortControl";
 import { HostFilter } from "@/components/HostFilter";
-import { TopicCard, type FeedPerms } from "@/components/TopicCard";
-import type { FeedTopic } from "@/lib/feedTypes";
-import { gqlFetch } from "@/lib/graphql";
-import { displayRolesFromCookies } from "@/lib/previewRoles.server";
-import { parseTimetableSettings } from "@/lib/timetableSettings";
+import { InfiniteFeed } from "@/components/InfiniteFeed";
+import { MarkFeedSeen } from "@/components/MarkFeedSeen";
+import { TopicCard } from "@/components/TopicCard";
+import {
+  FEED_PAGE_SIZE,
+  fetchFeedPage,
+  isTopicNew,
+  normalizeFeedSort,
+} from "@/lib/feedPage";
+import { roleLabel } from "@/lib/timetableSettings";
 
-type Data = {
-  timetable: {
-    viewerRoles: string[];
-    settings: string;
-    viewerHeartedPublishedCount: number | null;
-  } | null;
-  topicFeed: FeedTopic[];
-  timetableHosts: { id: string; name: string | null }[];
-};
-
-const COMMENT_FIELDS = `
-  id parentId authorId authorName authorImage body visibility hidden createdAt
-`;
-
-const QUERY = `
-  query Feed($s: String!, $sort: String, $host: String, $limit: Int, $offset: Int) {
-    timetable(idOrSlug: $s) { viewerRoles settings viewerHeartedPublishedCount }
-    timetableHosts(idOrSlug: $s) { id name }
-    topicFeed(idOrSlug: $s, sort: $sort, hostId: $host, limit: $limit, offset: $offset) {
-      id timetableId hostId hostName hostImage title bodyHtml coverImageUrl status
-      heartCount weightedScore viewerHasHearted commentCount
-      publishedAt createdAt
-      comments { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} } } }
-      weightedBreakdown { electorId electorName weight }
-    }
-  }
-`;
-
-const SORTS = new Set(["hearts", "comments", "recent"]);
-const PAGE_SIZE = 20;
-
-function pageHref({
-  sort,
-  host,
-  page,
-}: {
-  sort: string;
-  host: string;
-  page: number;
-}) {
-  const params = new URLSearchParams();
-  if (sort !== "hearts") params.set("sort", sort);
-  if (host) params.set("host", host);
-  if (page > 1) params.set("page", String(page));
-  const query = params.toString();
-  return query ? `?${query}` : "?";
-}
+import { loadMoreFeed } from "./actions";
 
 export default async function FeedPage({
   params,
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ sort?: string; host?: string; page?: string }>;
+  searchParams: Promise<{ sort?: string; host?: string; hearted?: string }>;
 }) {
   const { slug } = await params;
-  const { sort: sortParam, host: hostParam, page: pageParam } = await searchParams;
-  const sort = sortParam && SORTS.has(sortParam) ? sortParam : "hearts";
+  const {
+    sort: sortParam,
+    host: hostParam,
+    hearted: heartedParam,
+  } = await searchParams;
+  const sort = normalizeFeedSort(sortParam);
   const host = hostParam ?? "";
-  const page = Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1);
-  const offset = (page - 1) * PAGE_SIZE;
+  const hearted = heartedParam === "me";
 
-  const data = await gqlFetch<Data>(QUERY, {
-    s: slug,
-    sort,
-    host: host || null,
-    limit: PAGE_SIZE + 1,
-    offset,
-  });
-  const roles = await displayRolesFromCookies(
-    (data.timetable?.viewerRoles ?? []) as Role[],
-  );
-  const settings = parseTimetableSettings(data.timetable?.settings);
-  const topics = data.topicFeed.slice(0, PAGE_SIZE);
-  const hasNext = data.topicFeed.length > PAGE_SIZE;
-
-  const perms: FeedPerms = {
-    canHeart: isElector(roles),
-    canComment: roles.length > 0,
-    canHostOnly: isHost(roles) || isAdmin(roles),
-    canModerate: isAdmin(roles),
-  };
+  const page = await fetchFeedPage(slug, sort, host, 0, hearted);
+  const hostLabel = roleLabel(page.settings.roleLabels, "host");
+  const adminLabel = roleLabel(page.settings.roleLabels, "admin");
 
   return (
     <div className="stack">
+      {page.isMember ? <MarkFeedSeen slug={slug} /> : null}
+      {hearted ? (
+        <div className="page-head">
+          <h2 style={{ fontSize: 18, margin: 0 }}>My hearted topics</h2>
+          <p>Published topics you currently heart.</p>
+        </div>
+      ) : null}
       <div className="toolbar">
         <label htmlFor="sort">Sort</label>
         <FeedSortControl value={sort} />
-        {data.timetableHosts.length > 0 ? (
-          <HostFilter value={host} hosts={data.timetableHosts} />
+        {page.hosts.length > 0 ? (
+          <HostFilter value={host} hosts={page.hosts} />
         ) : null}
-        <span className="spacer" />
-        <span className="faint" style={{ fontSize: 12 }}>
-          Page {page}
-        </span>
       </div>
 
-      {roles.length === 0 ? (
+      {!page.isMember ? (
         <div className="notice">
           You&rsquo;re viewing a public feed. <Link href="/sign-in">Sign in</Link>{" "}
           to heart and comment.
         </div>
       ) : null}
 
-      {topics.length === 0 ? (
+      {page.topics.length === 0 && hearted ? (
+        <EmptyState
+          icon="♥"
+          title="No hearted topics yet"
+          hint="Heart topics in the feed and they'll collect here."
+        />
+      ) : page.topics.length === 0 ? (
         <EmptyState
           icon="◇"
           title="No published topics yet"
-          hint="Hosts draft and submit topics from My topics; admins publish them from the moderation queue."
+          hint={`${hostLabel}s draft and submit topics from My Topics; ${adminLabel.toLowerCase()}s publish them from Pending Topics.`}
         />
       ) : (
-        topics.map((topic) => (
-          <TopicCard
-            key={topic.id}
-            topic={topic}
-            perms={perms}
-            hostLabel={settings.roleLabels?.host}
-            viewerHeartCount={data.timetable?.viewerHeartedPublishedCount ?? null}
-          />
-        ))
-      )}
-
-      {(page > 1 || hasNext) && (
-        <div className="toolbar" style={{ justifyContent: "space-between" }}>
-          {page > 1 ? (
-            <Link href={pageHref({ sort, host, page: page - 1 })} className="btn">
-              Previous
-            </Link>
-          ) : (
-            <span />
-          )}
-          {hasNext ? (
-            <Link
-              href={pageHref({ sort, host, page: page + 1 })}
-              className="btn btn-primary"
-            >
-              Next
-            </Link>
-          ) : null}
-        </div>
+        <InfiniteFeed
+          key={`${sort}|${host}|${hearted}`}
+          slug={slug}
+          sort={sort}
+          host={host}
+          hearted={hearted}
+          pageSize={FEED_PAGE_SIZE}
+          initialHasNext={page.hasNext}
+          loadMore={loadMoreFeed}
+        >
+          {page.topics.map((topic) => (
+            <TopicCard
+              key={topic.id}
+              topic={topic}
+              perms={page.perms}
+              slug={slug}
+              viewerId={page.viewerId}
+              isNew={isTopicNew(topic, page.lastSeenAt)}
+              hostLabel={page.settings.roleLabels?.host}
+              adminLabel={adminLabel}
+              viewerHeartCount={page.viewerHeartCount}
+              hosts={page.hosts}
+            />
+          ))}
+        </InfiniteFeed>
       )}
     </div>
   );

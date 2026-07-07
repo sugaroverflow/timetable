@@ -60,7 +60,7 @@ const COMMENT_VISIBILITY_VALUES = [
   "host_only",
 ] as const satisfies readonly CommentVisibility[];
 
-const TIMETABLE_PRIVACY_VALUES = ["deactivated", "private", "public"] as const;
+const TIMETABLE_PRIVACY_VALUES = ["deactivated", "private", "public", "hosts_only", "no_comments"] as const;
 type TimetablePrivacy = (typeof TIMETABLE_PRIVACY_VALUES)[number];
 
 const AVAILABILITY_STATE_VALUES = ['green', 'yellow', 'red'] as const satisfies readonly AvailabilityState[];
@@ -254,7 +254,7 @@ function parseTimetable(markdown: string): TimetableFixture {
   const description = fieldFromBlock(block, "Description") || null;
   const privacyRaw = fieldFromBlock(block, "Privacy", { required: true });
   const privacy =
-    /\*\*(deactivated|private|public)\*\*/.exec(privacyRaw)?.[1] ??
+    /\*\*(deactivated|private|public|hosts_only|no_comments)\*\*/.exec(privacyRaw)?.[1] ??
     privacyRaw.trim();
 
   if (!hasValue(TIMETABLE_PRIVACY_VALUES, privacy)) {
@@ -770,9 +770,23 @@ function buildRows(fixture: Fixture): {
     ]),
   );
 
+  // Deterministic, unique user slugs from display names ("-2" on collision).
+  const seenUserSlugs = new Map<string, number>();
+  const userSlugFor = (name: string): string => {
+    const base =
+      name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "") || "user";
+    const n = (seenUserSlugs.get(base) ?? 0) + 1;
+    seenUserSlugs.set(base, n);
+    return n === 1 ? base : `${base}-${n}`;
+  };
+
   const userRows: NewUser[] = fixture.people.map((person, index) => ({
     id: localIdFor(person),
     name: person.displayName,
+    slug: userSlugFor(person.displayName),
     email: person.clerkId ? `${person.label.toLowerCase()}@real.clerk` : fakeEmailFor(person.label),
     emailVerified: BASE_TIME,
     image: null,
@@ -818,6 +832,8 @@ function buildRows(fixture: Fixture): {
       timetableId,
       hostId: userIds.get(topic.host) ?? "",
       title: topic.title,
+      // Fixture labels are unique, so stripping the prefix stays unique.
+      slug: topic.label.replace(/^topic-/, ""),
       bodyMd: topic.bodyMd,
       coverImageUrl: topic.coverImageUrl,
       status: topic.status,
@@ -835,20 +851,18 @@ function buildRows(fixture: Fixture): {
     ownerId,
   );
 
+  // Hearts on archived topics simply don't count (the topic isn't
+  // published); the old per-row archivedAt marking is gone — "archiving"
+  // is now the timetable-level heartsCountFrom cutoff.
   const heartRows: NewHeart[] = [];
   let heartIndex = 0;
   for (const row of fixture.hearts) {
-    const topic = fixture.topics.find((candidate) => candidate.label === row.topic);
-    const archivedAt =
-      topic?.status === "archived" ? new Date("2026-05-03T12:00:00.000Z") : null;
-
     for (const personLabel of row.people) {
       heartRows.push({
         id: stableUuid("heart", `${row.topic}:${personLabel}`),
         topicId: topicIds.get(row.topic) ?? "",
         userId: userIds.get(personLabel) ?? "",
         createdAt: addMinutes(HEART_TIME, heartIndex),
-        archivedAt,
       });
       heartIndex += 1;
     }

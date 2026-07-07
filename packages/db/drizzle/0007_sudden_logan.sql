@@ -1,0 +1,1 @@
+ALTER TABLE "timetable_memberships" ADD COLUMN "last_seen_feed_at" timestamp with time zone;

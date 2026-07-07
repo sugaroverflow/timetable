@@ -20,6 +20,9 @@ export const users = pgTable("user", {
   email: text().unique(),
   emailVerified: timestamp({ withTimezone: true }),
   image: text(),
+  /** URL slug (globally unique, from the display name). Cosmetic segment in
+   * topic permalinks — resolution is by topic slug, so renames are safe. */
+  slug: text().unique(),
   bio: text(),
   notificationSettings: jsonb()
     .$type<NotificationSettings>()

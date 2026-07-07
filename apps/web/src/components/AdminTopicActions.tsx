@@ -1,18 +1,40 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { useToast } from "@/components/Toast";
 import { clientGql } from "@/lib/clientGraphql";
 
-const UNPUBLISH = `mutation($id: String!){ unpublishTopic(topicId: $id){ id } }`;
-const ARCHIVE = `mutation($id: String!){ archiveTopicHearts(topicId: $id){ id } }`;
+import { TopicEditForm } from "./TopicEditForm";
 
-export function AdminTopicActions({ topicId }: { topicId: string }) {
+const UNPUBLISH = `mutation($id: String!){ unpublishTopic(topicId: $id){ id } }`;
+const REASSIGN = `mutation($id: String!, $host: String!){ reassignTopic(topicId: $id, hostId: $host){ id } }`;
+
+export function AdminTopicActions({
+  topic,
+  slug,
+  label = "Admin",
+  hosts = [],
+  currentHostId,
+}: {
+  topic: {
+    id: string;
+    title: string;
+    bodyMd: string;
+    coverImageUrl: string | null;
+  };
+  slug: string;
+  label?: string;
+  hosts?: { id: string; name: string | null }[];
+  currentHostId?: string;
+}) {
+  const topicId = topic.id;
   const router = useRouter();
   const { toast, toastError } = useToast();
   const [pending, startTransition] = useTransition();
+  const [editing, setEditing] = useState(false);
+  const [newHost, setNewHost] = useState("");
 
   async function unpublish() {
     try {
@@ -24,42 +46,77 @@ export function AdminTopicActions({ topicId }: { topicId: string }) {
     }
   }
 
-  async function archiveHearts() {
-    if (!confirm("Archive all hearts on this topic? This resets its votes."))
-      return;
+  async function reassign() {
+    if (!newHost) return;
     try {
-      await clientGql(ARCHIVE, { id: topicId });
-      toast("Hearts archived");
+      await clientGql(REASSIGN, { id: topicId, host: newHost });
+      toast("Topic reassigned");
+      setNewHost("");
       startTransition(() => router.refresh());
     } catch (err) {
       toastError(err instanceof Error ? err.message : "Action failed");
     }
   }
 
+  const reassignOptions = hosts.filter((h) => h.id !== currentHostId);
+
   return (
-    <div
-      className="row wrap"
-      style={{ gap: 8, borderTop: "1px solid var(--line)", paddingTop: 10 }}
-    >
-      <span className="faint" style={{ fontSize: 11 }}>
-        Admin:
-      </span>
-      <button
-        className="btn btn-ghost"
-        type="button"
-        disabled={pending}
-        onClick={unpublish}
+    <div className="stack" style={{ gap: 8 }}>
+      <div
+        className="row wrap"
+        style={{ gap: 8, borderTop: "1px solid var(--line)", paddingTop: 10 }}
       >
-        Unpublish
-      </button>
-      <button
-        className="btn btn-ghost"
-        type="button"
-        disabled={pending}
-        onClick={archiveHearts}
-      >
-        Archive hearts
-      </button>
+        <span className="faint" style={{ fontSize: 11 }}>
+          {label}:
+        </span>
+        <button
+          className="btn btn-ghost"
+          type="button"
+          onClick={() => setEditing((v) => !v)}
+        >
+          {editing ? "Close editor" : "Edit"}
+        </button>
+        <button
+          className="btn btn-ghost"
+          type="button"
+          disabled={pending}
+          onClick={unpublish}
+        >
+          Unpublish
+        </button>
+        {reassignOptions.length > 0 ? (
+          <>
+            <select
+              aria-label="Reassign topic owner"
+              value={newHost}
+              onChange={(e) => setNewHost(e.target.value)}
+              style={{ width: "auto", fontSize: 12, padding: "6px 8px" }}
+            >
+              <option value="">Reassign owner…</option>
+              {reassignOptions.map((h) => (
+                <option key={h.id} value={h.id}>
+                  {h.name ?? h.id}
+                </option>
+              ))}
+            </select>
+            <button
+              className="btn btn-ghost"
+              type="button"
+              disabled={pending || !newHost}
+              onClick={reassign}
+            >
+              Assign
+            </button>
+          </>
+        ) : null}
+      </div>
+      {editing ? (
+        <TopicEditForm
+          topic={topic}
+          slug={slug}
+          onDone={() => setEditing(false)}
+        />
+      ) : null}
     </div>
   );
 }

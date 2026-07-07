@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import type { FeedComment, WeightedHeart } from "@/lib/feedTypes";
+import type { WeightedHeart } from "@/lib/feedTypes";
 
 import { Avatar } from "./Avatar";
 
@@ -10,12 +10,10 @@ export function HostInsightsPanel({
   weightedScore,
   heartCount,
   weightedBreakdown,
-  hostComments,
 }: {
   weightedScore: number;
   heartCount: number;
   weightedBreakdown: WeightedHeart[];
-  hostComments: FeedComment[];
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -90,24 +88,6 @@ export function HostInsightsPanel({
                 </div>
               );
             })
-          )}
-
-          {/* Host-only comment thread */}
-          {hostComments.length > 0 && (
-            <div className="host-thread">
-              <div className="host-thread-head">🔒 Host thread</div>
-              {hostComments.map((c) => (
-                <div key={c.id} className="comment" style={{ marginBottom: 8 }}>
-                  <Avatar name={c.authorName} small />
-                  <div className="comment-main">
-                    <div className="comment-meta">
-                      <span className="who">{c.authorName ?? "Someone"}</span>
-                    </div>
-                    <div className="comment-body">{c.body}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
           )}
         </>
       )}
