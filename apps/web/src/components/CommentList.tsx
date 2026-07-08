@@ -1,5 +1,6 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import type { FeedComment } from "@/lib/feedTypes";
@@ -17,6 +18,15 @@ function countNested(comments: FeedComment[]): number {
   );
 }
 
+/** True when the deep-linked comment lives in this subtree — collapsed
+ * threads auto-expand so ?reply= targets are visible (QA #59 round 3). */
+function subtreeContains(comments: FeedComment[], id: string | null): boolean {
+  if (!id) return false;
+  return comments.some(
+    (c) => c.id === id || subtreeContains(c.replies ?? [], id),
+  );
+}
+
 function CommentItem({
   comment,
   canReply,
@@ -29,7 +39,10 @@ function CommentItem({
   slug?: string;
 }) {
   const replies = comment.replies ?? [];
-  const [showReplies, setShowReplies] = useState(false);
+  const searchParams = useSearchParams();
+  const [showReplies, setShowReplies] = useState(() =>
+    subtreeContains(replies, searchParams.get("reply")),
+  );
   const replyCount = countNested(replies);
 
   return (
@@ -106,7 +119,13 @@ export function CommentList({
   canModerate: boolean;
   slug?: string;
 }) {
-  const [showAll, setShowAll] = useState(false);
+  const searchParams = useSearchParams();
+  const [showAll, setShowAll] = useState(() =>
+    subtreeContains(
+      comments.slice(VISIBLE_TOP_LEVEL),
+      searchParams.get("reply"),
+    ),
+  );
   if (!comments.length) return null;
 
   const visible =

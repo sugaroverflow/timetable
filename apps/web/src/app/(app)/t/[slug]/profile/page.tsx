@@ -13,27 +13,18 @@ type Data = {
     image: string | null;
     notificationSettings: string;
   } | null;
-  myLastVisitedTimetableSlug: string | null;
 };
 
-const QUERY = `query {
-  me { name bio email image notificationSettings }
-  myLastVisitedTimetableSlug
-}`;
+const QUERY = `query { me { name bio email image notificationSettings } }`;
 
-/** Standalone profile route: users inside a timetable get the in-shell
- * version (QA #59 round 3), so redirect there when we know where they
- * live; users with no timetable get the plain page. */
-export default async function ProfilePage() {
+/** Profile inside the timetable shell (QA #59 round 3) — same sidebar and
+ * theme as every other page. The profile itself is global to the user. */
+export default async function TimetableProfilePage() {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
 
   const data = await gqlFetch<Data>(QUERY);
   if (!data.me) redirect("/sign-in");
-
-  if (data.myLastVisitedTimetableSlug) {
-    redirect(`/t/${data.myLastVisitedTimetableSlug}/profile`);
-  }
 
   let digest: DigestSettings = {};
   try {
@@ -42,9 +33,5 @@ export default async function ProfilePage() {
     digest = {};
   }
 
-  return (
-    <main className="container">
-      <ProfilePanel me={data.me} digest={digest} />
-    </main>
-  );
+  return <ProfilePanel me={data.me} digest={digest} />;
 }

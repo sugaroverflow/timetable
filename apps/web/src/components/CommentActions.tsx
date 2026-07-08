@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { useToast } from "@/components/Toast";
 import { clientGql } from "@/lib/clientGraphql";
@@ -27,9 +27,20 @@ export function CommentActions({
 }) {
   const router = useRouter();
   const { toast, toastError } = useToast();
-  const [open, setOpen] = useState(false);
+  const searchParams = useSearchParams();
+  // Deep link from the notifications pane (QA #59 round 3): ?reply=<id>
+  // opens and focuses this comment's reply composer.
+  const deepLinked = canReply && searchParams.get("reply") === commentId;
+  const [open, setOpen] = useState(deepLinked);
   const [body, setBody] = useState("");
   const [pending, startTransition] = useTransition();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (!deepLinked) return;
+    textareaRef.current?.focus();
+    textareaRef.current?.scrollIntoView({ block: "center" });
+  }, [deepLinked]);
 
   async function reply(e: React.FormEvent) {
     e.preventDefault();
@@ -73,6 +84,7 @@ export function CommentActions({
       {open ? (
         <form onSubmit={reply} className="inline-form" style={{ marginTop: 6 }}>
           <textarea
+            ref={textareaRef}
             value={body}
             onChange={(e) => setBody(e.target.value)}
             placeholder="Write a reply…"

@@ -160,7 +160,7 @@ export default async function TimetableLayout({
             {roles.length > 0 && (
               <NavLink href={`${base}/people`}>People</NavLink>
             )}
-            {isAuthed && <NavLink href="/profile">Profile</NavLink>}
+            {isAuthed && <NavLink href={`${base}/profile`}>Profile</NavLink>}
             {(isHost(roles) || isAdmin(roles)) && (
               <NavLink href={`${base}/dashboard`}>Dashboard</NavLink>
             )}

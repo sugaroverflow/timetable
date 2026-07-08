@@ -68,11 +68,21 @@ export function ImageUploadField({
       if (!signedRes.ok) throw new Error(await parseError(signedRes));
       const signed = (await signedRes.json()) as SignedUpload;
 
-      const uploadRes = await fetch(signed.uploadUrl, {
-        method: signed.method,
-        headers: signed.headers,
-        body: file,
-      });
+      // Direct browser→bucket PUT. A TypeError here is almost always the
+      // bucket rejecting the origin (CORS not configured for this site) —
+      // surface that instead of a bare "Failed to fetch".
+      let uploadRes: Response;
+      try {
+        uploadRes = await fetch(signed.uploadUrl, {
+          method: signed.method,
+          headers: signed.headers,
+          body: file,
+        });
+      } catch {
+        throw new Error(
+          "Storage isn't accepting uploads from this site yet (bucket CORS). You can paste an image URL instead.",
+        );
+      }
       if (!uploadRes.ok) throw new Error(await parseError(uploadRes));
 
       onChange(signed.publicUrl);

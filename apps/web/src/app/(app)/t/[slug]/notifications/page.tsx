@@ -67,6 +67,9 @@ export default async function NotificationsPage({
           {data.notifications.map((n) => {
             const base = topicPath(slug, n.topicHostSlug, n.topicSlug);
             const href = base ? `${base}#comment-${n.commentId}` : null;
+            const replyHref = base
+              ? `${base}?reply=${n.commentId}#comment-${n.commentId}`
+              : null;
             return (
               <li key={n.commentId} className="card">
                 <div className="row" style={{ alignItems: "flex-start" }}>
@@ -101,6 +104,12 @@ export default async function NotificationsPage({
                       {new Date(n.createdAt).toLocaleString()}
                     </div>
                   </div>
+                  <span style={{ flex: 1 }} />
+                  {replyHref ? (
+                    <Link className="btn btn-ghost" href={replyHref}>
+                      Reply
+                    </Link>
+                  ) : null}
                 </div>
               </li>
             );
