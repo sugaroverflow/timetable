@@ -169,9 +169,11 @@ export async function unpublishTopic(
   return updated;
 }
 
-export type ModerationAction = "publish" | "reject" | "request_changes";
+/** Moderation actions. request_changes is gone (QA #59 round 3) — admins
+ * discuss in the admin-only comment thread and hosts resubmit themselves. */
+export type ModerationAction = "publish" | "reject";
 
-/** Admin moderation: publish, reject, or request changes (with feedback). */
+/** Admin moderation: publish or reject. */
 export async function moderateTopic(
   topic: Topic,
   actorId: string,
@@ -191,32 +193,11 @@ export async function moderateTopic(
     return updated;
   }
 
-  if (action === "reject") {
-    const updated = await setStatus(topic.id, "unpublished");
-    await logActivity({
-      timetableId: topic.timetableId,
-      actorId,
-      action: "topic.reject",
-      payload: { topicId: topic.id, title: topic.title },
-      note: note ?? null,
-    });
-    return updated;
-  }
-
-  // request_changes: send the topic back to draft with host-only feedback.
-  const updated = await setStatus(topic.id, "draft");
-  if (note && note.trim()) {
-    await db.insert(comments).values({
-      topicId: topic.id,
-      authorId: actorId,
-      body: note.trim(),
-      visibility: "host_only",
-    });
-  }
+  const updated = await setStatus(topic.id, "unpublished");
   await logActivity({
     timetableId: topic.timetableId,
     actorId,
-    action: "topic.request_changes",
+    action: "topic.reject",
     payload: { topicId: topic.id, title: topic.title },
     note: note ?? null,
   });

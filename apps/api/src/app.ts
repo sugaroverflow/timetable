@@ -2,9 +2,10 @@ import "./load-env";
 
 import cors from "cors";
 import express from "express";
-import { createYoga } from "graphql-yoga";
+import { getOperationAST, GraphQLError } from "graphql";
+import { createYoga, type Plugin } from "graphql-yoga";
 
-import { buildContext } from "./context";
+import { buildContext, type ApiContext } from "./context";
 import { env } from "./env";
 import { useOperationLimits } from "./graphql/depth-limit";
 import { schema } from "./graphql/schema";
@@ -26,7 +27,7 @@ export function createApiApp() {
     cors({
       origin: env.webOrigin,
       credentials: true,
-      allowedHeaders: ["Content-Type", "Authorization"],
+      allowedHeaders: ["Content-Type", "Authorization", "x-view-as"],
     }),
   );
 
@@ -55,11 +56,26 @@ export function createApiApp() {
         maxDepth: env.graphqlMaxDepth,
         maxCost: env.graphqlMaxCost,
       }),
+      // While an admin previews the timetable as another member, the
+      // preview is strictly read-only (QA #59 round 3): acting as someone
+      // else would corrupt attribution.
+      {
+        onExecute({ args }) {
+          const op = getOperationAST(args.document, args.operationName);
+          const ctx = args.contextValue as ApiContext;
+          if (op?.operation === "mutation" && ctx.impersonation) {
+            throw new GraphQLError(
+              "Read-only while previewing as another member — exit the preview to make changes",
+            );
+          }
+        },
+      } satisfies Plugin<ApiContext>,
     ],
     context: ({ request }) =>
       buildContext({
         authHeader: request.headers.get("authorization"),
         cookieHeader: request.headers.get("cookie"),
+        viewAsHeader: request.headers.get("x-view-as"),
       }),
   });
 

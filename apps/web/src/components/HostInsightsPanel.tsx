@@ -31,7 +31,7 @@ export function HostInsightsPanel({
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
       >
-        {expanded ? "Hide breakdown ▾" : "Show vote breakdown ▸"}
+        {expanded ? "Hide ❤️ breakdown ▾" : "Show ❤️ breakdown ▸"}
       </button>
 
       {expanded && (

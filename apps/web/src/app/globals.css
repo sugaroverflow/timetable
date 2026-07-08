@@ -113,8 +113,20 @@ h3 {
   gap: 16px;
   padding: 12px 20px;
   background: var(--topbar);
+  color: var(--topbar-ink, var(--ink));
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--line);
+}
+.topbar .brand,
+.topbar .muted,
+.topbar .btn-ghost {
+  color: var(--topbar-ink, var(--ink));
+}
+
+@media (max-width: 640px) {
+  .topbar-email {
+    display: none;
+  }
 }
 
 .brand {
@@ -350,6 +362,24 @@ textarea {
   border-left: 3px solid var(--primary);
 }
 
+/* Topic card header (QA #59 round 3): larger on desktop */
+.topic-byline {
+  font-size: 12px;
+}
+@media (min-width: 861px) {
+  .topic-head .avatar {
+    width: 44px;
+    height: 44px;
+    font-size: 16px;
+  }
+  .topic-head .topic-title {
+    font-size: 24px;
+  }
+  .topic-byline {
+    font-size: 14px;
+  }
+}
+
 /* App shell: sidebar nav + content (QA #42) */
 .shell {
   display: grid;
@@ -363,6 +393,10 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  /* A sticky element taller than the viewport scrolls with the page — cap
+     it so the rail actually pins (QA #59 round 3). */
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
 }
 .sidebar-head {
   display: flex;
@@ -414,10 +448,14 @@ textarea {
 .sidebar-bug-link:hover {
   text-decoration: underline;
 }
-.sidebar-toggle {
+.topbar-hamburger {
   display: none;
-  align-self: flex-start;
-  margin-bottom: 12px;
+  border: none;
+  background: transparent;
+  color: var(--topbar-ink, var(--ink));
+  font-size: 20px;
+  padding: 2px 6px;
+  line-height: 1;
 }
 @media (max-width: 860px) {
   .shell {
@@ -427,12 +465,14 @@ textarea {
     grid-template-columns: minmax(0, 1fr);
     gap: 0;
   }
-  .sidebar-toggle {
+  .topbar-hamburger {
     display: inline-flex;
   }
   .sidebar {
     display: none;
     position: static;
+    max-height: none;
+    overflow-y: visible;
     margin-bottom: 16px;
   }
   .sidebar.open {
@@ -750,6 +790,20 @@ textarea {
 }
 .rte-content .tiptap img {
   max-width: 100%;
+}
+
+/* Dashboard ❤️ breakdown (QA #59 round 3) */
+.dash-breakdown-list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--wash);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
 }
 
 /* People page (QA #59) */

@@ -24,7 +24,7 @@ packages/
 | Auth | Clerk on web and API |
 | API | Express 5, GraphQL Yoga, Pothos |
 | Database | PostgreSQL 16, Drizzle ORM, drizzle-kit migrations |
-| Markdown | markdown-it and sanitize-html on the API |
+| Markdown | markdown-it and sanitize-html on the API; TipTap (tiptap-markdown) editor on the web |
 | Email | Resend when configured, console fallback in development |
 | Hosting | DigitalOcean App Platform and Managed PostgreSQL |
 | Tooling | TypeScript, ESLint, Vitest, Docker |
@@ -67,16 +67,28 @@ Codex/agent workflows are separate from the app runtime.
 
 - public landing page
 - Clerk sign-in and sign-up routes
-- signed-in app shell
-- timetable list and switcher
-- topic feed
-- host topic dashboard
-- moderation queue
-- activity timeline
-- settings
-- user profile
-- availability calendar
+- signed-in app shell: topbar with the current timetable's identity and a
+  per-user light/dark toggle; left sidebar with section nav, a "Report a bug"
+  link, and the timetable switcher (with visibility pills) in its footer
+- topic feed with infinite scroll, sort controls (hearts, latest comments,
+  newest-including-edits, seeded random), host filter with profile card, and
+  "new since last visit" highlights
+- topic permalinks at `/t/[slug]/[hostSlug]/[topicSlug]` (stale host segments
+  redirect)
+- My Topics (feed-identical cards + manage controls, TipTap editor)
+- Pending Topics (moderation queue as "Ready to publish" + read-only Drafts)
+- activity timeline (week/day grouping, date range, actor/role/type filters)
+- notifications pane (comments on your topics, replies to you, unread badge)
+- People page (role-grouped members, bios, admin editing)
+- settings (timetable profile + theme sections, hearts cutoff, invites)
+- user profile (name, avatar, markdown bio, digest preferences)
+- availability calendar (route live; nav link removed pending #55)
 - analytics dashboard
+- `/timetables` resolver → last-engaged timetable's feed, or the create screen
+
+Per-timetable theme (colours, fonts, dark palette) is validated server-side,
+stored in the settings JSON, and applied through a server-rendered style tag;
+the user's light/dark choice is applied pre-paint from localStorage.
 
 Server components call GraphQL through `apps/web/src/lib/graphql.ts`.
 Client components call GraphQL through `apps/web/src/lib/clientGraphql.ts` and
@@ -108,10 +120,8 @@ REST routes currently include:
 | `PATCH /api/memberships/:id/roles` | Change member roles |
 | `POST /api/jobs/digests` | Cron-protected digest job |
 | `GET /api/timetables/:idOrSlug/calendar.ics` | Calendar feed |
+| `POST /api/uploads` | Signed direct browser uploads to S3-compatible storage |
 | `GET /health` | Health check |
-
-Object-storage env placeholders exist, but the tracked API currently has no
-committed binary upload endpoint.
 
 ## GraphQL Surface
 
@@ -122,10 +132,15 @@ Main queries include:
 - `timetable`
 - `myMembership`
 - `timetableMembers`
-- `topicFeed`
+- `timetablePeople` / `person` (People page and bio modal, with published
+  topics per person)
+- `topicFeed` (sort + seed + host + hearted-by-me filters, offset paging)
+- `topicPermalink`
 - `hostDashboard`
-- `moderationQueue`
-- `activityTimeline`
+- `moderationQueue` / `draftTopics`
+- `activityTimeline` (actor, date-range args)
+- `notifications` / `notificationsUnread`
+- `myFeedLastSeenAt`
 - `timetableHosts`
 - `calendar`
 - `slotComments`
@@ -139,16 +154,22 @@ host/admin planning views.
 
 Main mutations cover:
 
-- topic creation, editing, submission, moderation, unpublishing
-- heart toggling
+- topic creation (hosts and admins), editing, submission, moderation,
+  unpublishing, and owner reassignment (`reassignTopic`)
+- heart toggling and the timetable hearts cutoff (`setHeartsCountFrom`)
 - public and host-only comments
 - comment hiding
-- profile and notification settings
-- timetable profile and settings
+- profile and notification settings; admin member-bio editing
+  (`updateMemberBio`)
+- timetable profile and settings, including validated theme JSON
+- feed and notification watermarks (`markFeedSeen`, `markNotificationsSeen`)
 - slot creation, weekly repeat creation, editing, deletion
 - availability and weekday availability
 - slot comments
 - slot topic tagging
+
+Hearts, comments, invites, and first sign-ins are logged as activity events
+alongside moderation and lifecycle actions.
 
 The web proxy uses `timetableRouteByDomain` to rewrite custom-domain requests
 onto the existing `/t/[slug]` route tree.
@@ -187,6 +208,13 @@ Core tables:
 - `slot_topics`
 - `api_rate_limit_buckets`
 
+Notable columns: `timetables.settings` is a JSON blob holding role labels,
+theme (colours, fonts, dark palette), icon/cover URLs, and digest defaults;
+`timetables.heartsCountFrom` is the heart-count cutoff; `topics.slug` +
+`users.slug` power permalinks; `topics.contentUpdatedAt` tracks content edits
+for "newest" sorting; memberships carry `lastSeenFeedAt` and
+`lastSeenNotificationsAt` watermarks.
+
 Migrations live in `packages/db/drizzle`.
 
 ## Assets
@@ -209,5 +237,9 @@ root. The current logo path is:
 - Production env validation exists for core API variables but is not exhaustive.
 - Topic and slot mutations check `deactivated` privacy; future mutations need
   the same review.
-- Activity logging is not comprehensive across all user actions.
+- Activity logging covers topic lifecycle, hearts, comments, invites, first
+  sign-ins, and settings changes; new user actions should keep logging.
 - Weighted feed and dashboard queries may need batching/materialization at scale.
+- Feed sorting (including seeded random) happens in the service layer after
+  loading the timetable's published topics; fine at current sizes, revisit for
+  very large timetables.

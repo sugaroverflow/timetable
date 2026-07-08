@@ -15,16 +15,39 @@ Roles are scoped to timetable membership:
 | Role | Can |
 | --- | --- |
 | Owner | Everything an admin can do, plus protected ownership of the timetable |
-| Admin | Moderate topics, hide comments, manage members and roles, edit settings, create slots, tag topics to slots, view the dashboard |
-| Host | Propose topics, submit drafts, see weighted-heart breakdowns, use host-only threads, join slot discussions, view the dashboard |
-| Elector | Read published topics, heart and comment on them, set availability |
+| Admin | Moderate topics, create topics and reassign their owner, see every host's drafts, hide comments, manage members and their bios from the People page, edit settings and theme, set the hearts cutoff, create slots, tag topics to slots, view the dashboard |
+| Host | Propose topics (rich-text editor), submit drafts, edit their own topics from the feed, see weighted-heart breakdowns, use host-only threads, join slot discussions, view the dashboard |
+| Elector | Read published topics, heart and comment on them, collect "My hearted topics", set availability |
+
+Each timetable can rename its roles (e.g. Admin → Dean, Host → Faculty,
+Elector → Fellowship Candidate); the custom labels are used throughout the UI.
+Every member has a markdown bio, shown in a popup from any byline and on the
+People page (members grouped by role; hosts list their published topics).
+
+A member whose roles have all been removed keeps the timetable in their
+switcher but otherwise sees what an anonymous visitor sees at the
+timetable's visibility level: no composer, no hearts, no People page, no
+member-only panels. Admins can also remove members outright from the
+People page (the owner can never be removed).
 
 ## Topic Feed
 
-Hosts draft markdown topics and submit them for moderation. Admins publish,
-reject, request changes, unpublish, archive hearts, and hide comments.
+Hosts (and admins) draft topics in a rich-text editor — markdown stays the
+stored format — and submit them for moderation. Admins publish, request
+changes (threaded feedback the host can reply to), unpublish, edit inline,
+reassign a topic's owner, and hide comments. Pending Topics shows the
+submitted queue ("Ready to publish") plus a read-only list of every host's
+drafts so forgotten drafts stay visible.
 
-Electors can heart and comment on published topics. Hosts and admins can see
+Published topics get stable permalinks (`/t/{timetable}/{host}/{topic}`;
+slugs freeze at first publish). The feed is single-column with infinite
+scroll and sorts by most hearts, latest comments, newest (content edits count
+as new, without triggering email), or seeded random. Topics published or
+edited since the member's last visit are highlighted. Filtering by a host
+shows their profile card above their topics.
+
+Electors can heart and comment on published topics; each hearted card shows
+the elector their own "your vote: 1/n" weight. Hosts and admins can see
 weighted scores and per-elector breakdowns; electors see only the public feed.
 
 Heart weighting:
@@ -36,10 +59,18 @@ weight = 1 / number of published topics that elector hearted
 This means each elector distributes a total influence of 1 across all published
 topics they heart.
 
-Topic comments support public threads and host-only visibility. Admin feedback
-for requested changes is implemented through host-only comments.
+Admins can set a timetable-wide hearts cutoff: hearts created before it are
+ignored in every count and weight (this replaced per-topic heart archiving).
+
+Topic comments support threaded public threads (auto-collapsed) and a
+separate host-only thread with its own composer, labelled with the
+timetable's host label. Admin feedback for requested changes lives in the
+host-only thread.
 
 ## Availability Calendar
+
+The calendar is currently unlinked from navigation (re-adding it is tracked in
+issue #55); the routes, API, and ICS feed remain fully functional.
 
 Admins create one-off or weekly repeating timeslots. Electors mark each slot as:
 
@@ -63,37 +94,59 @@ with multiple topics appears as a conflict in dashboard analytics.
 
 Admin surfaces include:
 
-- moderation queue
-- activity timeline
-- member and role management
-- timetable profile and privacy
-- custom domain field
-- custom role labels, theme colors, and cover image URL
+- Pending Topics (submitted queue + all hosts' drafts)
+- activity timeline: grouped by week and day with a date-range filter,
+  actor avatars/roles, filters by action type, actor, and role, and enriched
+  entries (comment text with a link to the comment, invites, first sign-ins)
+- member and role management from the People page (roles + markdown bios)
+- timetable profile: name, description, visibility, custom role labels with a
+  live preview sentence, digest defaults, and the custom domain field
+  (marked "coming soon" — routing is not wired up yet)
+- theme: primary/secondary/background/topbar/text colours with live preview,
+  curated font pairings, a dark-mode palette, cover image, and icon
+- hearts cutoff
 - dashboard analytics, including host-scoped elector activity
 
-Custom role labels and theme colors are rendered in the timetable shell and main
-feed fallbacks. Some lower-level UI copy still uses generic role names.
+Everyone gets a personal light/dark/auto mode toggle in the topbar; the
+timetable's theme defines both palettes.
 
-Profile images, topic covers, and timetable covers can be pasted as image URLs
-or uploaded through the app to S3-compatible object storage.
+Navigation is a left sidebar (drawer on mobile) with the timetable switcher —
+including a visibility pill per timetable and "New timetable" — in its footer.
+The topbar shows the current timetable's icon and name. New users with no
+timetable land on the create screen; returning users land on the feed of the
+timetable they last engaged with.
+
+Profile images, topic covers, icons, and timetable covers can be pasted as
+image URLs or uploaded through the app to S3-compatible object storage.
 
 ## Privacy
 
-Timetable visibility is enforced server-side:
+Timetable visibility is enforced server-side across five levels:
 
 | Mode | Read Access |
 | --- | --- |
-| `public` | Anyone can read the feed and public comments; sign-in is still required to heart or post |
+| `public` | Anyone can read topics, public comments, and member bios; sign-in is still required to heart or post |
+| `hosts_only` | Topics and host bios are public; comments and non-host bios are hidden from non-members |
+| `no_comments` | Topics and all bios are public; comments are hidden from non-members |
 | `private` | Members only |
 | `deactivated` | Admins only |
 
+Members always see everything their role allows, regardless of level.
+
 ## Notifications And Sync
 
-Users can opt into digest sections:
+In-app: each timetable has a Notifications pane listing comments on the
+member's topics and replies to their comments, each linking to the comment;
+an unread badge in the sidebar clears when the pane is opened.
+
+For email, users can opt into digest sections:
 
 - new published topics
 - replies to their comments
-- activity on their hosted topics
+- activity on their hosted topics (including topics reassigned to them)
+
+Admins can set timetable digest defaults, applied to new members who have
+never customized their own preferences.
 
 Email digests are the first supported notification channel. The digest
 computation, REST job endpoint, scheduled GitHub Actions caller, and Resend env
@@ -121,6 +174,8 @@ configuration remain environment setup tasks.
 | Phase 2: Profiles, privacy, polish | Mostly done | Profiles, privacy enforcement, comment hide, unpublish, archive hearts, host filter, digest prefs |
 | Phase 3: Availability calendar | Done | Timeslots, weekly repeat, availability, weekday patterns, audience filters, slot discussion, topic tagging, ICS |
 | Phase 4: Notifications, domains, analytics | Partial | Dashboard analytics, conflict alerts, digest computation/job, custom domain field/routing, ICS export, initial API hardening, and S3-compatible object storage uploads |
+| QA round 1 (issue #42, PR #56) | Done | Sidebar nav + switcher, permalinks, infinite scroll, People page + bios, admin topic management, hearts cutoff, five-level visibility, My hearted topics, enriched activity log, rich seed data |
+| QA round 2 (issue #59, PR #60) | Done | Status-aware moderation actions, role-label copy, Profile nav, sidebar-footer switcher, People grouping + member editing, random sort + edits-as-new, admin drafts, activity grouping/filters, full theming + dark mode + fonts, TipTap editor, My Topics feed parity, notifications pane |
 
 ## Go-Live Checklist
 
@@ -141,10 +196,13 @@ Before opening to real users:
 
 **Product gaps**
 
-- Feed has limit/offset pagination only; no cursor pagination or infinite scroll.
-- Custom-domain hostname routing is wired in the web proxy; production DNS/Clerk domain setup must still be configured per environment.
-- Email digest is the only notification channel; Slack, push, and others are not started.
+- Custom-domain hostname routing is wired in the web proxy; production DNS/Clerk domain setup must still be configured per environment (the settings field is labelled "coming soon").
+- Email digest is the only email channel; Slack, push, and others are not started. No immediate email on topic reassignment yet (#57).
+- The in-app notifications pane has no per-item read state or mark-all-read.
+- The activity feed is refresh-based, not live (#58).
+- The availability calendar is unlinked from navigation pending re-add (#55).
 - Calendar sync is one-way ICS export only.
+- Feed pagination is offset-based behind infinite scroll; cursor pagination is a future scalability item.
 
 **Testing gaps**
 

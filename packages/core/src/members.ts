@@ -11,6 +11,8 @@ import {
 } from "@timetable/db";
 import type { Role } from "@timetable/shared";
 
+import { logActivity } from "./activity";
+
 export async function getMembershipById(
   id: string,
 ): Promise<TimetableMembership | null> {
@@ -137,6 +139,32 @@ export async function markFeedSeen(
         eq(timetableMemberships.timetableId, timetableId),
       ),
     );
+}
+
+/** Remove a member from a timetable (QA #59 round 3 — People page).
+ * The caller guards admin permission and owner protection. */
+export async function removeMembership(
+  membership: TimetableMembership,
+  actorId: string,
+): Promise<void> {
+  const [user] = await db
+    .select({ name: users.name })
+    .from(users)
+    .where(eq(users.id, membership.userId))
+    .limit(1);
+  await db
+    .delete(timetableMemberships)
+    .where(eq(timetableMemberships.id, membership.id));
+  await logActivity({
+    timetableId: membership.timetableId,
+    actorId,
+    action: "member.remove",
+    payload: {
+      removedUserId: membership.userId,
+      removedName: user?.name ?? null,
+      roles: membership.roles,
+    },
+  });
 }
 
 export type PersonTopic = {

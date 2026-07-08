@@ -172,7 +172,9 @@ export async function computeUserDigest(
         timetableId: topics.timetableId,
       })
       .from(topics)
-      .where(and(eq(topics.hostId, recipient.id), eq(topics.status, "published")));
+      // All statuses: admin comments land on drafts/submissions too
+      // (QA #59 round 3) and should reach the owner's digest.
+      .where(eq(topics.hostId, recipient.id));
     const titleById = new Map(myTopics.map((t) => [t.id, t.title]));
     const pathById = new Map(
       myTopics.map((t) => [
@@ -194,7 +196,10 @@ export async function computeUserDigest(
           and(
             inArray(comments.topicId, myTopicIds),
             gt(comments.createdAt, since),
-            eq(comments.visibility, "public"),
+            // The owner sees public comments and their admin thread; the
+            // Faculty-only thread stays out of email.
+            inArray(comments.visibility, ["public", "admin_only"]),
+            ne(comments.authorId, recipient.id),
           ),
         )
         .groupBy(comments.topicId);

@@ -17,6 +17,7 @@ import {
   isDigestEmpty,
   listDigestRecipients,
   markDigestSent,
+  removeMembership,
   setMemberRoles,
 } from "@timetable/core";
 import {
@@ -169,6 +170,43 @@ restRouter.patch(
 
     const updated = await setMemberRoles(membership.id, roles);
     res.json(updated);
+  }),
+);
+
+/**
+ * DELETE /api/memberships/:id
+ * Admin-only removal from the timetable (QA #59 round 3 — People page).
+ * The timetable owner can never be removed.
+ */
+restRouter.delete(
+  "/memberships/:id",
+  h(async (req, res) => {
+    const ctx = await contextFromRequest(req);
+    if (!ctx.user) {
+      res.status(401).json({ error: "Not authenticated" });
+      return;
+    }
+
+    const membership = await getMembershipById(req.params.id as string);
+    if (!membership) {
+      res.status(404).json({ error: "Membership not found" });
+      return;
+    }
+
+    const viewer = await ctx.getViewer(membership.timetableId);
+    if (!canManageMembers(viewer)) {
+      res.status(403).json({ error: "Admins only" });
+      return;
+    }
+
+    const timetable = await getTimetableById(membership.timetableId);
+    if (timetable && membership.userId === timetable.ownerId) {
+      res.status(400).json({ error: "The owner can't be removed" });
+      return;
+    }
+
+    await removeMembership(membership, ctx.user.id);
+    res.json({ removed: true });
   }),
 );
 

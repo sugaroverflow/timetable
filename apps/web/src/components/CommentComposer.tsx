@@ -10,22 +10,29 @@ const MUTATION = `mutation AddComment($id: String!, $body: String!, $visibility:
   addComment(topicId: $id, body: $body, visibility: $visibility) { id }
 }`;
 
-/** Comment box fixed to one visibility: the public thread and the host-only
- * thread each get their own composer (QA #42 — no "hosts only" checkbox). */
+/** Comment box fixed to one visibility: the public, host-only, and
+ * admin-only threads each get their own composer (QA #42/#59). */
 export function CommentComposer({
   topicId,
   visibility = "public",
   hostLabel = "Host",
+  adminLabel = "Admin",
 }: {
   topicId: string;
-  visibility?: "public" | "host_only";
+  visibility?: "public" | "host_only" | "admin_only";
   hostLabel?: string;
+  adminLabel?: string;
 }) {
   const router = useRouter();
   const { toast, toastError } = useToast();
   const [body, setBody] = useState("");
   const [pending, startTransition] = useTransition();
-  const hostOnly = visibility === "host_only";
+  const scopeLabel =
+    visibility === "host_only"
+      ? `${hostLabel}-only`
+      : visibility === "admin_only"
+        ? adminLabel
+        : null;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -34,7 +41,7 @@ export function CommentComposer({
     try {
       await clientGql(MUTATION, { id: topicId, body: text, visibility });
       setBody("");
-      toast(hostOnly ? `${hostLabel}-only note added` : "Comment added");
+      toast(scopeLabel ? `${scopeLabel} note added` : "Comment added");
       startTransition(() => router.refresh());
     } catch (err) {
       toastError(err instanceof Error ? err.message : "Could not post comment");
@@ -47,10 +54,10 @@ export function CommentComposer({
         value={body}
         onChange={(e) => setBody(e.target.value)}
         placeholder={
-          hostOnly ? `Add a ${hostLabel}-only note…` : "Add a comment…"
+          scopeLabel ? `Add a ${scopeLabel} note…` : "Add a comment…"
         }
-        aria-label={hostOnly ? `${hostLabel}-only comment` : "Comment"}
-        data-topic-composer={hostOnly ? undefined : topicId}
+        aria-label={scopeLabel ? `${scopeLabel} comment` : "Comment"}
+        data-topic-composer={scopeLabel ? undefined : topicId}
       />
       <button className="btn btn-primary" type="submit" disabled={pending}>
         Post

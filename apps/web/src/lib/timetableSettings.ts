@@ -19,6 +19,7 @@ export type ThemeSettings = {
   secondary?: string;
   background?: string;
   topbar?: string;
+  topbarText?: string;
   text?: string;
   font?: string;
   dark?: {
@@ -26,6 +27,7 @@ export type ThemeSettings = {
     secondary?: string;
     background?: string;
     topbar?: string;
+    topbarText?: string;
     text?: string;
   };
 };
@@ -133,6 +135,7 @@ export function themeVars(
     : theme.secondary;
   const background = dark ? theme.dark?.background : theme.background;
   const topbar = dark ? theme.dark?.topbar : theme.topbar;
+  const topbarText = dark ? theme.dark?.topbarText : theme.topbarText;
   const text = dark ? theme.dark?.text : theme.text;
   if (primary) {
     vars["--primary"] = primary;
@@ -146,6 +149,7 @@ export function themeVars(
   }
   if (background) vars["--bg"] = background;
   if (topbar) vars["--topbar"] = topbar;
+  if (topbarText) vars["--topbar-ink"] = topbarText;
   if (text) vars["--ink"] = text;
   const font = theme.font ? FONT_PAIRINGS[theme.font] : undefined;
   if (font) {

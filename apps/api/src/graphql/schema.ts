@@ -15,7 +15,6 @@ import {
   getAudienceElectorIds,
   getCommentById,
   getDashboard,
-  getLatestHostOnlyComment,
   getOrCreateIcsToken,
   getReadableTimetable,
   getSlotById,
@@ -172,6 +171,7 @@ function parseThemeJson(
   theme.secondary = colour(source.secondary);
   theme.background = colour(source.background);
   theme.topbar = colour(source.topbar);
+  theme.topbarText = colour(source.topbarText);
   theme.text = colour(source.text);
   if (typeof source.font === "string" && THEME_FONTS.has(source.font)) {
     theme.font = source.font;
@@ -183,6 +183,7 @@ function parseThemeJson(
       secondary: colour(d.secondary),
       background: colour(d.background),
       topbar: colour(d.topbar),
+      topbarText: colour(d.topbarText),
       text: colour(d.text),
     };
   }
@@ -412,10 +413,6 @@ const ManagedTopicType = builder.objectRef<Topic>("ManagedTopic").implement({
       nullable: true,
       resolve: async (tp) => (await getUserById(tp.hostId))?.name ?? null,
     }),
-    feedback: t.string({
-      nullable: true,
-      resolve: (tp) => getLatestHostOnlyComment(tp.id),
-    }),
     /** Public comment thread — lets My Topics render feed-identical cards
      * (QA #59). */
     comments: t.field({
@@ -426,8 +423,8 @@ const ManagedTopicType = builder.objectRef<Topic>("ManagedTopic").implement({
           includeHidden: false,
         }),
     }),
-    /** Full host-only thread (admin feedback + host replies). ManagedTopic
-     * is only ever served to the owning host or admins, so this is safe. */
+    /** Host-only thread. ManagedTopic is only ever served to the owning
+     * host or admins, so this is safe. */
     hostOnlyComments: t.field({
       type: [CommentType],
       resolve: async (tp) => {
@@ -436,6 +433,20 @@ const ManagedTopicType = builder.objectRef<Topic>("ManagedTopic").implement({
           includeHidden: false,
         });
         return tree.filter((c) => c.visibility === "host_only");
+      },
+    }),
+    /** The drafting thread (QA #59 round 3): admins + topic owner only.
+     * Rendered on Pending Topics (admins) and My Topics (owner), never in
+     * the feed. */
+    adminComments: t.field({
+      type: [CommentType],
+      resolve: async (tp) => {
+        const tree = await listCommentTree(tp.id, {
+          includeHostOnly: false,
+          includeAdminOnly: true,
+          includeHidden: false,
+        });
+        return tree.filter((c) => c.visibility === "admin_only");
       },
     }),
     coverImageUrl: t.exposeString("coverImageUrl", { nullable: true }),
@@ -939,6 +950,55 @@ builder.mutationType({
       },
     }),
 
+    /** Audit trail for the view-as-user preview (QA #59 round 3): called
+     * as the admin enters the preview, before the cookie applies. The
+     * preview itself is enforced per-request from the x-view-as header. */
+    startUserPreview: t.boolean({
+      args: {
+        idOrSlug: t.arg.string({ required: true }),
+        userId: t.arg.string({ required: true }),
+      },
+      resolve: async (_p, args, ctx) => {
+        const user = await requireUser(ctx);
+        const readable = await getReadableTimetable(user.id, args.idOrSlug);
+        if (!readable) notFound("Timetable not found");
+        const viewer = { userId: user.id, roles: readable.roles };
+        if (!canModerate(viewer)) forbidden("Admins only");
+        const target = await getPerson(readable.timetable.id, args.userId);
+        if (!target) notFound("Member not found");
+        await logActivity({
+          timetableId: readable.timetable.id,
+          actorId: user.id,
+          action: "member.impersonate",
+          payload: { targetUserId: target.userId, targetName: target.name },
+        });
+        return true;
+      },
+    }),
+
+    /** Companion audit entry when the preview ends (cookie already
+     * cleared, so this runs as the real admin again). */
+    stopUserPreview: t.boolean({
+      args: {
+        idOrSlug: t.arg.string({ required: true }),
+        userId: t.arg.string({ required: true }),
+      },
+      resolve: async (_p, args, ctx) => {
+        const user = await requireUser(ctx);
+        const readable = await getReadableTimetable(user.id, args.idOrSlug);
+        if (!readable) notFound("Timetable not found");
+        const viewer = { userId: user.id, roles: readable.roles };
+        if (!canModerate(viewer)) forbidden("Admins only");
+        await logActivity({
+          timetableId: readable.timetable.id,
+          actorId: user.id,
+          action: "member.impersonate_end",
+          payload: { targetUserId: args.userId },
+        });
+        return true;
+      },
+    }),
+
     /** Resets the notifications badge (QA #59). */
     markNotificationsSeen: t.boolean({
       args: { idOrSlug: t.arg.string({ required: true }) },
@@ -1079,11 +1139,7 @@ builder.mutationType({
         const { topic, viewer } = await loadTopicAndViewer(ctx, args.topicId);
         if (!canModerate(viewer)) forbidden("Admins only");
         const action = args.action;
-        if (
-          action !== "publish" &&
-          action !== "reject" &&
-          action !== "request_changes"
-        ) {
+        if (action !== "publish" && action !== "reject") {
           throw new GraphQLError("Invalid moderation action");
         }
         const updated = await moderateTopic(
@@ -1119,8 +1175,19 @@ builder.mutationType({
       resolve: async (_p, args, ctx) => {
         const user = await requireUser(ctx);
         const { topic, viewer } = await loadTopicAndViewer(ctx, args.topicId);
-        const visibility = args.visibility === "host_only" ? "host_only" : "public";
-        if (visibility === "host_only") {
+        const visibility =
+          args.visibility === "host_only"
+            ? "host_only"
+            : args.visibility === "admin_only"
+              ? "admin_only"
+              : "public";
+        if (visibility === "admin_only") {
+          // The drafting thread: admins and the topic's owner only
+          // (QA #59 round 3).
+          if (!canModerate(viewer) && topic.hostId !== user.id) {
+            forbidden("Admins and the topic owner only");
+          }
+        } else if (visibility === "host_only") {
           if (!canSeeHostOnly(viewer)) forbidden("Hosts/admins only");
         } else {
           if (!canComment(viewer)) forbidden("Members only");
@@ -1159,7 +1226,11 @@ builder.mutationType({
         const parent = await getCommentById(args.commentId);
         if (!parent) notFound("Comment not found");
         const { topic, viewer } = await loadTopicAndViewer(ctx, parent.topicId);
-        if (parent.visibility === "host_only") {
+        if (parent.visibility === "admin_only") {
+          if (!canModerate(viewer) && topic.hostId !== user.id) {
+            forbidden("Admins and the topic owner only");
+          }
+        } else if (parent.visibility === "host_only") {
           if (!canSeeHostOnly(viewer)) forbidden("Hosts/admins only");
         } else if (!canComment(viewer)) {
           forbidden("Members only");
@@ -1963,6 +2034,7 @@ builder.queryFields((t) => ({
       idOrSlug: t.arg.string({ required: true }),
       hostId: t.arg.string({ required: false }),
       electorActivity: t.arg.string({ required: false }),
+      activitySince: t.arg.string({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
       const readable = await getReadableTimetable(
@@ -1972,10 +2044,35 @@ builder.queryFields((t) => ({
       if (!readable) return null;
       const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
       if (!canSeeHostOnly(viewer)) return null;
+      const sinceMs = args.activitySince
+        ? Date.parse(args.activitySince)
+        : Number.NaN;
       return getDashboard(readable.timetable.id, {
         hostId: args.hostId ?? undefined,
         electorActivity: parseElectorActivityFilter(args.electorActivity),
+        activitySince: Number.isNaN(sinceMs) ? undefined : new Date(sinceMs),
       });
+    },
+  }),
+
+  /** Per-elector weights for one topic — fetched lazily by the dashboard's
+   * "Show ❤️ breakdown" toggle (QA #59 round 3). Host/admin only. */
+  topicWeightedBreakdown: t.field({
+    type: [WeightedHeartType],
+    nullable: true,
+    args: {
+      idOrSlug: t.arg.string({ required: true }),
+      topicId: t.arg.string({ required: true }),
+    },
+    resolve: async (_p, args, ctx) => {
+      const readable = await getReadableTimetable(
+        ctx.user?.id ?? null,
+        args.idOrSlug,
+      );
+      if (!readable) return null;
+      const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
+      if (!canSeeHostOnly(viewer)) return null;
+      return getWeightedBreakdown(readable.timetable.id, args.topicId);
     },
   }),
 

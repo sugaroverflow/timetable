@@ -45,9 +45,12 @@ export default async function NotificationsPage({
   const { slug } = await params;
   const data = await gqlFetch<Data>(QUERY, { s: slug });
 
-  if ((data.timetable?.viewerRoles ?? []).length === 0) {
+  const viewerRoles = data.timetable?.viewerRoles ?? [];
+  if (viewerRoles.length === 0) {
     return <div className="notice">Members only.</div>;
   }
+  const viewerIsAdmin =
+    viewerRoles.includes("admin") || viewerRoles.includes("owner");
 
   return (
     <div className="stack">
@@ -65,8 +68,16 @@ export default async function NotificationsPage({
       ) : (
         <ul className="list">
           {data.notifications.map((n) => {
-            const base = topicPath(slug, n.topicHostSlug, n.topicSlug);
+            // Admin-thread comments never render on the feed permalink —
+            // their home is My Topics (owner) or Pending Topics (admins).
+            const base =
+              n.visibility === "admin_only"
+                ? `/t/${slug}/${viewerIsAdmin ? "moderation" : "topics"}`
+                : topicPath(slug, n.topicHostSlug, n.topicSlug);
             const href = base ? `${base}#comment-${n.commentId}` : null;
+            const replyHref = base
+              ? `${base}?reply=${n.commentId}#comment-${n.commentId}`
+              : null;
             return (
               <li key={n.commentId} className="card">
                 <div className="row" style={{ alignItems: "flex-start" }}>
@@ -101,6 +112,12 @@ export default async function NotificationsPage({
                       {new Date(n.createdAt).toLocaleString()}
                     </div>
                   </div>
+                  <span style={{ flex: 1 }} />
+                  {replyHref ? (
+                    <Link className="btn btn-ghost" href={replyHref}>
+                      Reply
+                    </Link>
+                  ) : null}
                 </div>
               </li>
             );

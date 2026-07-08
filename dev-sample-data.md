@@ -1589,20 +1589,20 @@ Comment ids are used so replies can reference a parent.
 - Topic: topic-worker-coops
   Comment id: c-gen-worker-coops-1
   Author: admin-ed
-  Visibility: hosts only
+  Visibility: admins only
   Text: This is close. The title oversells the scope a little — can you align them and resubmit?
 
 - Topic: topic-worker-coops
   Comment id: c-gen-worker-coops-2
   Author: host-jake
-  Visibility: hosts only
+  Visibility: admins only
   Reply to: c-gen-worker-coops-1
   Text: Added prerequisites and a format note. Let me know if it needs more.
 
 - Topic: topic-worker-coops
   Comment id: c-gen-worker-coops-3
   Author: admin-ed
-  Visibility: hosts only
+  Visibility: admins only
   Reply to: c-gen-worker-coops-2
   Text: Great, thanks for the quick turnaround.
 
@@ -5832,20 +5832,20 @@ Comment ids are used so replies can reference a parent.
 - Topic: topic-reform
   Comment id: c-gen-reform-1
   Author: admin-fatima
-  Visibility: hosts only
+  Visibility: admins only
   Text: This is close. The title oversells the scope a little — can you align them and resubmit?
 
 - Topic: topic-reform
   Comment id: c-gen-reform-2
   Author: host-hayley
-  Visibility: hosts only
+  Visibility: admins only
   Reply to: c-gen-reform-1
   Text: Fair. I've drafted a tighter version; does the new framing address the concern?
 
 - Topic: topic-reform
   Comment id: c-gen-reform-3
   Author: admin-fatima
-  Visibility: hosts only
+  Visibility: admins only
   Reply to: c-gen-reform-2
   Text: That addresses it — resubmit and I'll publish.
 
@@ -5983,20 +5983,20 @@ Comment ids are used so replies can reference a parent.
 - Topic: topic-presentation-of-self
   Comment id: c-gen-presentation-of-self-1
   Author: admin-edwin
-  Visibility: hosts only
+  Visibility: admins only
   Text: This is close. The title oversells the scope a little — can you align them and resubmit?
 
 - Topic: topic-presentation-of-self
   Comment id: c-gen-presentation-of-self-2
   Author: host-sam
-  Visibility: hosts only
+  Visibility: admins only
   Reply to: c-gen-presentation-of-self-1
   Text: Added prerequisites and a format note. Let me know if it needs more.
 
 - Topic: topic-presentation-of-self
   Comment id: c-gen-presentation-of-self-3
   Author: admin-edwin
-  Visibility: hosts only
+  Visibility: admins only
   Reply to: c-gen-presentation-of-self-2
   Text: Great, thanks for the quick turnaround.
 
@@ -7782,20 +7782,20 @@ Comment ids are used so replies can reference a parent.
 - Topic: topic-open-social-web
   Comment id: c-gen-open-social-web-1
   Author: admin-edwin
-  Visibility: hosts only
+  Visibility: admins only
   Text: Thanks for submitting this. Before we publish: could you tighten the description and add 2–3 concrete outcomes for attendees?
 
 - Topic: topic-open-social-web
   Comment id: c-gen-open-social-web-2
   Author: host-anya
-  Visibility: hosts only
+  Visibility: admins only
   Reply to: c-gen-open-social-web-1
   Text: Good push. I've anchored it to the theme explicitly in the first paragraph now.
 
 - Topic: topic-open-social-web
   Comment id: c-gen-open-social-web-3
   Author: admin-edwin
-  Visibility: hosts only
+  Visibility: admins only
   Reply to: c-gen-open-social-web-2
   Text: Much better. One tiny thing: fix the typo in the second heading, then it's good to go.
 
@@ -8233,20 +8233,20 @@ Comment ids are used so replies can reference a parent.
 - Topic: topic-serious-games
   Comment id: c-gen-serious-games-1
   Author: admin-fatima
-  Visibility: hosts only
+  Visibility: admins only
   Text: Good bones here. Please add a sentence on prerequisites and expected format so candidates can self-select.
 
 - Topic: topic-serious-games
   Comment id: c-gen-serious-games-2
   Author: host-aaron
-  Visibility: hosts only
+  Visibility: admins only
   Reply to: c-gen-serious-games-1
   Text: Fair. I've drafted a tighter version; does the new framing address the concern?
 
 - Topic: topic-serious-games
   Comment id: c-gen-serious-games-3
   Author: admin-fatima
-  Visibility: hosts only
+  Visibility: admins only
   Reply to: c-gen-serious-games-2
   Text: That addresses it — resubmit and I'll publish.
 

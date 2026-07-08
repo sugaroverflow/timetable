@@ -42,12 +42,15 @@ export const topicStatusEnum = pgEnum("topic_status", [
 
 /**
  * Comment visibility. Public comments are readable by everyone who can read the
- * timetable (including anonymous on public timetables). Host-only comments and
- * admin feedback are visible to hosts and admins only.
+ * timetable (including anonymous on public timetables). Host-only comments are
+ * visible to hosts and admins. Admin-only comments (QA #59 round 3) are the
+ * drafting-process thread: visible to admins and the topic's owner only, and
+ * never rendered in the feed.
  */
 export const commentVisibilityEnum = pgEnum("comment_visibility", [
   "public",
   "host_only",
+  "admin_only",
 ]);
 
 /** Elector availability for a timeslot. Default is yellow ("maybe"). */

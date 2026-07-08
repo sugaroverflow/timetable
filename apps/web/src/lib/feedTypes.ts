@@ -4,7 +4,7 @@ export type TopicStatus =
   | "published"
   | "unpublished"
   | "archived";
-export type CommentVisibility = "public" | "host_only";
+export type CommentVisibility = "public" | "host_only" | "admin_only";
 
 export type FeedComment = {
   id: string;
@@ -60,11 +60,12 @@ export type ManagedTopic = {
   coverImageUrl: string | null;
   updatedAt: string;
   hostName?: string | null;
-  feedback: string | null;
   /** Public thread — My Topics renders feed-identical cards (QA #59). */
   comments?: FeedComment[];
-  /** Threaded admin↔host feedback; fetched where the UI renders it. */
+  /** Faculty-only thread on published topics. */
   hostOnlyComments?: FeedComment[];
+  /** Drafting thread — admins + topic owner only (QA #59 round 3). */
+  adminComments?: FeedComment[];
 };
 
 export type ActivityEvent = {

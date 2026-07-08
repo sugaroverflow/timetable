@@ -5,21 +5,20 @@ import { notFound, redirect } from "next/navigation";
 import { isAdmin, isElector, isHost, type Role } from "@timetable/shared";
 
 import { NavLink } from "@/components/NavLink";
-import { PreviewToggle } from "@/components/PreviewToggle";
 import { RolePills } from "@/components/RolePills";
 import { Sidebar } from "@/components/Sidebar";
 import {
   TimetableSwitcher,
   type SwitcherItem,
 } from "@/components/TimetableSwitcher";
+import { UserPreviewExit } from "@/components/UserPreview";
 import { gqlFetch } from "@/lib/graphql";
-import { displayRoles, PREVIEW_COOKIE } from "@/lib/previewRoles";
 import {
   buildThemeCss,
   parseTimetableSettings,
   privacyBadge,
-  roleLabel,
 } from "@/lib/timetableSettings";
+import { parseViewAs, VIEW_AS_COOKIE } from "@/lib/userPreview";
 
 type TimetableResult = {
   timetable: {
@@ -89,11 +88,22 @@ export default async function TimetableLayout({
     notFound();
   }
 
-  const actualRoles = timetable.viewerRoles as Role[];
-  const previewOn =
-    (await cookies()).get(PREVIEW_COOKIE)?.value === "1" &&
-    (isHost(actualRoles) || isAdmin(actualRoles));
-  const roles = displayRoles(actualRoles, previewOn);
+  // Under a view-as-user preview the API already resolves every query as
+  // the target member, so these are the target's roles — no client-side
+  // role games needed (QA #59 round 3).
+  const roles = timetable.viewerRoles as Role[];
+  const previewUserId = parseViewAs(
+    (await cookies()).get(VIEW_AS_COOKIE)?.value,
+    slug,
+  );
+  let previewName: string | null = null;
+  if (previewUserId) {
+    const data = await gqlFetch<{ person: { name: string | null } | null }>(
+      `query($s: String!, $u: String!){ person(idOrSlug: $s, userId: $u){ name } }`,
+      { s: slug, u: previewUserId },
+    );
+    previewName = data.person?.name ?? null;
+  }
   const settings = parseTimetableSettings(timetable.settings);
   const base = `/t/${slug}`;
   const privacy = privacyBadge(timetable.privacy);
@@ -147,9 +157,7 @@ export default async function TimetableLayout({
               <NavLink href={`${base}/topics`}>My Topics</NavLink>
             )}
             {isElector(roles) && (
-              <NavLink href={`${base}/feed?hearted=me`}>
-                My hearted topics
-              </NavLink>
+              <NavLink href={`${base}/feed?hearted=me`}>❤️ Topics</NavLink>
             )}
             {roles.length > 0 && (
               <NavLink href={`${base}/notifications`}>
@@ -162,7 +170,7 @@ export default async function TimetableLayout({
             {roles.length > 0 && (
               <NavLink href={`${base}/people`}>People</NavLink>
             )}
-            {isAuthed && <NavLink href="/profile">Profile</NavLink>}
+            {isAuthed && <NavLink href={`${base}/profile`}>Profile</NavLink>}
             {(isHost(roles) || isAdmin(roles)) && (
               <NavLink href={`${base}/dashboard`}>Dashboard</NavLink>
             )}
@@ -177,12 +185,12 @@ export default async function TimetableLayout({
             )}
           </nav>
 
-          {isHost(actualRoles) || isAdmin(actualRoles) ? (
+          {previewUserId ? (
             <div className="sidebar-foot">
-              <PreviewToggle
-                on={previewOn}
+              <UserPreviewExit
                 slug={slug}
-                electorLabel={roleLabel(settings.roleLabels, "elector")}
+                userId={previewUserId}
+                name={previewName}
               />
             </div>
           ) : null}
