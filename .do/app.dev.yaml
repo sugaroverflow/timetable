@@ -50,7 +50,10 @@ services:
       - { key: EMAIL_FROM, value: "${EMAIL_FROM}", scope: RUN_TIME }
       - { key: SPACES_ENDPOINT, value: "https://lon1.digitaloceanspaces.com", scope: RUN_TIME }
       - { key: SPACES_REGION, value: "lon1", scope: RUN_TIME }
-      - { key: SPACES_BUCKET, value: "timetable", scope: RUN_TIME }
+      # Dev uses its own bucket (matching local dev) — the shared "timetable"
+      # bucket rejects PutBucketCors with 501, and dev/prod isolation is
+      # better anyway. Production stays on "timetable" (app.yaml).
+      - { key: SPACES_BUCKET, value: "timetable-dev", scope: RUN_TIME }
       - { key: SPACES_KEY_PREFIX, value: "uploads/dev", scope: RUN_TIME }
       - { key: SPACES_PUBLIC_BASE_URL, scope: RUN_TIME }
       - { key: SPACES_KEY, value: "${SPACES_KEY}", scope: RUN_TIME, type: SECRET }

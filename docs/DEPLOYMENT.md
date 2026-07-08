@@ -259,17 +259,19 @@ Required API component variables:
 - `SPACES_KEY`
 - `SPACES_SECRET`
 
-Use one Spaces bucket for dev and production, then isolate objects with
-environment-specific prefixes:
+Dev (hosted and local) uses its own bucket; production uses `timetable`:
 
 | Environment | `SPACES_BUCKET` | `SPACES_KEY_PREFIX` |
 | --- | --- | --- |
-| Dev/local | `timetable` | `uploads/dev` |
+| Dev/local | `timetable-dev` | `uploads/dev` |
 | Production | `timetable` | `uploads/production` |
 
-This keeps setup simple while preventing dev uploads from appearing in the
-production prefix. Use separate buckets later only if operational isolation,
-access policies, or retention rules require it.
+Dev originally shared the `timetable` bucket behind a key prefix, but that
+bucket rejects `PutBucketCors` with `501 NotImplemented` (a bucket-specific
+DigitalOcean quirk — `timetable-dev` accepts the same call), so dev moved to
+its own bucket, which also gives cleaner dev/prod isolation. Before go-live,
+production CORS on `timetable` must be set through the DigitalOcean console
+(Spaces → timetable → Settings → CORS) since the API path is refused.
 
 `doctl apps update` can set these App Platform env values. The installed `doctl`
 Spaces commands manage Spaces access keys only; bucket creation and CORS still
