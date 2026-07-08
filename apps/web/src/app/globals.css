@@ -792,6 +792,20 @@ textarea {
   max-width: 100%;
 }
 
+/* Dashboard ❤️ breakdown (QA #59 round 3) */
+.dash-breakdown-list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--wash);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
 /* People page (QA #59) */
 .people-heading {
   font-size: 14px;

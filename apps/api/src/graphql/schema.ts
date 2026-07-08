@@ -1965,6 +1965,7 @@ builder.queryFields((t) => ({
       idOrSlug: t.arg.string({ required: true }),
       hostId: t.arg.string({ required: false }),
       electorActivity: t.arg.string({ required: false }),
+      activitySince: t.arg.string({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
       const readable = await getReadableTimetable(
@@ -1974,10 +1975,35 @@ builder.queryFields((t) => ({
       if (!readable) return null;
       const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
       if (!canSeeHostOnly(viewer)) return null;
+      const sinceMs = args.activitySince
+        ? Date.parse(args.activitySince)
+        : Number.NaN;
       return getDashboard(readable.timetable.id, {
         hostId: args.hostId ?? undefined,
         electorActivity: parseElectorActivityFilter(args.electorActivity),
+        activitySince: Number.isNaN(sinceMs) ? undefined : new Date(sinceMs),
       });
+    },
+  }),
+
+  /** Per-elector weights for one topic — fetched lazily by the dashboard's
+   * "Show ❤️ breakdown" toggle (QA #59 round 3). Host/admin only. */
+  topicWeightedBreakdown: t.field({
+    type: [WeightedHeartType],
+    nullable: true,
+    args: {
+      idOrSlug: t.arg.string({ required: true }),
+      topicId: t.arg.string({ required: true }),
+    },
+    resolve: async (_p, args, ctx) => {
+      const readable = await getReadableTimetable(
+        ctx.user?.id ?? null,
+        args.idOrSlug,
+      );
+      if (!readable) return null;
+      const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
+      if (!canSeeHostOnly(viewer)) return null;
+      return getWeightedBreakdown(readable.timetable.id, args.topicId);
     },
   }),
 

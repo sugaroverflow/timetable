@@ -106,7 +106,13 @@ function matchesActivityFilter(
 
 export async function getDashboard(
   timetableId: string,
-  opts: { hostId?: string; electorActivity?: ElectorActivityFilter } = {},
+  opts: {
+    hostId?: string;
+    electorActivity?: ElectorActivityFilter;
+    /** Only count elector activity on/after this date (QA #59 round 3);
+     * the UI defaults it to the hearts cutoff. */
+    activitySince?: Date;
+  } = {},
 ): Promise<DashboardData> {
   const emptyCounts: Record<TopicStatus, number> = {
     draft: 0,
@@ -191,8 +197,14 @@ export async function getDashboard(
   if (opts.hostId) activityTopicConds.push(eq(topics.hostId, opts.hostId));
 
   const cutoff = await getHeartsCountFrom(timetableId);
+  // Elector activity starts at the explicit date, or the hearts cutoff by
+  // default (QA #59 round 3).
+  const activitySince = opts.activitySince ?? cutoff ?? undefined;
   const heartCountConds = [...activityTopicConds];
   if (cutoff) heartCountConds.push(gte(hearts.createdAt, cutoff));
+  if (activitySince) {
+    heartCountConds.push(gte(hearts.createdAt, activitySince));
+  }
 
   const heartRows = await db
     .select({
@@ -236,6 +248,7 @@ export async function getDashboard(
         ...activityTopicConds,
         eq(comments.visibility, "public" as const),
         isNull(comments.hiddenAt),
+        ...(activitySince ? [gte(comments.createdAt, activitySince)] : []),
       ),
     )
     .groupBy(comments.authorId);
@@ -248,7 +261,14 @@ export async function getDashboard(
     })
     .from(availability)
     .innerJoin(timeslots, eq(timeslots.id, availability.slotId))
-    .where(eq(timeslots.timetableId, timetableId))
+    .where(
+      and(
+        eq(timeslots.timetableId, timetableId),
+        ...(activitySince
+          ? [gte(availability.updatedAt, activitySince)]
+          : []),
+      ),
+    )
     .groupBy(availability.userId);
 
   const heartsByElector = new Map<string, Stat>();
