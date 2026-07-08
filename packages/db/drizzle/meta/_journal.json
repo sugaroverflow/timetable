@@ -92,6 +92,20 @@
       "when": 1783440136290,
       "tag": "0012_qa59_notifications_seen",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1783533135415,
+      "tag": "0013_qa59_admin_only_comments",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1783533135958,
+      "tag": "0014_qa59_migrate_draft_feedback",
+      "breakpoints": true
     }
   ]
 }

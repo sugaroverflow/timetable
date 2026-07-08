@@ -21,8 +21,8 @@ const QUERY = `
   query Moderation($s: String!) {
     timetable(idOrSlug: $s) { viewerRoles settings }
     moderationQueue(idOrSlug: $s) {
-      id title slug hostSlug hostName status bodyMd bodyHtml coverImageUrl updatedAt feedback
-      hostOnlyComments { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} } } }
+      id title slug hostSlug hostName status bodyMd bodyHtml coverImageUrl updatedAt
+      adminComments { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} } } }
     }
     draftTopics(idOrSlug: $s) {
       id title slug hostSlug hostName updatedAt
@@ -52,7 +52,10 @@ export default async function ModerationPage({
     <div className="stack">
       <div className="page-head">
         <h2 style={{ fontSize: 18, margin: 0 }}>Pending topics</h2>
-        <p>Review submitted topics: publish, request changes, or edit.</p>
+        <p>
+          Review submitted topics: publish, edit, or discuss in the{" "}
+          {adminLabel} comments.
+        </p>
       </div>
       <h3 className="people-heading">Ready to publish</h3>
       {data.moderationQueue.length === 0 ? (
@@ -69,6 +72,7 @@ export default async function ModerationPage({
               topic={topic}
               slug={slug}
               hostLabel={hostLabel}
+              adminLabel={adminLabel}
             />
           ))}
         </ul>

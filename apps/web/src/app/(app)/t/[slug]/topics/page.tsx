@@ -20,9 +20,10 @@ const QUERY = `
   query HostDashboard($s: String!) {
     timetable(idOrSlug: $s) { viewerRoles settings }
     hostDashboard(idOrSlug: $s) {
-      id title slug hostSlug status bodyMd bodyHtml coverImageUrl updatedAt feedback
+      id title slug hostSlug status bodyMd bodyHtml coverImageUrl updatedAt
       comments { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} } } }
       hostOnlyComments { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} } } }
+      adminComments { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} } } }
     }
   }
 `;
@@ -39,6 +40,7 @@ export default async function MyTopicsPage({
   );
   const settings = parseTimetableSettings(data.timetable?.settings);
   const hostLabel = roleLabel(settings.roleLabels, "host");
+  const adminLabel = roleLabel(settings.roleLabels, "admin");
 
   if (!isHost(roles) && !isAdmin(roles)) {
     return (
@@ -67,6 +69,7 @@ export default async function MyTopicsPage({
                 topic={topic}
                 slug={slug}
                 hostLabel={hostLabel}
+                adminLabel={adminLabel}
               />
             ))}
           </ul>

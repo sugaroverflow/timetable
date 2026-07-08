@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 
 import {
   comments,
@@ -99,25 +99,6 @@ export async function setCommentHidden(
   return updated ?? null;
 }
 
-/** Latest visible host-only note on a topic (e.g. admin "request changes" feedback). */
-export async function getLatestHostOnlyComment(
-  topicId: string,
-): Promise<string | null> {
-  const [row] = await db
-    .select({ body: comments.body })
-    .from(comments)
-    .where(
-      and(
-        eq(comments.topicId, topicId),
-        eq(comments.visibility, "host_only"),
-        isNull(comments.hiddenAt),
-      ),
-    )
-    .orderBy(desc(comments.createdAt))
-    .limit(1);
-  return row?.body ?? null;
-}
-
 export type CommentNode = {
   id: string;
   parentId: string | null;
@@ -131,13 +112,24 @@ export type CommentNode = {
   replies: CommentNode[];
 };
 
-/** Threaded comments for a topic, filtered by the viewer's visibility scope. */
+/** Threaded comments for a topic, filtered by the viewer's visibility scope.
+ * admin_only (the drafting thread) is opt-in and never included by the feed
+ * paths — only the Pending Topics / My Topics panels request it. */
 export async function listCommentTree(
   topicId: string,
-  opts: { includeHostOnly: boolean; includeHidden: boolean },
+  opts: {
+    includeHostOnly: boolean;
+    includeHidden: boolean;
+    includeAdminOnly?: boolean;
+  },
 ): Promise<CommentNode[]> {
-  const conds = [eq(comments.topicId, topicId)];
-  if (!opts.includeHostOnly) conds.push(eq(comments.visibility, "public"));
+  const visibilities: CommentVisibility[] = ["public"];
+  if (opts.includeHostOnly) visibilities.push("host_only");
+  if (opts.includeAdminOnly) visibilities.push("admin_only");
+  const conds = [
+    eq(comments.topicId, topicId),
+    inArray(comments.visibility, visibilities),
+  ];
   if (!opts.includeHidden) conds.push(isNull(comments.hiddenAt));
 
   const rows = await db

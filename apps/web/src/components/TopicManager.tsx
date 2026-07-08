@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
+import { AdminCommentsPanel } from "@/components/AdminCommentsPanel";
 import { CommentComposer } from "@/components/CommentComposer";
 import { CommentList } from "@/components/CommentList";
 import { HostOnlyPanel } from "@/components/HostOnlyPanel";
@@ -22,10 +23,12 @@ export function TopicManager({
   topic,
   slug,
   hostLabel = "Host",
+  adminLabel = "Admin",
 }: {
   topic: ManagedTopic;
   slug: string;
   hostLabel?: string;
+  adminLabel?: string;
 }) {
   const router = useRouter();
   const { toast, toastError } = useToast();
@@ -105,6 +108,15 @@ export function TopicManager({
         />
       ) : null}
 
+      {/* Drafting thread with the admins (QA #59 round 3). */}
+      <AdminCommentsPanel
+        topicId={topic.id}
+        comments={topic.adminComments ?? []}
+        canModerate={false}
+        slug={slug}
+        adminLabel={adminLabel}
+      />
+
       {editing ? (
         <TopicEditForm
           topic={topic}
@@ -136,24 +148,10 @@ export function TopicManager({
               Unpublish
             </button>
           )}
-          {topic.status === "submitted" && !topic.feedback && (
+          {topic.status === "submitted" && (
             <span className="faint" style={{ fontSize: 13 }}>
               Pending review…
             </span>
-          )}
-          {topic.status === "submitted" && topic.feedback && (
-            <>
-              <span className="faint" style={{ fontSize: 13 }}>
-                Changes requested — edit and resubmit when ready
-              </span>
-              <button
-                className="btn btn-primary"
-                type="button"
-                onClick={() => setEditing(true)}
-              >
-                Edit &amp; resubmit
-              </button>
-            </>
           )}
           <button
             className="btn btn-ghost"

@@ -15,7 +15,6 @@ import {
   getAudienceElectorIds,
   getCommentById,
   getDashboard,
-  getLatestHostOnlyComment,
   getOrCreateIcsToken,
   getReadableTimetable,
   getSlotById,
@@ -414,10 +413,6 @@ const ManagedTopicType = builder.objectRef<Topic>("ManagedTopic").implement({
       nullable: true,
       resolve: async (tp) => (await getUserById(tp.hostId))?.name ?? null,
     }),
-    feedback: t.string({
-      nullable: true,
-      resolve: (tp) => getLatestHostOnlyComment(tp.id),
-    }),
     /** Public comment thread — lets My Topics render feed-identical cards
      * (QA #59). */
     comments: t.field({
@@ -428,8 +423,8 @@ const ManagedTopicType = builder.objectRef<Topic>("ManagedTopic").implement({
           includeHidden: false,
         }),
     }),
-    /** Full host-only thread (admin feedback + host replies). ManagedTopic
-     * is only ever served to the owning host or admins, so this is safe. */
+    /** Host-only thread. ManagedTopic is only ever served to the owning
+     * host or admins, so this is safe. */
     hostOnlyComments: t.field({
       type: [CommentType],
       resolve: async (tp) => {
@@ -438,6 +433,20 @@ const ManagedTopicType = builder.objectRef<Topic>("ManagedTopic").implement({
           includeHidden: false,
         });
         return tree.filter((c) => c.visibility === "host_only");
+      },
+    }),
+    /** The drafting thread (QA #59 round 3): admins + topic owner only.
+     * Rendered on Pending Topics (admins) and My Topics (owner), never in
+     * the feed. */
+    adminComments: t.field({
+      type: [CommentType],
+      resolve: async (tp) => {
+        const tree = await listCommentTree(tp.id, {
+          includeHostOnly: false,
+          includeAdminOnly: true,
+          includeHidden: false,
+        });
+        return tree.filter((c) => c.visibility === "admin_only");
       },
     }),
     coverImageUrl: t.exposeString("coverImageUrl", { nullable: true }),
@@ -1081,11 +1090,7 @@ builder.mutationType({
         const { topic, viewer } = await loadTopicAndViewer(ctx, args.topicId);
         if (!canModerate(viewer)) forbidden("Admins only");
         const action = args.action;
-        if (
-          action !== "publish" &&
-          action !== "reject" &&
-          action !== "request_changes"
-        ) {
+        if (action !== "publish" && action !== "reject") {
           throw new GraphQLError("Invalid moderation action");
         }
         const updated = await moderateTopic(
@@ -1121,8 +1126,19 @@ builder.mutationType({
       resolve: async (_p, args, ctx) => {
         const user = await requireUser(ctx);
         const { topic, viewer } = await loadTopicAndViewer(ctx, args.topicId);
-        const visibility = args.visibility === "host_only" ? "host_only" : "public";
-        if (visibility === "host_only") {
+        const visibility =
+          args.visibility === "host_only"
+            ? "host_only"
+            : args.visibility === "admin_only"
+              ? "admin_only"
+              : "public";
+        if (visibility === "admin_only") {
+          // The drafting thread: admins and the topic's owner only
+          // (QA #59 round 3).
+          if (!canModerate(viewer) && topic.hostId !== user.id) {
+            forbidden("Admins and the topic owner only");
+          }
+        } else if (visibility === "host_only") {
           if (!canSeeHostOnly(viewer)) forbidden("Hosts/admins only");
         } else {
           if (!canComment(viewer)) forbidden("Members only");
@@ -1161,7 +1177,11 @@ builder.mutationType({
         const parent = await getCommentById(args.commentId);
         if (!parent) notFound("Comment not found");
         const { topic, viewer } = await loadTopicAndViewer(ctx, parent.topicId);
-        if (parent.visibility === "host_only") {
+        if (parent.visibility === "admin_only") {
+          if (!canModerate(viewer) && topic.hostId !== user.id) {
+            forbidden("Admins and the topic owner only");
+          }
+        } else if (parent.visibility === "host_only") {
           if (!canSeeHostOnly(viewer)) forbidden("Hosts/admins only");
         } else if (!canComment(viewer)) {
           forbidden("Members only");

@@ -1,0 +1,1 @@
+ALTER TYPE "public"."comment_visibility" ADD VALUE 'admin_only';

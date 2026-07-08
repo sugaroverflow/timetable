@@ -67,6 +67,11 @@ function CommentItem({
               hosts
             </span>
           ) : null}
+          {comment.visibility === "admin_only" ? (
+            <span className="pill pill-admin" style={{ marginLeft: 6, fontSize: 10 }}>
+              admins
+            </span>
+          ) : null}
           {comment.hidden ? (
             <span className="faint" style={{ marginLeft: 6, fontSize: 11 }}>
               hidden

@@ -58,6 +58,7 @@ const TOPIC_STATUS_VALUES = [
 const COMMENT_VISIBILITY_VALUES = [
   "public",
   "host_only",
+  "admin_only",
 ] as const satisfies readonly CommentVisibility[];
 
 const TIMETABLE_PRIVACY_VALUES = ["deactivated", "private", "public", "hosts_only", "no_comments"] as const;
@@ -379,9 +380,10 @@ function parseTopics(markdown: string): TopicFixture[] {
 function visibilityFromText(value: string, label: string): CommentVisibility {
   const normalized = value.toLowerCase().replace(/\s+/g, "_");
   if (normalized === "hosts_only") return "host_only";
+  if (normalized === "admins_only") return "admin_only";
   if (hasValue(COMMENT_VISIBILITY_VALUES, normalized)) return normalized;
   throw new Error(
-    `Invalid visibility "${value}" for comment "${label}". Valid values: public, hosts only`,
+    `Invalid visibility "${value}" for comment "${label}". Valid values: public, hosts only, admins only`,
   );
 }
 

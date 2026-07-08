@@ -282,7 +282,7 @@ for (const topic of topics) {
       topic: topic.label,
       id: fbId,
       author: admin,
-      visibility: "hosts only",
+      visibility: "admins only",
       replyTo: null,
       text: pick(FEEDBACK_OPENERS),
     });
@@ -291,7 +291,7 @@ for (const topic of topics) {
       topic: topic.label,
       id: replyId,
       author: topic.host,
-      visibility: "hosts only",
+      visibility: "admins only",
       replyTo: fbId,
       text: pick(FEEDBACK_HOST_REPLIES),
     });
@@ -299,7 +299,7 @@ for (const topic of topics) {
       topic: topic.label,
       id: nextId(),
       author: admin,
-      visibility: "hosts only",
+      visibility: "admins only",
       replyTo: replyId,
       text: pick(FEEDBACK_FOLLOWUPS),
     });
