@@ -172,6 +172,7 @@ function parseThemeJson(
   theme.secondary = colour(source.secondary);
   theme.background = colour(source.background);
   theme.topbar = colour(source.topbar);
+  theme.topbarText = colour(source.topbarText);
   theme.text = colour(source.text);
   if (typeof source.font === "string" && THEME_FONTS.has(source.font)) {
     theme.font = source.font;
@@ -183,6 +184,7 @@ function parseThemeJson(
       secondary: colour(d.secondary),
       background: colour(d.background),
       topbar: colour(d.topbar),
+      topbarText: colour(d.topbarText),
       text: colour(d.text),
     };
   }

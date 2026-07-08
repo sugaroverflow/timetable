@@ -57,12 +57,6 @@ type Dashboard = {
     availabilityCount: number;
     latestActivityAt: string | null;
   }[];
-  unallocatedTopics: {
-    id: string;
-    title: string;
-    slug: string | null;
-    hostSlug: string | null;
-  }[];
   conflicts: {
     slotId: string;
     location: string;
@@ -90,7 +84,6 @@ const QUERY = `
         electorId electorName heartCount commentCount availabilityCount
         latestActivityAt
       }
-      unallocatedTopics { id title slug hostSlug }
       conflicts { slotId location startsAt topics { id title } }
     }
   }
@@ -136,6 +129,8 @@ export default async function DashboardPage({
   const settings = parseTimetableSettings(data.timetable?.settings);
   const hostLabel = roleLabel(settings.roleLabels, "host");
   const hostsPlural = pluralLabel(hostLabel);
+  const electorLabel = roleLabel(settings.roleLabels, "elector");
+  const viewerIsAdmin = isAdmin(roles);
 
   return (
     <div className="stack">
@@ -151,7 +146,7 @@ export default async function DashboardPage({
           hosts={data.timetableHosts}
           allLabel={`All ${hostsPlural}`}
         />
-        <label>Elector activity</label>
+        <label>{electorLabel} activity</label>
         <DashboardActivityFilter value={activity} />
       </div>
 
@@ -214,6 +209,7 @@ export default async function DashboardPage({
           )}
         </div>
 
+        {viewerIsAdmin ? (
         <div className="card">
           <h3 style={{ marginTop: 0, fontSize: 15 }}>
             All {hostsPlural} by weighted votes
@@ -241,6 +237,7 @@ export default async function DashboardPage({
             </ul>
           )}
         </div>
+        ) : null}
       </div>
 
       <div className="card">
@@ -248,7 +245,7 @@ export default async function DashboardPage({
           className="row wrap"
           style={{ justifyContent: "space-between", marginBottom: 12 }}
         >
-          <h3 style={{ margin: 0, fontSize: 15 }}>Elector activity</h3>
+          <h3 style={{ margin: 0, fontSize: 15 }}>{electorLabel} activity</h3>
           <span className="faint" style={{ fontSize: 12 }}>
             {d.electorActivity.length} shown
           </span>
@@ -262,7 +259,7 @@ export default async function DashboardPage({
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Elector</th>
+                  <th>{electorLabel}</th>
                   <th>Hearts</th>
                   <th>Comments</th>
                   <th>Availability</th>
@@ -293,27 +290,6 @@ export default async function DashboardPage({
         )}
       </div>
 
-      <div className="card">
-        <h3 style={{ marginTop: 0, fontSize: 15 }}>
-          Unallocated published topics ({d.unallocatedTopics.length})
-        </h3>
-        {d.unallocatedTopics.length === 0 ? (
-          <p className="faint" style={{ fontSize: 13 }}>
-            Every published topic is tagged to a slot.
-          </p>
-        ) : (
-          <ul className="list">
-            {d.unallocatedTopics.map((t) => (
-              <li key={t.id} style={{ fontSize: 14 }}>
-                {(() => {
-                  const href = topicPath(slug, t.hostSlug, t.slug);
-                  return href ? <Link href={href}>{t.title}</Link> : t.title;
-                })()}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
     </div>
   );
 }

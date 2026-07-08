@@ -51,6 +51,7 @@ function applyPreview(theme: ThemeSettings) {
 const DARK_DEFAULTS = {
   background: "#14171e",
   topbar: "#1d222c",
+  topbarText: "#e7eaf1",
   text: "#e7eaf1",
 };
 
@@ -74,10 +75,16 @@ export function SettingsForm({
     secondary: current.theme?.secondary ?? "#5b7bff",
     background: current.theme?.background ?? "#eceef3",
     topbar: current.theme?.topbar ?? "#ffffff",
+    topbarText: current.theme?.topbarText ?? "#1b2330",
     text: current.theme?.text ?? "#1b2330",
     font: current.theme?.font ?? "default",
+    darkPrimary: current.theme?.dark?.primary ?? current.theme?.primary ?? "#2f54eb",
+    darkSecondary:
+      current.theme?.dark?.secondary ?? current.theme?.secondary ?? "#5b7bff",
     darkBackground: current.theme?.dark?.background ?? DARK_DEFAULTS.background,
     darkTopbar: current.theme?.dark?.topbar ?? DARK_DEFAULTS.topbar,
+    darkTopbarText:
+      current.theme?.dark?.topbarText ?? DARK_DEFAULTS.topbarText,
     darkText: current.theme?.dark?.text ?? DARK_DEFAULTS.text,
     cover: current.coverImageUrl ?? "",
     icon: current.iconUrl ?? "",
@@ -87,10 +94,14 @@ export function SettingsForm({
   const [secondary, setSecondary] = useState(initial.secondary);
   const [background, setBackground] = useState(initial.background);
   const [topbar, setTopbar] = useState(initial.topbar);
+  const [topbarText, setTopbarText] = useState(initial.topbarText);
   const [text, setText] = useState(initial.text);
   const [font, setFont] = useState(initial.font);
+  const [darkPrimary, setDarkPrimary] = useState(initial.darkPrimary);
+  const [darkSecondary, setDarkSecondary] = useState(initial.darkSecondary);
   const [darkBackground, setDarkBackground] = useState(initial.darkBackground);
   const [darkTopbar, setDarkTopbar] = useState(initial.darkTopbar);
+  const [darkTopbarText, setDarkTopbarText] = useState(initial.darkTopbarText);
   const [darkText, setDarkText] = useState(initial.darkText);
   const [cover, setCover] = useState(initial.cover);
   const [icon, setIcon] = useState(initial.icon);
@@ -105,11 +116,15 @@ export function SettingsForm({
       secondary: state.secondary,
       background: state.background,
       topbar: state.topbar,
+      topbarText: state.topbarText,
       text: state.text,
       font: state.font,
       dark: {
+        primary: state.darkPrimary,
+        secondary: state.darkSecondary,
         background: state.darkBackground,
         topbar: state.darkTopbar,
+        topbarText: state.darkTopbarText,
         text: state.darkText,
       },
     };
@@ -121,10 +136,14 @@ export function SettingsForm({
       secondary,
       background,
       topbar,
+      topbarText,
       text,
       font,
+      darkPrimary,
+      darkSecondary,
       darkBackground,
       darkTopbar,
+      darkTopbarText,
       darkText,
       cover,
       icon,
@@ -140,10 +159,14 @@ export function SettingsForm({
     setSecondary(initial.secondary);
     setBackground(initial.background);
     setTopbar(initial.topbar);
+    setTopbarText(initial.topbarText);
     setText(initial.text);
     setFont(initial.font);
+    setDarkPrimary(initial.darkPrimary);
+    setDarkSecondary(initial.darkSecondary);
     setDarkBackground(initial.darkBackground);
     setDarkTopbar(initial.darkTopbar);
+    setDarkTopbarText(initial.darkTopbarText);
     setDarkText(initial.darkText);
     setCover(initial.cover);
     setIcon(initial.icon);
@@ -203,6 +226,7 @@ export function SettingsForm({
         {colourField("ts", "Secondary", secondary, setSecondary, "secondary")}
         {colourField("tb", "Background", background, setBackground, "background")}
         {colourField("tt", "Top bar", topbar, setTopbar, "topbar")}
+        {colourField("tti", "Top bar text", topbarText, setTopbarText, "topbarText")}
         {colourField("tx", "Text", text, setText, "text")}
       </div>
 
@@ -226,12 +250,15 @@ export function SettingsForm({
 
       <h3 style={{ fontSize: 15, margin: "18px 0 2px" }}>Dark mode palette</h3>
       <p className="faint" style={{ marginTop: 0, fontSize: 12 }}>
-        Used when a member switches to dark mode (toggle in the top bar).
-        Primary and secondary carry over automatically.
+        Used when a member switches to dark mode (toggle on their Profile
+        page).
       </p>
       <div className="row wrap">
+        {colourField("dp", "Primary", darkPrimary, setDarkPrimary, "darkPrimary")}
+        {colourField("ds", "Secondary", darkSecondary, setDarkSecondary, "darkSecondary")}
         {colourField("db", "Background", darkBackground, setDarkBackground, "darkBackground")}
         {colourField("dt", "Top bar", darkTopbar, setDarkTopbar, "darkTopbar")}
+        {colourField("dti", "Top bar text", darkTopbarText, setDarkTopbarText, "darkTopbarText")}
         {colourField("dx", "Text", darkText, setDarkText, "darkText")}
       </div>
 

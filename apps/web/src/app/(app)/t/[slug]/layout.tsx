@@ -147,9 +147,7 @@ export default async function TimetableLayout({
               <NavLink href={`${base}/topics`}>My Topics</NavLink>
             )}
             {isElector(roles) && (
-              <NavLink href={`${base}/feed?hearted=me`}>
-                My hearted topics
-              </NavLink>
+              <NavLink href={`${base}/feed?hearted=me`}>❤️ Topics</NavLink>
             )}
             {roles.length > 0 && (
               <NavLink href={`${base}/notifications`}>

@@ -56,7 +56,7 @@ export function TopicCard({
 
   return (
     <article className={`card stack${isNew ? " topic-new" : ""}`}>
-      <div className="row" style={{ alignItems: "flex-start" }}>
+      <div className="row topic-head" style={{ alignItems: "flex-start" }}>
         <PersonChip slug={slug} userId={topic.hostId}>
           <Avatar name={topic.hostName} />
         </PersonChip>
@@ -70,7 +70,7 @@ export function TopicCard({
               topic.title
             )}
           </h3>
-          <div className="faint" style={{ fontSize: 12 }}>
+          <div className="faint topic-byline">
             by{" "}
             <PersonChip slug={slug} userId={topic.hostId}>
               {topic.hostName ?? hostLabel}

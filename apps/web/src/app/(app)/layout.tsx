@@ -2,8 +2,8 @@ import { UserButton } from "@clerk/nextjs";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import Link from "next/link";
 
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { TopbarBrand, type BrandItem } from "@/components/TopbarBrand";
+import { TopbarHamburger } from "@/components/TopbarHamburger";
 import { ToastProvider } from "@/components/Toast";
 import { gqlFetch } from "@/lib/graphql";
 import { parseTimetableSettings } from "@/lib/timetableSettings";
@@ -44,15 +44,19 @@ export default async function AppLayout({
   return (
     <ToastProvider>
       <header className="topbar">
+        <TopbarHamburger />
         <TopbarBrand
           items={brandItems}
           fallbackHref={userId ? "/timetables" : "/"}
         />
         <div className="spacer" />
-        <ThemeToggle />
         {userId ? (
           <>
-            <Link className="muted" href="/profile" style={{ fontSize: 13 }}>
+            <Link
+              className="muted topbar-email"
+              href="/profile"
+              style={{ fontSize: 13 }}
+            >
               {email ?? "Account"}
             </Link>
             <UserButton />

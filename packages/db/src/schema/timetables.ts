@@ -24,6 +24,7 @@ export type ThemeSettings = {
   secondary?: string;
   background?: string;
   topbar?: string;
+  topbarText?: string;
   text?: string;
   font?: string;
   dark?: {
@@ -31,6 +32,7 @@ export type ThemeSettings = {
     secondary?: string;
     background?: string;
     topbar?: string;
+    topbarText?: string;
     text?: string;
   };
 };

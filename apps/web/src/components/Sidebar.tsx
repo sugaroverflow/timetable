@@ -1,33 +1,28 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
-/** Left navigation rail (QA #42): always visible on desktop, collapsed
- * behind a menu button on mobile. Closes itself after navigation. */
+import {
+  closeSidebar,
+  isSidebarOpen,
+  subscribeSidebar,
+} from "@/lib/sidebarStore";
+
+/** Left navigation rail (QA #42): always visible on desktop, a drawer on
+ * mobile toggled by the topbar hamburger (QA #59 round 3). Closes itself
+ * after navigation. */
 export function Sidebar({ children }: { children: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
   const pathname = usePathname();
-
-  // Close after navigation — state adjustment during render (not an
-  // effect), per react-hooks/set-state-in-effect.
-  const [lastPathname, setLastPathname] = useState(pathname);
-  if (pathname !== lastPathname) {
-    setLastPathname(pathname);
-    setOpen(false);
-  }
-
-  return (
-    <>
-      <button
-        type="button"
-        className="sidebar-toggle btn"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-      >
-        ☰ Menu
-      </button>
-      <aside className={`sidebar${open ? " open" : ""}`}>{children}</aside>
-    </>
+  const open = useSyncExternalStore(
+    subscribeSidebar,
+    isSidebarOpen,
+    () => false,
   );
+
+  useEffect(() => {
+    closeSidebar();
+  }, [pathname]);
+
+  return <aside className={`sidebar${open ? " open" : ""}`}>{children}</aside>;
 }

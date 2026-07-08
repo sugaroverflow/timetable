@@ -3,6 +3,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+
+import { clientGql } from "@/lib/clientGraphql";
+import { parseTimetableSettings } from "@/lib/timetableSettings";
 
 export type BrandItem = {
   slug: string;
@@ -10,12 +14,19 @@ export type BrandItem = {
   iconUrl: string | null;
 };
 
+const PUBLIC_BRAND_QUERY = `
+  query TopbarBrand($s: String!) {
+    timetable(idOrSlug: $s) { name settings }
+  }
+`;
+
 /**
  * Topbar identity (QA #59): inside a timetable the topbar shows only that
  * timetable's icon + name (linking home to its feed) — the app logotype and
- * switcher are gone (switching lives in the sidebar footer). Outside a
- * timetable (profile, create screens, signed out) it falls back to the app
- * brand.
+ * switcher are gone (switching lives in the sidebar footer). Signed-in
+ * viewers get the identity from their membership list; anonymous visitors
+ * on a public timetable resolve it client-side (QA #59 round 3). Outside a
+ * timetable it falls back to the app brand.
  */
 export function TopbarBrand({
   items,
@@ -26,7 +37,34 @@ export function TopbarBrand({
 }) {
   const pathname = usePathname();
   const currentSlug = /^\/t\/([^/]+)/.exec(pathname ?? "")?.[1] ?? null;
-  const current = items.find((i) => i.slug === currentSlug) ?? null;
+  const [fetched, setFetched] = useState<BrandItem | null>(null);
+  const listed = items.find((i) => i.slug === currentSlug) ?? null;
+  const current =
+    listed ?? (fetched && fetched.slug === currentSlug ? fetched : null);
+
+  useEffect(() => {
+    if (!currentSlug || listed) return;
+    let cancelled = false;
+    clientGql<{ timetable: { name: string; settings: string } | null }>(
+      PUBLIC_BRAND_QUERY,
+      { s: currentSlug },
+    )
+      .then((data) => {
+        if (cancelled || !data.timetable) return;
+        setFetched({
+          slug: currentSlug,
+          name: data.timetable.name,
+          iconUrl:
+            parseTimetableSettings(data.timetable.settings).iconUrl ?? null,
+        });
+      })
+      .catch(() => {
+        // Not readable (private) or transient failure — keep the app brand.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentSlug, listed]);
 
   if (current) {
     return (

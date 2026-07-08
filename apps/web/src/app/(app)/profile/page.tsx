@@ -6,6 +6,7 @@ import {
   type DigestSettings,
 } from "@/components/DigestSettingsForm";
 import { ProfileForm } from "@/components/ProfileForm";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { gqlFetch } from "@/lib/graphql";
 
 type Data = {
@@ -42,6 +43,15 @@ export default async function ProfilePage() {
       </div>
       <div className="stack">
         <ProfileForm name={data.me.name} bio={data.me.bio} image={data.me.image} />
+        <div className="card row" style={{ justifyContent: "space-between" }}>
+          <div>
+            <strong style={{ fontSize: 14 }}>Appearance</strong>
+            <p className="faint" style={{ margin: "2px 0 0", fontSize: 12 }}>
+              Light, dark, or follow your system.
+            </p>
+          </div>
+          <ThemeToggle />
+        </div>
         <DigestSettingsForm current={digest} />
       </div>
     </main>
