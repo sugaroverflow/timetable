@@ -24,6 +24,12 @@ Elector → Fellowship Candidate); the custom labels are used throughout the UI.
 Every member has a markdown bio, shown in a popup from any byline and on the
 People page (members grouped by role; hosts list their published topics).
 
+A member whose roles have all been removed keeps the timetable in their
+switcher but otherwise sees what an anonymous visitor sees at the
+timetable's visibility level: no composer, no hearts, no People page, no
+member-only panels. Admins can also remove members outright from the
+People page (the owner can never be removed).
+
 ## Topic Feed
 
 Hosts (and admins) draft topics in a rich-text editor — markdown stays the

@@ -17,4 +17,5 @@ export const ACTION_LABELS: Record<string, string> = {
   "comment.reply": "replied to a comment",
   "member.invite": "invited someone",
   "member.first_login": "logged in for the first time",
+  "member.remove": "removed a member",
 };
