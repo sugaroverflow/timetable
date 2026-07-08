@@ -1,16 +1,13 @@
-import { cookies } from "next/headers";
-
 import type { Role } from "@timetable/shared";
 
-import { displayRoles, PREVIEW_COOKIE } from "./previewRoles";
-
 /**
- * Roles to use for rendering, honoring the preview-as-elector cookie.
- * Rendering only — every query and mutation still runs with the real session.
+ * Roles to use for rendering. Since the view-as-user preview (QA #59
+ * round 3), impersonation happens API-side: queries already return the
+ * preview target's roles and data, so this is a pass-through. Kept so
+ * page-level call sites read as "roles for display".
  */
 export async function displayRolesFromCookies(
   roles: readonly Role[],
 ): Promise<Role[]> {
-  const on = (await cookies()).get(PREVIEW_COOKIE)?.value === "1";
-  return displayRoles(roles, on);
+  return [...roles];
 }

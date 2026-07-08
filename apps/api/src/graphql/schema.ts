@@ -950,6 +950,55 @@ builder.mutationType({
       },
     }),
 
+    /** Audit trail for the view-as-user preview (QA #59 round 3): called
+     * as the admin enters the preview, before the cookie applies. The
+     * preview itself is enforced per-request from the x-view-as header. */
+    startUserPreview: t.boolean({
+      args: {
+        idOrSlug: t.arg.string({ required: true }),
+        userId: t.arg.string({ required: true }),
+      },
+      resolve: async (_p, args, ctx) => {
+        const user = await requireUser(ctx);
+        const readable = await getReadableTimetable(user.id, args.idOrSlug);
+        if (!readable) notFound("Timetable not found");
+        const viewer = { userId: user.id, roles: readable.roles };
+        if (!canModerate(viewer)) forbidden("Admins only");
+        const target = await getPerson(readable.timetable.id, args.userId);
+        if (!target) notFound("Member not found");
+        await logActivity({
+          timetableId: readable.timetable.id,
+          actorId: user.id,
+          action: "member.impersonate",
+          payload: { targetUserId: target.userId, targetName: target.name },
+        });
+        return true;
+      },
+    }),
+
+    /** Companion audit entry when the preview ends (cookie already
+     * cleared, so this runs as the real admin again). */
+    stopUserPreview: t.boolean({
+      args: {
+        idOrSlug: t.arg.string({ required: true }),
+        userId: t.arg.string({ required: true }),
+      },
+      resolve: async (_p, args, ctx) => {
+        const user = await requireUser(ctx);
+        const readable = await getReadableTimetable(user.id, args.idOrSlug);
+        if (!readable) notFound("Timetable not found");
+        const viewer = { userId: user.id, roles: readable.roles };
+        if (!canModerate(viewer)) forbidden("Admins only");
+        await logActivity({
+          timetableId: readable.timetable.id,
+          actorId: user.id,
+          action: "member.impersonate_end",
+          payload: { targetUserId: args.userId },
+        });
+        return true;
+      },
+    }),
+
     /** Resets the notifications badge (QA #59). */
     markNotificationsSeen: t.boolean({
       args: { idOrSlug: t.arg.string({ required: true }) },

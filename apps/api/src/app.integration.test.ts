@@ -63,6 +63,7 @@ function testContext(userId: string | null, roles: Role[] = []): ApiContext {
           bio: null,
         }
       : null,
+    impersonation: null,
     getViewer: vi.fn(async () => ({ userId, roles })),
   };
 }

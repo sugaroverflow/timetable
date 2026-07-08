@@ -6,6 +6,7 @@ import { Avatar } from "@/components/Avatar";
 import { EmptyState } from "@/components/EmptyState";
 import { PersonAdminPanel } from "@/components/PersonAdminPanel";
 import { RolePills } from "@/components/RolePills";
+import { UserPreviewStart } from "@/components/UserPreview";
 import { gqlFetch } from "@/lib/graphql";
 import { displayRolesFromCookies } from "@/lib/previewRoles.server";
 import {
@@ -26,12 +27,14 @@ type Person = {
 
 type Data = {
   timetable: { id: string; settings: string; viewerRoles: string[] } | null;
+  me: { id: string } | null;
   timetablePeople: Person[];
 };
 
 const QUERY = `
   query People($s: String!) {
     timetable(idOrSlug: $s) { id settings viewerRoles }
+    me { id }
     timetablePeople(idOrSlug: $s) {
       userId name slug roles bioHtml
       publishedTopics { id title slug }
@@ -139,6 +142,13 @@ export default async function PeoplePage({
                           >
                             View topics →
                           </Link>
+                        ) : null}
+                        {canEdit && person.userId !== data.me?.id ? (
+                          <UserPreviewStart
+                            slug={slug}
+                            userId={person.userId}
+                            name={person.name}
+                          />
                         ) : null}
                         {canEdit && member ? (
                           <PersonAdminPanel

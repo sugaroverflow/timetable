@@ -1,6 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
+import { cookies } from "next/headers";
 
 import { env } from "@/env";
+import { VIEW_AS_COOKIE } from "@/lib/userPreview";
 
 type GraphQLResponse<T> = {
   data?: T;
@@ -17,12 +19,16 @@ export async function gqlFetch<T>(
 ): Promise<T> {
   const { getToken } = await auth();
   const token = await getToken();
+  // Path-scoped view-as-user preview cookie (QA #59 round 3): forwarded as
+  // a header; the API re-verifies admin rights on every request.
+  const viewAs = (await cookies()).get(VIEW_AS_COOKIE)?.value;
 
   const res = await fetch(env.graphqlUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(token && viewAs ? { "x-view-as": viewAs } : {}),
     },
     body: JSON.stringify({ query, variables }),
     cache: "no-store",
