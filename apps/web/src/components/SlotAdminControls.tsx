@@ -1,5 +1,6 @@
 "use client";
 
+import { X } from "lucide-react";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
@@ -58,7 +59,7 @@ export function SlotAdminControls({
           disabled={pending}
           onClick={() => run(UNTAG, { s: slotId, t: tag.id }, "Tag removed")}
         >
-          {tag.title} ✕
+          {tag.title} <X size={14} aria-hidden />
         </button>
       ))}
       <select

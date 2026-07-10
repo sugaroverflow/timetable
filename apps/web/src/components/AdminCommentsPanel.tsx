@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { Collapsible } from "@base-ui/react/collapsible";
+import { ChevronDown, ChevronRight, Shield } from "lucide-react";
 
 import type { FeedComment } from "@/lib/feedTypes";
 
@@ -35,31 +37,38 @@ export function AdminCommentsPanel({
   const [expanded, setExpanded] = useState(count > 0);
 
   return (
-    <div className="host-panel admin-panel">
-      <button
-        className="host-panel-toggle"
-        onClick={() => setExpanded((v) => !v)}
-        aria-expanded={expanded}
-      >
-        {expanded
-          ? `Hide ${adminLabel} comments ▾`
-          : `🛡 ${adminLabel} comments (${count}) ▸`}
-      </button>
-      {expanded && (
-        <div className="host-thread">
-          <CommentList
-            comments={comments}
-            canReply={true}
-            canModerate={canModerate}
-            slug={slug}
-          />
-          <CommentComposer
-            topicId={topicId}
-            visibility="admin_only"
-            adminLabel={adminLabel}
-          />
-        </div>
-      )}
-    </div>
+    <Collapsible.Root
+      className="host-panel admin-panel"
+      open={expanded}
+      onOpenChange={setExpanded}
+    >
+      <Collapsible.Trigger className="host-panel-toggle">
+        {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}{" "}
+        {expanded ? (
+          `Hide ${adminLabel} comments`
+        ) : (
+          <>
+            <Shield size={14} aria-hidden /> {adminLabel} comments ({count})
+          </>
+        )}
+      </Collapsible.Trigger>
+      <Collapsible.Panel>
+        {expanded && (
+          <div className="host-thread">
+            <CommentList
+              comments={comments}
+              canReply={true}
+              canModerate={canModerate}
+              slug={slug}
+            />
+            <CommentComposer
+              topicId={topicId}
+              visibility="admin_only"
+              adminLabel={adminLabel}
+            />
+          </div>
+        )}
+      </Collapsible.Panel>
+    </Collapsible.Root>
   );
 }

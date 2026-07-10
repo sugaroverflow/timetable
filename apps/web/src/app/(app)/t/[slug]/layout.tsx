@@ -1,4 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
+import { Flag, Heart } from "lucide-react";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
@@ -157,7 +158,9 @@ export default async function TimetableLayout({
               <NavLink href={`${base}/topics`}>My Topics</NavLink>
             )}
             {isElector(roles) && (
-              <NavLink href={`${base}/feed?hearted=me`}>❤️ Topics</NavLink>
+              <NavLink href={`${base}/feed?hearted=me`}>
+                <Heart size={14} fill="currentColor" aria-hidden /> Topics
+              </NavLink>
             )}
             {roles.length > 0 && (
               <NavLink href={`${base}/notifications`}>
@@ -201,7 +204,7 @@ export default async function TimetableLayout({
             target="_blank"
             rel="noopener noreferrer"
           >
-            ⚑ Report a bug
+            <Flag size={14} aria-hidden /> Report a bug
           </a>
 
           {switcherItems.length > 0 ? (

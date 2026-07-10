@@ -1,3 +1,4 @@
+import { Heart } from "lucide-react";
 import Link from "next/link";
 
 import type { FeedTopic } from "@/lib/feedTypes";
@@ -107,7 +108,9 @@ export function TopicCard({
           />
         ) : (
           <span className="heart-btn" aria-hidden>
-            <span className="ic">{"♥"}</span>
+            <span className="ic">
+              <Heart size={16} fill="currentColor" />
+            </span>
             {topic.heartCount}
           </span>
         )}

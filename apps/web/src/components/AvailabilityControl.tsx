@@ -1,5 +1,7 @@
 "use client";
 
+import { Toggle } from "@base-ui/react/toggle";
+import { ToggleGroup } from "@base-ui/react/toggle-group";
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 
@@ -40,19 +42,27 @@ export function AvailabilityControl({
   const effective = state ?? "yellow";
 
   return (
-    <span className="avseg">
+    <ToggleGroup
+      className="avseg"
+      value={[effective]}
+      onValueChange={(groupValue) => {
+        // Controlled + always-one-selected: ignore a deselect (empty array);
+        // the controlled value keeps the current segment lit.
+        const v = groupValue[0];
+        if (typeof v === "string" && v !== effective) set(v);
+      }}
+      aria-label="Your availability"
+    >
       {STATES.map((s) => (
-        <button
+        <Toggle
           key={s.value}
-          type="button"
+          value={s.value}
           className={effective === s.value ? s.onClass : ""}
           disabled={pending}
-          onClick={() => set(s.value)}
-          aria-pressed={effective === s.value}
         >
           {s.label}
-        </button>
+        </Toggle>
       ))}
-    </span>
+    </ToggleGroup>
   );
 }

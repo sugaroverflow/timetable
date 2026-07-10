@@ -1,5 +1,7 @@
 "use client";
 
+import { MessageCircle } from "lucide-react";
+
 export function FocusCommentButton({
   topicId,
   commentCount,
@@ -18,9 +20,9 @@ export function FocusCommentButton({
         ta?.focus();
       }}
     >
-      <span className="ic">💬</span>
+      <MessageCircle size={16} aria-hidden />
       {commentCount || ""}
-      <span style={{ fontWeight: 600 }}>Comment</span>
+      <span style={{ fontWeight: "var(--fw-semibold)" }}>Comment</span>
     </button>
   );
 }

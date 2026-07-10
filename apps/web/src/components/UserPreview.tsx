@@ -1,5 +1,6 @@
 "use client";
 
+import { Eye, X } from "lucide-react";
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 
@@ -60,7 +61,7 @@ export function UserPreviewStart({
       onClick={() => void start()}
       title="Read-only preview of this timetable as this member sees it"
     >
-      👁 View as {name ?? "member"}
+      <Eye size={16} aria-hidden /> View as {name ?? "member"}
     </button>
   );
 }
@@ -92,7 +93,7 @@ export function UserPreviewExit({
       disabled={pending}
       onClick={() => void stop()}
     >
-      ✕ Exit {name ?? "member"} preview
+      <X size={16} aria-hidden /> Exit {name ?? "member"} preview
     </button>
   );
 }

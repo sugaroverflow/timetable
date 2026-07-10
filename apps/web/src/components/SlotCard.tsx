@@ -1,3 +1,5 @@
+import { MapPin, TriangleAlert } from "lucide-react";
+
 import type { CalendarSlot, TopicOption } from "@/lib/calendarTypes";
 
 import { AvailabilityControl } from "./AvailabilityControl";
@@ -60,7 +62,7 @@ export function SlotCard({
             </div>
             {slot.location ? (
               <div className="faint" style={{ fontSize: 13, marginTop: 3 }}>
-                📍 {slot.location}
+                <MapPin size={14} aria-hidden /> {slot.location}
               </div>
             ) : null}
           </div>
@@ -94,7 +96,7 @@ export function SlotCard({
                 borderColor: "transparent",
               }}
             >
-              ⚠ conflict: {slot.topics.length} topics
+              <TriangleAlert size={14} aria-hidden /> conflict: {slot.topics.length} topics
             </span>
           ) : null}
         </div>

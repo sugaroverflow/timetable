@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { Collapsible } from "@base-ui/react/collapsible";
+import { ChevronDown, ChevronRight, Heart } from "lucide-react";
 
 import type { WeightedHeart } from "@/lib/feedTypes";
 
@@ -25,17 +27,18 @@ export function HostInsightsPanel({
   const coveragePct = Math.min((weightedScore / 5.0) * 100, 100);
 
   return (
-    <div className="host-panel">
-      <button
-        className="host-panel-toggle"
-        onClick={() => setExpanded((v) => !v)}
-        aria-expanded={expanded}
-      >
-        {expanded ? "Hide ❤️ breakdown ▾" : "Show ❤️ breakdown ▸"}
-      </button>
+    <Collapsible.Root
+      className="host-panel"
+      open={expanded}
+      onOpenChange={setExpanded}
+    >
+      <Collapsible.Trigger className="host-panel-toggle">
+        {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}{" "}
+        {expanded ? "Hide " : "Show "}
+        <Heart size={14} fill="currentColor" aria-hidden /> breakdown
+      </Collapsible.Trigger>
 
-      {expanded && (
-        <>
+      <Collapsible.Panel>
           {/* Coverage summary row */}
           <div className="coverage-row">
             <span className="coverage-num">{weightedScore.toFixed(2)}</span>
@@ -89,8 +92,7 @@ export function HostInsightsPanel({
               );
             })
           )}
-        </>
-      )}
-    </div>
+      </Collapsible.Panel>
+    </Collapsible.Root>
   );
 }

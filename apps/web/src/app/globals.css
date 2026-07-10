@@ -521,11 +521,12 @@ textarea {
   font-weight: var(--fw-normal);
   color: var(--faint);
 }
-.tt-switcher-list {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 0;
+/* Base UI Menu.Positioner owns placement (portaled); the popup is just the
+   visual surface. */
+.tt-switcher-positioner {
   z-index: var(--z-dropdown);
+}
+.tt-switcher-list {
   min-width: 240px;
   background: var(--card);
   border: 1px solid var(--line-strong);

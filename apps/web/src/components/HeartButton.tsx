@@ -1,5 +1,6 @@
 "use client";
 
+import { Heart } from "lucide-react";
 import { useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
@@ -49,7 +50,7 @@ export function HeartButton({
       aria-pressed={hearted}
     >
       <span className="ic" ref={icRef}>
-        {hearted ? "♥" : "♡"}
+        <Heart size={16} fill={hearted ? "currentColor" : "none"} aria-hidden />
       </span>
       {count}
     </button>

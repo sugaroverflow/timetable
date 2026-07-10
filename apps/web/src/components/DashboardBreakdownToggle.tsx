@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { Collapsible } from "@base-ui/react/collapsible";
+import { ChevronDown, ChevronRight, Heart } from "lucide-react";
 
 import { Avatar } from "@/components/Avatar";
 import { clientGql } from "@/lib/clientGraphql";
@@ -25,8 +27,7 @@ export function DashboardBreakdownToggle({
   const [rows, setRows] = useState<WeightedHeart[] | null>(null);
   const [failed, setFailed] = useState(false);
 
-  async function toggle() {
-    const next = !expanded;
+  async function handleOpenChange(next: boolean) {
     setExpanded(next);
     if (!next || rows !== null) return;
     try {
@@ -40,16 +41,18 @@ export function DashboardBreakdownToggle({
   }
 
   return (
-    <div className="dash-breakdown">
-      <button
-        type="button"
-        className="thread-toggle"
-        aria-expanded={expanded}
-        onClick={() => void toggle()}
-      >
-        {expanded ? "Hide ❤️ breakdown ▾" : "Show ❤️ breakdown ▸"}
-      </button>
-      {expanded ? (
+    <Collapsible.Root
+      className="dash-breakdown"
+      open={expanded}
+      onOpenChange={(next) => void handleOpenChange(next)}
+    >
+      <Collapsible.Trigger className="thread-toggle">
+        {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}{" "}
+        {expanded ? "Hide " : "Show "}
+        <Heart size={14} fill="currentColor" aria-hidden /> breakdown
+      </Collapsible.Trigger>
+      <Collapsible.Panel>
+        {expanded ? (
         failed ? (
           <div className="faint" style={{ fontSize: 12 }}>
             Couldn&rsquo;t load the breakdown.
@@ -74,8 +77,9 @@ export function DashboardBreakdownToggle({
               </li>
             ))}
           </ul>
-        )
-      ) : null}
-    </div>
+          )
+        ) : null}
+      </Collapsible.Panel>
+    </Collapsible.Root>
   );
 }

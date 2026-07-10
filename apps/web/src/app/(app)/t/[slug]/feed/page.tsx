@@ -1,3 +1,4 @@
+import { Heart } from "lucide-react";
 import Link from "next/link";
 
 import { Avatar } from "@/components/Avatar";
@@ -73,7 +74,9 @@ export default async function FeedPage({
       {page.isMember ? <MarkFeedSeen slug={slug} /> : null}
       {hearted ? (
         <div className="page-head">
-          <h2 className="section-title">❤️ Topics</h2>
+          <h2 className="section-title">
+            <Heart size={14} fill="currentColor" aria-hidden /> Topics
+          </h2>
           <p>Published topics you currently heart.</p>
         </div>
       ) : null}
