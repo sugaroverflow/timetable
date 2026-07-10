@@ -56,7 +56,7 @@ export default async function NotificationsPage({
     <div className="stack">
       <MarkNotificationsSeen slug={slug} />
       <div className="page-head">
-        <h2 style={{ fontSize: 18, margin: 0 }}>Notifications</h2>
+        <h2 className="section-title">Notifications</h2>
         <p>Comments on your topics and replies to your comments.</p>
       </div>
       {data.notifications.length === 0 ? (

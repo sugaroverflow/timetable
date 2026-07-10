@@ -153,7 +153,7 @@ export default async function DashboardPage({
   return (
     <div className="stack">
       <div className="page-head">
-        <h2 style={{ fontSize: 18, margin: 0 }}>Dashboard</h2>
+        <h2 className="section-title">Dashboard</h2>
         <p>Activity and standings across this timetable.</p>
       </div>
 
@@ -169,7 +169,7 @@ export default async function DashboardPage({
         <DashboardSinceFilter value={sinceValue} />
       </div>
 
-      <div className="grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
+      <div className="stat-grid">
         <Stat label="Published topics" value={d.topicCounts.published} />
         <Stat label="Total hearts" value={d.totalHearts} />
         <Stat label="Electors" value={d.electorCount} />

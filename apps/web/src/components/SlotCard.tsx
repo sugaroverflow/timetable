@@ -68,7 +68,7 @@ export function SlotCard({
         {perms.canSetAvailability ? (
           <span
             className="stack"
-            style={{ gap: 4, alignItems: "flex-end" }}
+            style={{ gap: "var(--space-1)", alignItems: "flex-end" }}
           >
             <span className="faint" style={{ fontSize: 11, fontWeight: 600 }}>
               Your availability
@@ -89,8 +89,8 @@ export function SlotCard({
             <span
               className="pill"
               style={{
-                background: "var(--yellow-soft, #fdf2dc)",
-                color: "#a9700f",
+                background: "var(--yellow-soft)",
+                color: "var(--warning-ink)",
                 borderColor: "transparent",
               }}
             >
@@ -100,7 +100,7 @@ export function SlotCard({
         </div>
       ) : null}
 
-      <div className="row" style={{ gap: 8 }}>
+      <div className="row" style={{ gap: "var(--space-2)" }}>
         <span className="avail-bar" style={{ width: 160 }}>
           <span className="g" style={{ width: pct(slot.counts.green, total) }} />
           <span className="y" style={{ width: pct(slot.counts.yellow, total) }} />
@@ -113,12 +113,12 @@ export function SlotCard({
       </div>
 
       {perms.canSeeHostOnly && slot.perUser && slot.perUser.length > 0 ? (
-        <div className="row wrap" style={{ gap: 8 }}>
+        <div className="row wrap" style={{ gap: "var(--space-2)" }}>
           {slot.perUser.map((u) => (
             <span
               key={u.userId}
               className="row"
-              style={{ gap: 4, fontSize: 12 }}
+              style={{ gap: "var(--space-1)", fontSize: 12 }}
             >
               <span className={`dot ${u.state}`} /> {u.name ?? "?"}
             </span>

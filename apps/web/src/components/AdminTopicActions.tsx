@@ -67,8 +67,8 @@ export function AdminTopicActions({
   return (
     <div className="stack" style={{ gap: 8 }}>
       <div
-        className="row wrap"
-        style={{ gap: 8, borderTop: "1px solid var(--line)", paddingTop: 10 }}
+        className="row wrap divider-top"
+        style={{ gap: 8, paddingTop: 10 }}
       >
         <span className="faint" style={{ fontSize: 11 }}>
           {label}:

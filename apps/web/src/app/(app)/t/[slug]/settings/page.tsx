@@ -75,7 +75,7 @@ export default async function SettingsPage({
 
         <div className="stack">
           <div className="page-head">
-            <h2 style={{ fontSize: 18, margin: 0 }}>Members</h2>
+            <h2 className="section-title">Members</h2>
             <p>
               Roles and bios are edited from the{" "}
               <Link href={`/t/${slug}/people`}>People page</Link>.

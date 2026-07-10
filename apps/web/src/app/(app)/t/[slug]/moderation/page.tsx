@@ -51,7 +51,7 @@ export default async function ModerationPage({
   return (
     <div className="stack">
       <div className="page-head">
-        <h2 style={{ fontSize: 18, margin: 0 }}>Pending topics</h2>
+        <h2 className="section-title">Pending topics</h2>
         <p>
           Review submitted topics: publish, edit, or discuss in the{" "}
           {adminLabel} comments.

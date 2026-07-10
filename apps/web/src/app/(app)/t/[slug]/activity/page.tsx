@@ -130,7 +130,7 @@ export default async function ActivityPage({
   return (
     <div className="stack">
       <div className="page-head">
-        <h2 style={{ fontSize: 18, margin: 0 }}>Activity log</h2>
+        <h2 className="section-title">Activity log</h2>
         <p>Every moderation and lifecycle action in this timetable.</p>
       </div>
       <div className="toolbar wrap">

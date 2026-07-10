@@ -73,7 +73,7 @@ export default async function FeedPage({
       {page.isMember ? <MarkFeedSeen slug={slug} /> : null}
       {hearted ? (
         <div className="page-head">
-          <h2 style={{ fontSize: 18, margin: 0 }}>❤️ Topics</h2>
+          <h2 className="section-title">❤️ Topics</h2>
           <p>Published topics you currently heart.</p>
         </div>
       ) : null}
