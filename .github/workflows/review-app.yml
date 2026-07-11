@@ -1,0 +1,186 @@
+# Ephemeral per-PR review apps on DigitalOcean App Platform.
+#
+# Opt-in: add the `preview` label to a PR. On each push (while labeled) the app
+# is (re)deployed from the PR branch and seeded; closing the PR (or removing the
+# label) tears the app + its per-PR database down. The live URL is posted as a
+# sticky PR comment.
+#
+# Reuses existing infra: the `timetable-db` Postgres cluster (one database per
+# PR), the DOCR-free App-Platform GitHub build, the dev Clerk instance, the
+# shared Spaces bucket, and the `timetable-dev` GitHub Environment secrets.
+name: Review App
+
+on:
+  pull_request:
+    types: [labeled, unlabeled, synchronize, reopened, closed]
+
+concurrency:
+  group: review-app-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  REVIEW_LABEL: preview
+  MAX_REVIEW_APPS: "3"
+  DB_CLUSTER: timetable-db
+
+jobs:
+  deploy:
+    # Create/update while the PR is open AND carries the `preview` label.
+    if: >-
+      github.event.action != 'closed' &&
+      github.event.action != 'unlabeled' &&
+      contains(github.event.pull_request.labels.*.name, 'preview')
+    runs-on: ubuntu-latest
+    environment: timetable-dev
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Compute names
+        id: vars
+        run: |
+          PR=${{ github.event.pull_request.number }}
+          {
+            echo "pr=$PR"
+            echo "app=timetable-pr-$PR"
+            echo "db=pr_$PR"
+            echo "branch=${{ github.event.pull_request.head.ref }}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Enforce concurrency cap
+        run: |
+          set -euo pipefail
+          total=$(doctl apps list -o json | jq '[.[] | select(.spec.name | startswith("timetable-pr-"))] | length')
+          exists=$(doctl apps list -o json | jq '[.[] | select(.spec.name=="${{ steps.vars.outputs.app }}")] | length')
+          if [ "$exists" = "0" ] && [ "$total" -ge "$MAX_REVIEW_APPS" ]; then
+            echo "::error::Review-app cap ($MAX_REVIEW_APPS) reached — close another preview first."
+            exit 1
+          fi
+
+      - name: Create per-PR database + derive connection string
+        id: db
+        run: |
+          set -euo pipefail
+          cid=$(doctl databases list -o json | jq -r '.[] | select(.name=="'"$DB_CLUSTER"'") | .id')
+          if [ -z "$cid" ]; then echo "::error::cluster $DB_CLUSTER not found"; exit 1; fi
+          # Idempotent: ignore "already exists".
+          doctl databases db create "$cid" "${{ steps.vars.outputs.db }}" >/dev/null 2>&1 || true
+          uri=$(doctl databases connection "$cid" --format URI --no-header)
+          dburl=$(printf '%s' "$uri" | sed "s#/defaultdb#/${{ steps.vars.outputs.db }}#")
+          echo "::add-mask::$dburl"
+          echo "database_url=$dburl" >> "$GITHUB_OUTPUT"
+
+      - name: Render app spec
+        env:
+          DATABASE_URL: ${{ steps.db.outputs.database_url }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          SPACES_KEY: ${{ secrets.SPACES_KEY }}
+          SPACES_SECRET: ${{ secrets.SPACES_SECRET }}
+          EMAIL_FROM: ${{ vars.EMAIL_FROM }}
+        run: |
+          set -euo pipefail
+          sed -e "s/__PR_NUMBER__/${{ steps.vars.outputs.pr }}/g" \
+              -e "s#__BRANCH__#${{ steps.vars.outputs.branch }}#g" \
+              .do/app.review.yaml > /tmp/app.rendered.yaml
+          # Substitute ONLY these tokens; leave ${APP_URL} for App Platform.
+          envsubst '$DATABASE_URL $CLERK_SECRET_KEY $NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY $CRON_SECRET $RESEND_API_KEY $SPACES_KEY $SPACES_SECRET $EMAIL_FROM' \
+            < /tmp/app.rendered.yaml > /tmp/app.final.yaml
+
+      - name: Create or update the review app
+        id: deploy
+        run: |
+          set -euo pipefail
+          id=$(doctl apps list -o json | jq -r '.[] | select(.spec.name=="${{ steps.vars.outputs.app }}") | .id')
+          if [ -z "$id" ]; then
+            id=$(doctl apps create --spec /tmp/app.final.yaml --format ID --no-header --wait)
+          else
+            doctl apps update "$id" --spec /tmp/app.final.yaml --wait
+            # Force a fresh build from the branch head (spec may be unchanged on a push).
+            doctl apps create-deployment "$id" --force-rebuild --wait
+          fi
+          url=$(doctl apps get "$id" -o json | jq -r '.[0].default_ingress // .[0].live_url')
+          {
+            echo "id=$id"
+            echo "url=$url"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Post preview URL
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const url = '${{ steps.deploy.outputs.url }}';
+            const marker = '<!-- review-app -->';
+            const body = [
+              marker,
+              `### 🔍 Review app`,
+              ``,
+              `**${url}**`,
+              ``,
+              `Deployed from \`${{ steps.vars.outputs.branch }}\` with fresh seeded data. Sign in with a Clerk test user (OTP \`424242\`). Torn down automatically when this PR closes or the \`preview\` label is removed.`,
+            ].join('\n');
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number,
+            });
+            const existing = comments.find((c) => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body });
+            }
+
+  teardown:
+    # Destroy on PR close, or when the `preview` label is removed.
+    if: >-
+      github.event.action == 'closed' ||
+      (github.event.action == 'unlabeled' && github.event.label.name == 'preview')
+    runs-on: ubuntu-latest
+    environment: timetable-dev
+    steps:
+      - name: Compute names
+        id: vars
+        run: |
+          PR=${{ github.event.pull_request.number }}
+          {
+            echo "app=timetable-pr-$PR"
+            echo "db=pr_$PR"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Delete review app + per-PR database
+        run: |
+          set -euo pipefail
+          id=$(doctl apps list -o json | jq -r '.[] | select(.spec.name=="${{ steps.vars.outputs.app }}") | .id')
+          if [ -n "$id" ]; then doctl apps delete "$id" -f; fi
+          cid=$(doctl databases list -o json | jq -r '.[] | select(.name=="'"$DB_CLUSTER"'") | .id')
+          if [ -n "$cid" ]; then doctl databases db delete "$cid" "${{ steps.vars.outputs.db }}" -f >/dev/null 2>&1 || true; fi
+
+      - name: Update PR comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const marker = '<!-- review-app -->';
+            const body = `${marker}\n### 🧹 Review app torn down`;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number,
+            });
+            const existing = comments.find((c) => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body });
+            }

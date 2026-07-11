@@ -114,6 +114,8 @@ s3cfg="${tmpdir}/s3cfg"
   printf '%s\n' '</CORSConfiguration>'
 } > "$cors_xml"
 
+# Create before chmod — chmod on a missing file aborts under set -e.
+touch "$s3cfg"
 chmod 600 "$s3cfg"
 {
   printf '%s\n' '[default]'
