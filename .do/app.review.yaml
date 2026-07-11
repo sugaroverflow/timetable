@@ -55,7 +55,10 @@ services:
       - { key: EMAIL_FROM, value: "${EMAIL_FROM}", scope: RUN_TIME }
       - { key: SPACES_ENDPOINT, value: "https://lon1.digitaloceanspaces.com", scope: RUN_TIME }
       - { key: SPACES_REGION, value: "lon1", scope: RUN_TIME }
-      - { key: SPACES_BUCKET, value: "timetable", scope: RUN_TIME }
+      # Use the dev bucket: the shared "timetable" bucket rejects PutBucketCors
+      # (501 NotImplemented), so uploads' CORS would fail; "timetable-dev"
+      # accepts it (cf. #63). Per-PR objects isolated by the key prefix.
+      - { key: SPACES_BUCKET, value: "timetable-dev", scope: RUN_TIME }
       - { key: SPACES_KEY_PREFIX, value: "uploads/pr-__PR_NUMBER__", scope: RUN_TIME }
       - { key: SPACES_KEY, value: "${SPACES_KEY}", scope: RUN_TIME, type: SECRET }
       - { key: SPACES_SECRET, value: "${SPACES_SECRET}", scope: RUN_TIME, type: SECRET }
