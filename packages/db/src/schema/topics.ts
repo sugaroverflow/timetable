@@ -34,7 +34,7 @@ export const topics = pgTable(
     slug: text(),
     bodyMd: text().notNull().default(""),
     coverImageUrl: text(),
-    status: topicStatusEnum().notNull().default("draft"),
+    status: topicStatusEnum().notNull().default("submitted"),
     publishedAt: timestamp({ withTimezone: true }),
     // Bumped only by host/admin edits to title/body/cover — never by status
     // churn. Drives "newest" sorting and the new-since-last-visit highlight

@@ -133,7 +133,7 @@ export default async function FeedPage({
         <EmptyState
           icon="◇"
           title="No published topics yet"
-          hint={`${pluralLabel(hostLabel)} draft and submit topics from My Topics; ${pluralLabel(adminLabel).toLowerCase()} publish them from Pending Topics.`}
+          hint={`${pluralLabel(hostLabel)} create topics from My Topics; ${pluralLabel(adminLabel).toLowerCase()} publish them from Pending Topics.`}
         />
       ) : (
         <InfiniteFeed

@@ -1,5 +1,4 @@
 export type TopicStatus =
-  | "draft"
   | "submitted"
   | "published"
   | "unpublished"

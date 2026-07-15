@@ -48,7 +48,6 @@ const ROLE_VALUES = ["owner", "admin", "host", "elector"] as const;
 export type Role = (typeof ROLE_VALUES)[number];
 
 const TOPIC_STATUS_VALUES = [
-  "draft",
   "submitted",
   "published",
   "unpublished",
@@ -349,8 +348,11 @@ function parseTopics(markdown: string): TopicFixture[] {
     const title = fieldFromBlock(fields, "Title", { required: true });
     const host = fieldFromBlock(fields, "Host", { required: true });
     const statusRaw = fieldFromBlock(fields, "Status", { required: true });
+    // Draft removed (product feedback round 1): legacy "draft" fixtures seed
+    // as "submitted" (the new created/publishable state).
+    const status = statusRaw === "draft" ? "submitted" : statusRaw;
 
-    if (!hasValue(TOPIC_STATUS_VALUES, statusRaw)) {
+    if (!hasValue(TOPIC_STATUS_VALUES, status)) {
       throw new Error(
         `Invalid status "${statusRaw}" for topic "${label}". Valid statuses: ${TOPIC_STATUS_VALUES.join(", ")}`,
       );
@@ -360,7 +362,7 @@ function parseTopics(markdown: string): TopicFixture[] {
       label,
       title,
       host,
-      status: statusRaw,
+      status,
       publishedAt: parseTopicDate(
         fieldFromBlock(fields, "Published date, if published"),
         label,

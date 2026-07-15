@@ -31,7 +31,6 @@ type Dashboard = {
   hostCount: number;
   slotCount: number;
   topicCounts: {
-    draft: number;
     submitted: number;
     published: number;
     unpublished: number;
@@ -94,7 +93,7 @@ const QUERY = `
     timetableHosts(idOrSlug: $s) { id name }
     dashboard(idOrSlug: $s, hostId: $host, electorActivity: $activity, activitySince: $since) {
       totalHearts electorCount hostCount slotCount
-      topicCounts { draft submitted published unpublished archived }
+      topicCounts { submitted published unpublished archived }
       topicLeaderboard { id title slug hostName hostSlug weightedScore l2Score devotionScore heartCount lastHeartAt }
       hostLeaderboard { hostId hostName weightedScore }
       electorActivity {

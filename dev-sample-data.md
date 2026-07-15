@@ -68,7 +68,7 @@ Notes:
 
 Title: Comparative Chat Architecture
 Host: host-jake
-Status: draft
+Status: submitted
 Published date, if published:
 Cover image URL, if any:
 
@@ -82,7 +82,7 @@ _Draft — full body to be written._
 
 Title: Organisers' Needs from WhatsApp
 Host: host-jake
-Status: draft
+Status: submitted
 Published date, if published:
 Cover image URL, if any:
 
@@ -94,7 +94,7 @@ _Draft — body to be written._
 
 Title: Matrix Protocol
 Host: host-jake
-Status: draft
+Status: submitted
 Published date, if published:
 Cover image URL, if any:
 
@@ -108,7 +108,7 @@ _Draft — full body to be written._
 
 Title: Sociocracy
 Host: host-jake
-Status: draft
+Status: submitted
 Published date, if published:
 Cover image URL, if any:
 
@@ -120,7 +120,7 @@ _Draft — body to be written._
 
 Title: Worker Coops
 Host: host-jake
-Status: draft
+Status: submitted
 Published date, if published:
 Cover image URL, if any:
 
@@ -132,7 +132,7 @@ _Draft — body to be written._
 
 Title: Sources of Social Power
 Host: host-jake
-Status: draft
+Status: submitted
 Published date, if published:
 Cover image URL, if any:
 
@@ -144,7 +144,7 @@ _Draft — body to be written._
 
 Title: Maps
 Host: host-jake
-Status: draft
+Status: submitted
 Published date, if published:
 Cover image URL, if any:
 
@@ -156,7 +156,7 @@ _Draft — body to be written._
 
 Title: Land Registry Data in England and Wales
 Host: host-jake
-Status: draft
+Status: submitted
 Published date, if published:
 Cover image URL, if any:
 
@@ -168,7 +168,7 @@ _Draft — body to be written._
 
 Title: Front-end Development
 Host: host-jake
-Status: draft
+Status: submitted
 Published date, if published:
 Cover image URL, if any:
 
@@ -490,7 +490,7 @@ _Submitted — body to be written. (In moderation queue for testing.)_
 
 Title: Elections in the UK
 Host: host-hayley
-Status: draft
+Status: submitted
 Published date, if published:
 Cover image URL, if any:
 
@@ -543,7 +543,7 @@ Body:
 
 Title: The Psychology of Power and Hierarchy
 Host: host-sam
-Status: draft
+Status: submitted
 Published date, if published:
 Cover image URL, if any:
 
@@ -555,7 +555,7 @@ _Draft — body to be written._
 
 Title: Healthy Institutions
 Host: host-sam
-Status: draft
+Status: submitted
 Published date, if published:
 Cover image URL, if any:
 
@@ -567,7 +567,7 @@ _Draft — body to be written._
 
 Title: Healthy Relationships to Work and Institutions
 Host: host-sam
-Status: draft
+Status: submitted
 Published date, if published:
 Cover image URL, if any:
 
@@ -581,7 +581,7 @@ _Draft — full body to be written._
 
 Title: Leadership
 Host: host-sam
-Status: draft
+Status: submitted
 Published date, if published:
 Cover image URL, if any:
 
@@ -593,7 +593,7 @@ _Draft — body to be written._
 
 Title: Models of Group Development
 Host: host-sam
-Status: draft
+Status: submitted
 Published date, if published:
 Cover image URL, if any:
 
@@ -607,7 +607,7 @@ _Draft — full body to be written._
 
 Title: Presentation of Self
 Host: host-sam
-Status: draft
+Status: submitted
 Published date, if published:
 Cover image URL, if any:
 
@@ -844,7 +844,7 @@ Key optional readings:
 
 Title: Artificial Collective Intelligence
 Host: host-zara
-Status: draft
+Status: submitted
 Published date, if published:
 Cover image URL, if any:
 

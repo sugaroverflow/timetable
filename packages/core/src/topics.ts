@@ -57,7 +57,9 @@ export async function createTopic(
       slug,
       bodyMd: input.bodyMd ?? "",
       coverImageUrl: input.coverImageUrl ?? null,
-      status: "draft",
+      // Draft removed (product feedback round 1): new topics are created
+      // "submitted" — immediately publishable by an admin.
+      status: "submitted",
     })
     .returning();
   if (!topic) throw new Error("Failed to create topic");
@@ -143,7 +145,7 @@ export async function reassignTopic(
   return updated ?? null;
 }
 
-/** Host submits a draft for moderation. */
+/** Host submits an unpublished topic (re)back into the moderation queue. */
 export async function submitTopic(
   topic: Topic,
   actorId: string,
@@ -229,18 +231,6 @@ export async function listSubmittedTopics(
     .from(topics)
     .where(
       and(eq(topics.timetableId, timetableId), eq(topics.status, "submitted")),
-    )
-    .orderBy(desc(topics.updatedAt));
-}
-
-/** Every host's drafts — surfaced read-only to admins so forgotten drafts
- * don't go unnoticed (QA #59). */
-export async function listDraftTopics(timetableId: string): Promise<Topic[]> {
-  return db
-    .select()
-    .from(topics)
-    .where(
-      and(eq(topics.timetableId, timetableId), eq(topics.status, "draft")),
     )
     .orderBy(desc(topics.updatedAt));
 }

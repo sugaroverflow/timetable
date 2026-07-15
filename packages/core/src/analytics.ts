@@ -126,7 +126,6 @@ export async function getDashboard(
   } = {},
 ): Promise<DashboardData> {
   const emptyCounts: Record<TopicStatus, number> = {
-    draft: 0,
     submitted: 0,
     published: 0,
     unpublished: 0,

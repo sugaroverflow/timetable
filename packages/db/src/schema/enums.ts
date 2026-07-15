@@ -31,9 +31,10 @@ export const inviteStatusEnum = pgEnum("invite_status", [
   "revoked",
 ]);
 
-/** Topic lifecycle: draft -> submitted -> published / unpublished (or archived). */
+/** Topic lifecycle: submitted -> published / unpublished (or archived).
+ * Draft was removed (product feedback round 1): a host's new topic is
+ * created as "submitted" (immediately publishable by an admin). */
 export const topicStatusEnum = pgEnum("topic_status", [
-  "draft",
   "submitted",
   "published",
   "unpublished",

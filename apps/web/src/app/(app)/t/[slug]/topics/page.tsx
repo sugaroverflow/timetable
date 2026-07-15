@@ -57,10 +57,10 @@ export default async function MyTopicsPage({
       <div className="stack">
         <div className="page-head">
           <h2 className="section-title">My Topics</h2>
-          <p>Draft, submit for review, and unpublish your topics.</p>
+          <p>Create topics for an admin to publish, and unpublish your own.</p>
         </div>
         {data.hostDashboard.length === 0 ? (
-          <div className="notice">No topics yet — create your first draft.</div>
+          <div className="notice">No topics yet — create your first one.</div>
         ) : (
           <ul className="list">
             {data.hostDashboard.map((topic) => (

@@ -38,7 +38,6 @@ import {
   listMembers,
   listMembershipsForUser,
   listSlotComments,
-  listDraftTopics,
   listSubmittedTopics,
   listTimetableHosts,
   logActivity,
@@ -790,23 +789,6 @@ builder.queryType({
       },
     }),
 
-    /** Every host's drafts, read-only (admin only, QA #59 — forgotten
-     * drafts stay visible on Pending Topics). */
-    draftTopics: t.field({
-      type: [ManagedTopicType],
-      args: { idOrSlug: t.arg.string({ required: true }) },
-      resolve: async (_p, args, ctx) => {
-        const readable = await getReadableTimetable(
-          ctx.user?.id ?? null,
-          args.idOrSlug,
-        );
-        if (!readable) return [];
-        const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
-        if (!canModerate(viewer)) return [];
-        return listDraftTopics(readable.timetable.id);
-      },
-    }),
-
     /** Activity timeline (admin only). */
     activityTimeline: t.field({
       type: [ActivityType],
@@ -1130,9 +1112,9 @@ builder.mutationType({
         const { topic, viewer } = await loadTopicAndViewer(ctx, args.topicId);
         const ownerHost = topic.hostId === user.id && isHost(viewer.roles);
         if (!(ownerHost || isAdmin(viewer.roles))) forbidden();
-        if (topic.status !== "draft" && topic.status !== "unpublished") {
+        if (topic.status !== "unpublished") {
           throw new GraphQLError(
-            "Only draft or unpublished topics can be submitted",
+            "Only unpublished topics can be re-submitted",
           );
         }
         const updated = await submitTopic(topic, user.id);
@@ -1933,7 +1915,6 @@ const TopicCountsType = builder
   .objectRef<DashboardData["topicCounts"]>("TopicCounts")
   .implement({
     fields: (t) => ({
-      draft: t.exposeInt("draft"),
       submitted: t.exposeInt("submitted"),
       published: t.exposeInt("published"),
       unpublished: t.exposeInt("unpublished"),

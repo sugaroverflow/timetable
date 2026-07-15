@@ -34,7 +34,7 @@ export function CreateTopicForm({ slug }: { slug: string }) {
       setTitle("");
       setBody("");
       setCover("");
-      toast("Draft created");
+      toast("Topic created");
       startTransition(() => router.refresh());
     } catch (err) {
       toastError(err instanceof Error ? err.message : "Could not create topic");
@@ -75,7 +75,7 @@ export function CreateTopicForm({ slug }: { slug: string }) {
         type="submit"
         disabled={pending || uploadingCover}
       >
-        {uploadingCover ? "Uploading…" : pending ? "Creating…" : "Create draft"}
+        {uploadingCover ? "Uploading…" : pending ? "Creating…" : "Create topic"}
       </button>
     </form>
   );
