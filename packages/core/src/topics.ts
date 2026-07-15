@@ -10,7 +10,11 @@ import {
   type Topic,
   type TopicStatus,
 } from "@timetable/db";
-import { computeElectorWeights, topicWeightedScore } from "@timetable/shared";
+import {
+  computeElectorHeartCounts,
+  computeElectorWeights,
+  topicNormScores,
+} from "@timetable/shared";
 
 import { logActivity } from "./activity";
 import { coerceDate } from "./dates";
@@ -298,7 +302,20 @@ export async function countViewerPublishedHearts(
   return row?.n ?? 0;
 }
 
-export type FeedSort = "hearts" | "comments" | "recent" | "random";
+/**
+ * Feed ranking. The four normalisations (raw/l2/l1/devotion) mirror the
+ * dashboard "Analysis" switcher; "hearts" is kept as a backward-compatible
+ * alias for "l1" (the original weighted score). See {@link topicNormScores}.
+ */
+export type FeedSort =
+  | "hearts"
+  | "raw"
+  | "l2"
+  | "l1"
+  | "devotion"
+  | "comments"
+  | "recent"
+  | "random";
 
 export type FeedTopic = {
   id: string;
@@ -316,7 +333,12 @@ export type FeedTopic = {
   contentUpdatedAt: Date | null;
   createdAt: Date;
   heartCount: number;
+  /** L1 norm (Σ 1/total). Kept named weightedScore for back-compat. */
   weightedScore: number;
+  /** L2 norm (Σ 1/√total). */
+  l2Score: number;
+  /** Average devotion (L1/L∞): weightedScore / heartCount. */
+  devotionScore: number;
   viewerHasHearted: boolean;
   commentCount: number;
   latestCommentAt: Date | null;
@@ -379,7 +401,7 @@ export async function buildFeed(
     .innerJoin(topics, eq(topics.id, hearts.topicId))
     .where(and(...heartConds));
 
-  const weights = computeElectorWeights(heartRows, publishedIdSet);
+  const heartCounts = computeElectorHeartCounts(heartRows, publishedIdSet);
 
   const heartsByTopic = new Map<string, string[]>();
   for (const h of heartRows) {
@@ -442,6 +464,7 @@ export async function buildFeed(
     const topicHearts = (heartsByTopic.get(topic.id) ?? []).map(
       (electorId) => ({ topicId: topic.id, electorId }),
     );
+    const norms = topicNormScores(topicHearts, heartCounts);
     return {
       id: topic.id,
       timetableId: topic.timetableId,
@@ -457,8 +480,10 @@ export async function buildFeed(
       publishedAt: topic.publishedAt,
       contentUpdatedAt: topic.contentUpdatedAt,
       createdAt: topic.createdAt,
-      heartCount: topicHearts.length,
-      weightedScore: topicWeightedScore(topicHearts, weights),
+      heartCount: norms.raw,
+      weightedScore: norms.l1,
+      l2Score: norms.l2,
+      devotionScore: norms.devotion,
       viewerHasHearted: viewerUserId
         ? topicHearts.some((h) => h.electorId === viewerUserId)
         : false,
@@ -480,6 +505,19 @@ export async function buildFeed(
       t.publishedAt?.getTime() ?? t.createdAt.getTime(),
       t.contentUpdatedAt?.getTime() ?? 0,
     );
+  // Score used by the normalisation sorts ("hearts" is a legacy alias for L1).
+  const normScore = (t: FeedTopic): number => {
+    switch (sort) {
+      case "raw":
+        return t.heartCount;
+      case "l2":
+        return t.l2Score;
+      case "devotion":
+        return t.devotionScore;
+      default:
+        return t.weightedScore; // "l1" and legacy "hearts"
+    }
+  };
   visibleFeed.sort((a, b) => {
     if (sort === "comments") {
       const at = a.latestCommentAt?.getTime() ?? 0;
@@ -493,7 +531,9 @@ export async function buildFeed(
     if (sort === "random") {
       return seededRank(seed, a.id) - seededRank(seed, b.id);
     }
-    return b.weightedScore - a.weightedScore;
+    const diff = normScore(b) - normScore(a);
+    // Stable tie-break so equal scores don't jitter between requests.
+    return diff !== 0 ? diff : recency(b) - recency(a);
   });
 
   const offset = Math.max(0, opts.offset ?? 0);

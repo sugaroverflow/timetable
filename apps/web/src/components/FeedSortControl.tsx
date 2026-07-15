@@ -2,6 +2,8 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
+import { NORM_MODES } from "@/lib/normModes";
+
 export function FeedSortControl({ value }: { value: string }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -27,10 +29,16 @@ export function FeedSortControl({ value }: { value: string }) {
       value={value}
       onChange={(e) => change(e.target.value)}
     >
-      <option value="hearts">Most hearts</option>
+      <option value="random">Random</option>
+      <optgroup label="By hearts">
+        {NORM_MODES.map((mode) => (
+          <option key={mode.key} value={mode.key} title={mode.description}>
+            {mode.symbol} — {mode.label}
+          </option>
+        ))}
+      </optgroup>
       <option value="comments">Latest comments</option>
       <option value="recent">Newest</option>
-      <option value="random">Random</option>
     </select>
   );
 }

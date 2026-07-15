@@ -11,10 +11,22 @@ import {
 
 export const FEED_PAGE_SIZE = 20;
 
-const SORTS = new Set(["hearts", "comments", "recent", "random"]);
+const SORTS = new Set([
+  "raw",
+  "l2",
+  "l1",
+  "devotion",
+  "comments",
+  "recent",
+  "random",
+]);
 
+/** Default feed sort is Random (product feedback round 1). "hearts" is a
+ * legacy alias for the L1 weighted score. */
 export function normalizeFeedSort(sort: string | undefined): string {
-  return sort && SORTS.has(sort) ? sort : "hearts";
+  if (!sort) return "random";
+  if (sort === "hearts") return "l1";
+  return SORTS.has(sort) ? sort : "random";
 }
 
 type Data = {

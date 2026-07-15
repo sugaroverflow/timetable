@@ -53,7 +53,11 @@ export default async function FeedPage({
   const sort = normalizeFeedSort(sortParam);
   const host = hostParam ?? "";
   const hearted = heartedParam === "me";
-  const seed = seedParam ?? "";
+  // Random is the default sort, so a first visit has no seed in the URL —
+  // mint a fresh one server-side so the shuffle is genuinely random per visit
+  // yet stable across this render's infinite-scroll pages.
+  const seed =
+    seedParam ?? (sort === "random" ? Math.random().toString(36).slice(2, 10) : "");
 
   const page = await fetchFeedPage(slug, sort, host, 0, hearted, seed);
   const hostLabel = roleLabel(page.settings.roleLabels, "host");

@@ -881,6 +881,46 @@ textarea {
   white-space: nowrap;
 }
 
+/* Sortable table headers (Analysis) */
+.th-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  font-weight: var(--fw-bold);
+  text-transform: inherit;
+}
+.th-sort:hover {
+  color: var(--ink);
+}
+.th-sort-active {
+  color: var(--primary);
+}
+.th-sort-arrow {
+  font-size: 10px;
+}
+
+/* "Show ❤️s" expansion rows in the elector-activity table */
+.elector-hearts-row td {
+  background: var(--bg);
+}
+.elector-hearts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.elector-hearts-group ul {
+  margin: 2px 0 0;
+  padding-left: 16px;
+  font-size: var(--text-sm);
+}
+
 /* Heart button */
 .heart-btn {
   display: inline-flex;
