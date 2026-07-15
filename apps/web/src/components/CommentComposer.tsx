@@ -1,5 +1,6 @@
 "use client";
 
+import { Send } from "lucide-react";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
@@ -59,8 +60,14 @@ export function CommentComposer({
         aria-label={scopeLabel ? `${scopeLabel} comment` : "Comment"}
         data-topic-composer={scopeLabel ? undefined : topicId}
       />
-      <button className="btn btn-primary" type="submit" disabled={pending}>
-        Post
+      <button
+        className="btn btn-primary btn-send"
+        type="submit"
+        disabled={pending}
+        aria-label={scopeLabel ? `Post ${scopeLabel} note` : "Post comment"}
+        title="Post"
+      >
+        <Send size={16} aria-hidden />
       </button>
     </form>
   );
