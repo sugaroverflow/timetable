@@ -118,12 +118,16 @@ export default async function TimetableLayout({
         ? gqlFetch<{ notificationsUnread: number }>(UNREAD_QUERY, { s: slug })
         : Promise.resolve({ notificationsUnread: 0 }),
     ]);
-    switcherItems = mine.myTimetables.map((m) => ({
-      slug: m.timetable.slug,
-      name: m.timetable.name,
-      privacy: m.timetable.privacy,
-      iconUrl: parseTimetableSettings(m.timetable.settings).iconUrl ?? null,
-    }));
+    switcherItems = mine.myTimetables.map((m) => {
+      const s = parseTimetableSettings(m.timetable.settings);
+      return {
+        slug: m.timetable.slug,
+        name: m.timetable.name,
+        privacy: m.timetable.privacy,
+        iconUrl: s.iconUrl ?? null,
+        iconEmoji: s.iconEmoji ?? null,
+      };
+    });
     unread = unreadData.notificationsUnread;
   }
 
@@ -153,7 +157,7 @@ export default async function TimetableLayout({
           </div>
 
           <nav className="nav side-nav">
-            <NavLink href={`${base}/feed`}>Topic feed</NavLink>
+            <NavLink href={`${base}/feed`}>Topic Feed</NavLink>
             {(isHost(roles) || isAdmin(roles)) && (
               <NavLink href={`${base}/topics`}>My Topics</NavLink>
             )}
@@ -175,13 +179,13 @@ export default async function TimetableLayout({
             )}
             {isAuthed && <NavLink href={`${base}/profile`}>Profile</NavLink>}
             {(isHost(roles) || isAdmin(roles)) && (
-              <NavLink href={`${base}/dashboard`}>Dashboard</NavLink>
+              <NavLink href={`${base}/dashboard`}>Analysis</NavLink>
             )}
             {isAdmin(roles) && (
               <NavLink href={`${base}/moderation`}>Pending Topics</NavLink>
             )}
             {isAdmin(roles) && (
-              <NavLink href={`${base}/activity`}>Activity</NavLink>
+              <NavLink href={`${base}/activity`}>Activity Log</NavLink>
             )}
             {isAdmin(roles) && (
               <NavLink href={`${base}/settings`}>Settings</NavLink>

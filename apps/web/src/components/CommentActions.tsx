@@ -1,5 +1,6 @@
 "use client";
 
+import { Send } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -90,8 +91,14 @@ export function CommentActions({
             placeholder="Write a reply…"
             aria-label="Reply"
           />
-          <button className="btn" type="submit" disabled={pending}>
-            Reply
+          <button
+            className="btn btn-primary btn-send"
+            type="submit"
+            disabled={pending}
+            aria-label="Post reply"
+            title="Reply"
+          >
+            <Send size={16} aria-hidden />
           </button>
         </form>
       ) : null}

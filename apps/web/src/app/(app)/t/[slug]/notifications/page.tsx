@@ -9,7 +9,7 @@ import { topicPath } from "@/lib/topicPath";
 
 type Notification = {
   commentId: string;
-  kind: "reply" | "comment";
+  kind: "reply" | "comment" | "mention";
   authorId: string;
   authorName: string | null;
   body: string;
@@ -89,7 +89,9 @@ export default async function NotificationsPage({
                       <b>{n.authorName ?? "Someone"}</b>{" "}
                       {n.kind === "reply"
                         ? "replied to your comment on"
-                        : "commented on"}{" "}
+                        : n.kind === "mention"
+                          ? "mentioned you on"
+                          : "commented on"}{" "}
                       {href ? (
                         <Link href={href}>{n.topicTitle}</Link>
                       ) : (

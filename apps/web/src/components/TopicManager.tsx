@@ -95,7 +95,7 @@ export function TopicManager({
         />
       ) : null}
       {topic.status === "published" ? (
-        <CommentComposer topicId={topic.id} />
+        <CommentComposer topicId={topic.id} mentionSlug={slug} />
       ) : null}
 
       {hostComments.length > 0 ? (
@@ -128,7 +128,7 @@ export function TopicManager({
           className="row wrap divider-top"
           style={{ paddingTop: 10 }}
         >
-          {(topic.status === "draft" || topic.status === "unpublished") && (
+          {topic.status === "unpublished" && (
             <button
               className="btn btn-primary"
               type="button"

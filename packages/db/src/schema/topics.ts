@@ -34,7 +34,7 @@ export const topics = pgTable(
     slug: text(),
     bodyMd: text().notNull().default(""),
     coverImageUrl: text(),
-    status: topicStatusEnum().notNull().default("draft"),
+    status: topicStatusEnum().notNull().default("submitted"),
     publishedAt: timestamp({ withTimezone: true }),
     // Bumped only by host/admin edits to title/body/cover — never by status
     // churn. Drives "newest" sorting and the new-since-last-visit highlight
@@ -91,6 +91,27 @@ export const comments = pgTable(
   (t) => [
     index("comments_topic_idx").on(t.topicId),
     index("comments_parent_idx").on(t.parentId),
+  ],
+);
+
+/** @mentions in a comment (product feedback round 1): one row per mentioned
+ * member. Populated on insert for public comments; drives mention
+ * notifications. */
+export const commentMentions = pgTable(
+  "comment_mentions",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    commentId: uuid()
+      .notNull()
+      .references(() => comments.id, { onDelete: "cascade" }),
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("comment_mentions_comment_user_uq").on(t.commentId, t.userId),
+    index("comment_mentions_user_idx").on(t.userId),
   ],
 );
 

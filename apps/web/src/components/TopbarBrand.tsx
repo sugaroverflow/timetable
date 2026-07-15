@@ -12,6 +12,7 @@ export type BrandItem = {
   slug: string;
   name: string;
   iconUrl: string | null;
+  iconEmoji?: string | null;
 };
 
 const PUBLIC_BRAND_QUERY = `
@@ -51,11 +52,12 @@ export function TopbarBrand({
     )
       .then((data) => {
         if (cancelled || !data.timetable) return;
+        const parsed = parseTimetableSettings(data.timetable.settings);
         setFetched({
           slug: currentSlug,
           name: data.timetable.name,
-          iconUrl:
-            parseTimetableSettings(data.timetable.settings).iconUrl ?? null,
+          iconUrl: parsed.iconUrl ?? null,
+          iconEmoji: parsed.iconEmoji ?? null,
         });
       })
       .catch(() => {
@@ -69,7 +71,11 @@ export function TopbarBrand({
   if (current) {
     return (
       <Link className="brand" href={`/t/${current.slug}/feed`}>
-        {current.iconUrl ? (
+        {current.iconEmoji ? (
+          <span className="tt-menu-icon tt-menu-icon-emoji" aria-hidden>
+            {current.iconEmoji}
+          </span>
+        ) : current.iconUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img className="tt-menu-icon" src={current.iconUrl} alt="" />
         ) : (

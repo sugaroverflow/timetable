@@ -104,7 +104,6 @@ export default async function PeoplePage({
     <div className="stack">
       <div className="page-head">
         <h2 className="section-title">People</h2>
-        <p>Everyone in this timetable.</p>
       </div>
       {data.timetablePeople.length === 0 ? (
         <EmptyState
@@ -121,12 +120,24 @@ export default async function PeoplePage({
               <ul className="list">
                 {section.people.map((person) => {
                   const member = membersByUser.get(person.userId);
+                  const hasTopics = person.publishedTopics.length > 0;
+                  const canPreview = canEdit && person.userId !== data.me?.id;
+                  const canManage = canEdit && member != null;
                   return (
                     <li key={person.userId} className="card stack">
                       <div className="row" style={{ alignItems: "center" }}>
                         <Avatar name={person.name} large />
                         <div>
-                          <strong>{person.name ?? "Member"}</strong>
+                          {hasTopics ? (
+                            <Link
+                              className="person-name-link"
+                              href={`/t/${slug}/feed?host=${person.userId}`}
+                            >
+                              <strong>{person.name ?? "Member"}</strong>
+                            </Link>
+                          ) : (
+                            <strong>{person.name ?? "Member"}</strong>
+                          )}
                           <div style={{ marginTop: 4 }}>
                             <RolePills
                               roles={person.roles}
@@ -134,33 +145,6 @@ export default async function PeoplePage({
                             />
                           </div>
                         </div>
-                        <span style={{ flex: 1 }} />
-                        {person.publishedTopics.length > 0 ? (
-                          <Link
-                            className="btn btn-ghost"
-                            href={`/t/${slug}/feed?host=${person.userId}`}
-                          >
-                            View topics →
-                          </Link>
-                        ) : null}
-                        {canEdit && person.userId !== data.me?.id ? (
-                          <UserPreviewStart
-                            slug={slug}
-                            userId={person.userId}
-                            name={person.name}
-                          />
-                        ) : null}
-                        {canEdit && member ? (
-                          <PersonAdminPanel
-                            membershipId={member.membershipId}
-                            userId={person.userId}
-                            slug={slug}
-                            name={member.name}
-                            email={member.email}
-                            roles={member.roles}
-                            roleLabels={settings.roleLabels}
-                          />
-                        ) : null}
                       </div>
                       {person.bioHtml ? (
                         <div
@@ -191,6 +175,32 @@ export default async function PeoplePage({
                               );
                             })}
                           </ul>
+                        </div>
+                      ) : null}
+                      {canPreview || canManage ? (
+                        <div
+                          className="row people-card-actions"
+                          style={{ alignItems: "center" }}
+                        >
+                          <span style={{ flex: 1 }} />
+                          {canPreview ? (
+                            <UserPreviewStart
+                              slug={slug}
+                              userId={person.userId}
+                              name={person.name}
+                            />
+                          ) : null}
+                          {canManage ? (
+                            <PersonAdminPanel
+                              membershipId={member!.membershipId}
+                              userId={person.userId}
+                              slug={slug}
+                              name={member!.name}
+                              email={member!.email}
+                              roles={member!.roles}
+                              roleLabels={settings.roleLabels}
+                            />
+                          ) : null}
                         </div>
                       ) : null}
                     </li>

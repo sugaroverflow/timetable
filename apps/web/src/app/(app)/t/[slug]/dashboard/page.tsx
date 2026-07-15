@@ -1,12 +1,13 @@
-import { Heart, TriangleAlert } from "lucide-react";
+import { TriangleAlert } from "lucide-react";
 import Link from "next/link";
 
 import { isAdmin, isHost, type Role } from "@timetable/shared";
 
 import { DashboardActivityFilter } from "@/components/DashboardActivityFilter";
-import { DashboardBreakdownToggle } from "@/components/DashboardBreakdownToggle";
 import { DashboardSinceFilter } from "@/components/DashboardSinceFilter";
+import { ElectorActivityTable } from "@/components/ElectorActivityTable";
 import { HostFilter } from "@/components/HostFilter";
+import { TopicLeaderboard } from "@/components/TopicLeaderboard";
 import { gqlFetch } from "@/lib/graphql";
 import { displayRolesFromCookies } from "@/lib/previewRoles.server";
 import {
@@ -14,7 +15,6 @@ import {
   pluralLabel,
   roleLabel,
 } from "@/lib/timetableSettings";
-import { topicPath } from "@/lib/topicPath";
 
 const ACTIVITY_FILTERS = new Set([
   "all",
@@ -31,7 +31,6 @@ type Dashboard = {
   hostCount: number;
   slotCount: number;
   topicCounts: {
-    draft: number;
     submitted: number;
     published: number;
     unpublished: number;
@@ -44,6 +43,8 @@ type Dashboard = {
     hostName: string | null;
     hostSlug: string | null;
     weightedScore: number;
+    l2Score: number;
+    devotionScore: number;
     heartCount: number;
     lastHeartAt: string | null;
   }[];
@@ -59,6 +60,14 @@ type Dashboard = {
     commentCount: number;
     availabilityCount: number;
     latestActivityAt: string | null;
+    heartedTopics: {
+      topicId: string;
+      title: string;
+      slug: string | null;
+      hostId: string;
+      hostName: string | null;
+      hostSlug: string | null;
+    }[];
   }[];
   conflicts: {
     slotId: string;
@@ -84,12 +93,13 @@ const QUERY = `
     timetableHosts(idOrSlug: $s) { id name }
     dashboard(idOrSlug: $s, hostId: $host, electorActivity: $activity, activitySince: $since) {
       totalHearts electorCount hostCount slotCount
-      topicCounts { draft submitted published unpublished archived }
-      topicLeaderboard { id title slug hostName hostSlug weightedScore heartCount lastHeartAt }
+      topicCounts { submitted published unpublished archived }
+      topicLeaderboard { id title slug hostName hostSlug weightedScore l2Score devotionScore heartCount lastHeartAt }
       hostLeaderboard { hostId hostName weightedScore }
       electorActivity {
         electorId electorName heartCount commentCount availabilityCount
         latestActivityAt
+        heartedTopics { topicId title slug hostId hostName hostSlug }
       }
       conflicts { slotId location startsAt topics { id title } }
     }
@@ -154,7 +164,7 @@ export default async function DashboardPage({
   return (
     <div className="stack">
       <div className="page-head">
-        <h2 className="section-title">Dashboard</h2>
+        <h2 className="section-title">Analysis</h2>
         <p>Activity and standings across this timetable.</p>
       </div>
 
@@ -194,40 +204,11 @@ export default async function DashboardPage({
       ) : null}
 
       <div className="grid grid-2">
-        <div className="card">
-          <h3 style={{ marginTop: 0, fontSize: 15 }}>All topics by weighted votes</h3>
-          {d.topicLeaderboard.length === 0 ? (
-            <p className="faint" style={{ fontSize: 13 }}>
-              No published topics yet.
-            </p>
-          ) : (
-            <ul className="list">
-              {d.topicLeaderboard.map((t) => (
-                <li key={t.id} style={{ fontSize: 14 }}>
-                  <div className="row" style={{ justifyContent: "space-between" }}>
-                    <span>
-                      {(() => {
-                        const href = topicPath(slug, t.hostSlug, t.slug);
-                        return href ? <Link href={href}>{t.title}</Link> : t.title;
-                      })()}{" "}
-                      <span className="faint">· {t.hostName ?? hostLabel}</span>
-                    </span>
-                    <span className="mono" style={{ textAlign: "right" }}>
-                      {t.weightedScore.toFixed(2)}
-                      {t.lastHeartAt ? (
-                        <span className="faint" style={{ display: "block", fontSize: 11 }}>
-                          last <Heart size={14} fill="currentColor" aria-hidden />{" "}
-                          {new Date(t.lastHeartAt).toLocaleDateString()}
-                        </span>
-                      ) : null}
-                    </span>
-                  </div>
-                  <DashboardBreakdownToggle slug={slug} topicId={t.id} />
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        <TopicLeaderboard
+          slug={slug}
+          hostLabel={hostLabel}
+          entries={d.topicLeaderboard}
+        />
 
         {viewerIsAdmin ? (
         <div className="card">
@@ -275,38 +256,11 @@ export default async function DashboardPage({
             No electors match this filter.
           </p>
         ) : (
-          <div className="table-wrap">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>{electorLabel}</th>
-                  <th>Hearts</th>
-                  <th>Comments</th>
-                  <th>Availability</th>
-                  <th>Last activity</th>
-                </tr>
-              </thead>
-              <tbody>
-                {d.electorActivity.map((elector) => (
-                  <tr key={elector.electorId}>
-                    <td>
-                      <strong>{elector.electorName ?? "Elector"}</strong>
-                    </td>
-                    <td className="mono">{elector.heartCount}</td>
-                    <td className="mono">{elector.commentCount}</td>
-                    <td className="mono">{elector.availabilityCount}</td>
-                    <td>
-                      {elector.latestActivityAt ? (
-                        new Date(elector.latestActivityAt).toLocaleString()
-                      ) : (
-                        <span className="faint">None</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ElectorActivityTable
+            slug={slug}
+            electorLabel={electorLabel}
+            rows={d.electorActivity}
+          />
         )}
       </div>
 

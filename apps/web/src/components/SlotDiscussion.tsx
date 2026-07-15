@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Collapsible } from "@base-ui/react/collapsible";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Send } from "lucide-react";
 
 import { useToast } from "@/components/Toast";
 import { clientGql } from "@/lib/clientGraphql";
@@ -100,16 +100,25 @@ export function SlotDiscussion({
           {canPost ? (
             <div className="hc" style={{ alignItems: "flex-start" }}>
               <Avatar name={null} small />
-              <form onSubmit={add} style={{ flex: 1, display: "flex", gap: 8 }}>
+              <form
+                onSubmit={add}
+                style={{ flex: 1, display: "flex", gap: 8, alignItems: "flex-start" }}
+              >
                 <textarea
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
                   placeholder="Add to the discussion…"
                   aria-label="Slot message"
-                  style={{ flex: 1, minHeight: 36 }}
+                  style={{ flex: 1, minHeight: 38 }}
                 />
-                <button className="btn btn-sm btn-primary" type="submit" disabled={pending}>
-                  Send
+                <button
+                  className="btn btn-primary btn-send"
+                  type="submit"
+                  disabled={pending}
+                  aria-label="Send message"
+                  title="Send"
+                >
+                  <Send size={16} aria-hidden />
                 </button>
               </form>
             </div>

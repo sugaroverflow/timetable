@@ -34,11 +34,15 @@ export default async function AppLayout({
   let brandItems: BrandItem[] = [];
   if (userId) {
     const data = await gqlFetch<MenuData>(MENU_QUERY);
-    brandItems = data.myTimetables.map((m) => ({
-      slug: m.timetable.slug,
-      name: m.timetable.name,
-      iconUrl: parseTimetableSettings(m.timetable.settings).iconUrl ?? null,
-    }));
+    brandItems = data.myTimetables.map((m) => {
+      const s = parseTimetableSettings(m.timetable.settings);
+      return {
+        slug: m.timetable.slug,
+        name: m.timetable.name,
+        iconUrl: s.iconUrl ?? null,
+        iconEmoji: s.iconEmoji ?? null,
+      };
+    });
   }
 
   return (

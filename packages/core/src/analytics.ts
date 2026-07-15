@@ -41,6 +41,8 @@ export type DashboardData = {
     hostName: string | null;
     hostSlug: string | null;
     weightedScore: number;
+    l2Score: number;
+    devotionScore: number;
     heartCount: number;
     lastHeartAt: Date | null;
   }[];
@@ -56,6 +58,15 @@ export type DashboardData = {
     commentCount: number;
     availabilityCount: number;
     latestActivityAt: Date | null;
+    /** Topics this elector hearted (grouped by host in the UI). */
+    heartedTopics: {
+      topicId: string;
+      title: string;
+      slug: string | null;
+      hostId: string;
+      hostName: string | null;
+      hostSlug: string | null;
+    }[];
   }[];
   unallocatedTopics: {
     id: string;
@@ -115,7 +126,6 @@ export async function getDashboard(
   } = {},
 ): Promise<DashboardData> {
   const emptyCounts: Record<TopicStatus, number> = {
-    draft: 0,
     submitted: 0,
     published: 0,
     unpublished: 0,
@@ -169,6 +179,8 @@ export async function getDashboard(
     hostName: t.hostName,
     hostSlug: t.hostSlug,
     weightedScore: t.weightedScore,
+    l2Score: t.l2Score,
+    devotionScore: t.devotionScore,
     heartCount: t.heartCount,
     lastHeartAt: null as Date | null,
   }));
@@ -233,6 +245,39 @@ export async function getDashboard(
   );
   for (const t of topicLeaderboard) {
     t.lastHeartAt = lastHeartByTopic.get(t.id) ?? null;
+  }
+
+  // Per-elector hearted topics for the "Show ❤️s" toggle — same cutoff/filter
+  // as the heart counts, joined to the host so the UI can group by host.
+  const heartedTopicRows = await db
+    .select({
+      electorId: hearts.userId,
+      topicId: topics.id,
+      title: topics.title,
+      slug: topics.slug,
+      hostId: topics.hostId,
+      hostName: users.name,
+      hostSlug: users.slug,
+    })
+    .from(hearts)
+    .innerJoin(topics, eq(topics.id, hearts.topicId))
+    .innerJoin(users, eq(users.id, topics.hostId))
+    .where(and(...heartCountConds));
+  const heartedTopicsByElector = new Map<
+    string,
+    DashboardData["electorActivity"][number]["heartedTopics"]
+  >();
+  for (const r of heartedTopicRows) {
+    const list = heartedTopicsByElector.get(r.electorId) ?? [];
+    list.push({
+      topicId: r.topicId,
+      title: r.title,
+      slug: r.slug,
+      hostId: r.hostId,
+      hostName: r.hostName,
+      hostSlug: r.hostSlug,
+    });
+    heartedTopicsByElector.set(r.electorId, list);
   }
 
   const commentRows = await db
@@ -312,6 +357,7 @@ export async function getDashboard(
           commentStat?.latestAt,
           availabilityStat?.latestAt,
         ),
+        heartedTopics: heartedTopicsByElector.get(elector.userId) ?? [],
       };
     })
     .filter((row) => matchesActivityFilter(row, activityFilter))

@@ -7,6 +7,7 @@ import {
   addSlotComment,
   buildCalendar,
   buildFeed,
+  type FeedSort,
   claimInvitesForUser,
   countViewerPublishedHearts,
   createSlots,
@@ -37,7 +38,6 @@ import {
   listMembers,
   listMembershipsForUser,
   listSlotComments,
-  listDraftTopics,
   listSubmittedTopics,
   listTimetableHosts,
   logActivity,
@@ -91,6 +91,7 @@ import {
   isAdmin,
   isElector,
   isHost,
+  PRIVACY_LEVELS,
   type Privacy,
   type Role as SharedRole,
 } from "@timetable/shared";
@@ -371,10 +372,19 @@ const TopicType = builder.objectRef<GqlTopic>("Topic").implement({
       resolve: (tp) => tp.contentUpdatedAt?.toISOString() ?? null,
     }),
     createdAt: t.string({ resolve: (tp) => tp.createdAt.toISOString() }),
-    // Weighted score is host/admin-only.
+    // Weighted score is host/admin-only. weightedScore is the L1 norm; the
+    // L2 and average-devotion norms power the Analysis switcher + feed sorts.
     weightedScore: t.float({
       nullable: true,
       resolve: (tp) => (tp.canSeeHostOnly ? tp.weightedScore : null),
+    }),
+    l2Score: t.float({
+      nullable: true,
+      resolve: (tp) => (tp.canSeeHostOnly ? tp.l2Score : null),
+    }),
+    devotionScore: t.float({
+      nullable: true,
+      resolve: (tp) => (tp.canSeeHostOnly ? tp.devotionScore : null),
     }),
     // Per-elector breakdown, host/admin-only.
     weightedBreakdown: t.field({
@@ -715,10 +725,21 @@ builder.queryType({
           readable.timetable.privacy as Privacy,
           viewer,
         );
-        const validSorts = new Set(["hearts", "comments", "recent", "random"]);
+        const validSorts = new Set<FeedSort>([
+          "hearts",
+          "raw",
+          "l2",
+          "l1",
+          "devotion",
+          "comments",
+          "recent",
+          "random",
+        ]);
         const sort = (
-          args.sort && validSorts.has(args.sort) ? args.sort : "hearts"
-        ) as "hearts" | "comments" | "recent" | "random";
+          args.sort && validSorts.has(args.sort as FeedSort)
+            ? args.sort
+            : "hearts"
+        ) as FeedSort;
         const feed = await buildFeed(
           readable.timetable.id,
           ctx.user?.id ?? null,
@@ -765,23 +786,6 @@ builder.queryType({
         const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
         if (!canModerate(viewer)) return [];
         return listSubmittedTopics(readable.timetable.id);
-      },
-    }),
-
-    /** Every host's drafts, read-only (admin only, QA #59 — forgotten
-     * drafts stay visible on Pending Topics). */
-    draftTopics: t.field({
-      type: [ManagedTopicType],
-      args: { idOrSlug: t.arg.string({ required: true }) },
-      resolve: async (_p, args, ctx) => {
-        const readable = await getReadableTimetable(
-          ctx.user?.id ?? null,
-          args.idOrSlug,
-        );
-        if (!readable) return [];
-        const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
-        if (!canModerate(viewer)) return [];
-        return listDraftTopics(readable.timetable.id);
       },
     }),
 
@@ -883,6 +887,8 @@ builder.queryType({
           createdAt: topic.createdAt,
           heartCount: 0,
           weightedScore: 0,
+          l2Score: 0,
+          devotionScore: 0,
           viewerHasHearted: false,
           commentCount: 0,
           latestCommentAt: null,
@@ -1106,9 +1112,9 @@ builder.mutationType({
         const { topic, viewer } = await loadTopicAndViewer(ctx, args.topicId);
         const ownerHost = topic.hostId === user.id && isHost(viewer.roles);
         if (!(ownerHost || isAdmin(viewer.roles))) forbidden();
-        if (topic.status !== "draft" && topic.status !== "unpublished") {
+        if (topic.status !== "unpublished") {
           throw new GraphQLError(
-            "Only draft or unpublished topics can be submitted",
+            "Only unpublished topics can be re-submitted",
           );
         }
         const updated = await submitTopic(topic, user.id);
@@ -1369,16 +1375,12 @@ builder.mutationType({
         const viewer = { userId: user.id, roles: readable.roles };
         if (!canEditSettings(viewer)) forbidden("Admins only");
 
-        let privacy: "public" | "private" | "deactivated" | undefined;
+        let privacy: Privacy | undefined;
         if (args.privacy != null) {
-          if (
-            args.privacy !== "public" &&
-            args.privacy !== "private" &&
-            args.privacy !== "deactivated"
-          ) {
+          if (!(PRIVACY_LEVELS as readonly string[]).includes(args.privacy)) {
             throw new GraphQLError("Invalid privacy value");
           }
-          privacy = args.privacy;
+          privacy = args.privacy as Privacy;
         }
 
         const updated = await updateTimetableProfile(readable.timetable.id, {
@@ -1471,6 +1473,7 @@ builder.mutationType({
         themeJson: t.arg.string({ required: false }),
         coverImageUrl: t.arg.string({ required: false }),
         iconUrl: t.arg.string({ required: false }),
+        iconEmoji: t.arg.string({ required: false }),
         digestNewTopics: t.arg.boolean({ required: false }),
         digestReplies: t.arg.boolean({ required: false }),
         digestActivity: t.arg.boolean({ required: false }),
@@ -1530,6 +1533,11 @@ builder.mutationType({
 
         if (args.iconUrl != null) {
           patch.iconUrl = args.iconUrl.trim() || null;
+        }
+
+        // A short emoji sequence (capped to guard against arbitrary payloads).
+        if (args.iconEmoji != null) {
+          patch.iconEmoji = args.iconEmoji.trim().slice(0, 24) || null;
         }
 
         if (
@@ -1907,7 +1915,6 @@ const TopicCountsType = builder
   .objectRef<DashboardData["topicCounts"]>("TopicCounts")
   .implement({
     fields: (t) => ({
-      draft: t.exposeInt("draft"),
       submitted: t.exposeInt("submitted"),
       published: t.exposeInt("published"),
       unpublished: t.exposeInt("unpublished"),
@@ -1925,6 +1932,8 @@ const TopicLeaderboardEntryType = builder
       hostName: t.exposeString("hostName", { nullable: true }),
       hostSlug: t.exposeString("hostSlug", { nullable: true }),
       weightedScore: t.exposeFloat("weightedScore"),
+      l2Score: t.exposeFloat("l2Score"),
+      devotionScore: t.exposeFloat("devotionScore"),
       heartCount: t.exposeInt("heartCount"),
       lastHeartAt: t.string({
         nullable: true,
@@ -1965,6 +1974,21 @@ const ConflictSlotType = builder
     }),
   });
 
+const ElectorHeartedTopicType = builder
+  .objectRef<
+    DashboardData["electorActivity"][number]["heartedTopics"][number]
+  >("ElectorHeartedTopic")
+  .implement({
+    fields: (t) => ({
+      topicId: t.exposeID("topicId"),
+      title: t.exposeString("title"),
+      slug: t.exposeString("slug", { nullable: true }),
+      hostId: t.exposeID("hostId"),
+      hostName: t.exposeString("hostName", { nullable: true }),
+      hostSlug: t.exposeString("hostSlug", { nullable: true }),
+    }),
+  });
+
 const ElectorActivityType = builder
   .objectRef<DashboardData["electorActivity"][number]>("ElectorActivity")
   .implement({
@@ -1977,6 +2001,10 @@ const ElectorActivityType = builder
       latestActivityAt: t.string({
         nullable: true,
         resolve: (activity) => activity.latestActivityAt?.toISOString() ?? null,
+      }),
+      heartedTopics: t.field({
+        type: [ElectorHeartedTopicType],
+        resolve: (activity) => activity.heartedTopics,
       }),
     }),
   });
