@@ -1,8 +1,12 @@
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 
+import { parseMentionHandles } from "@timetable/shared";
+
 import {
+  commentMentions,
   comments,
   db,
+  timetableMemberships,
   topics,
   users,
   type Comment,
@@ -10,6 +14,44 @@ import {
 } from "@timetable/db";
 
 import { logActivity } from "./activity";
+
+/**
+ * Record @mentions for a public comment (product feedback round 1). Handles
+ * are resolved against the timetable's members by slug; the author can't
+ * mention themselves. Restricted to public comments so a mention can never
+ * leak a host-only/admin-only comment body to a non-privileged member. */
+async function recordMentions(comment: Comment): Promise<void> {
+  if (comment.visibility !== "public") return;
+  const handles = parseMentionHandles(comment.body);
+  if (handles.length === 0) return;
+
+  const [topic] = await db
+    .select({ timetableId: topics.timetableId })
+    .from(topics)
+    .where(eq(topics.id, comment.topicId))
+    .limit(1);
+  if (!topic) return;
+
+  const members = await db
+    .select({ userId: users.id, slug: users.slug })
+    .from(users)
+    .innerJoin(
+      timetableMemberships,
+      eq(timetableMemberships.userId, users.id),
+    )
+    .where(
+      and(
+        eq(timetableMemberships.timetableId, topic.timetableId),
+        inArray(users.slug, handles),
+      ),
+    );
+
+  const rows = members
+    .filter((m) => m.userId !== comment.authorId)
+    .map((m) => ({ commentId: comment.id, userId: m.userId }));
+  if (rows.length === 0) return;
+  await db.insert(commentMentions).values(rows).onConflictDoNothing();
+}
 
 /** Comments are logged to the activity feed (QA #42); the snippet lets the
  * timeline show what was said without a second lookup. */
@@ -58,6 +100,7 @@ export async function addComment(
     .returning();
   if (!comment) throw new Error("Failed to add comment");
   await logCommentActivity(comment, "comment.add");
+  await recordMentions(comment);
   return comment;
 }
 
@@ -79,6 +122,7 @@ export async function addReply(
     .returning();
   if (!comment) throw new Error("Failed to add reply");
   await logCommentActivity(comment, "comment.reply");
+  await recordMentions(comment);
   return comment;
 }
 

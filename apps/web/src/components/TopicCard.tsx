@@ -133,7 +133,9 @@ export function TopicCard({
         slug={slug}
       />
 
-      {perms.canComment ? <CommentComposer topicId={topic.id} /> : null}
+      {perms.canComment ? (
+        <CommentComposer topicId={topic.id} mentionSlug={slug} />
+      ) : null}
 
       {perms.canHostOnly && topic.weightedScore != null ? (
         <HostInsightsPanel

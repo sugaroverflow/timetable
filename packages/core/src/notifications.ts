@@ -1,13 +1,21 @@
-import { and, desc, eq, gt, isNull, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
-import { comments, db, timetableMemberships, topics, users } from "@timetable/db";
+import {
+  commentMentions,
+  comments,
+  db,
+  timetableMemberships,
+  topics,
+  users,
+} from "@timetable/db";
 
 /** One entry in the notifications pane (QA #59): a comment on one of the
- * viewer's topics, or a reply to one of the viewer's comments. */
+ * viewer's topics, a reply to one of the viewer's comments, or a comment that
+ * @mentions the viewer (product feedback round 1). */
 export type NotificationItem = {
   commentId: string;
-  kind: "reply" | "comment";
+  kind: "reply" | "comment" | "mention";
   authorId: string;
   authorName: string | null;
   body: string;
@@ -30,12 +38,14 @@ export async function listNotifications(
 ): Promise<NotificationItem[]> {
   const parents = alias(comments, "parent_comments");
   const hostUsers = alias(users, "host_users");
+  const mentions = alias(commentMentions, "viewer_mentions");
 
   const rows = await db
     .select({
       commentId: comments.id,
       parentAuthorId: parents.authorId,
       topicHostId: topics.hostId,
+      mentionUserId: mentions.userId,
       authorId: comments.authorId,
       authorName: users.name,
       body: comments.body,
@@ -51,12 +61,20 @@ export async function listNotifications(
     .innerJoin(hostUsers, eq(hostUsers.id, topics.hostId))
     .innerJoin(users, eq(users.id, comments.authorId))
     .leftJoin(parents, eq(parents.id, comments.parentId))
+    .leftJoin(
+      mentions,
+      and(eq(mentions.commentId, comments.id), eq(mentions.userId, userId)),
+    )
     .where(
       and(
         eq(topics.timetableId, timetableId),
         ne(comments.authorId, userId),
         isNull(comments.hiddenAt),
-        or(eq(topics.hostId, userId), eq(parents.authorId, userId)),
+        or(
+          eq(topics.hostId, userId),
+          eq(parents.authorId, userId),
+          isNotNull(mentions.userId),
+        ),
       ),
     )
     .orderBy(desc(comments.createdAt))
@@ -64,7 +82,12 @@ export async function listNotifications(
 
   return rows.map((r) => ({
     commentId: r.commentId,
-    kind: r.parentAuthorId === userId ? "reply" : "comment",
+    kind:
+      r.parentAuthorId === userId
+        ? "reply"
+        : r.topicHostId === userId
+          ? "comment"
+          : "mention",
     authorId: r.authorId,
     authorName: r.authorName,
     body: r.body,
@@ -95,11 +118,16 @@ export async function countUnreadNotifications(
   if (!membership) return 0;
 
   const parents = alias(comments, "parent_comments");
+  const mentions = alias(commentMentions, "viewer_mentions");
   const conds = [
     eq(topics.timetableId, timetableId),
     ne(comments.authorId, userId),
     isNull(comments.hiddenAt),
-    or(eq(topics.hostId, userId), eq(parents.authorId, userId)),
+    or(
+      eq(topics.hostId, userId),
+      eq(parents.authorId, userId),
+      isNotNull(mentions.userId),
+    ),
   ];
   if (membership.seenAt) conds.push(gt(comments.createdAt, membership.seenAt));
 
@@ -108,6 +136,10 @@ export async function countUnreadNotifications(
     .from(comments)
     .innerJoin(topics, eq(topics.id, comments.topicId))
     .leftJoin(parents, eq(parents.id, comments.parentId))
+    .leftJoin(
+      mentions,
+      and(eq(mentions.commentId, comments.id), eq(mentions.userId, userId)),
+    )
     .where(and(...conds));
   return row?.n ?? 0;
 }

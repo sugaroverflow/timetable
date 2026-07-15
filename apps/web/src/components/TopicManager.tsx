@@ -95,7 +95,7 @@ export function TopicManager({
         />
       ) : null}
       {topic.status === "published" ? (
-        <CommentComposer topicId={topic.id} />
+        <CommentComposer topicId={topic.id} mentionSlug={slug} />
       ) : null}
 
       {hostComments.length > 0 ? (

@@ -94,6 +94,27 @@ export const comments = pgTable(
   ],
 );
 
+/** @mentions in a comment (product feedback round 1): one row per mentioned
+ * member. Populated on insert for public comments; drives mention
+ * notifications. */
+export const commentMentions = pgTable(
+  "comment_mentions",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    commentId: uuid()
+      .notNull()
+      .references(() => comments.id, { onDelete: "cascade" }),
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("comment_mentions_comment_user_uq").on(t.commentId, t.userId),
+    index("comment_mentions_user_idx").on(t.userId),
+  ],
+);
+
 /** Append-only audit log of moderation and lifecycle actions per timetable. */
 export const activityEvents = pgTable(
   "activity_events",

@@ -7,6 +7,7 @@ import type { FeedComment } from "@/lib/feedTypes";
 
 import { Avatar } from "./Avatar";
 import { CommentActions } from "./CommentActions";
+import { CommentBody } from "./CommentBody";
 import { PersonChip } from "./PersonChip";
 
 const VISIBLE_TOP_LEVEL = 3;
@@ -77,7 +78,9 @@ function CommentItem({
               hidden
             </span>
           ) : null}
-          <div className="c-text">{comment.body}</div>
+          <div className="c-text">
+            <CommentBody body={comment.body} />
+          </div>
         </div>
         <CommentActions
           commentId={comment.id}

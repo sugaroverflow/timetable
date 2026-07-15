@@ -1033,6 +1033,64 @@ textarea {
   min-height: 38px;
 }
 
+/* @mention autocomplete */
+.mention-field {
+  position: relative;
+  flex: 1;
+  display: flex;
+}
+.mention-field textarea {
+  flex: 1;
+  min-height: 38px;
+}
+.mention-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: var(--z-dropdown);
+  margin: 4px 0 0;
+  padding: 4px;
+  list-style: none;
+  min-width: 220px;
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-pop, 0 8px 24px rgba(0, 0, 0, 0.16));
+}
+.mention-option {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  background: none;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+.mention-option:hover,
+.mention-option.on {
+  background: var(--primary-soft);
+}
+.mention-name {
+  font-weight: var(--fw-medium);
+}
+.mention-handle {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+/* Rendered @mention token in comment text */
+.mention-token {
+  color: var(--primary);
+  font-weight: var(--fw-medium);
+}
+
 /* Circular paper-plane send button — matches the composer's one-line height */
 .btn-send {
   flex: none;
