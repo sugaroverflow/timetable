@@ -114,6 +114,58 @@ export const FONT_PAIRINGS: Record<
 };
 
 /**
+ * Built-in theme palettes — the app's default look. These MIRROR the light and
+ * dark semantic values in tokens.css (--primary / --bg / --topbar / --ink / …);
+ * keep them in sync if those tokens change. Single source of truth for the
+ * Settings form's initial state and its Discard baseline.
+ */
+export const DEFAULT_THEME_LIGHT = {
+  primary: "#2f54eb", // --primary (--blue-600)
+  secondary: "#5b7bff", // host accent seed (--blue-500)
+  background: "#eceef3", // --bg
+  topbar: "#ffffff", // --card (opaque top bar)
+  topbarText: "#1b2330", // --ink
+  text: "#1b2330", // --ink
+  font: "default",
+} as const;
+
+export const DEFAULT_THEME_DARK = {
+  primary: "#2f54eb",
+  secondary: "#5b7bff",
+  background: "#14171e", // --bg (dark)
+  topbar: "#1d222c", // --card (dark)
+  topbarText: "#e7eaf1", // --ink (dark)
+  text: "#e7eaf1", // --ink (dark)
+} as const;
+
+/** Pick legible ink for text on a solid `hex` background: white on dark
+ * colours, dark ink (#1b2330) on light ones, via WCAG relative luminance. The
+ * crossover sits near L≈0.21 (the contrast break-even against #1b2330, above
+ * the naive 0.5 midpoint) so light/gold primaries like #f3a712 get dark text
+ * instead of invisible white. Falls back to white when `hex` isn't a clean
+ * 6-digit value. */
+function readableInk(hex: string): "#ffffff" | "#1b2330" {
+  if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return "#ffffff";
+  const n = parseInt(hex.slice(1), 16);
+  const lin = (c: number) => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  const L =
+    0.2126 * lin((n >> 16) & 255) +
+    0.7152 * lin((n >> 8) & 255) +
+    0.0722 * lin(n & 255);
+  return L > 0.21 ? "#1b2330" : "#ffffff";
+}
+
+/** Append an 8-bit alpha suffix to a solid #rrggbb (→ #rrggbbaa), but only when
+ * `hex` is a clean 6-digit value — otherwise return it unchanged so we never
+ * emit a broken colour like "var(--x)1a". */
+function withAlpha(hex: string, aa: string): string {
+  return /^#[0-9a-fA-F]{6}$/.test(hex) ? hex + aa : hex;
+}
+
+/**
  * The single theme→CSS-variable mapping, used for both server render
  * (buildThemeCss) and the settings page's live preview. Primary drives the
  * accent colours; secondary drives the host-only panel colours; background,
@@ -139,13 +191,19 @@ export function themeVars(
   const text = dark ? theme.dark?.text : theme.text;
   if (primary) {
     vars["--primary"] = primary;
-    vars["--primary-soft"] = primary + "1a";
-    vars["--primary-ink"] = "#ffffff";
+    vars["--primary-soft"] = withAlpha(primary, "1a");
+    vars["--primary-ink"] = readableInk(primary);
   }
   if (secondary) {
     vars["--host-ink"] = secondary;
-    vars["--host-wash"] = secondary + "15";
-    vars["--host-line"] = secondary + "40";
+    vars["--host-wash"] = withAlpha(secondary, "15");
+    vars["--host-line"] = withAlpha(secondary, "40");
+    // Insight-bar track/chip fills + gradient end, so themed coverage/voter
+    // bars pick up the timetable's accent (mirrors --host-track / --host-chip /
+    // --host-accent-2 in tokens.css).
+    vars["--host-track"] = withAlpha(secondary, "22");
+    vars["--host-chip"] = withAlpha(secondary, "22");
+    vars["--host-accent-2"] = secondary;
   }
   if (background) vars["--bg"] = background;
   if (topbar) vars["--topbar"] = topbar;

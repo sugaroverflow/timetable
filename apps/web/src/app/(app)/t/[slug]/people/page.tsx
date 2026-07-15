@@ -103,7 +103,7 @@ export default async function PeoplePage({
   return (
     <div className="stack">
       <div className="page-head">
-        <h2 style={{ fontSize: 18, margin: 0 }}>People</h2>
+        <h2 className="section-title">People</h2>
         <p>Everyone in this timetable.</p>
       </div>
       {data.timetablePeople.length === 0 ? (

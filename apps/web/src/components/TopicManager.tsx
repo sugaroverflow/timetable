@@ -125,8 +125,8 @@ export function TopicManager({
         />
       ) : (
         <div
-          className="row wrap"
-          style={{ borderTop: "1px solid var(--line)", paddingTop: 10 }}
+          className="row wrap divider-top"
+          style={{ paddingTop: 10 }}
         >
           {(topic.status === "draft" || topic.status === "unpublished") && (
             <button

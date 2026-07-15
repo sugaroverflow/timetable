@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { useToast } from "@/components/Toast";
 import { clientGql } from "@/lib/clientGraphql";
 import {
+  DEFAULT_THEME_DARK,
+  DEFAULT_THEME_LIGHT,
   FONT_PAIRINGS,
   themeVars,
   type DigestSettings,
@@ -30,31 +32,6 @@ export type SettingsValues = {
   digestDefaults?: DigestSettings;
 };
 
-function applyPreview(theme: ThemeSettings) {
-  // The timetable shell (<main>) carries inline CSS vars that shadow the
-  // theme <style> tag — write the preview where it wins. Preview reflects
-  // the viewer's current light/dark mode.
-  const mode =
-    document.documentElement.dataset.theme === "dark" ? "dark" : "light";
-  const target =
-    document.querySelector<HTMLElement>("main.container") ??
-    document.documentElement;
-  // Clear earlier previews so removed values fall back to the stylesheet.
-  for (const name of Array.from(target.style)) {
-    if (name.startsWith("--")) target.style.removeProperty(name);
-  }
-  for (const [name, value] of Object.entries(themeVars(theme, mode))) {
-    target.style.setProperty(name, value);
-  }
-}
-
-const DARK_DEFAULTS = {
-  background: "#14171e",
-  topbar: "#1d222c",
-  topbarText: "#e7eaf1",
-  text: "#e7eaf1",
-};
-
 /** Theme section of Settings (QA #59): every base colour, an optional dark
  * palette, font pairing, cover image, and icon — with live preview. */
 export function SettingsForm({
@@ -71,21 +48,27 @@ export function SettingsForm({
 
   // Single source for both the initial state and what Discard restores.
   const initial = {
-    primary: current.theme?.primary ?? "#2f54eb",
-    secondary: current.theme?.secondary ?? "#5b7bff",
-    background: current.theme?.background ?? "#eceef3",
-    topbar: current.theme?.topbar ?? "#ffffff",
-    topbarText: current.theme?.topbarText ?? "#1b2330",
-    text: current.theme?.text ?? "#1b2330",
-    font: current.theme?.font ?? "default",
-    darkPrimary: current.theme?.dark?.primary ?? current.theme?.primary ?? "#2f54eb",
+    primary: current.theme?.primary ?? DEFAULT_THEME_LIGHT.primary,
+    secondary: current.theme?.secondary ?? DEFAULT_THEME_LIGHT.secondary,
+    background: current.theme?.background ?? DEFAULT_THEME_LIGHT.background,
+    topbar: current.theme?.topbar ?? DEFAULT_THEME_LIGHT.topbar,
+    topbarText: current.theme?.topbarText ?? DEFAULT_THEME_LIGHT.topbarText,
+    text: current.theme?.text ?? DEFAULT_THEME_LIGHT.text,
+    font: current.theme?.font ?? DEFAULT_THEME_LIGHT.font,
+    darkPrimary:
+      current.theme?.dark?.primary ??
+      current.theme?.primary ??
+      DEFAULT_THEME_DARK.primary,
     darkSecondary:
-      current.theme?.dark?.secondary ?? current.theme?.secondary ?? "#5b7bff",
-    darkBackground: current.theme?.dark?.background ?? DARK_DEFAULTS.background,
-    darkTopbar: current.theme?.dark?.topbar ?? DARK_DEFAULTS.topbar,
+      current.theme?.dark?.secondary ??
+      current.theme?.secondary ??
+      DEFAULT_THEME_DARK.secondary,
+    darkBackground:
+      current.theme?.dark?.background ?? DEFAULT_THEME_DARK.background,
+    darkTopbar: current.theme?.dark?.topbar ?? DEFAULT_THEME_DARK.topbar,
     darkTopbarText:
-      current.theme?.dark?.topbarText ?? DARK_DEFAULTS.topbarText,
-    darkText: current.theme?.dark?.text ?? DARK_DEFAULTS.text,
+      current.theme?.dark?.topbarText ?? DEFAULT_THEME_DARK.topbarText,
+    darkText: current.theme?.dark?.text ?? DEFAULT_THEME_DARK.text,
     cover: current.coverImageUrl ?? "",
     icon: current.iconUrl ?? "",
   };
@@ -107,6 +90,37 @@ export function SettingsForm({
   const [icon, setIcon] = useState(initial.icon);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [uploadingIcon, setUploadingIcon] = useState(false);
+
+  // Live preview writes theme vars onto :root (document.documentElement) so
+  // every surface updates — background, top bar, and top-bar text included —
+  // and preview matches what the saved <style> tag will render. We record
+  // exactly which custom properties we set, so cleanup removes precisely those;
+  // without it the in-progress theme would leak onto other pages.
+  const previewKeys = useRef<string[]>([]);
+
+  const applyPreview = (theme: ThemeSettings) => {
+    const root = document.documentElement;
+    const mode = root.dataset.theme === "dark" ? "dark" : "light";
+    // Drop the prior preview's props first so cleared values fall back to the
+    // SSR <style> tag rather than lingering.
+    for (const name of previewKeys.current) root.style.removeProperty(name);
+    const vars = themeVars(theme, mode);
+    for (const [name, value] of Object.entries(vars)) {
+      root.style.setProperty(name, value);
+    }
+    previewKeys.current = Object.keys(vars);
+  };
+
+  const clearPreview = useCallback(() => {
+    const root = document.documentElement;
+    for (const name of previewKeys.current) root.style.removeProperty(name);
+    previewKeys.current = [];
+  }, []);
+
+  // Strip any preview overrides when the form unmounts (navigating away) so the
+  // in-progress theme can't leak onto other pages; the SSR <style> tag remains
+  // the source of truth.
+  useEffect(() => clearPreview, [clearPreview]);
 
   type State = typeof initial;
 
@@ -170,7 +184,9 @@ export function SettingsForm({
     setDarkText(initial.darkText);
     setCover(initial.cover);
     setIcon(initial.icon);
-    applyPreview(toTheme(initial));
+    // Reset: drop the inline overrides so the page falls back to the saved
+    // theme rendered by the SSR <style> tag.
+    clearPreview();
     setSaved(false);
   }
 

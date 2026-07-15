@@ -1,0 +1,317 @@
+/* =============================================================================
+   DESIGN TOKENS — single source of truth for the app's visual language.
+   Loaded before globals.css (see app/layout.tsx). Two tiers:
+
+     1. PALETTE (chromatic primitives) — raw hue values, mode-agnostic. The only
+        place a raw chromatic hex should live. Never referenced directly by
+        components; only by the semantic layer below.
+     2. SEMANTIC tokens — what components consume (`var(--card)`, `var(--primary)`,
+        `var(--status-published-ink)`, `var(--space-4)` …). Defined for light on
+        `:root` and remapped for dark on `html[data-theme="dark"]`. Components
+        reference semantics only, so they never need to know about the mode.
+
+   Per-timetable themes override a subset of semantic tokens (--primary,
+   --primary-soft, --primary-ink, --host-*, --bg, --topbar, --topbar-ink, --ink,
+   --serif, --sans) at :root / html[data-theme="dark"] via an injected <style>
+   tag (see lib/timetableSettings.ts -> buildThemeCss). Those names are load
+   bearing for the theming engine — do not rename them.
+   ============================================================================= */
+
+:root {
+  /* ---------------------------------------------------------------------------
+     PALETTE — chromatic primitives (mode-agnostic). Neutrals live directly in
+     the semantic light/dark blocks below since they differ per mode.
+     --------------------------------------------------------------------------- */
+  /* Brand blue */
+  --blue-100: #eaeefe;
+  --blue-400: #6b8afe;
+  --blue-500: #5b7bff;
+  --blue-600: #2f54eb;
+  --blue-950: #24304d;
+
+  /* Host purple (a.k.a. "secondary" / faculty accent) */
+  --purple-100: #f4f1fc;
+  --purple-200: #ddd4f5;
+  --purple-300: #ab99ea;
+  --purple-350: #6f5bc0;
+  --purple-400: #8a73e0;
+  --purple-600: #5a44b8;
+  --purple-track: #e7e1f7; /* light insight-bar track / chip fill */
+  --purple-chip: #efeafb;
+  --purple-track-d: #2e2650; /* dark insight-bar track / chip fill */
+  --purple-950: #262038;
+  --purple-900: #453a68;
+
+  /* Heart / owner pink */
+  --pink-100: #fde7ec;
+  --pink-300: #f0a3b8;
+  --pink-400: #f16a84;
+  --pink-500: #ec4d6b;
+  --pink-strong-bg: #fdeef0;
+  --pink-strong-ink: #b23a4c;
+  --pink-strong-line: #f6d2d8;
+  --pink-950: #3a2230;
+  --pink-900: #5a3548;
+
+  /* Success green */
+  --green-100: #e8f6ec;
+  --green-200: #6bd188;
+  --green-300: #5cc47a;
+  --green-500: #2f9e44;
+  --green-700: #207a32;
+  --green-950: #1c2b21;
+
+  /* Warning / availability amber-yellow */
+  --yellow-100: #fdf2dc; /* availability "maybe" soft */
+  --yellow-400: #f3b13a;
+  --yellow-500: #f3a712;
+  --amber-100: #fff4e0; /* status/feedback warning surface */
+  --amber-ink: #a9700f;
+  --amber-ink-d: #e0b24d;
+  --amber-line: #f3e0b8;
+  --amber-line-d: #5a4a2a;
+  --amber-950: #3a2f1a;
+
+  /* Danger red */
+  --red-100: #fbe9e9;
+  --red-300: #f0807f;
+  --red-400: #f06565;
+  --red-500: #e23b3b;
+  --red-700: #b23131;
+  --red-950: #3a2020;
+
+  /* Toast accents (fixed across modes) */
+  --toast-ok-hue: #7ee0a0;
+  --toast-error-bg-hue: #5c1f24;
+  --toast-error-ink-hue: #ff9aa5;
+
+  /* ===========================================================================
+     SEMANTIC TOKENS — LIGHT (the default). Dark overrides in the block below.
+     =========================================================================== */
+
+  /* --- Surfaces --- */
+  --bg: #eceef3; /* page background (themeable) */
+  --card: #ffffff; /* raised surface: cards, inputs, menus */
+  --wash: #f4f5f8; /* subtle fill / hover on cards */
+  --wash-strong: #e4e7ef; /* stronger hover (nav) */
+  --scrim: rgba(20, 22, 30, 0.45); /* modal backdrop */
+
+  /* --- Text --- */
+  --ink: #1b2330; /* primary text (themeable) */
+  --muted: #69727f; /* secondary text — AA on --card */
+  --faint: #6e7784; /* tertiary text — darkened from #9aa2af to pass WCAG AA (4.53:1) */
+  --on-accent: #ffffff; /* text/icon on a saturated colored fill */
+
+  /* --- Borders --- */
+  --line: #e3e7ef;
+  --line-strong: #d3d9e4;
+
+  /* --- Brand / primary (themeable) --- */
+  --primary: var(--blue-600);
+  --primary-soft: var(--blue-100);
+  --primary-ink: #ffffff; /* engine recomputes for contrast on custom primaries */
+
+  /* --- Host / secondary accent (themeable) --- */
+  --host-ink: var(--purple-600);
+  --host-wash: var(--purple-100);
+  --host-line: var(--purple-200);
+  --host-track: var(--purple-track); /* insight coverage/voter bar track */
+  --host-chip: var(--purple-chip); /* voter-weight chip background */
+  --host-accent-2: var(--purple-400); /* coverage-fill gradient end */
+
+  /* --- Heart --- */
+  --heart: var(--pink-500);
+  --heart-soft: var(--pink-100);
+
+  /* --- Status: success (published) --- */
+  --green: var(--green-500);
+  --green-soft: var(--green-100);
+  --green-ink: var(--green-700);
+
+  /* --- Status: warning / availability "maybe" --- */
+  --yellow: var(--yellow-500);
+  --yellow-soft: var(--yellow-100);
+  --warning-ink: var(--amber-ink);
+  --warning-soft: var(--amber-100);
+  --warning-line: var(--amber-line);
+
+  /* --- Status: danger / availability "can't" --- */
+  --red: var(--red-500);
+  --red-soft: var(--red-100);
+  --red-ink: var(--red-700);
+
+  /* --- Status: neutral chips (draft / unpublished / archived) --- */
+  --status-draft-bg: #f1f0ee;
+  --status-draft-ink: #7a756c;
+  --status-neutral-bg: #eef0f5;
+  --status-neutral-ink: #7d8694;
+
+  /* --- Strong role pill (owner / admin) --- */
+  --pill-strong-bg: var(--pink-strong-bg);
+  --pill-strong-ink: var(--pink-strong-ink);
+  --pill-strong-line: var(--pink-strong-line);
+
+  /* --- Comment bubble --- */
+  --bubble-bg: #eef1f6;
+
+  /* --- Toast (self-contained; must not follow --ink or it inverts in dark) --- */
+  --toast-bg: #1b2330;
+  --toast-ink: #ffffff;
+  --toast-ok: var(--toast-ok-hue);
+  --toast-error-bg: var(--toast-error-bg-hue);
+  --toast-error-ink: var(--toast-error-ink-hue);
+
+  /* --- Topbar (themeable) --- */
+  --topbar: rgba(255, 255, 255, 0.92);
+  --topbar-ink: var(--ink); /* a timetable theme may override with topbarText */
+
+  /* ===========================================================================
+     SCALES — non-color design values
+     =========================================================================== */
+
+  /* --- Radius --- */
+  --radius-xs: 6px;
+  --radius-sm: 9px;
+  --radius-md: 10px;
+  --radius: 14px; /* base / cards */
+  --radius-pill: 999px;
+
+  /* --- Spacing (4px base) --- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+
+  /* --- Typography: sizes --- */
+  --text-2xs: 11px;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-md: 15px;
+  --text-lg: 16px;
+  --text-xl: 18px;
+  --text-2xl: 20px;
+  --text-3xl: 24px;
+  --text-4xl: 26px;
+
+  /* --- Typography: weights --- */
+  --fw-normal: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+
+  /* --- Typography: line-heights --- */
+  --lh-tight: 1.3;
+  --lh-snug: 1.4;
+  --lh-base: 1.5;
+  --lh-relaxed: 1.6;
+
+  /* --- Typography: families --- */
+  --brand-display: "Poetsen One", "Fraunces", Georgia, serif;
+  --sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --serif: "Fraunces", Georgia, serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+
+  /* --- Elevation --- */
+  --shadow-sm: 0 1px 2px rgba(20, 30, 50, 0.06);
+  --shadow: 0 1px 2px rgba(20, 30, 50, 0.05), 0 2px 8px rgba(20, 30, 50, 0.05);
+  --shadow-pop: 0 8px 28px rgba(20, 30, 50, 0.16);
+
+  /* --- Z-index scale --- */
+  --z-sticky: 40; /* sticky topbar */
+  --z-dropdown: 50; /* menus, switchers */
+  --z-modal: 100; /* dialogs + backdrop */
+  --z-toast: 200; /* toasts sit above dialogs */
+
+  /* --- Motion --- */
+  --transition-fast: 120ms;
+  --transition: 200ms;
+  --ease: cubic-bezier(0.2, 0.6, 0.2, 1);
+}
+
+/* =============================================================================
+   SEMANTIC TOKENS — DARK. Only tokens that differ from light are remapped here;
+   everything else (scales, fonts, radii, brand-ink, on-accent) inherits.
+   A timetable theme may further override the themeable subset via its injected
+   html[data-theme="dark"] block.
+   ============================================================================= */
+html[data-theme="dark"] {
+  /* Surfaces */
+  --bg: #14171e;
+  --card: #1d222c;
+  --wash: #262b35;
+  --wash-strong: #2f3644;
+  --scrim: rgba(0, 0, 0, 0.6);
+
+  /* Text */
+  --ink: #e7eaf1;
+  --muted: #9aa4b4;
+  --faint: #8b94a2; /* lightened to keep AA on dark surfaces */
+
+  /* Borders */
+  --line: #2a303c;
+  --line-strong: #3a4252;
+
+  /* Brand — lift primary so it stays legible on --primary-soft in dark */
+  --primary: var(--blue-400);
+  --primary-soft: var(--blue-950);
+
+  /* Host */
+  --host-ink: var(--purple-300);
+  --host-wash: var(--purple-950);
+  --host-line: var(--purple-900);
+  --host-track: var(--purple-track-d);
+  --host-chip: var(--purple-track-d);
+  --host-accent-2: var(--purple-350);
+
+  /* Heart */
+  --heart: var(--pink-400);
+  --heart-soft: var(--pink-950);
+
+  /* Status: success */
+  --green: var(--green-300);
+  --green-soft: var(--green-950);
+  --green-ink: var(--green-200);
+
+  /* Status: warning */
+  --yellow: var(--yellow-400);
+  --yellow-soft: var(--amber-950);
+  --warning-ink: var(--amber-ink-d);
+  --warning-soft: var(--amber-950);
+  --warning-line: var(--amber-line-d);
+
+  /* Status: danger */
+  --red: var(--red-400);
+  --red-soft: var(--red-950);
+  --red-ink: var(--red-300);
+
+  /* Status: neutral chips */
+  --status-draft-bg: #2a2e38;
+  --status-draft-ink: #9aa4b4;
+  --status-neutral-bg: #2a2e38;
+  --status-neutral-ink: #9aa4b4;
+
+  /* Strong role pill */
+  --pill-strong-bg: var(--pink-950);
+  --pill-strong-ink: var(--pink-300);
+  --pill-strong-line: var(--pink-900);
+
+  /* Comment bubble */
+  --bubble-bg: #2a303c;
+
+  /* Toast — a lighter dark surface so it reads as elevated over the dark page */
+  --toast-bg: #2f3745;
+  --toast-ink: #e7eaf1;
+
+  /* Topbar */
+  --topbar: rgba(29, 34, 44, 0.92);
+
+  /* Elevation — deeper shadows on dark */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-pop: 0 8px 28px rgba(0, 0, 0, 0.5);
+}

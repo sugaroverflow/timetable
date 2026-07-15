@@ -1,5 +1,6 @@
 "use client";
 
+import { Monitor, Moon, Sun } from "lucide-react";
 import { useSyncExternalStore } from "react";
 
 type Mode = "system" | "light" | "dark";
@@ -39,7 +40,7 @@ export function ThemeToggle() {
     setMode(mode === "system" ? "dark" : mode === "dark" ? "light" : "system");
   }
 
-  const icon = mode === "dark" ? "☾" : mode === "light" ? "☀" : "◑";
+  const Icon = mode === "dark" ? Moon : mode === "light" ? Sun : Monitor;
   const label =
     mode === "dark" ? "Dark" : mode === "light" ? "Light" : "Auto";
 
@@ -51,7 +52,7 @@ export function ThemeToggle() {
       title={`Theme: ${label} — click to change`}
       aria-label={`Theme: ${label} — click to change`}
     >
-      {icon} {label}
+      <Icon size={16} aria-hidden /> {label}
     </button>
   );
 }

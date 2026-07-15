@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Collapsible } from "@base-ui/react/collapsible";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 import { useToast } from "@/components/Toast";
 import { clientGql } from "@/lib/clientGraphql";
@@ -37,8 +39,7 @@ export function SlotDiscussion({
   const [body, setBody] = useState("");
   const [pending, startTransition] = useTransition();
 
-  async function toggle() {
-    const next = !open;
+  async function handleOpenChange(next: boolean) {
     setOpen(next);
     if (next && comments === null) {
       try {
@@ -70,13 +71,18 @@ export function SlotDiscussion({
   }
 
   return (
-    <div>
-      <button className="slot-expand" type="button" onClick={toggle}>
-        {open ? "▾ Hide discussion" : "▸ Discussion & host chat"}
+    <Collapsible.Root
+      open={open}
+      onOpenChange={(next) => void handleOpenChange(next)}
+    >
+      <Collapsible.Trigger className="slot-expand">
+        {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}{" "}
+        {open ? "Hide discussion" : "Discussion & host chat"}
         {count > 0 ? ` · ${count} message${count === 1 ? "" : "s"}` : ""}
-      </button>
-      {open ? (
-        <div className="host-thread">
+      </Collapsible.Trigger>
+      <Collapsible.Panel>
+        {open ? (
+          <div className="host-thread">
           {comments?.map((c) => (
             <div key={c.id} className="hc">
               <Avatar name={c.authorName} small />
@@ -108,8 +114,9 @@ export function SlotDiscussion({
               </form>
             </div>
           ) : null}
-        </div>
-      ) : null}
-    </div>
+          </div>
+        ) : null}
+      </Collapsible.Panel>
+    </Collapsible.Root>
   );
 }

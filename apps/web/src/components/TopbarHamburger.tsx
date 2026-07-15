@@ -1,5 +1,6 @@
 "use client";
 
+import { Menu } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useSyncExternalStore } from "react";
 
@@ -30,7 +31,7 @@ export function TopbarHamburger() {
       aria-label={open ? "Close menu" : "Open menu"}
       onClick={toggleSidebar}
     >
-      ☰
+      <Menu size={16} aria-hidden />
     </button>
   );
 }

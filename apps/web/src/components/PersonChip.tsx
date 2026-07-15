@@ -1,5 +1,6 @@
 "use client";
 
+import { Dialog } from "@base-ui/react/dialog";
 import { useState } from "react";
 
 import { clientGql } from "@/lib/clientGraphql";
@@ -29,8 +30,9 @@ type PersonData = {
   } | null;
 };
 
-/** Wraps a user's name/avatar anywhere in the app; clicking opens their
- * bio as a popup modal (QA #42 — one pattern everywhere). */
+/** Wraps a user's name/avatar anywhere in the app; clicking opens their bio as a
+ * modal (QA #42 — one pattern everywhere). Uses Base UI Dialog for focus trap,
+ * scroll lock, Escape-to-close, and focus return (was a hand-rolled div). */
 export function PersonChip({
   slug,
   userId,
@@ -40,18 +42,16 @@ export function PersonChip({
   userId: string;
   children: React.ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
   const [data, setData] = useState<PersonData | null>(null);
   const [loading, setLoading] = useState(false);
 
-  async function show() {
-    setOpen(true);
+  async function load() {
     if (data || loading) return;
     setLoading(true);
     try {
       setData(await clientGql<PersonData>(QUERY, { s: slug, u: userId }));
     } catch {
-      // Keep the modal open with a fallback message.
+      // Keep the dialog open with a fallback message.
       setData({ timetable: null, person: null });
     } finally {
       setLoading(false);
@@ -64,65 +64,54 @@ export function PersonChip({
     : undefined;
 
   return (
-    <>
-      <button type="button" className="person-trigger" onClick={show}>
-        {children}
-      </button>
-      {open ? (
-        <div
-          className="modal-backdrop"
-          onClick={() => setOpen(false)}
-          role="presentation"
-        >
-          <div
-            className="card stack person-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Member bio"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {loading || !data ? (
-              <p className="faint" style={{ margin: 0 }}>
-                Loading…
-              </p>
-            ) : person ? (
-              <>
-                <div className="row" style={{ alignItems: "center" }}>
-                  <Avatar name={person.name} />
-                  <div>
-                    <strong>{person.name ?? "Member"}</strong>
-                    <div style={{ marginTop: 4 }}>
-                      <RolePills roles={person.roles} labels={roleLabels} />
-                    </div>
+    <Dialog.Root
+      onOpenChange={(open) => {
+        if (open) load();
+      }}
+    >
+      <Dialog.Trigger className="person-trigger">{children}</Dialog.Trigger>
+      <Dialog.Portal>
+        <Dialog.Backdrop className="modal-backdrop" />
+        <Dialog.Popup className="card stack person-modal" aria-label="Member bio">
+          {loading || !data ? (
+            <p className="faint" style={{ margin: 0 }}>
+              Loading…
+            </p>
+          ) : person ? (
+            <>
+              <div className="row" style={{ alignItems: "center" }}>
+                <Avatar name={person.name} />
+                <div>
+                  <strong>{person.name ?? "Member"}</strong>
+                  <div style={{ marginTop: "var(--space-1)" }}>
+                    <RolePills roles={person.roles} labels={roleLabels} />
                   </div>
                 </div>
-                {person.bioHtml ? (
-                  <div
-                    className="topic-body"
-                    dangerouslySetInnerHTML={{ __html: person.bioHtml }}
-                  />
-                ) : (
-                  <p className="faint" style={{ margin: 0 }}>
-                    No bio yet.
-                  </p>
-                )}
-              </>
-            ) : (
-              <p className="faint" style={{ margin: 0 }}>
-                Profile unavailable.
-              </p>
-            )}
-            <button
-              type="button"
-              className="btn btn-ghost"
-              style={{ alignSelf: "flex-end" }}
-              onClick={() => setOpen(false)}
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      ) : null}
-    </>
+              </div>
+              {person.bioHtml ? (
+                <div
+                  className="topic-body"
+                  dangerouslySetInnerHTML={{ __html: person.bioHtml }}
+                />
+              ) : (
+                <p className="faint" style={{ margin: 0 }}>
+                  No bio yet.
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="faint" style={{ margin: 0 }}>
+              Profile unavailable.
+            </p>
+          )}
+          <Dialog.Close
+            className="btn btn-ghost"
+            style={{ alignSelf: "flex-end" }}
+          >
+            Close
+          </Dialog.Close>
+        </Dialog.Popup>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }

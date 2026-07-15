@@ -5,6 +5,17 @@ import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import {
+  Bold,
+  Heading2,
+  Heading3,
+  Image as ImageIcon,
+  Italic,
+  Link2,
+  List,
+  ListOrdered,
+  Quote,
+} from "lucide-react";
 import { useEffect, useRef } from "react";
 import { Markdown } from "tiptap-markdown";
 
@@ -60,23 +71,21 @@ export function RichTextEditor({
         <ToolButton
           editor={editor}
           active={editor.isActive("bold")}
-          label="B"
+          label={<Bold size={16} aria-hidden />}
           title="Bold"
           onClick={() => editor.chain().focus().toggleBold().run()}
-          style={{ fontWeight: 700 }}
         />
         <ToolButton
           editor={editor}
           active={editor.isActive("italic")}
-          label="I"
+          label={<Italic size={16} aria-hidden />}
           title="Italic"
           onClick={() => editor.chain().focus().toggleItalic().run()}
-          style={{ fontStyle: "italic" }}
         />
         <ToolButton
           editor={editor}
           active={editor.isActive("heading", { level: 2 })}
-          label="H2"
+          label={<Heading2 size={16} aria-hidden />}
           title="Heading"
           onClick={() =>
             editor.chain().focus().toggleHeading({ level: 2 }).run()
@@ -85,7 +94,7 @@ export function RichTextEditor({
         <ToolButton
           editor={editor}
           active={editor.isActive("heading", { level: 3 })}
-          label="H3"
+          label={<Heading3 size={16} aria-hidden />}
           title="Subheading"
           onClick={() =>
             editor.chain().focus().toggleHeading({ level: 3 }).run()
@@ -94,28 +103,28 @@ export function RichTextEditor({
         <ToolButton
           editor={editor}
           active={editor.isActive("bulletList")}
-          label="•"
+          label={<List size={16} aria-hidden />}
           title="Bullet list"
           onClick={() => editor.chain().focus().toggleBulletList().run()}
         />
         <ToolButton
           editor={editor}
           active={editor.isActive("orderedList")}
-          label="1."
+          label={<ListOrdered size={16} aria-hidden />}
           title="Numbered list"
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
         />
         <ToolButton
           editor={editor}
           active={editor.isActive("blockquote")}
-          label="❝"
+          label={<Quote size={16} aria-hidden />}
           title="Quote"
           onClick={() => editor.chain().focus().toggleBlockquote().run()}
         />
         <ToolButton
           editor={editor}
           active={editor.isActive("link")}
-          label="🔗"
+          label={<Link2 size={16} aria-hidden />}
           title="Link"
           onClick={() => {
             if (editor.isActive("link")) {
@@ -131,7 +140,7 @@ export function RichTextEditor({
         <ToolButton
           editor={editor}
           active={false}
-          label="🖼"
+          label={<ImageIcon size={16} aria-hidden />}
           title="Image from URL"
           onClick={() => {
             const url = window.prompt("Image URL");
@@ -163,7 +172,7 @@ function ToolButton({
 }: {
   editor: Editor;
   active: boolean;
-  label: string;
+  label: React.ReactNode;
   title: string;
   onClick: () => void;
   style?: React.CSSProperties;

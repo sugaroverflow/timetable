@@ -1,3 +1,4 @@
+import { Heart, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 
 import { isAdmin, isHost, type Role } from "@timetable/shared";
@@ -153,7 +154,7 @@ export default async function DashboardPage({
   return (
     <div className="stack">
       <div className="page-head">
-        <h2 style={{ fontSize: 18, margin: 0 }}>Dashboard</h2>
+        <h2 className="section-title">Dashboard</h2>
         <p>Activity and standings across this timetable.</p>
       </div>
 
@@ -169,7 +170,7 @@ export default async function DashboardPage({
         <DashboardSinceFilter value={sinceValue} />
       </div>
 
-      <div className="grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
+      <div className="stat-grid">
         <Stat label="Published topics" value={d.topicCounts.published} />
         <Stat label="Total hearts" value={d.totalHearts} />
         <Stat label="Electors" value={d.electorCount} />
@@ -179,7 +180,7 @@ export default async function DashboardPage({
       {d.conflicts.length > 0 ? (
         <div className="card" style={{ borderColor: "var(--yellow)" }}>
           <h3 style={{ marginTop: 0, fontSize: 15 }}>
-            ⚠ Slot conflicts ({d.conflicts.length})
+            <TriangleAlert size={14} aria-hidden /> Slot conflicts ({d.conflicts.length})
           </h3>
           <ul className="list">
             {d.conflicts.map((c) => (
@@ -215,7 +216,8 @@ export default async function DashboardPage({
                       {t.weightedScore.toFixed(2)}
                       {t.lastHeartAt ? (
                         <span className="faint" style={{ display: "block", fontSize: 11 }}>
-                          last ♥ {new Date(t.lastHeartAt).toLocaleDateString()}
+                          last <Heart size={14} fill="currentColor" aria-hidden />{" "}
+                          {new Date(t.lastHeartAt).toLocaleDateString()}
                         </span>
                       ) : null}
                     </span>

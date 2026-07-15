@@ -18,7 +18,7 @@ export function ProfilePanel({
   return (
     <div className="stack">
       <div className="page-head">
-        <h2 style={{ fontSize: 18, margin: 0 }}>Profile</h2>
+        <h2 className="section-title">Profile</h2>
         <p>{me.email}</p>
       </div>
       <ProfileForm name={me.name} bio={me.bio} image={me.image} />

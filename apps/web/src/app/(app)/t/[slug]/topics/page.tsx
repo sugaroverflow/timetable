@@ -56,7 +56,7 @@ export default async function MyTopicsPage({
 
       <div className="stack">
         <div className="page-head">
-          <h2 style={{ fontSize: 18, margin: 0 }}>My Topics</h2>
+          <h2 className="section-title">My Topics</h2>
           <p>Draft, submit for review, and unpublish your topics.</p>
         </div>
         {data.hostDashboard.length === 0 ? (

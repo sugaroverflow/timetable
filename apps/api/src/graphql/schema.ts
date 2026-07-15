@@ -150,6 +150,12 @@ const THEME_FONTS = new Set([
 ]);
 const HEX_COLOUR = /^#[0-9a-fA-F]{6}$/;
 
+/** A validated #rrggbb hex, or undefined. Shared by the themeJson parser and
+ * the legacy themePrimary/themeSecondary args so no unvalidated colour is ever
+ * stored (and later injected into the SSR theme <style> tag). */
+const colour = (v: unknown): string | undefined =>
+  typeof v === "string" && HEX_COLOUR.test(v) ? v : undefined;
+
 /** Validate a client-sent theme (QA #59): known keys only, colours must be
  * #rrggbb, font from the curated list. Returns null when invalid. */
 function parseThemeJson(
@@ -163,8 +169,6 @@ function parseThemeJson(
   }
   if (typeof parsed !== "object" || parsed === null) return null;
   const source = parsed as Record<string, unknown>;
-  const colour = (v: unknown) =>
-    typeof v === "string" && HEX_COLOUR.test(v) ? v : undefined;
 
   const theme: NonNullable<TimetableSettings["theme"]> = {};
   theme.primary = colour(source.primary);
@@ -1500,15 +1504,17 @@ builder.mutationType({
           };
         }
 
-        if (args.themePrimary != null || args.themeSecondary != null) {
+        // Legacy individual theme args — validate through the same HEX_COLOUR
+        // gate the themeJson path uses so an invalid string can't be persisted
+        // and later injected into the SSR theme <style> tag. Invalid/absent
+        // values are dropped (mirrors colour() in parseThemeJson).
+        const themePrimary = colour(args.themePrimary);
+        const themeSecondary = colour(args.themeSecondary);
+        if (themePrimary != null || themeSecondary != null) {
           patch.theme = {
             ...(current.theme ?? {}),
-            ...(args.themePrimary != null
-              ? { primary: args.themePrimary }
-              : {}),
-            ...(args.themeSecondary != null
-              ? { secondary: args.themeSecondary }
-              : {}),
+            ...(themePrimary != null ? { primary: themePrimary } : {}),
+            ...(themeSecondary != null ? { secondary: themeSecondary } : {}),
           };
         }
 
