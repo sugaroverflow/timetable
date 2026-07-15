@@ -91,6 +91,7 @@ import {
   isAdmin,
   isElector,
   isHost,
+  PRIVACY_LEVELS,
   type Privacy,
   type Role as SharedRole,
 } from "@timetable/shared";
@@ -1369,16 +1370,12 @@ builder.mutationType({
         const viewer = { userId: user.id, roles: readable.roles };
         if (!canEditSettings(viewer)) forbidden("Admins only");
 
-        let privacy: "public" | "private" | "deactivated" | undefined;
+        let privacy: Privacy | undefined;
         if (args.privacy != null) {
-          if (
-            args.privacy !== "public" &&
-            args.privacy !== "private" &&
-            args.privacy !== "deactivated"
-          ) {
+          if (!(PRIVACY_LEVELS as readonly string[]).includes(args.privacy)) {
             throw new GraphQLError("Invalid privacy value");
           }
-          privacy = args.privacy;
+          privacy = args.privacy as Privacy;
         }
 
         const updated = await updateTimetableProfile(readable.timetable.id, {
@@ -1471,6 +1468,7 @@ builder.mutationType({
         themeJson: t.arg.string({ required: false }),
         coverImageUrl: t.arg.string({ required: false }),
         iconUrl: t.arg.string({ required: false }),
+        iconEmoji: t.arg.string({ required: false }),
         digestNewTopics: t.arg.boolean({ required: false }),
         digestReplies: t.arg.boolean({ required: false }),
         digestActivity: t.arg.boolean({ required: false }),
@@ -1530,6 +1528,11 @@ builder.mutationType({
 
         if (args.iconUrl != null) {
           patch.iconUrl = args.iconUrl.trim() || null;
+        }
+
+        // A short emoji sequence (capped to guard against arbitrary payloads).
+        if (args.iconEmoji != null) {
+          patch.iconEmoji = args.iconEmoji.trim().slice(0, 24) || null;
         }
 
         if (

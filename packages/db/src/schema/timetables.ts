@@ -43,6 +43,8 @@ export type TimetableSettings = {
   coverImageUrl?: string | null;
   /** Small square icon shown in the topbar timetable menu. */
   iconUrl?: string | null;
+  /** Emoji shown as the icon instead of an uploaded image (takes precedence). */
+  iconEmoji?: string | null;
   /** Digest settings seeded onto new members who haven't customized theirs. */
   digestDefaults?: NotificationSettings;
 };

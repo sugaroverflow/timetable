@@ -15,20 +15,30 @@ import {
   type ThemeSettings,
 } from "@/lib/timetableSettings";
 
-const MUTATION = `mutation Theme($s: String!, $theme: String, $cover: String, $icon: String) {
+const MUTATION = `mutation Theme($s: String!, $theme: String, $cover: String, $icon: String, $emoji: String) {
   updateTimetableSettings(
     idOrSlug: $s
     themeJson: $theme
     coverImageUrl: $cover
     iconUrl: $icon
+    iconEmoji: $emoji
   ) { id }
 }`;
+
+// Curated quick-pick set — enough breadth for a timetable/faculty context
+// without pulling in a heavyweight emoji-picker dependency.
+const EMOJI_CHOICES = [
+  "📚", "🎓", "🏛️", "🗳️", "💡", "📊", "📈", "🔬",
+  "⚖️", "🌍", "🤝", "💬", "📅", "⭐", "❤️", "🔥",
+  "🎯", "🧠", "🏆", "📝", "🎤", "🌱", "⚡", "🎨",
+];
 
 export type SettingsValues = {
   roleLabels?: { admin?: string; host?: string; elector?: string };
   theme?: ThemeSettings;
   coverImageUrl?: string | null;
   iconUrl?: string | null;
+  iconEmoji?: string | null;
   digestDefaults?: DigestSettings;
 };
 
@@ -71,6 +81,7 @@ export function SettingsForm({
     darkText: current.theme?.dark?.text ?? DEFAULT_THEME_DARK.text,
     cover: current.coverImageUrl ?? "",
     icon: current.iconUrl ?? "",
+    iconEmoji: current.iconEmoji ?? "",
   };
 
   const [primary, setPrimary] = useState(initial.primary);
@@ -88,7 +99,20 @@ export function SettingsForm({
   const [darkText, setDarkText] = useState(initial.darkText);
   const [cover, setCover] = useState(initial.cover);
   const [icon, setIcon] = useState(initial.icon);
+  const [iconEmoji, setIconEmoji] = useState(initial.iconEmoji);
   const [uploadingCover, setUploadingCover] = useState(false);
+
+  // Emoji and uploaded image are mutually exclusive icon sources — setting one
+  // clears the other so the render precedence (emoji > image > letter) is
+  // unambiguous.
+  function chooseEmoji(value: string) {
+    setIconEmoji(value);
+    if (value) setIcon("");
+  }
+  function handleIconChange(value: string) {
+    setIcon(value);
+    if (value.trim()) setIconEmoji("");
+  }
   const [uploadingIcon, setUploadingIcon] = useState(false);
 
   // Live preview writes theme vars onto :root (document.documentElement) so
@@ -161,6 +185,7 @@ export function SettingsForm({
       darkText,
       cover,
       icon,
+      iconEmoji,
     };
   }
 
@@ -184,6 +209,7 @@ export function SettingsForm({
     setDarkText(initial.darkText);
     setCover(initial.cover);
     setIcon(initial.icon);
+    setIconEmoji(initial.iconEmoji);
     // Reset: drop the inline overrides so the page falls back to the saved
     // theme rendered by the SSR <style> tag.
     clearPreview();
@@ -199,6 +225,7 @@ export function SettingsForm({
         theme: JSON.stringify(toTheme(currentState())),
         cover: cover.trim() || null,
         icon: icon.trim() || null,
+        emoji: iconEmoji.trim() || null,
       });
       setSaved(true);
       toast("Theme saved");
@@ -295,11 +322,43 @@ export function SettingsForm({
           id="icon"
           label="Icon (square, shown in the switcher and top bar)"
           value={icon}
-          onChange={setIcon}
+          onChange={handleIconChange}
           purpose="timetable-icon"
           timetableIdOrSlug={slug}
           onUploadingChange={setUploadingIcon}
         />
+      </div>
+
+      <div className="field" style={{ marginTop: 12 }}>
+        <label>Or pick an emoji icon</label>
+        <p className="faint" style={{ marginTop: 0, fontSize: 12 }}>
+          An emoji is used instead of an uploaded image.
+        </p>
+        <div className="emoji-grid" role="group" aria-label="Icon emoji">
+          {EMOJI_CHOICES.map((choice) => (
+            <button
+              key={choice}
+              type="button"
+              className={
+                iconEmoji === choice ? "emoji-choice on" : "emoji-choice"
+              }
+              aria-pressed={iconEmoji === choice}
+              onClick={() => chooseEmoji(iconEmoji === choice ? "" : choice)}
+            >
+              {choice}
+            </button>
+          ))}
+        </div>
+        {iconEmoji ? (
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            style={{ marginTop: 8 }}
+            onClick={() => chooseEmoji("")}
+          >
+            Clear emoji
+          </button>
+        ) : null}
       </div>
 
       <div className="row" style={{ marginTop: 12 }}>

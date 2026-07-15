@@ -10,10 +10,18 @@ export type SwitcherItem = {
   slug: string;
   name: string;
   iconUrl: string | null;
+  iconEmoji?: string | null;
   privacy: string;
 };
 
 function ItemIcon({ item }: { item: SwitcherItem }) {
+  if (item.iconEmoji) {
+    return (
+      <span className="tt-menu-icon tt-menu-icon-emoji" aria-hidden>
+        {item.iconEmoji}
+      </span>
+    );
+  }
   if (item.iconUrl) {
     // eslint-disable-next-line @next/next/no-img-element
     return <img className="tt-menu-icon" src={item.iconUrl} alt="" />;

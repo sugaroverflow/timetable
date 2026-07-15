@@ -37,6 +37,7 @@ export type TimetableSettings = {
   theme?: ThemeSettings;
   coverImageUrl?: string | null;
   iconUrl?: string | null;
+  iconEmoji?: string | null;
   digestDefaults?: DigestSettings;
 };
 
