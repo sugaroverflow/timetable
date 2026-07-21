@@ -1,45 +1,20 @@
 import type { CSSProperties } from "react";
 
-export type RoleLabels = {
-  admin?: string;
-  host?: string;
-  elector?: string;
-};
+import type {
+  NotificationSettings,
+  RoleLabels,
+  ThemeSettings,
+  TimetableSettings,
+} from "@timetable/shared";
 
-/** Mirrors NotificationSettings in @timetable/db (web doesn't depend on db). */
-export type DigestSettings = {
-  digestNewTopics?: boolean;
-  digestReplies?: boolean;
-  digestActivity?: boolean;
-};
+/** Settings shapes live in @timetable/shared (single source of truth, shared
+ * with the db schema); re-exported here for the web components that import
+ * them alongside the theming helpers below. */
+export type { RoleLabels, ThemeSettings, TimetableSettings };
 
-/** Mirrors ThemeSettings in @timetable/db. */
-export type ThemeSettings = {
-  primary?: string;
-  secondary?: string;
-  background?: string;
-  topbar?: string;
-  topbarText?: string;
-  text?: string;
-  font?: string;
-  dark?: {
-    primary?: string;
-    secondary?: string;
-    background?: string;
-    topbar?: string;
-    topbarText?: string;
-    text?: string;
-  };
-};
-
-export type TimetableSettings = {
-  roleLabels?: RoleLabels;
-  theme?: ThemeSettings;
-  coverImageUrl?: string | null;
-  iconUrl?: string | null;
-  iconEmoji?: string | null;
-  digestDefaults?: DigestSettings;
-};
+/** Web-facing name for the digest preference shape; the canonical type is
+ * NotificationSettings in @timetable/shared (also the per-user prefs). */
+export type DigestSettings = NotificationSettings;
 
 export function parseTimetableSettings(raw: string | null | undefined) {
   if (!raw) return {} as TimetableSettings;

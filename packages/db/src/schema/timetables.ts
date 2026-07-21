@@ -9,45 +9,14 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-import { users, type NotificationSettings } from "./auth";
+import type { TimetableSettings } from "@timetable/shared";
+
+import { users } from "./auth";
 import { inviteStatusEnum, privacyEnum, roleEnum } from "./enums";
 
-/**
- * Per-timetable settings persisted as JSON: custom role labels, theme colors,
- * default digest options, etc. Kept loose in Phase 0; typed in @timetable/shared.
- */
-/** Per-timetable theme (QA #59 full theming). All colours are #rrggbb.
- * `dark` overrides apply when the viewer uses dark mode; unset dark values
- * fall back to the built-in dark palette. `font` picks a curated pairing. */
-export type ThemeSettings = {
-  primary?: string;
-  secondary?: string;
-  background?: string;
-  topbar?: string;
-  topbarText?: string;
-  text?: string;
-  font?: string;
-  dark?: {
-    primary?: string;
-    secondary?: string;
-    background?: string;
-    topbar?: string;
-    topbarText?: string;
-    text?: string;
-  };
-};
-
-export type TimetableSettings = {
-  roleLabels?: { admin?: string; host?: string; elector?: string };
-  theme?: ThemeSettings;
-  coverImageUrl?: string | null;
-  /** Small square icon shown in the topbar timetable menu. */
-  iconUrl?: string | null;
-  /** Emoji shown as the icon instead of an uploaded image (takes precedence). */
-  iconEmoji?: string | null;
-  /** Digest settings seeded onto new members who haven't customized theirs. */
-  digestDefaults?: NotificationSettings;
-};
+/** Per-timetable settings shapes (role labels, theme, digest defaults) are
+ * defined in @timetable/shared; re-exported here for schema consumers. */
+export type { ThemeSettings, TimetableSettings } from "@timetable/shared";
 
 export const timetables = pgTable("timetables", {
   id: uuid().primaryKey().defaultRandom(),

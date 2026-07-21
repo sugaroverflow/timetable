@@ -1,11 +1,10 @@
 import { jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
-/** Per-user digest/notification preferences (no sends yet — Phase 4). */
-export type NotificationSettings = {
-  digestNewTopics?: boolean;
-  digestReplies?: boolean;
-  digestActivity?: boolean;
-};
+import type { NotificationSettings } from "@timetable/shared";
+
+/** Per-user digest/notification preferences — defined in @timetable/shared,
+ * re-exported here for schema consumers. */
+export type { NotificationSettings };
 
 /**
  * Local user record. Authentication is handled by Clerk; `id` is the Clerk
