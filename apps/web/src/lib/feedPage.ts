@@ -6,6 +6,7 @@ import { gqlFetch } from "@/lib/graphql";
 import { displayRolesFromCookies } from "@/lib/previewRoles.server";
 import {
   parseTimetableSettings,
+  roleLabel,
   type TimetableSettings,
 } from "@/lib/timetableSettings";
 
@@ -78,10 +79,30 @@ export function isTopicNew(topic: FeedTopic, lastSeenAt: string | null): boolean
   return newer(topic.comments);
 }
 
+/**
+ * The one place viewer permissions for a topic are derived — used by the
+ * feed (whose topics are always published; see buildFeed in core) and by
+ * the topic permalink, which can render unpublished topics to their host
+ * and admins, where hearting/commenting must stay off.
+ */
+export function topicPerms(
+  roles: Role[],
+  status: FeedTopic["status"],
+): FeedPerms {
+  const published = status === "published";
+  return {
+    canHeart: isElector(roles) && published,
+    canComment: roles.length > 0 && published,
+    canHostOnly: isHost(roles) || isAdmin(roles),
+    canModerate: isAdmin(roles),
+  };
+}
+
 export type FeedPage = {
+  slug: string;
   topics: FeedTopic[];
   hasNext: boolean;
-  perms: FeedPerms;
+  roles: Role[];
   settings: TimetableSettings;
   viewerHeartCount: number | null;
   viewerId: string | null;
@@ -89,6 +110,23 @@ export type FeedPage = {
   isMember: boolean;
   hosts: { id: string; name: string | null }[];
 };
+
+/** Everything one TopicCard needs, derived once per topic: perms gated on
+ * the topic's own status, role labels resolved symmetrically. Spread into
+ * <TopicCard {...topicCardProps(page, topic)} />. */
+export function topicCardProps(page: FeedPage, topic: FeedTopic) {
+  return {
+    topic,
+    perms: topicPerms(page.roles, topic.status),
+    slug: page.slug,
+    viewerId: page.viewerId,
+    isNew: isTopicNew(topic, page.lastSeenAt),
+    hostLabel: roleLabel(page.settings.roleLabels, "host"),
+    adminLabel: roleLabel(page.settings.roleLabels, "admin"),
+    viewerHeartCount: page.viewerHeartCount,
+    hosts: page.hosts,
+  };
+}
 
 /**
  * One page of the topic feed plus the viewer-dependent bits needed to render
@@ -117,14 +155,10 @@ export async function fetchFeedPage(
   );
 
   return {
+    slug,
     topics: data.topicFeed.slice(0, FEED_PAGE_SIZE),
     hasNext: data.topicFeed.length > FEED_PAGE_SIZE,
-    perms: {
-      canHeart: isElector(roles),
-      canComment: roles.length > 0,
-      canHostOnly: isHost(roles) || isAdmin(roles),
-      canModerate: isAdmin(roles),
-    },
+    roles,
     settings: parseTimetableSettings(data.timetable?.settings),
     viewerHeartCount: data.timetable?.viewerHeartedPublishedCount ?? null,
     viewerId: data.me?.id ?? null,

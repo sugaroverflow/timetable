@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 
-import { isAdmin, isElector, isHost, type Role } from "@timetable/shared";
+import { type Role } from "@timetable/shared";
 
-import { TopicCard, type FeedPerms } from "@/components/TopicCard";
+import { TopicCard } from "@/components/TopicCard";
+import { topicPerms } from "@/lib/feedPage";
 import type { FeedTopic } from "@/lib/feedTypes";
 import { gqlFetch } from "@/lib/graphql";
 import { displayRolesFromCookies } from "@/lib/previewRoles.server";
@@ -59,12 +60,7 @@ export default async function TopicPermalinkPage({
     (data.timetable?.viewerRoles ?? []) as Role[],
   );
   const settings = parseTimetableSettings(data.timetable?.settings);
-  const perms: FeedPerms = {
-    canHeart: isElector(roles) && topic.status === "published",
-    canComment: roles.length > 0 && topic.status === "published",
-    canHostOnly: isHost(roles) || isAdmin(roles),
-    canModerate: isAdmin(roles),
-  };
+  const perms = topicPerms(roles, topic.status);
 
   return (
     <div className="stack">
@@ -83,7 +79,7 @@ export default async function TopicPermalinkPage({
         perms={perms}
         slug={slug}
         viewerId={data.me?.id ?? null}
-        hostLabel={settings.roleLabels?.host}
+        hostLabel={roleLabel(settings.roleLabels, "host")}
         adminLabel={roleLabel(settings.roleLabels, "admin")}
         viewerHeartCount={data.timetable?.viewerHeartedPublishedCount ?? null}
       />

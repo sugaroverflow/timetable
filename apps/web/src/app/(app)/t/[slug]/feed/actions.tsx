@@ -1,8 +1,7 @@
 "use server";
 
 import { TopicCard } from "@/components/TopicCard";
-import { fetchFeedPage, isTopicNew } from "@/lib/feedPage";
-import { roleLabel } from "@/lib/timetableSettings";
+import { fetchFeedPage, topicCardProps } from "@/lib/feedPage";
 
 /**
  * Loads the next feed page as server-rendered TopicCards for the infinite
@@ -20,18 +19,7 @@ export async function loadMoreFeed(
   const page = await fetchFeedPage(slug, sort, host, offset, hearted, seed);
   return {
     cards: page.topics.map((topic) => (
-      <TopicCard
-        key={topic.id}
-        topic={topic}
-        perms={page.perms}
-        slug={slug}
-        viewerId={page.viewerId}
-        isNew={isTopicNew(topic, page.lastSeenAt)}
-        hostLabel={page.settings.roleLabels?.host}
-        adminLabel={roleLabel(page.settings.roleLabels, "admin")}
-        viewerHeartCount={page.viewerHeartCount}
-        hosts={page.hosts}
-      />
+      <TopicCard key={topic.id} {...topicCardProps(page, topic)} />
     )),
     hasNext: page.hasNext,
   };
