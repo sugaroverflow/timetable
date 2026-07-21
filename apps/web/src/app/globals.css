@@ -1110,10 +1110,6 @@ textarea {
   font-size: var(--text-xs);
   font-weight: var(--fw-semibold);
 }
-.status-draft {
-  background: var(--status-draft-bg);
-  color: var(--status-draft-ink);
-}
 .status-submitted {
   background: var(--warning-soft);
   color: var(--warning-ink);
