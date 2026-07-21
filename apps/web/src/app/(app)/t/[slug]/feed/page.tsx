@@ -11,8 +11,8 @@ import { TopicCard } from "@/components/TopicCard";
 import {
   FEED_PAGE_SIZE,
   fetchFeedPage,
-  isTopicNew,
   normalizeFeedSort,
+  topicCardProps,
 } from "@/lib/feedPage";
 import { gqlFetch } from "@/lib/graphql";
 import { pluralLabel, roleLabel } from "@/lib/timetableSettings";
@@ -153,18 +153,7 @@ export default async function FeedPage({
           loadMore={loadMoreFeed}
         >
           {page.topics.map((topic) => (
-            <TopicCard
-              key={topic.id}
-              topic={topic}
-              perms={page.perms}
-              slug={slug}
-              viewerId={page.viewerId}
-              isNew={isTopicNew(topic, page.lastSeenAt)}
-              hostLabel={page.settings.roleLabels?.host}
-              adminLabel={adminLabel}
-              viewerHeartCount={page.viewerHeartCount}
-              hosts={page.hosts}
-            />
+            <TopicCard key={topic.id} {...topicCardProps(page, topic)} />
           ))}
         </InfiniteFeed>
       )}
