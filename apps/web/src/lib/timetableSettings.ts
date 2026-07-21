@@ -122,7 +122,7 @@ export const FONT_PAIRINGS: Record<
  */
 export const DEFAULT_THEME_LIGHT = {
   primary: "#2f54eb", // --primary (--blue-600)
-  secondary: "#5b7bff", // host accent seed (--blue-500)
+  secondary: "#5b7bff", // host accent seed (brand blue)
   background: "#eceef3", // --bg
   topbar: "#ffffff", // --card (opaque top bar)
   topbarText: "#1b2330", // --ink
