@@ -1,20 +1,10 @@
-import { getClerkToken } from "./clientAuth";
+import { clientTransport } from "@/lib/transport.client";
 
-export const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
-
-/** Browser fetch to the API with the Clerk session token as a Bearer. */
+/** Browser fetch to the API with the Clerk session token as a Bearer.
+ * Returns the raw Response; callers own error handling. */
 export async function clientApi(
   path: string,
   init?: RequestInit,
 ): Promise<Response> {
-  const token = await getClerkToken();
-  return fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers ?? {}),
-    },
-  });
+  return clientTransport.rest(path, init);
 }
