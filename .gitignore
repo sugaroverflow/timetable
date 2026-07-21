@@ -43,6 +43,7 @@ packages/db/drizzle/meta/_journal.json.bak
 .docker-data/
 *.local-backup
 
-# local agent state
-.claude/
+# local agent state (shared agent config IS committed: .claude/settings.json)
+.claude/*
+!.claude/settings.json
 prototype.html
