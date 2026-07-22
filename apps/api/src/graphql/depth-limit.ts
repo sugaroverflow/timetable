@@ -131,7 +131,11 @@ function costForSelection(
     return (
       1 +
       (selection.selectionSet
-        ? costForSelectionSet(selection.selectionSet, fragments, visitedFragments)
+        ? costForSelectionSet(
+            selection.selectionSet,
+            fragments,
+            visitedFragments,
+          )
         : 0)
     );
   }
@@ -164,7 +168,11 @@ export function maxCostRule(maxCost: number) {
     const fragments = fragmentsByName(context.getDocument());
     return {
       OperationDefinition(node) {
-        const cost = costForSelectionSet(node.selectionSet, fragments, new Set());
+        const cost = costForSelectionSet(
+          node.selectionSet,
+          fragments,
+          new Set(),
+        );
         if (cost > maxCost) {
           context.reportError(
             new GraphQLError(

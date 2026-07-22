@@ -64,7 +64,9 @@ export function CommentActions({
       toast(hidden ? "Comment unhidden" : "Comment hidden");
       startTransition(() => router.refresh());
     } catch (err) {
-      toastError(err instanceof Error ? err.message : "Could not update comment");
+      toastError(
+        err instanceof Error ? err.message : "Could not update comment",
+      );
     }
   }
 

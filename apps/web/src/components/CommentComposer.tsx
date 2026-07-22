@@ -4,7 +4,10 @@ import { Send } from "lucide-react";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
-import { MentionTextarea, type MentionCandidate } from "@/components/MentionTextarea";
+import {
+  MentionTextarea,
+  type MentionCandidate,
+} from "@/components/MentionTextarea";
 import { useToast } from "@/components/Toast";
 import { clientGql } from "@/lib/clientGraphql";
 

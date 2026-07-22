@@ -153,7 +153,11 @@ export function TimetableProfileForm({
       <h3 style={{ fontSize: 15, margin: "18px 0 2px" }}>Role labels</h3>
       <div className="field">
         <label htmlFor="ra">Admin label</label>
-        <input id="ra" value={admin} onChange={(e) => setAdmin(e.target.value)} />
+        <input
+          id="ra"
+          value={admin}
+          onChange={(e) => setAdmin(e.target.value)}
+        />
       </div>
       <div className="field">
         <label htmlFor="rh">Host label</label>

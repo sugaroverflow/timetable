@@ -17,7 +17,9 @@ describe("logRequestError", () => {
   });
 
   it("logs nested error causes and common driver fields", () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
     const driverError = Object.assign(new Error("driver failed"), {
       code: "ERR_DRIVER",
       detail: "bad timestamp parameter",

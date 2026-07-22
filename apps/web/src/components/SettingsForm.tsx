@@ -28,9 +28,30 @@ const MUTATION = `mutation Theme($s: String!, $theme: String, $cover: String, $i
 // Curated quick-pick set — enough breadth for a timetable/faculty context
 // without pulling in a heavyweight emoji-picker dependency.
 const EMOJI_CHOICES = [
-  "📚", "🎓", "🏛️", "🗳️", "💡", "📊", "📈", "🔬",
-  "⚖️", "🌍", "🤝", "💬", "📅", "⭐", "❤️", "🔥",
-  "🎯", "🧠", "🏆", "📝", "🎤", "🌱", "⚡", "🎨",
+  "📚",
+  "🎓",
+  "🏛️",
+  "🗳️",
+  "💡",
+  "📊",
+  "📈",
+  "🔬",
+  "⚖️",
+  "🌍",
+  "🤝",
+  "💬",
+  "📅",
+  "⭐",
+  "❤️",
+  "🔥",
+  "🎯",
+  "🧠",
+  "🏆",
+  "📝",
+  "🎤",
+  "🌱",
+  "⚡",
+  "🎨",
 ];
 
 export type SettingsValues = {
@@ -267,9 +288,21 @@ export function SettingsForm({
       <div className="row wrap">
         {colourField("tp", "Primary", primary, setPrimary, "primary")}
         {colourField("ts", "Secondary", secondary, setSecondary, "secondary")}
-        {colourField("tb", "Background", background, setBackground, "background")}
+        {colourField(
+          "tb",
+          "Background",
+          background,
+          setBackground,
+          "background",
+        )}
         {colourField("tt", "Top bar", topbar, setTopbar, "topbar")}
-        {colourField("tti", "Top bar text", topbarText, setTopbarText, "topbarText")}
+        {colourField(
+          "tti",
+          "Top bar text",
+          topbarText,
+          setTopbarText,
+          "topbarText",
+        )}
         {colourField("tx", "Text", text, setText, "text")}
       </div>
 
@@ -293,15 +326,38 @@ export function SettingsForm({
 
       <h3 style={{ fontSize: 15, margin: "18px 0 2px" }}>Dark mode palette</h3>
       <p className="faint" style={{ marginTop: 0, fontSize: 12 }}>
-        Used when a member switches to dark mode (toggle on their Profile
-        page).
+        Used when a member switches to dark mode (toggle on their Profile page).
       </p>
       <div className="row wrap">
-        {colourField("dp", "Primary", darkPrimary, setDarkPrimary, "darkPrimary")}
-        {colourField("ds", "Secondary", darkSecondary, setDarkSecondary, "darkSecondary")}
-        {colourField("db", "Background", darkBackground, setDarkBackground, "darkBackground")}
+        {colourField(
+          "dp",
+          "Primary",
+          darkPrimary,
+          setDarkPrimary,
+          "darkPrimary",
+        )}
+        {colourField(
+          "ds",
+          "Secondary",
+          darkSecondary,
+          setDarkSecondary,
+          "darkSecondary",
+        )}
+        {colourField(
+          "db",
+          "Background",
+          darkBackground,
+          setDarkBackground,
+          "darkBackground",
+        )}
         {colourField("dt", "Top bar", darkTopbar, setDarkTopbar, "darkTopbar")}
-        {colourField("dti", "Top bar text", darkTopbarText, setDarkTopbarText, "darkTopbarText")}
+        {colourField(
+          "dti",
+          "Top bar text",
+          darkTopbarText,
+          setDarkTopbarText,
+          "darkTopbarText",
+        )}
         {colourField("dx", "Text", darkText, setDarkText, "darkText")}
       </div>
 

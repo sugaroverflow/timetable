@@ -25,10 +25,7 @@ export const timetables = pgTable("timetables", {
   description: text(),
   privacy: privacyEnum().notNull().default("private"),
   customDomain: text().unique(),
-  settings: jsonb()
-    .$type<TimetableSettings>()
-    .notNull()
-    .default({}),
+  settings: jsonb().$type<TimetableSettings>().notNull().default({}),
   // Heart-count cutoff (QA #42): hearts created before this timestamp are
   // ignored wherever counts/weights are computed. Null = count everything.
   heartsCountFrom: timestamp({ withTimezone: true }),

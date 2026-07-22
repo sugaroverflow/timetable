@@ -91,7 +91,10 @@ export function TopicLeaderboard({
             const score = scoreFor(t, norm);
             return (
               <li key={t.id} style={{ fontSize: 14 }}>
-                <div className="row" style={{ justifyContent: "space-between" }}>
+                <div
+                  className="row"
+                  style={{ justifyContent: "space-between" }}
+                >
                   <span>
                     {href ? <Link href={href}>{t.title}</Link> : t.title}{" "}
                     <span className="faint">· {t.hostName ?? hostLabel}</span>
@@ -103,8 +106,7 @@ export function TopicLeaderboard({
                         className="faint"
                         style={{ display: "block", fontSize: 11 }}
                       >
-                        last{" "}
-                        <Heart size={14} fill="currentColor" aria-hidden />{" "}
+                        last <Heart size={14} fill="currentColor" aria-hidden />{" "}
                         {new Date(t.lastHeartAt).toLocaleDateString()}
                       </span>
                     ) : null}

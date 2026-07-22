@@ -2,7 +2,7 @@
   "name": "timetable",
   "version": "0.1.0",
   "private": true,
-  "description": "Collaborative timetables — multi-tenant topic feed, availability calendar, and moderation. Produced by Sparkle Bureaucracy.",
+  "description": "Topic — collaborative forums: multi-tenant topic feed, availability calendar, and moderation. Produced by Sparkle Bureaucracy.",
   "license": "SEE LICENSE.md",
   "workspaces": [
     "packages/*",
@@ -16,6 +16,8 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present && npm run lint:node",
     "lint:node": "eslint apps/api packages tests scripts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "npm run test --workspaces --if-present",
     "test:e2e": "playwright test",
     "dev": "npm run dev --workspace @timetable/api & npm run dev --workspace @timetable/web",

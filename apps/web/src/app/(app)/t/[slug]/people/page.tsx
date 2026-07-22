@@ -90,17 +90,13 @@ export default async function PeoplePage({
       MEMBERS_QUERY,
       { timetableId: data.timetable!.id },
     );
-    membersByUser = new Map(
-      members.timetableMembers.map((m) => [m.userId, m]),
-    );
+    membersByUser = new Map(members.timetableMembers.map((m) => [m.userId, m]));
   }
 
   const sections = (["admin", "host", "elector"] as const).map((role) => ({
     role,
     heading: pluralLabel(roleLabel(settings.roleLabels, role)),
-    people: data.timetablePeople.filter(
-      (p) => primaryRole(p.roles) === role,
-    ),
+    people: data.timetablePeople.filter((p) => primaryRole(p.roles) === role),
   }));
 
   return (

@@ -11,10 +11,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { users } from "./auth";
-import {
-  commentVisibilityEnum,
-  topicStatusEnum,
-} from "./enums";
+import { commentVisibilityEnum, topicStatusEnum } from "./enums";
 import { timetables } from "./timetables";
 
 export const topics = pgTable(

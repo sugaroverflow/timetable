@@ -7,23 +7,13 @@ export * from "./rate-limits";
 
 import { users } from "./auth";
 import { apiRateLimitBuckets } from "./rate-limits";
-import {
-  availability,
-  slotComments,
-  slotTopics,
-  timeslots,
-} from "./calendar";
+import { availability, slotComments, slotTopics, timeslots } from "./calendar";
 import {
   timetableInvites,
   timetableMemberships,
   timetables,
 } from "./timetables";
-import {
-  activityEvents,
-  comments,
-  hearts,
-  topics,
-} from "./topics";
+import { activityEvents, comments, hearts, topics } from "./topics";
 
 /** Convenience: inferred row types for the whole schema. */
 export type User = typeof users.$inferSelect;

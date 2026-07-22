@@ -1,4 +1,8 @@
-import { getPerson, getReadableTimetable, getViewerRoles } from "@timetable/core";
+import {
+  getPerson,
+  getReadableTimetable,
+  getViewerRoles,
+} from "@timetable/core";
 import { isAdmin, type Role, type Viewer } from "@timetable/shared";
 
 import { getUserFromRequest, type SessionUser } from "./auth/clerk";

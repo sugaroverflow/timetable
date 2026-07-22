@@ -75,7 +75,11 @@ export async function updateTopic(
   let slug: string | undefined;
   if (input.title !== undefined) {
     const current = await getTopicById(topicId);
-    if (current && current.publishedAt === null && input.title !== current.title) {
+    if (
+      current &&
+      current.publishedAt === null &&
+      input.title !== current.title
+    ) {
       slug = await ensureTopicSlug(current.timetableId, input.title, {
         excludeTopicId: topicId,
       });
@@ -450,37 +454,39 @@ export async function buildFeed(
     }
   }
 
-  const feed: FeedTopic[] = rows.map(({ topic, hostName, hostImage, hostSlug }) => {
-    const topicHearts = (heartsByTopic.get(topic.id) ?? []).map(
-      (electorId) => ({ topicId: topic.id, electorId }),
-    );
-    const norms = topicNormScores(topicHearts, heartCounts);
-    return {
-      id: topic.id,
-      timetableId: topic.timetableId,
-      hostId: topic.hostId,
-      hostName,
-      hostImage,
-      hostSlug,
-      title: topic.title,
-      slug: topic.slug,
-      bodyMd: topic.bodyMd,
-      coverImageUrl: topic.coverImageUrl,
-      status: topic.status,
-      publishedAt: topic.publishedAt,
-      contentUpdatedAt: topic.contentUpdatedAt,
-      createdAt: topic.createdAt,
-      heartCount: norms.raw,
-      weightedScore: norms.l1,
-      l2Score: norms.l2,
-      devotionScore: norms.devotion,
-      viewerHasHearted: viewerUserId
-        ? topicHearts.some((h) => h.electorId === viewerUserId)
-        : false,
-      commentCount: commentStats.get(topic.id)?.count ?? 0,
-      latestCommentAt: commentStats.get(topic.id)?.latestCommentAt ?? null,
-    };
-  });
+  const feed: FeedTopic[] = rows.map(
+    ({ topic, hostName, hostImage, hostSlug }) => {
+      const topicHearts = (heartsByTopic.get(topic.id) ?? []).map(
+        (electorId) => ({ topicId: topic.id, electorId }),
+      );
+      const norms = topicNormScores(topicHearts, heartCounts);
+      return {
+        id: topic.id,
+        timetableId: topic.timetableId,
+        hostId: topic.hostId,
+        hostName,
+        hostImage,
+        hostSlug,
+        title: topic.title,
+        slug: topic.slug,
+        bodyMd: topic.bodyMd,
+        coverImageUrl: topic.coverImageUrl,
+        status: topic.status,
+        publishedAt: topic.publishedAt,
+        contentUpdatedAt: topic.contentUpdatedAt,
+        createdAt: topic.createdAt,
+        heartCount: norms.raw,
+        weightedScore: norms.l1,
+        l2Score: norms.l2,
+        devotionScore: norms.devotion,
+        viewerHasHearted: viewerUserId
+          ? topicHearts.some((h) => h.electorId === viewerUserId)
+          : false,
+        commentCount: commentStats.get(topic.id)?.count ?? 0,
+        latestCommentAt: commentStats.get(topic.id)?.latestCommentAt ?? null,
+      };
+    },
+  );
 
   const visibleFeed =
     opts.heartedByViewer && viewerUserId

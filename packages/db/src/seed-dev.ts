@@ -60,19 +60,29 @@ const COMMENT_VISIBILITY_VALUES = [
   "admin_only",
 ] as const satisfies readonly CommentVisibility[];
 
-const TIMETABLE_PRIVACY_VALUES = ["deactivated", "private", "public", "hosts_only", "no_comments"] as const;
+const TIMETABLE_PRIVACY_VALUES = [
+  "deactivated",
+  "private",
+  "public",
+  "hosts_only",
+  "no_comments",
+] as const;
 type TimetablePrivacy = (typeof TIMETABLE_PRIVACY_VALUES)[number];
 
-const AVAILABILITY_STATE_VALUES = ['green', 'yellow', 'red'] as const satisfies readonly AvailabilityState[];
+const AVAILABILITY_STATE_VALUES = [
+  "green",
+  "yellow",
+  "red",
+] as const satisfies readonly AvailabilityState[];
 
 type SlotAvailability = { person: string; state: AvailabilityState };
 type SlotDiscussionEntry = { author: string; text: string };
 
 type SlotFixture = {
   label: string;
-  date: string;       // YYYY-MM-DD
-  startTime: string;  // HH:MM
-  endTime: string;    // HH:MM
+  date: string; // YYYY-MM-DD
+  startTime: string; // HH:MM
+  endTime: string; // HH:MM
   location: string;
   topicTags: string[];
   availability: SlotAvailability[];
@@ -254,8 +264,9 @@ function parseTimetable(markdown: string): TimetableFixture {
   const description = fieldFromBlock(block, "Description") || null;
   const privacyRaw = fieldFromBlock(block, "Privacy", { required: true });
   const privacy =
-    /\*\*(deactivated|private|public|hosts_only|no_comments)\*\*/.exec(privacyRaw)?.[1] ??
-    privacyRaw.trim();
+    /\*\*(deactivated|private|public|hosts_only|no_comments)\*\*/.exec(
+      privacyRaw,
+    )?.[1] ?? privacyRaw.trim();
 
   if (!hasValue(TIMETABLE_PRIVACY_VALUES, privacy)) {
     throw new Error(
@@ -264,7 +275,9 @@ function parseTimetable(markdown: string): TimetableFixture {
   }
 
   const roleLabels: RoleLabels = {};
-  for (const match of block.matchAll(/^- (Admin|Host|Elector):[ \t]*(.+)$/gim)) {
+  for (const match of block.matchAll(
+    /^- (Admin|Host|Elector):[ \t]*(.+)$/gim,
+  )) {
     const role = match[1]?.toLowerCase() as keyof NonNullable<RoleLabels>;
     const label = match[2]?.trim();
     if (role && label) roleLabels[role] = label;
@@ -279,9 +292,15 @@ function parsePeople(markdown: string): PersonFixture[] {
 
   for (const line of block.split("\n")) {
     if (!line.trim().startsWith("|")) continue;
-    if (line.includes("---") || line.includes("Person label") || line.includes("Clerk ID")) continue;
+    if (
+      line.includes("---") ||
+      line.includes("Person label") ||
+      line.includes("Clerk ID")
+    )
+      continue;
 
-    const [label, displayName, rolesRaw, bioRaw, clerkIdRaw] = markdownTableCells(line);
+    const [label, displayName, rolesRaw, bioRaw, clerkIdRaw] =
+      markdownTableCells(line);
     if (!label || !displayName || !rolesRaw) {
       throw new Error(`Invalid person row: ${line}`);
     }
@@ -530,13 +549,20 @@ function parseSlots(markdown: string): SlotFixture[] {
     if (availMatch) {
       for (const line of availMatch[1]!.split("\n")) {
         if (!line.trim().startsWith("|")) continue;
-        if (line.includes("---") || line.toLowerCase().includes("person label") || line.toLowerCase().includes("state")) continue;
+        if (
+          line.includes("---") ||
+          line.toLowerCase().includes("person label") ||
+          line.toLowerCase().includes("state")
+        )
+          continue;
         const cells = markdownTableCells(line);
         const person = cells[0]?.trim();
         const stateRaw = cells[1]?.trim().toLowerCase() ?? "";
         if (!person) continue;
         if (!hasValue(AVAILABILITY_STATE_VALUES, stateRaw)) {
-          throw new Error(`Invalid availability state "${stateRaw}" for slot "${label}"`);
+          throw new Error(
+            `Invalid availability state "${stateRaw}" for slot "${label}"`,
+          );
         }
         availabilityEntries.push({ person, state: stateRaw });
       }
@@ -617,7 +643,9 @@ function validateFixture(fixture: Fixture): void {
 
   const owner = fixture.people.find((person) => person.roles.includes("owner"));
   if (!owner) {
-    throw new Error("Sample data must include at least one person with owner role");
+    throw new Error(
+      "Sample data must include at least one person with owner role",
+    );
   }
 
   for (const topic of fixture.topics) {
@@ -695,20 +723,36 @@ function validateFixture(fixture: Fixture): void {
     }
   }
 
-  assertUnique(fixture.slots, s => s.label, 'slot label');
+  assertUnique(fixture.slots, (s) => s.label, "slot label");
   for (const slot of fixture.slots) {
     for (const tag of slot.topicTags) {
-      if (!topicsByLabel.has(tag)) throw new Error(`Slot "${slot.label}" references missing topic "${tag}"`);
+      if (!topicsByLabel.has(tag))
+        throw new Error(
+          `Slot "${slot.label}" references missing topic "${tag}"`,
+        );
     }
     for (const av of slot.availability) {
       const p = peopleByLabel.get(av.person);
-      if (!p) throw new Error(`Slot "${slot.label}" availability references missing person "${av.person}"`);
-      if (!p.roles.includes('elector') && !p.roles.includes('host') && !p.roles.includes('admin') && !p.roles.includes('owner')) {
-        throw new Error(`Slot "${slot.label}" availability person "${av.person}" has no recognised role`);
+      if (!p)
+        throw new Error(
+          `Slot "${slot.label}" availability references missing person "${av.person}"`,
+        );
+      if (
+        !p.roles.includes("elector") &&
+        !p.roles.includes("host") &&
+        !p.roles.includes("admin") &&
+        !p.roles.includes("owner")
+      ) {
+        throw new Error(
+          `Slot "${slot.label}" availability person "${av.person}" has no recognised role`,
+        );
       }
     }
     for (const d of slot.discussion) {
-      if (!peopleByLabel.has(d.author)) throw new Error(`Slot "${slot.label}" discussion references missing author "${d.author}"`);
+      if (!peopleByLabel.has(d.author))
+        throw new Error(
+          `Slot "${slot.label}" discussion references missing author "${d.author}"`,
+        );
     }
   }
 }
@@ -796,7 +840,9 @@ function buildRows(fixture: Fixture): {
     id: localIdFor(person),
     name: person.displayName,
     slug: userSlugFor(person.displayName),
-    email: person.clerkId ? `${person.label.toLowerCase()}@real.clerk` : fakeEmailFor(person.label),
+    email: person.clerkId
+      ? `${person.label.toLowerCase()}@real.clerk`
+      : fakeEmailFor(person.label),
     emailVerified: BASE_TIME,
     image: null,
     bio: person.bio,
@@ -931,7 +977,9 @@ function buildCommentRows(
       rows.push({
         id: commentIds.get(label) ?? "",
         topicId: topicIds.get(comment.topic) ?? "",
-        parentId: comment.replyTo ? (commentIds.get(comment.replyTo) ?? "") : null,
+        parentId: comment.replyTo
+          ? (commentIds.get(comment.replyTo) ?? "")
+          : null,
         authorId: userIds.get(comment.author) ?? "",
         body: comment.text,
         visibility: comment.visibility,
@@ -1006,7 +1054,8 @@ function buildActivityRows(
       });
     } else if (topic.status === "archived") {
       const archivedHeartCount =
-        fixture.hearts.find((row) => row.topic === topic.label)?.people.length ?? 0;
+        fixture.hearts.find((row) => row.topic === topic.label)?.people
+          .length ?? 0;
       push(`archive:${topic.label}`, ownerId, "topic.archive", {
         topicId,
         title: topic.title,
@@ -1047,7 +1096,7 @@ function buildSlotRows(
   const slotTopicRows: NewSlotTopic[] = [];
 
   for (const slot of fixture.slots) {
-    const slotId = stableUuid('slot', slot.label);
+    const slotId = stableUuid("slot", slot.label);
     const startsAt = new Date(`${slot.date}T${slot.startTime}:00.000Z`);
     const endsAt = new Date(`${slot.date}T${slot.endTime}:00.000Z`);
 
@@ -1063,7 +1112,7 @@ function buildSlotRows(
 
     for (const av of slot.availability) {
       availabilityRows.push({
-        id: stableUuid('slot-avail', `${slot.label}:${av.person}`),
+        id: stableUuid("slot-avail", `${slot.label}:${av.person}`),
         slotId,
         userId: userIds.get(av.person) ?? "",
         state: av.state,
@@ -1074,7 +1123,7 @@ function buildSlotRows(
     for (let i = 0; i < slot.discussion.length; i++) {
       const d = slot.discussion[i]!;
       slotCommentRows.push({
-        id: stableUuid('slot-comment', `${slot.label}:${i}`),
+        id: stableUuid("slot-comment", `${slot.label}:${i}`),
         slotId,
         authorId: userIds.get(d.author) ?? "",
         body: d.text,
@@ -1167,7 +1216,9 @@ async function main(): Promise<void> {
           });
       }
 
-      await tx.delete(timetables).where(eq(timetables.slug, fixture.timetable.slug));
+      await tx
+        .delete(timetables)
+        .where(eq(timetables.slug, fixture.timetable.slug));
       await tx.insert(timetables).values(rows.timetable);
       await tx.insert(timetableMemberships).values(rows.memberships);
       await tx.insert(topics).values(rows.topics);
@@ -1203,7 +1254,9 @@ async function main(): Promise<void> {
     console.log("Reset dev database app tables before seeding");
   }
   console.log(`Timetable slug: ${fixture.timetable.slug}`);
-  console.log(`Owner dev user: ${rows.ownerId} (${fakeEmailFor(ownerLabel(fixture))})`);
+  console.log(
+    `Owner dev user: ${rows.ownerId} (${fakeEmailFor(ownerLabel(fixture))})`,
+  );
   console.log(
     [
       `${rows.users.length} users`,
@@ -1222,6 +1275,9 @@ function ownerLabel(fixture: Fixture): string {
   return owner.label;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
   await main();
 }

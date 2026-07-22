@@ -35,10 +35,7 @@ async function recordMentions(comment: Comment): Promise<void> {
   const members = await db
     .select({ userId: users.id, slug: users.slug })
     .from(users)
-    .innerJoin(
-      timetableMemberships,
-      eq(timetableMemberships.userId, users.id),
-    )
+    .innerJoin(timetableMemberships, eq(timetableMemberships.userId, users.id))
     .where(
       and(
         eq(timetableMemberships.timetableId, topic.timetableId),
@@ -60,7 +57,11 @@ async function logCommentActivity(
   action: "comment.add" | "comment.reply",
 ): Promise<void> {
   const [topic] = await db
-    .select({ id: topics.id, title: topics.title, timetableId: topics.timetableId })
+    .select({
+      id: topics.id,
+      title: topics.title,
+      timetableId: topics.timetableId,
+    })
     .from(topics)
     .where(eq(topics.id, comment.topicId))
     .limit(1);

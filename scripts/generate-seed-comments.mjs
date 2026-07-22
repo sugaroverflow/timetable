@@ -19,8 +19,13 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const FIXTURE = join(dirname(fileURLToPath(import.meta.url)), "..", "dev-sample-data.md");
-const MARKER = "<!-- GENERATED COMMENTS (scripts/generate-seed-comments.mjs) — do not hand-edit below this line -->";
+const FIXTURE = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "dev-sample-data.md",
+);
+const MARKER =
+  "<!-- GENERATED COMMENTS (scripts/generate-seed-comments.mjs) — do not hand-edit below this line -->";
 const SEED = 42;
 
 // --- deterministic PRNG -----------------------------------------------------
@@ -42,12 +47,26 @@ const src = readFileSync(FIXTURE, "utf8");
 
 const people = [];
 for (const line of src.split("\n")) {
-  const m = /^\|\s*((?:admin|host|elector)-[a-z]+)\s*\|\s*([^|]+)\|\s*([^|]+)\|/.exec(line);
-  if (m) people.push({ label: m[1], name: m[2].trim(), roles: m[3].split(",").map((r) => r.trim()) });
+  const m =
+    /^\|\s*((?:admin|host|elector)-[a-z]+)\s*\|\s*([^|]+)\|\s*([^|]+)\|/.exec(
+      line,
+    );
+  if (m)
+    people.push({
+      label: m[1],
+      name: m[2].trim(),
+      roles: m[3].split(",").map((r) => r.trim()),
+    });
 }
-const electors = people.filter((p) => p.roles.includes("elector")).map((p) => p.label);
-const hosts = people.filter((p) => p.roles.includes("host")).map((p) => p.label);
-const admins = people.filter((p) => p.roles.includes("admin")).map((p) => p.label);
+const electors = people
+  .filter((p) => p.roles.includes("elector"))
+  .map((p) => p.label);
+const hosts = people
+  .filter((p) => p.roles.includes("host"))
+  .map((p) => p.label);
+const admins = people
+  .filter((p) => p.roles.includes("admin"))
+  .map((p) => p.label);
 
 const topics = [];
 {
@@ -210,7 +229,9 @@ for (const topic of topics) {
 
   // Public discussion on published topics
   if (topic.status === "published") {
-    const target = megaLabels.has(topic.label) ? randInt(100, 115) : randInt(10, 15);
+    const target = megaLabels.has(topic.label)
+      ? randInt(100, 115)
+      : randInt(10, 15);
     const count = Math.max(0, target - (existingCounts.get(topic.label) ?? 0));
     // pool of {id, depth, author} comments replies can attach to
     const attachable = [];
@@ -253,9 +274,10 @@ for (const topic of topics) {
       const replyCount = randInt(1, 3);
       let parentId = rootId;
       for (let i = 0; i < replyCount; i++) {
-        const author = pick(
-          [...admins, ...hosts.filter((h) => h !== topic.host)],
-        );
+        const author = pick([
+          ...admins,
+          ...hosts.filter((h) => h !== topic.host),
+        ]);
         const id = nextId();
         emit({
           topic: topic.label,

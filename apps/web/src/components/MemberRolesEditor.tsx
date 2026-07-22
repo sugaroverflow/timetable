@@ -164,7 +164,9 @@ export function MemberRolesEditor({
             <textarea
               value={bio ?? ""}
               onChange={(e) => setBio(e.target.value)}
-              placeholder={bio === null ? "Loading…" : "Member bio (markdown supported)"}
+              placeholder={
+                bio === null ? "Loading…" : "Member bio (markdown supported)"
+              }
               aria-label="Member bio"
               disabled={bio === null}
             />

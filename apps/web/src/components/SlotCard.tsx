@@ -13,13 +13,17 @@ export type CalendarPerms = {
 };
 
 function formatWeekday(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, { weekday: "short" }).toUpperCase();
+  return new Date(iso)
+    .toLocaleString(undefined, { weekday: "short" })
+    .toUpperCase();
 }
 function formatDay(iso: string): string {
   return String(new Date(iso).getDate());
 }
 function formatMonth(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, { month: "short" }).toUpperCase();
+  return new Date(iso)
+    .toLocaleString(undefined, { month: "short" })
+    .toUpperCase();
 }
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, {
@@ -49,7 +53,10 @@ export function SlotCard({
 
   return (
     <li className="card stack">
-      <div className="row wrap" style={{ justifyContent: "space-between", alignItems: "flex-start" }}>
+      <div
+        className="row wrap"
+        style={{ justifyContent: "space-between", alignItems: "flex-start" }}
+      >
         <div className="row" style={{ gap: 14, alignItems: "flex-start" }}>
           <div className="slot-date">
             <div className="d-wd">{formatWeekday(slot.startsAt)}</div>
@@ -96,7 +103,8 @@ export function SlotCard({
                 borderColor: "transparent",
               }}
             >
-              <TriangleAlert size={14} aria-hidden /> conflict: {slot.topics.length} topics
+              <TriangleAlert size={14} aria-hidden /> conflict:{" "}
+              {slot.topics.length} topics
             </span>
           ) : null}
         </div>
@@ -104,8 +112,14 @@ export function SlotCard({
 
       <div className="row" style={{ gap: "var(--space-2)" }}>
         <span className="avail-bar" style={{ width: 160 }}>
-          <span className="g" style={{ width: pct(slot.counts.green, total) }} />
-          <span className="y" style={{ width: pct(slot.counts.yellow, total) }} />
+          <span
+            className="g"
+            style={{ width: pct(slot.counts.green, total) }}
+          />
+          <span
+            className="y"
+            style={{ width: pct(slot.counts.yellow, total) }}
+          />
           <span className="r" style={{ width: pct(slot.counts.red, total) }} />
         </span>
         <span className="faint" style={{ fontSize: 12 }}>

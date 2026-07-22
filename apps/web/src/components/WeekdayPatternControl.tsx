@@ -48,7 +48,9 @@ export function WeekdayPatternControl({ slug }: { slug: string }) {
       toast(`Every ${day} set to “${word}”`);
       startTransition(() => router.refresh());
     } catch (err) {
-      toastError(err instanceof Error ? err.message : "Could not apply pattern");
+      toastError(
+        err instanceof Error ? err.message : "Could not apply pattern",
+      );
     }
   }
 

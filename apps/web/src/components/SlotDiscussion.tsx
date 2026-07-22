@@ -83,46 +83,51 @@ export function SlotDiscussion({
       <Collapsible.Panel>
         {open ? (
           <div className="host-thread">
-          {comments?.map((c) => (
-            <div key={c.id} className="hc">
-              <Avatar name={c.authorName} small />
-              <div>
-                <div className="hc-name">{c.authorName ?? "Someone"}</div>
-                <div className="hc-bubble">{c.body}</div>
+            {comments?.map((c) => (
+              <div key={c.id} className="hc">
+                <Avatar name={c.authorName} small />
+                <div>
+                  <div className="hc-name">{c.authorName ?? "Someone"}</div>
+                  <div className="hc-bubble">{c.body}</div>
+                </div>
               </div>
-            </div>
-          ))}
-          {comments && comments.length === 0 ? (
-            <div className="faint" style={{ fontSize: 12, padding: "4px 0" }}>
-              No messages yet.
-            </div>
-          ) : null}
-          {canPost ? (
-            <div className="hc" style={{ alignItems: "flex-start" }}>
-              <Avatar name={null} small />
-              <form
-                onSubmit={add}
-                style={{ flex: 1, display: "flex", gap: 8, alignItems: "flex-start" }}
-              >
-                <textarea
-                  value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                  placeholder="Add to the discussion…"
-                  aria-label="Slot message"
-                  style={{ flex: 1, minHeight: 38 }}
-                />
-                <button
-                  className="btn btn-primary btn-send"
-                  type="submit"
-                  disabled={pending}
-                  aria-label="Send message"
-                  title="Send"
+            ))}
+            {comments && comments.length === 0 ? (
+              <div className="faint" style={{ fontSize: 12, padding: "4px 0" }}>
+                No messages yet.
+              </div>
+            ) : null}
+            {canPost ? (
+              <div className="hc" style={{ alignItems: "flex-start" }}>
+                <Avatar name={null} small />
+                <form
+                  onSubmit={add}
+                  style={{
+                    flex: 1,
+                    display: "flex",
+                    gap: 8,
+                    alignItems: "flex-start",
+                  }}
                 >
-                  <Send size={16} aria-hidden />
-                </button>
-              </form>
-            </div>
-          ) : null}
+                  <textarea
+                    value={body}
+                    onChange={(e) => setBody(e.target.value)}
+                    placeholder="Add to the discussion…"
+                    aria-label="Slot message"
+                    style={{ flex: 1, minHeight: 38 }}
+                  />
+                  <button
+                    className="btn btn-primary btn-send"
+                    type="submit"
+                    disabled={pending}
+                    aria-label="Send message"
+                    title="Send"
+                  >
+                    <Send size={16} aria-hidden />
+                  </button>
+                </form>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </Collapsible.Panel>

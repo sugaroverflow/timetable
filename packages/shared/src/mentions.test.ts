@@ -4,9 +4,9 @@ import { parseMentionHandles } from "./mentions";
 
 describe("parseMentionHandles", () => {
   it("extracts unique lowercased handles", () => {
-    expect(parseMentionHandles("hey @jane-doe and @Bob, also @jane-doe")).toEqual(
-      ["jane-doe", "bob"],
-    );
+    expect(
+      parseMentionHandles("hey @jane-doe and @Bob, also @jane-doe"),
+    ).toEqual(["jane-doe", "bob"]);
   });
 
   it("ignores email addresses", () => {

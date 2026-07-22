@@ -1,8 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const port = Number(process.env.PLAYWRIGHT_PORT ?? 3000);
-const baseURL =
-  process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${port}`;
+const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${port}`;
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -24,8 +23,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command:
-      "npm run dev --workspace @timetable/web -- --hostname 127.0.0.1",
+    command: "npm run dev --workspace @timetable/web -- --hostname 127.0.0.1",
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
@@ -34,8 +32,7 @@ export default defineConfig({
       NEXT_PUBLIC_API_URL:
         process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:4000",
       NEXT_PUBLIC_GRAPHQL_URL:
-        process.env.NEXT_PUBLIC_GRAPHQL_URL ??
-        "http://127.0.0.1:4000/graphql",
+        process.env.NEXT_PUBLIC_GRAPHQL_URL ?? "http://127.0.0.1:4000/graphql",
       NEXT_PUBLIC_CANONICAL_HOSTS:
         process.env.NEXT_PUBLIC_CANONICAL_HOSTS ?? "localhost,127.0.0.1",
     },

@@ -24,7 +24,11 @@ const errorFieldNames = [
   "routine",
 ] as const;
 
-function writeLog(level: LogLevel, event: string, fields: Record<string, unknown>) {
+function writeLog(
+  level: LogLevel,
+  event: string,
+  fields: Record<string, unknown>,
+) {
   const entry = {
     level,
     event,
@@ -83,10 +87,9 @@ export function logRequestError(
   });
 }
 
-export function structuredLogger(component: string): Record<
-  LogLevel,
-  (...args: unknown[]) => void
-> {
+export function structuredLogger(
+  component: string,
+): Record<LogLevel, (...args: unknown[]) => void> {
   return {
     debug: (...args) => writeLog("debug", "log", { component, args }),
     info: (...args) => writeLog("info", "log", { component, args }),

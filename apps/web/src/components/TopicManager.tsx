@@ -124,16 +124,15 @@ export function TopicManager({
           onDone={() => setEditing(false)}
         />
       ) : (
-        <div
-          className="row wrap divider-top"
-          style={{ paddingTop: 10 }}
-        >
+        <div className="row wrap divider-top" style={{ paddingTop: 10 }}>
           {topic.status === "unpublished" && (
             <button
               className="btn btn-primary"
               type="button"
               disabled={pending}
-              onClick={() => run(SUBMIT, { id: topic.id }, "Submitted for review")}
+              onClick={() =>
+                run(SUBMIT, { id: topic.id }, "Submitted for review")
+              }
             >
               Submit for review
             </button>
@@ -143,7 +142,9 @@ export function TopicManager({
               className="btn"
               type="button"
               disabled={pending}
-              onClick={() => run(UNPUBLISH, { id: topic.id }, "Topic unpublished")}
+              onClick={() =>
+                run(UNPUBLISH, { id: topic.id }, "Topic unpublished")
+              }
             >
               Unpublish
             </button>

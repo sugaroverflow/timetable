@@ -103,8 +103,8 @@ export default async function FeedPage({
 
       {!page.isMember ? (
         <div className="notice">
-          You&rsquo;re viewing a public feed. <Link href="/sign-in">Sign in</Link>{" "}
-          to heart and comment.
+          You&rsquo;re viewing a public feed.{" "}
+          <Link href="/sign-in">Sign in</Link> to heart and comment.
         </div>
       ) : null}
 

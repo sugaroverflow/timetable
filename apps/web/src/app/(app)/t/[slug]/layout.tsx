@@ -49,7 +49,12 @@ const TIMETABLE_QUERY = `
 
 type MineResult = {
   myTimetables: {
-    timetable: { slug: string; name: string; privacy: string; settings: string };
+    timetable: {
+      slug: string;
+      name: string;
+      privacy: string;
+      settings: string;
+    };
   }[];
 };
 
@@ -137,7 +142,9 @@ export default async function TimetableLayout({
     <main className="container">
       {/* The timetable's theme applies globally (topbar included) while
        * this layout is mounted; dark overrides ride the same tag. */}
-      {themeCss ? <style dangerouslySetInnerHTML={{ __html: themeCss }} /> : null}
+      {themeCss ? (
+        <style dangerouslySetInnerHTML={{ __html: themeCss }} />
+      ) : null}
       <div className="shell">
         <Sidebar>
           <div className="sidebar-head">
@@ -170,7 +177,9 @@ export default async function TimetableLayout({
               <NavLink href={`${base}/notifications`}>
                 Notifications
                 {unread > 0 ? (
-                  <span className="nav-badge">{unread > 99 ? "99+" : unread}</span>
+                  <span className="nav-badge">
+                    {unread > 99 ? "99+" : unread}
+                  </span>
                 ) : null}
               </NavLink>
             )}
