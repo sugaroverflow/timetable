@@ -105,3 +105,33 @@ export function renderDigest(digest: UserDigest): {
     html: parts.join("\n"),
   };
 }
+
+/**
+ * Invite email for a pre-created account (product feedback round 2). Sent
+ * explicitly by an admin after the person's profile/topics are populated —
+ * never automatically on account creation.
+ */
+export function renderInvite(args: {
+  timetableName: string;
+  timetableSlug: string;
+  inviteeName: string | null;
+  inviterName: string | null;
+  topicsCount: number;
+}): { subject: string; html: string } {
+  const subject = `You've been added to ${args.timetableName}`;
+  const greeting = args.inviteeName ? `Hi ${esc(args.inviteeName)},` : "Hi,";
+  const by = args.inviterName ? ` by ${esc(args.inviterName)}` : "";
+  const topics =
+    args.topicsCount > 0
+      ? `<p>You already have ${args.topicsCount} topic${
+          args.topicsCount === 1 ? "" : "s"
+        } waiting under your name.</p>`
+      : "";
+  const html = [
+    `<p>${greeting}</p>`,
+    `<p>You've been added to <strong>${esc(args.timetableName)}</strong>${by}.</p>`,
+    topics,
+    `<p>${linked("Sign in with this email address to get started", `/t/${args.timetableSlug}`)} — no password needed, you'll receive a one-time code.</p>`,
+  ].join("\n");
+  return { subject, html };
+}

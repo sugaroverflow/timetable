@@ -1,6 +1,7 @@
 export * from "./timetables";
 export * from "./invites";
 export * from "./members";
+export * from "./people";
 export * from "./topics";
 export * from "./hearts";
 export * from "./comments";

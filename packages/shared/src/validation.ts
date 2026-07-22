@@ -24,6 +24,15 @@ export const inviteSchema = z.object({
 });
 export type InviteInput = z.infer<typeof inviteSchema>;
 
+/** Admin "add person" (product feedback round 2): pre-create an account with
+ * a real email, populate it, then send the invite email separately. */
+export const addPersonSchema = z.object({
+  email: z.string().email(),
+  name: z.string().min(1).max(120).optional(),
+  roles: z.array(assignableRoleEnum).min(1, "Pick at least one role"),
+});
+export type AddPersonInput = z.infer<typeof addPersonSchema>;
+
 export const updateMemberRolesSchema = z.object({
   roles: z.array(roleEnum),
 });

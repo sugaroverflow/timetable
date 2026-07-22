@@ -111,3 +111,30 @@ export async function getUserFromRequest(
 
   return loadLocalUser(clerkUserId);
 }
+
+/**
+ * Find the Clerk account for an email, or create one silently (Clerk's
+ * createUser sends no email — the invite email is ours, sent explicitly
+ * later once the admin has populated the account; product feedback round 2).
+ */
+export async function getOrCreateClerkUser(
+  email: string,
+  name: string | null,
+): Promise<{ id: string; created: boolean }> {
+  const normalized = email.trim().toLowerCase();
+  const existing = await clerkClient.users.getUserList({
+    emailAddress: [normalized],
+  });
+  const found = existing.data[0];
+  if (found) return { id: found.id, created: false };
+
+  const [firstName, ...rest] = (name ?? "").trim().split(/\s+/);
+  const created = await clerkClient.users.createUser({
+    emailAddress: [normalized],
+    ...(firstName ? { firstName } : {}),
+    ...(rest.length > 0 ? { lastName: rest.join(" ") } : {}),
+    skipPasswordRequirement: true,
+    skipLegalChecks: true,
+  });
+  return { id: created.id, created: true };
+}

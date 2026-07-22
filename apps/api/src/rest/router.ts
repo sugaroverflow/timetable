@@ -7,20 +7,26 @@ import {
 
 import {
   computeUserDigest,
+  createLocalUser,
   createTimetable,
+  getMembership,
   getMembershipById,
   getReadableTimetable,
   getSlotsForIcs,
   getTimetableById,
+  getUserById,
   getUserByIcsToken,
   inviteEmails,
   isDigestEmpty,
   listDigestRecipients,
+  listHostTopics,
   markDigestSent,
+  markInviteSent,
   removeMembership,
   setMemberRoles,
 } from "@timetable/core";
 import {
+  addPersonSchema,
   canEditSettings,
   canManageMembers,
   canModerate,
@@ -31,8 +37,9 @@ import {
   type Role,
 } from "@timetable/shared";
 
+import { getOrCreateClerkUser } from "../auth/clerk";
 import { buildContext } from "../context";
-import { renderDigest, sendEmail } from "../email";
+import { renderDigest, renderInvite, sendEmail } from "../email";
 import { getRequestId, logRequestError } from "../http/request-log";
 import { buildIcs } from "../ics";
 import {
@@ -121,6 +128,115 @@ restRouter.post(
       parsed.data.roles,
     );
     res.json({ results });
+  }),
+);
+
+/**
+ * POST /api/timetables/:id/people
+ * Admin pre-creates an account (product feedback round 2): a Clerk user and
+ * local row exist immediately so the admin can populate profile/topics, but
+ * NO email is sent — that's the separate invite endpoint below.
+ */
+restRouter.post(
+  "/timetables/:id/people",
+  h(async (req, res) => {
+    const ctx = await contextFromRequest(req);
+    if (!ctx.user) {
+      res.status(401).json({ error: "Not authenticated" });
+      return;
+    }
+
+    const timetableId = req.params.id as string;
+    const viewer = await ctx.getViewer(timetableId);
+    if (!canManageMembers(viewer)) {
+      res.status(403).json({ error: "Admins only" });
+      return;
+    }
+
+    const parsed = addPersonSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res
+        .status(400)
+        .json({ error: "Invalid input", details: parsed.error.flatten() });
+      return;
+    }
+
+    const email = parsed.data.email.trim().toLowerCase();
+    const clerkUser = await getOrCreateClerkUser(
+      email,
+      parsed.data.name ?? null,
+    );
+    await createLocalUser({
+      id: clerkUser.id,
+      email,
+      name: parsed.data.name ?? null,
+    });
+    // The local row now exists, so inviteEmails attaches the membership
+    // immediately (merging roles if they were already a member).
+    const [outcome] = await inviteEmails(
+      timetableId,
+      ctx.user.id,
+      [email],
+      parsed.data.roles,
+    );
+    const membership = await getMembership(timetableId, clerkUser.id);
+
+    res.json({
+      userId: clerkUser.id,
+      membershipId: membership?.id ?? null,
+      accountCreated: clerkUser.created,
+      status: outcome?.status ?? "added",
+    });
+  }),
+);
+
+/**
+ * POST /api/memberships/:id/invite
+ * Send (or resend) the invite email for a member — the explicit final step
+ * after the admin has populated the account. Records inviteSentAt.
+ */
+restRouter.post(
+  "/memberships/:id/invite",
+  h(async (req, res) => {
+    const ctx = await contextFromRequest(req);
+    if (!ctx.user) {
+      res.status(401).json({ error: "Not authenticated" });
+      return;
+    }
+
+    const membership = await getMembershipById(req.params.id as string);
+    if (!membership) {
+      res.status(404).json({ error: "Membership not found" });
+      return;
+    }
+    const viewer = await ctx.getViewer(membership.timetableId);
+    if (!canManageMembers(viewer)) {
+      res.status(403).json({ error: "Admins only" });
+      return;
+    }
+
+    const [member, timetable] = await Promise.all([
+      getUserById(membership.userId),
+      getTimetableById(membership.timetableId),
+    ]);
+    if (!member?.email || !timetable) {
+      res.status(400).json({ error: "Member has no email address" });
+      return;
+    }
+
+    const topics = await listHostTopics(membership.timetableId, member.id);
+    const { subject, html } = renderInvite({
+      timetableName: timetable.name,
+      timetableSlug: timetable.slug,
+      inviteeName: member.name,
+      inviterName: ctx.user.name,
+      topicsCount: topics.length,
+    });
+    await sendEmail({ to: member.email, subject, html });
+
+    const sentAt = new Date();
+    await markInviteSent(membership.id, sentAt);
+    res.json({ sentAt: sentAt.toISOString() });
   }),
 );
 

@@ -110,6 +110,7 @@ type GqlMembership = { id: string; roles: string[]; timetable: GqlTimetable };
 type GqlMember = {
   membershipId: string;
   roles: string[];
+  inviteSentAt: Date | null;
   user: { id: string; name: string | null; email: string | null; image: string | null };
 };
 type GqlTopic = FeedTopic & {
@@ -280,6 +281,10 @@ const MemberType = builder.objectRef<GqlMember>("Member").implement({
   fields: (t) => ({
     membershipId: t.exposeID("membershipId"),
     roles: t.exposeStringList("roles"),
+    inviteSentAt: t.string({
+      nullable: true,
+      resolve: (m) => m.inviteSentAt?.toISOString() ?? null,
+    }),
     userId: t.id({ resolve: (m) => m.user.id }),
     name: t.string({ nullable: true, resolve: (m) => m.user.name }),
     email: t.string({ nullable: true, resolve: (m) => m.user.email }),
@@ -698,6 +703,7 @@ builder.queryType({
         return members.map((m) => ({
           membershipId: m.membershipId,
           roles: m.roles as string[],
+          inviteSentAt: m.inviteSentAt,
           user: m.user,
         }));
       },
@@ -1031,6 +1037,9 @@ builder.mutationType({
         title: t.arg.string({ required: true }),
         bodyMd: t.arg.string({ required: false }),
         coverImageUrl: t.arg.string({ required: false }),
+        /** Admin-only: create the topic owned by another host (product
+         * feedback round 2 — populate a pre-created account's topics). */
+        hostId: t.arg.string({ required: false }),
       },
       resolve: async (_p, args, ctx) => {
         const user = await requireUser(ctx);
@@ -1038,12 +1047,44 @@ builder.mutationType({
         if (!readable) notFound("Timetable not found");
         const viewer = { userId: user.id, roles: readable.roles };
         if (!canProposeTopics(viewer)) forbidden("Hosts only");
-        return createTopic(readable.timetable.id, user.id, {
+
+        let hostId = user.id;
+        if (args.hostId && args.hostId !== user.id) {
+          if (!isAdmin(viewer.roles)) forbidden("Admins only");
+          const targetRoles = await getViewerRoles(
+            args.hostId,
+            readable.timetable.id,
+          );
+          if (!(isHost(targetRoles) || isAdmin(targetRoles))) {
+            throw new GraphQLError(
+              "Topic owner must hold the host or admin role in this timetable",
+            );
+          }
+          hostId = args.hostId;
+        }
+
+        const created = await createTopic(readable.timetable.id, hostId, {
           title: args.title,
           bodyMd: args.bodyMd ?? "",
           coverImageUrl:
             args.coverImageUrl != null ? args.coverImageUrl.trim() : undefined,
         });
+        if (hostId !== user.id) {
+          // Same event shape as reassignTopic so the digest's "assigned to
+          // you" section picks up admin-created topics too.
+          await logActivity({
+            timetableId: readable.timetable.id,
+            actorId: user.id,
+            action: "topic.reassign",
+            payload: {
+              topicId: created.id,
+              title: created.title,
+              previousHostId: user.id,
+              newHostId: hostId,
+            },
+          });
+        }
+        return created;
       },
     }),
 

@@ -9,23 +9,46 @@ import type { Role } from "@timetable/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createApiApp } from "./app";
+import * as clerk from "./auth/clerk";
 import * as context from "./context";
 import type { ApiContext } from "./context";
+import * as email from "./email";
 
 vi.mock("@timetable/core", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@timetable/core")>();
   return {
     ...actual,
     countViewerPublishedHearts: vi.fn(),
+    createLocalUser: vi.fn(),
+    getMembership: vi.fn(),
     getMembershipById: vi.fn(),
     getReadableTimetable: vi.fn(),
     getSlotsForIcs: vi.fn(),
     getTimetableById: vi.fn(),
+    getUserById: vi.fn(),
     getUserByIcsToken: vi.fn(),
     inviteEmails: vi.fn(),
     listDigestRecipients: vi.fn(),
+    listHostTopics: vi.fn(),
+    markInviteSent: vi.fn(),
     setMemberRoles: vi.fn(),
     updateTimetableSettings: vi.fn(),
+  };
+});
+
+vi.mock("./auth/clerk", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./auth/clerk")>();
+  return {
+    ...actual,
+    getOrCreateClerkUser: vi.fn(),
+  };
+});
+
+vi.mock("./email", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./email")>();
+  return {
+    ...actual,
+    sendEmail: vi.fn(async () => {}),
   };
 });
 
@@ -133,6 +156,7 @@ function membershipFixture(
     roles: ["host"],
     lastSeenFeedAt: null,
     lastSeenNotificationsAt: null,
+    inviteSentAt: null,
     createdAt: new Date("2026-01-01T00:00:00.000Z"),
     updatedAt: new Date("2026-01-01T00:00:00.000Z"),
     ...patch,
@@ -184,15 +208,22 @@ afterEach(() => {
   restoreStorageEnv();
   vi.mocked(context.buildContext).mockReset();
   vi.mocked(core.countViewerPublishedHearts).mockReset();
+  vi.mocked(core.createLocalUser).mockReset();
+  vi.mocked(core.getMembership).mockReset();
   vi.mocked(core.getMembershipById).mockReset();
   vi.mocked(core.getReadableTimetable).mockReset();
   vi.mocked(core.getSlotsForIcs).mockReset();
   vi.mocked(core.getTimetableById).mockReset();
+  vi.mocked(core.getUserById).mockReset();
   vi.mocked(core.getUserByIcsToken).mockReset();
   vi.mocked(core.inviteEmails).mockReset();
   vi.mocked(core.listDigestRecipients).mockReset();
+  vi.mocked(core.listHostTopics).mockReset();
+  vi.mocked(core.markInviteSent).mockReset();
   vi.mocked(core.setMemberRoles).mockReset();
   vi.mocked(core.updateTimetableSettings).mockReset();
+  vi.mocked(clerk.getOrCreateClerkUser).mockReset();
+  vi.mocked(email.sendEmail).mockClear();
 });
 
 describe("createApiApp", () => {
@@ -293,6 +324,127 @@ describe("createApiApp", () => {
         "admin-1",
         ["new-host@example.com"],
         ["host"],
+      );
+    });
+  });
+
+  it("rejects add-person from non-admins", async () => {
+    mockSession("host-1", ["host"]);
+
+    await withTestServer(async (baseUrl) => {
+      const res = await fetch(`${baseUrl}/api/timetables/timetable-1/people`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "ada@example.com", roles: ["host"] }),
+      });
+
+      expect(res.status).toBe(403);
+      expect(clerk.getOrCreateClerkUser).not.toHaveBeenCalled();
+      expect(core.createLocalUser).not.toHaveBeenCalled();
+    });
+  });
+
+  it("lets admins pre-create a person without sending any email", async () => {
+    mockSession("admin-1", ["admin"]);
+    vi.mocked(clerk.getOrCreateClerkUser).mockResolvedValue({
+      id: "clerk-9",
+      created: true,
+    });
+    vi.mocked(core.inviteEmails).mockResolvedValue([
+      { email: "ada@example.com", status: "added" },
+    ]);
+    vi.mocked(core.getMembership).mockResolvedValue({
+      id: "membership-9",
+      inviteSentAt: null,
+    });
+
+    await withTestServer(async (baseUrl) => {
+      const res = await fetch(`${baseUrl}/api/timetables/timetable-1/people`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: "Ada@Example.com",
+          name: "Ada Lovelace",
+          roles: ["host"],
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toEqual({
+        userId: "clerk-9",
+        membershipId: "membership-9",
+        accountCreated: true,
+        status: "added",
+      });
+      expect(clerk.getOrCreateClerkUser).toHaveBeenCalledWith(
+        "ada@example.com",
+        "Ada Lovelace",
+      );
+      expect(core.createLocalUser).toHaveBeenCalledWith({
+        id: "clerk-9",
+        email: "ada@example.com",
+        name: "Ada Lovelace",
+      });
+      expect(core.inviteEmails).toHaveBeenCalledWith(
+        "timetable-1",
+        "admin-1",
+        ["ada@example.com"],
+        ["host"],
+      );
+      expect(email.sendEmail).not.toHaveBeenCalled();
+    });
+  });
+
+  it("rejects invite-send from non-admins", async () => {
+    mockSession("host-1", ["host"]);
+    vi.mocked(core.getMembershipById).mockResolvedValue(membershipFixture());
+
+    await withTestServer(async (baseUrl) => {
+      const res = await fetch(
+        `${baseUrl}/api/memberships/membership-1/invite`,
+        { method: "POST" },
+      );
+
+      expect(res.status).toBe(403);
+      expect(email.sendEmail).not.toHaveBeenCalled();
+      expect(core.markInviteSent).not.toHaveBeenCalled();
+    });
+  });
+
+  it("sends the invite email and records inviteSentAt", async () => {
+    mockSession("admin-1", ["admin"]);
+    vi.mocked(core.getMembershipById).mockResolvedValue(
+      membershipFixture({ userId: "member-9" }),
+    );
+    vi.mocked(core.getUserById).mockResolvedValue({
+      id: "member-9",
+      name: "Ada Lovelace",
+      email: "ada@example.com",
+      image: null,
+    });
+    vi.mocked(core.getTimetableById).mockResolvedValue(
+      timetableFixture({ name: "Spring Term", slug: "spring-term" }),
+    );
+    vi.mocked(core.listHostTopics).mockResolvedValue([]);
+
+    await withTestServer(async (baseUrl) => {
+      const res = await fetch(
+        `${baseUrl}/api/memberships/membership-1/invite`,
+        { method: "POST" },
+      );
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { sentAt: string };
+      expect(new Date(body.sentAt).getTime()).not.toBeNaN();
+      expect(email.sendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: "ada@example.com",
+          subject: expect.stringContaining("Spring Term"),
+        }),
+      );
+      expect(core.markInviteSent).toHaveBeenCalledWith(
+        "membership-1",
+        expect.any(Date),
       );
     });
   });

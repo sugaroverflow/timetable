@@ -61,6 +61,10 @@ export const timetableMemberships = pgTable(
     // Watermark for the notifications pane's unread badge (QA #59);
     // null until the member first opens Notifications.
     lastSeenNotificationsAt: timestamp({ withTimezone: true }),
+    // When the invite email was last sent to this member (product feedback
+    // round 2: admins pre-create accounts, populate them, then send the
+    // invite explicitly). Null = added but never invited.
+    inviteSentAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },

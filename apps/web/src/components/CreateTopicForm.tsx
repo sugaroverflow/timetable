@@ -8,16 +8,26 @@ import { RichTextEditor } from "@/components/RichTextEditor";
 import { useToast } from "@/components/Toast";
 import { clientGql } from "@/lib/clientGraphql";
 
-const MUTATION = `mutation Create($s: String!, $title: String!, $body: String, $cover: String) {
-  createTopic(idOrSlug: $s, title: $title, bodyMd: $body, coverImageUrl: $cover) { id }
+const MUTATION = `mutation Create($s: String!, $title: String!, $body: String, $cover: String, $host: String) {
+  createTopic(idOrSlug: $s, title: $title, bodyMd: $body, coverImageUrl: $cover, hostId: $host) { id }
 }`;
 
-export function CreateTopicForm({ slug }: { slug: string }) {
+export function CreateTopicForm({
+  slug,
+  hosts,
+  hostLabel = "Host",
+}: {
+  slug: string;
+  /** Admin-only (round 2): other hosts this topic can be created for. */
+  hosts?: { id: string; name: string | null }[];
+  hostLabel?: string;
+}) {
   const router = useRouter();
   const { toast, toastError } = useToast();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [cover, setCover] = useState("");
+  const [host, setHost] = useState("");
   const [uploadingCover, setUploadingCover] = useState(false);
   const [pending, startTransition] = useTransition();
 
@@ -30,11 +40,14 @@ export function CreateTopicForm({ slug }: { slug: string }) {
         title: title.trim(),
         body,
         cover: cover.trim() || null,
+        host: host || null,
       });
+      const owner = hosts?.find((h) => h.id === host)?.name;
       setTitle("");
       setBody("");
       setCover("");
-      toast("Topic created");
+      setHost("");
+      toast(owner ? `Topic created for ${owner}` : "Topic created");
       startTransition(() => router.refresh());
     } catch (err) {
       toastError(err instanceof Error ? err.message : "Could not create topic");
@@ -70,6 +83,23 @@ export function CreateTopicForm({ slug }: { slug: string }) {
           placeholder="What is this session about?"
         />
       </div>
+      {hosts && hosts.length > 0 ? (
+        <div className="field">
+          <label htmlFor="topic-host">{hostLabel}</label>
+          <select
+            id="topic-host"
+            value={host}
+            onChange={(e) => setHost(e.target.value)}
+          >
+            <option value="">Me</option>
+            {hosts.map((h) => (
+              <option key={h.id} value={h.id}>
+                {h.name ?? "Member"}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
       <button
         className="btn btn-primary"
         type="submit"

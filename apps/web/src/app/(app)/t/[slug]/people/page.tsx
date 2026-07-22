@@ -2,8 +2,10 @@ import Link from "next/link";
 
 import { isAdmin, type Role } from "@timetable/shared";
 
+import { AddPersonForm } from "@/components/AddPersonForm";
 import { Avatar } from "@/components/Avatar";
 import { EmptyState } from "@/components/EmptyState";
+import { InviteSendButton } from "@/components/InviteSendButton";
 import { PersonAdminPanel } from "@/components/PersonAdminPanel";
 import { RolePills } from "@/components/RolePills";
 import { UserPreviewStart } from "@/components/UserPreview";
@@ -48,12 +50,13 @@ type Member = {
   roles: string[];
   name: string | null;
   email: string | null;
+  inviteSentAt: string | null;
 };
 
 const MEMBERS_QUERY = `
   query Members($timetableId: String!) {
     timetableMembers(timetableId: $timetableId) {
-      membershipId userId roles name email
+      membershipId userId roles name email inviteSentAt
     }
   }
 `;
@@ -105,6 +108,12 @@ export default async function PeoplePage({
       <div className="page-head">
         <h2 className="section-title">People</h2>
       </div>
+      {canEdit ? (
+        <AddPersonForm
+          timetableId={data.timetable!.id}
+          roleLabels={settings.roleLabels}
+        />
+      ) : null}
       {data.timetablePeople.length === 0 ? (
         <EmptyState
           icon="◎"
@@ -183,6 +192,13 @@ export default async function PeoplePage({
                           style={{ alignItems: "center" }}
                         >
                           <span style={{ flex: 1 }} />
+                          {canManage && person.userId !== data.me?.id ? (
+                            <InviteSendButton
+                              membershipId={member!.membershipId}
+                              email={member!.email}
+                              inviteSentAt={member!.inviteSentAt}
+                            />
+                          ) : null}
                           {canPreview ? (
                             <UserPreviewStart
                               slug={slug}
