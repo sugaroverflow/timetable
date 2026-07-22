@@ -485,7 +485,6 @@ restRouter.get(
   }),
 );
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 restRouter.use(
   (err: unknown, req: Request, res: Response, _next: NextFunction) => {
     logRequestError(req, err, { component: "rest" });

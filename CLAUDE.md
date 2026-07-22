@@ -52,7 +52,8 @@ defaults; YAML/Markdown are exempt — deploy specs are sed-templated).
 Tests are vitest (`packages/shared`, `apps/api`, `apps/web`) + one Playwright
 smoke suite (`tests/e2e/`). Follow existing patterns:
 `apps/web/src/lib/transport.test.ts`, `packages/shared/src/hearts.test.ts`.
-Note: `lint` currently covers only `apps/web`.
+Lint covers everything: `apps/web` has its own Next config; the root
+`eslint.config.mjs` lints `apps/api`, `packages/*`, `tests/`, `scripts/`.
 
 ## Git & deploy workflow
 
