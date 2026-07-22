@@ -1,3 +1,4 @@
+/* eslint-disable complexity, max-lines-per-function, sonarjs/cognitive-complexity -- audit debt (2026-07-22): decomposition queued — remove this disable when refactoring */
 import { auth } from "@clerk/nextjs/server";
 import { Flag, Heart } from "lucide-react";
 import { cookies } from "next/headers";

@@ -1,3 +1,4 @@
+/* eslint-disable complexity, max-lines-per-function -- audit debt (2026-07-22): decomposition queued — remove this disable when refactoring */
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";

@@ -1,3 +1,4 @@
+/* eslint-disable complexity -- audit debt (2026-07-22): decomposition queued — remove this disable when refactoring */
 import { Heart } from "lucide-react";
 import Link from "next/link";
 

@@ -1,3 +1,4 @@
+/* eslint-disable complexity, max-depth, sonarjs/cognitive-complexity -- audit debt (2026-07-22): decomposition queued — remove this disable when refactoring */
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
