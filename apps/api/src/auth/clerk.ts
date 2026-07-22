@@ -131,10 +131,26 @@ export async function getOrCreateClerkUser(
   const [firstName, ...rest] = (name ?? "").trim().split(/\s+/);
   const created = await clerkClient.users.createUser({
     emailAddress: [normalized],
+    // The Clerk instance requires a username (createUser fails with
+    // form_data_missing without one — the dev seed script always sent one).
+    // Sign-in is by email OTP, so this is cosmetic; random suffix for
+    // uniqueness.
+    username: usernameFor(normalized, name),
     ...(firstName ? { firstName } : {}),
     ...(rest.length > 0 ? { lastName: rest.join(" ") } : {}),
     skipPasswordRequirement: true,
     skipLegalChecks: true,
   });
   return { id: created.id, created: true };
+}
+
+function usernameFor(email: string, name: string | null): string {
+  const base =
+    (name ?? email.split("@")[0] ?? "member")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 24) || "member";
+  const suffix = Math.random().toString(36).slice(2, 6);
+  return `${base}-${suffix}`;
 }
