@@ -1,4 +1,5 @@
 import eslint from "@eslint/js";
+import sonarjs from "eslint-plugin-sonarjs";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
@@ -25,6 +26,21 @@ export default tseslint.config(
       "@typescript-eslint/no-unused-vars": [
         "error",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
+    },
+  },
+  // Complexity budgets (2026-07-22 simplify audit). New code stays under
+  // them; pre-existing offenders carry file-level disables that form the
+  // decomposition burn-down list — remove the disable when you refactor.
+  {
+    plugins: { sonarjs },
+    rules: {
+      "sonarjs/cognitive-complexity": ["error", 15],
+      complexity: ["error", 12],
+      "max-depth": ["error", 4],
+      "max-lines-per-function": [
+        "error",
+        { max: 150, skipBlankLines: true, skipComments: true },
       ],
     },
   },

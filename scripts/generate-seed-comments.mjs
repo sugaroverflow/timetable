@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable max-depth -- audit debt (2026-07-22): decomposition queued — remove this disable when refactoring */
 /**
  * One-time (re-runnable) generator that writes seed comments into
  * dev-sample-data.md (QA #42, WS10). Deterministic: same input file +

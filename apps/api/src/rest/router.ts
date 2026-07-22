@@ -1,3 +1,4 @@
+/* eslint-disable complexity, sonarjs/cognitive-complexity -- audit debt (2026-07-22): decomposition queued — remove this disable when refactoring */
 import {
   Router,
   type NextFunction,

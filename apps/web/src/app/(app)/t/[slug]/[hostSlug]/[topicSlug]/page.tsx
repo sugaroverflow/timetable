@@ -1,3 +1,4 @@
+/* eslint-disable complexity -- audit debt (2026-07-22): decomposition queued — remove this disable when refactoring */
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 
