@@ -1,4 +1,3 @@
-/* eslint-disable complexity, max-depth, sonarjs/cognitive-complexity -- audit debt (2026-07-22): decomposition queued — remove this disable when refactoring */
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -287,6 +286,35 @@ function parseTimetable(markdown: string): TimetableFixture {
   return { name, slug, description, privacy, roleLabels };
 }
 
+function parseRoles(rolesRaw: string, label: string): Role[] {
+  const roles: Role[] = [];
+  for (const role of rolesRaw.split(",").map((value) => value.trim())) {
+    if (!hasValue(ROLE_VALUES, role)) {
+      throw new Error(
+        `Invalid role "${role}" for person "${label}". Valid roles: ${ROLE_VALUES.join(", ")}`,
+      );
+    }
+    roles.push(role);
+  }
+  return roles;
+}
+
+function parsePersonRow(line: string): PersonFixture {
+  const [label, displayName, rolesRaw, bioRaw, clerkIdRaw] =
+    markdownTableCells(line);
+  if (!label || !displayName || !rolesRaw) {
+    throw new Error(`Invalid person row: ${line}`);
+  }
+
+  return {
+    label,
+    displayName,
+    roles: parseRoles(rolesRaw, label),
+    bio: bioRaw?.trim() || null,
+    clerkId: clerkIdRaw?.trim() || null,
+  };
+}
+
 function parsePeople(markdown: string): PersonFixture[] {
   const block = section(markdown, "People");
   const people: PersonFixture[] = [];
@@ -300,29 +328,7 @@ function parsePeople(markdown: string): PersonFixture[] {
     )
       continue;
 
-    const [label, displayName, rolesRaw, bioRaw, clerkIdRaw] =
-      markdownTableCells(line);
-    if (!label || !displayName || !rolesRaw) {
-      throw new Error(`Invalid person row: ${line}`);
-    }
-
-    const roles: Role[] = [];
-    for (const role of rolesRaw.split(",").map((value) => value.trim())) {
-      if (!hasValue(ROLE_VALUES, role)) {
-        throw new Error(
-          `Invalid role "${role}" for person "${label}". Valid roles: ${ROLE_VALUES.join(", ")}`,
-        );
-      }
-      roles.push(role);
-    }
-
-    people.push({
-      label,
-      displayName,
-      roles,
-      bio: bioRaw?.trim() || null,
-      clerkId: clerkIdRaw?.trim() || null,
-    });
+    people.push(parsePersonRow(line));
   }
 
   if (people.length === 0) {
@@ -348,12 +354,7 @@ function parseTopics(markdown: string): TopicFixture[] {
   const parsed: TopicFixture[] = [];
 
   for (const topicBlock of topicBlocks) {
-    const firstNewline = topicBlock.indexOf("\n");
-    const label =
-      firstNewline === -1
-        ? topicBlock.trim()
-        : topicBlock.slice(0, firstNewline).trim();
-    const rest = firstNewline === -1 ? "" : topicBlock.slice(firstNewline + 1);
+    const { label, rest } = splitLabeledBlock(topicBlock);
 
     if (!label) throw new Error("Found topic section without a label");
 
@@ -419,43 +420,61 @@ function parseHidden(value: string | undefined, label: string): boolean {
   );
 }
 
+function commentFromFields(fields: Record<string, string>): CommentFixture {
+  const topic = fields["Topic"];
+  const label = fields["Comment id"];
+  const author = fields["Author"];
+  const visibility = fields["Visibility"];
+  const text = fields["Text"];
+
+  if (!topic || !label || !author || !visibility || !text) {
+    throw new Error(
+      `Comment is missing one of Topic, Comment id, Author, Visibility, or Text: ${JSON.stringify(fields)}`,
+    );
+  }
+
+  return {
+    label,
+    topic,
+    author,
+    visibility: visibilityFromText(visibility, label),
+    replyTo: fields["Reply to"] || null,
+    hidden: parseHidden(fields["Hidden"], label),
+    text,
+  };
+}
+
+/** Apply an indented "  Key: value" or Text-continuation line to the comment
+ * being parsed. Returns whether following lines may still continue Text. */
+function applyCommentBodyLine(
+  current: Record<string, string>,
+  line: string,
+  textContinuation: boolean,
+): boolean {
+  const fieldMatch = /^ {2}([^:]+):\s*(.*)$/.exec(line);
+  if (fieldMatch) {
+    const key = fieldMatch[1]?.trim() ?? "";
+    current[key] = fieldMatch[2]?.trim() ?? "";
+    return key === "Text";
+  }
+
+  if (textContinuation && line.startsWith("  ")) {
+    current["Text"] = `${current["Text"] ?? ""}\n${line.trim()}`;
+  }
+  return textContinuation;
+}
+
 function parseComments(markdown: string): CommentFixture[] {
   const block = section(markdown, "Comments");
   const commentsFixture: CommentFixture[] = [];
   let current: Record<string, string> | null = null;
   let currentTextContinuation = false;
 
-  function flush(): void {
-    if (!current) return;
-
-    const topic = current["Topic"];
-    const label = current["Comment id"];
-    const author = current["Author"];
-    const visibility = current["Visibility"];
-    const text = current["Text"];
-
-    if (!topic || !label || !author || !visibility || !text) {
-      throw new Error(
-        `Comment is missing one of Topic, Comment id, Author, Visibility, or Text: ${JSON.stringify(current)}`,
-      );
-    }
-
-    commentsFixture.push({
-      label,
-      topic,
-      author,
-      visibility: visibilityFromText(visibility, label),
-      replyTo: current["Reply to"] || null,
-      hidden: parseHidden(current["Hidden"], label),
-      text,
-    });
-  }
-
   for (const rawLine of block.split("\n")) {
     const line = rawLine.trimEnd();
     const topicMatch = /^- Topic:\s*(.+)$/.exec(line);
     if (topicMatch) {
-      flush();
+      if (current) commentsFixture.push(commentFromFields(current));
       current = { Topic: topicMatch[1]?.trim() ?? "" };
       currentTextContinuation = false;
       continue;
@@ -463,21 +482,14 @@ function parseComments(markdown: string): CommentFixture[] {
 
     if (!current) continue;
 
-    const fieldMatch = /^ {2}([^:]+):\s*(.*)$/.exec(line);
-    if (fieldMatch) {
-      const key = fieldMatch[1]?.trim() ?? "";
-      const value = fieldMatch[2]?.trim() ?? "";
-      current[key] = value;
-      currentTextContinuation = key === "Text";
-      continue;
-    }
-
-    if (currentTextContinuation && line.startsWith("  ")) {
-      current["Text"] = `${current["Text"] ?? ""}\n${line.trim()}`;
-    }
+    currentTextContinuation = applyCommentBodyLine(
+      current,
+      line,
+      currentTextContinuation,
+    );
   }
 
-  flush();
+  if (current) commentsFixture.push(commentFromFields(current));
   return commentsFixture;
 }
 
@@ -508,6 +520,121 @@ function parseHearts(markdown: string): HeartsFixture[] {
   return parsed;
 }
 
+/** Split a "### Something: <label>" block into its label line and body. */
+function splitLabeledBlock(block: string): { label: string; rest: string } {
+  const firstNewline = block.indexOf("\n");
+  const label =
+    firstNewline === -1 ? block.trim() : block.slice(0, firstNewline).trim();
+  const rest = firstNewline === -1 ? "" : block.slice(firstNewline + 1);
+  return { label, rest };
+}
+
+function parseAvailabilityRow(
+  line: string,
+  label: string,
+): SlotAvailability | null {
+  if (!line.trim().startsWith("|")) return null;
+  if (
+    line.includes("---") ||
+    line.toLowerCase().includes("person label") ||
+    line.toLowerCase().includes("state")
+  )
+    return null;
+  const cells = markdownTableCells(line);
+  const person = cells[0]?.trim();
+  const stateRaw = cells[1]?.trim().toLowerCase() ?? "";
+  if (!person) return null;
+  if (!hasValue(AVAILABILITY_STATE_VALUES, stateRaw)) {
+    throw new Error(
+      `Invalid availability state "${stateRaw}" for slot "${label}"`,
+    );
+  }
+  return { person, state: stateRaw };
+}
+
+/** Parse a slot's Availability table. */
+function parseSlotAvailability(
+  rest: string,
+  label: string,
+): SlotAvailability[] {
+  // \Z (PCRE end-of-string) doesn't exist in JS regexes — it matched a
+  // literal "Z". $(?![\s\S]) is the real end-of-input anchor.
+  const availMatch =
+    /^Availability:\s*$([\s\S]*?)(?=^(?:Discussion:|###)|$(?![\s\S]))/m.exec(
+      rest,
+    );
+  if (!availMatch) return [];
+
+  const entries: SlotAvailability[] = [];
+  for (const line of availMatch[1]!.split("\n")) {
+    const entry = parseAvailabilityRow(line, label);
+    if (entry) entries.push(entry);
+  }
+  return entries;
+}
+
+/** Apply a "  Text: …" or continuation line to the discussion entry. */
+function applyDiscussionLine(current: SlotDiscussionEntry, line: string): void {
+  const textMatch = /^ {2}Text:\s*(.*)$/.exec(line);
+  if (textMatch) {
+    current.text = textMatch[1]?.trim() ?? "";
+    return;
+  }
+  if (line.startsWith("  ") && line.trim()) {
+    current.text = current.text
+      ? `${current.text}\n${line.trim()}`
+      : line.trim();
+  }
+}
+
+/** Parse a slot's Discussion list — rest is already isolated to one slot
+ * block, so capture greedily to end of block (\Z is not valid in JS regex). */
+function parseSlotDiscussion(rest: string): SlotDiscussionEntry[] {
+  const discussMatch = /^Discussion:\s*$([\s\S]*)/m.exec(rest);
+  if (!discussMatch) return [];
+
+  const discussion: SlotDiscussionEntry[] = [];
+  let current: SlotDiscussionEntry | null = null;
+  for (const rawLine of discussMatch[1]!.split("\n")) {
+    const line = rawLine.trimEnd();
+    const authorMatch = /^- Author:\s*(.+)$/.exec(line);
+    if (authorMatch) {
+      if (current) discussion.push(current);
+      current = { author: authorMatch[1]!.trim(), text: "" };
+      continue;
+    }
+    if (current) applyDiscussionLine(current, line);
+  }
+  if (current) discussion.push(current);
+  return discussion;
+}
+
+function parseSlotBlock(slotBlock: string): SlotFixture {
+  const { label, rest } = splitLabeledBlock(slotBlock);
+  if (!label) throw new Error("Found slot section without a label");
+
+  const date = fieldFromBlock(rest, "Date", { required: true });
+  const startTime = fieldFromBlock(rest, "Start", { required: true });
+  const endTime = fieldFromBlock(rest, "End", { required: true });
+  const location = fieldFromBlock(rest, "Location", { required: true });
+  const topicsRaw = fieldFromBlock(rest, "Topics");
+  const topicTags = topicsRaw
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+
+  return {
+    label,
+    date,
+    startTime,
+    endTime,
+    location,
+    topicTags,
+    availability: parseSlotAvailability(rest, label),
+    discussion: parseSlotDiscussion(rest),
+  };
+}
+
 function parseSlots(markdown: string): SlotFixture[] {
   let block: string;
   try {
@@ -516,102 +643,10 @@ function parseSlots(markdown: string): SlotFixture[] {
     return [];
   }
 
-  const slotBlocks = block.split(/^### Slot:\s*/m).slice(1);
-  const parsed: SlotFixture[] = [];
-
-  for (const slotBlock of slotBlocks) {
-    const firstNewline = slotBlock.indexOf("\n");
-    const label =
-      firstNewline === -1
-        ? slotBlock.trim()
-        : slotBlock.slice(0, firstNewline).trim();
-    const rest = firstNewline === -1 ? "" : slotBlock.slice(firstNewline + 1);
-
-    if (!label) throw new Error("Found slot section without a label");
-
-    const date = fieldFromBlock(rest, "Date", { required: true });
-    const startTime = fieldFromBlock(rest, "Start", { required: true });
-    const endTime = fieldFromBlock(rest, "End", { required: true });
-    const location = fieldFromBlock(rest, "Location", { required: true });
-    const topicsRaw = fieldFromBlock(rest, "Topics");
-    const topicTags = topicsRaw
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean);
-
-    // Parse Availability table
-    const availabilityEntries: SlotAvailability[] = [];
-    // \Z (PCRE end-of-string) doesn't exist in JS regexes — it matched a
-    // literal "Z". $(?![\s\S]) is the real end-of-input anchor.
-    const availMatch =
-      /^Availability:\s*$([\s\S]*?)(?=^(?:Discussion:|###)|$(?![\s\S]))/m.exec(
-        rest,
-      );
-    if (availMatch) {
-      for (const line of availMatch[1]!.split("\n")) {
-        if (!line.trim().startsWith("|")) continue;
-        if (
-          line.includes("---") ||
-          line.toLowerCase().includes("person label") ||
-          line.toLowerCase().includes("state")
-        )
-          continue;
-        const cells = markdownTableCells(line);
-        const person = cells[0]?.trim();
-        const stateRaw = cells[1]?.trim().toLowerCase() ?? "";
-        if (!person) continue;
-        if (!hasValue(AVAILABILITY_STATE_VALUES, stateRaw)) {
-          throw new Error(
-            `Invalid availability state "${stateRaw}" for slot "${label}"`,
-          );
-        }
-        availabilityEntries.push({ person, state: stateRaw });
-      }
-    }
-
-    // Parse Discussion list — rest is already isolated to one slot block,
-    // so capture greedily to end of block (\Z is not valid in JS regex)
-    const discussion: SlotDiscussionEntry[] = [];
-    const discussMatch = /^Discussion:\s*$([\s\S]*)/m.exec(rest);
-    if (discussMatch) {
-      let current: SlotDiscussionEntry | null = null;
-      for (const rawLine of discussMatch[1]!.split("\n")) {
-        const line = rawLine.trimEnd();
-        const authorMatch = /^- Author:\s*(.+)$/.exec(line);
-        if (authorMatch) {
-          if (current) discussion.push(current);
-          current = { author: authorMatch[1]!.trim(), text: "" };
-          continue;
-        }
-        if (current) {
-          const textMatch = /^ {2}Text:\s*(.*)$/.exec(line);
-          if (textMatch) {
-            current.text = textMatch[1]?.trim() ?? "";
-            continue;
-          }
-          if (line.startsWith("  ") && line.trim()) {
-            current.text = current.text
-              ? `${current.text}\n${line.trim()}`
-              : line.trim();
-          }
-        }
-      }
-      if (current) discussion.push(current);
-    }
-
-    parsed.push({
-      label,
-      date,
-      startTime,
-      endTime,
-      location,
-      topicTags,
-      availability: availabilityEntries,
-      discussion,
-    });
-  }
-
-  return parsed;
+  return block
+    .split(/^### Slot:\s*/m)
+    .slice(1)
+    .map((slotBlock) => parseSlotBlock(slotBlock));
 }
 
 function assertUnique<T>(
@@ -624,6 +659,139 @@ function assertUnique<T>(
     const key = getKey(value);
     if (seen.has(key)) throw new Error(`Duplicate ${label} "${key}"`);
     seen.add(key);
+  }
+}
+
+function validateTopics(
+  fixtureTopics: TopicFixture[],
+  peopleByLabel: Map<string, PersonFixture>,
+): void {
+  for (const topic of fixtureTopics) {
+    const host = peopleByLabel.get(topic.host);
+    if (!host) {
+      throw new Error(
+        `Topic "${topic.label}" refers to missing host "${topic.host}"`,
+      );
+    }
+    if (!host.roles.includes("host")) {
+      throw new Error(
+        `Topic "${topic.label}" host "${topic.host}" does not have the host role`,
+      );
+    }
+  }
+}
+
+function validateComments(
+  fixtureComments: CommentFixture[],
+  topicsByLabel: Map<string, TopicFixture>,
+  peopleByLabel: Map<string, PersonFixture>,
+  commentsByLabel: Map<string, CommentFixture>,
+): void {
+  for (const comment of fixtureComments) {
+    if (!topicsByLabel.has(comment.topic)) {
+      throw new Error(
+        `Comment "${comment.label}" refers to missing topic "${comment.topic}"`,
+      );
+    }
+    if (!peopleByLabel.has(comment.author)) {
+      throw new Error(
+        `Comment "${comment.label}" refers to missing author "${comment.author}"`,
+      );
+    }
+    if (comment.replyTo) {
+      const parent = commentsByLabel.get(comment.replyTo);
+      if (!parent) {
+        throw new Error(
+          `Comment "${comment.label}" replies to missing comment "${comment.replyTo}"`,
+        );
+      }
+      if (parent.topic !== comment.topic) {
+        throw new Error(
+          `Comment "${comment.label}" replies to "${comment.replyTo}" on a different topic`,
+        );
+      }
+    }
+  }
+}
+
+function validateHeartPeople(
+  row: HeartsFixture,
+  peopleByLabel: Map<string, PersonFixture>,
+  seenHearts: Set<string>,
+): void {
+  for (const personLabel of row.people) {
+    const person = peopleByLabel.get(personLabel);
+    if (!person) {
+      throw new Error(
+        `Hearts row for topic "${row.topic}" refers to missing person "${personLabel}"`,
+      );
+    }
+    if (!person.roles.includes("elector")) {
+      throw new Error(
+        `Hearts row for topic "${row.topic}" refers to "${personLabel}", who does not have the elector role`,
+      );
+    }
+
+    const key = `${row.topic}:${personLabel}`;
+    if (seenHearts.has(key)) {
+      throw new Error(
+        `Duplicate heart for topic "${row.topic}" and person "${personLabel}"`,
+      );
+    }
+    seenHearts.add(key);
+  }
+}
+
+function validateHearts(
+  fixtureHearts: HeartsFixture[],
+  topicsByLabel: Map<string, TopicFixture>,
+  peopleByLabel: Map<string, PersonFixture>,
+): void {
+  const seenHearts = new Set<string>();
+  for (const row of fixtureHearts) {
+    const topic = topicsByLabel.get(row.topic);
+    if (!topic) {
+      throw new Error(`Hearts row refers to missing topic "${row.topic}"`);
+    }
+    if (!["published", "archived"].includes(topic.status)) {
+      throw new Error(
+        `Hearts row for topic "${row.topic}" targets a ${topic.status} topic; only published or archived topics should be hearted`,
+      );
+    }
+
+    validateHeartPeople(row, peopleByLabel, seenHearts);
+  }
+}
+
+function validateSlot(
+  slot: SlotFixture,
+  topicsByLabel: Map<string, TopicFixture>,
+  peopleByLabel: Map<string, PersonFixture>,
+): void {
+  for (const tag of slot.topicTags) {
+    if (!topicsByLabel.has(tag))
+      throw new Error(`Slot "${slot.label}" references missing topic "${tag}"`);
+  }
+  for (const av of slot.availability) {
+    const p = peopleByLabel.get(av.person);
+    if (!p)
+      throw new Error(
+        `Slot "${slot.label}" availability references missing person "${av.person}"`,
+      );
+    const recognised = (["elector", "host", "admin", "owner"] as const).some(
+      (role) => p.roles.includes(role),
+    );
+    if (!recognised) {
+      throw new Error(
+        `Slot "${slot.label}" availability person "${av.person}" has no recognised role`,
+      );
+    }
+  }
+  for (const d of slot.discussion) {
+    if (!peopleByLabel.has(d.author))
+      throw new Error(
+        `Slot "${slot.label}" discussion references missing author "${d.author}"`,
+      );
   }
 }
 
@@ -649,112 +817,18 @@ function validateFixture(fixture: Fixture): void {
     );
   }
 
-  for (const topic of fixture.topics) {
-    const host = peopleByLabel.get(topic.host);
-    if (!host) {
-      throw new Error(
-        `Topic "${topic.label}" refers to missing host "${topic.host}"`,
-      );
-    }
-    if (!host.roles.includes("host")) {
-      throw new Error(
-        `Topic "${topic.label}" host "${topic.host}" does not have the host role`,
-      );
-    }
-  }
-
-  for (const comment of fixture.comments) {
-    if (!topicsByLabel.has(comment.topic)) {
-      throw new Error(
-        `Comment "${comment.label}" refers to missing topic "${comment.topic}"`,
-      );
-    }
-    if (!peopleByLabel.has(comment.author)) {
-      throw new Error(
-        `Comment "${comment.label}" refers to missing author "${comment.author}"`,
-      );
-    }
-    if (comment.replyTo) {
-      const parent = commentsByLabel.get(comment.replyTo);
-      if (!parent) {
-        throw new Error(
-          `Comment "${comment.label}" replies to missing comment "${comment.replyTo}"`,
-        );
-      }
-      if (parent.topic !== comment.topic) {
-        throw new Error(
-          `Comment "${comment.label}" replies to "${comment.replyTo}" on a different topic`,
-        );
-      }
-    }
-  }
-
-  const seenHearts = new Set<string>();
-  for (const row of fixture.hearts) {
-    const topic = topicsByLabel.get(row.topic);
-    if (!topic) {
-      throw new Error(`Hearts row refers to missing topic "${row.topic}"`);
-    }
-    if (!["published", "archived"].includes(topic.status)) {
-      throw new Error(
-        `Hearts row for topic "${row.topic}" targets a ${topic.status} topic; only published or archived topics should be hearted`,
-      );
-    }
-
-    for (const personLabel of row.people) {
-      const person = peopleByLabel.get(personLabel);
-      if (!person) {
-        throw new Error(
-          `Hearts row for topic "${row.topic}" refers to missing person "${personLabel}"`,
-        );
-      }
-      if (!person.roles.includes("elector")) {
-        throw new Error(
-          `Hearts row for topic "${row.topic}" refers to "${personLabel}", who does not have the elector role`,
-        );
-      }
-
-      const key = `${row.topic}:${personLabel}`;
-      if (seenHearts.has(key)) {
-        throw new Error(
-          `Duplicate heart for topic "${row.topic}" and person "${personLabel}"`,
-        );
-      }
-      seenHearts.add(key);
-    }
-  }
+  validateTopics(fixture.topics, peopleByLabel);
+  validateComments(
+    fixture.comments,
+    topicsByLabel,
+    peopleByLabel,
+    commentsByLabel,
+  );
+  validateHearts(fixture.hearts, topicsByLabel, peopleByLabel);
 
   assertUnique(fixture.slots, (s) => s.label, "slot label");
   for (const slot of fixture.slots) {
-    for (const tag of slot.topicTags) {
-      if (!topicsByLabel.has(tag))
-        throw new Error(
-          `Slot "${slot.label}" references missing topic "${tag}"`,
-        );
-    }
-    for (const av of slot.availability) {
-      const p = peopleByLabel.get(av.person);
-      if (!p)
-        throw new Error(
-          `Slot "${slot.label}" availability references missing person "${av.person}"`,
-        );
-      if (
-        !p.roles.includes("elector") &&
-        !p.roles.includes("host") &&
-        !p.roles.includes("admin") &&
-        !p.roles.includes("owner")
-      ) {
-        throw new Error(
-          `Slot "${slot.label}" availability person "${av.person}" has no recognised role`,
-        );
-      }
-    }
-    for (const d of slot.discussion) {
-      if (!peopleByLabel.has(d.author))
-        throw new Error(
-          `Slot "${slot.label}" discussion references missing author "${d.author}"`,
-        );
-    }
+    validateSlot(slot, topicsByLabel, peopleByLabel);
   }
 }
 
@@ -953,6 +1027,35 @@ function buildRows(fixture: Fixture): {
   };
 }
 
+function toCommentRow(
+  comment: CommentFixture,
+  ids: {
+    topicIds: Map<string, string>;
+    userIds: Map<string, string>;
+    commentIds: Map<string, string>;
+  },
+  ownerId: string,
+  index: number,
+): NewComment {
+  const createdAt = addMinutes(COMMENT_TIME, index * 7);
+  const hiddenAt = comment.hidden ? addMinutes(createdAt, 3) : null;
+
+  return {
+    id: ids.commentIds.get(comment.label) ?? "",
+    topicId: ids.topicIds.get(comment.topic) ?? "",
+    parentId: comment.replyTo
+      ? (ids.commentIds.get(comment.replyTo) ?? "")
+      : null,
+    authorId: ids.userIds.get(comment.author) ?? "",
+    body: comment.text,
+    visibility: comment.visibility,
+    hiddenAt,
+    hiddenByUserId: hiddenAt ? ownerId : null,
+    createdAt,
+    updatedAt: hiddenAt ?? createdAt,
+  };
+}
+
 function buildCommentRows(
   fixtureComments: CommentFixture[],
   topicIds: Map<string, string>,
@@ -965,6 +1068,7 @@ function buildCommentRows(
   );
   const inserted = new Set<string>();
   const rows: NewComment[] = [];
+  const ids = { topicIds, userIds, commentIds };
 
   while (pending.size > 0) {
     let progressed = false;
@@ -972,23 +1076,7 @@ function buildCommentRows(
     for (const [label, comment] of Array.from(pending.entries())) {
       if (comment.replyTo && !inserted.has(comment.replyTo)) continue;
 
-      const createdAt = addMinutes(COMMENT_TIME, rows.length * 7);
-      const hiddenAt = comment.hidden ? addMinutes(createdAt, 3) : null;
-
-      rows.push({
-        id: commentIds.get(label) ?? "",
-        topicId: topicIds.get(comment.topic) ?? "",
-        parentId: comment.replyTo
-          ? (commentIds.get(comment.replyTo) ?? "")
-          : null,
-        authorId: userIds.get(comment.author) ?? "",
-        body: comment.text,
-        visibility: comment.visibility,
-        hiddenAt,
-        hiddenByUserId: hiddenAt ? ownerId : null,
-        createdAt,
-        updatedAt: hiddenAt ?? createdAt,
-      });
+      rows.push(toCommentRow(comment, ids, ownerId, rows.length));
 
       inserted.add(label);
       pending.delete(label);
@@ -1007,6 +1095,56 @@ function buildCommentRows(
   return rows;
 }
 
+type ActivityPush = (
+  key: string,
+  actorId: string | null,
+  action: string,
+  payload: Record<string, unknown>,
+  note?: string | null,
+) => void;
+
+/** Status-appropriate activity events for one seeded topic. */
+function pushTopicActivity(
+  push: ActivityPush,
+  topic: TopicFixture,
+  fixture: Fixture,
+  ownerId: string,
+  topicIds: Map<string, string>,
+  userIds: Map<string, string>,
+): void {
+  const topicId = topicIds.get(topic.label) ?? "";
+  const hostId = userIds.get(topic.host) ?? "";
+  if (topic.status === "submitted") {
+    push(`submit:${topic.label}`, hostId, "topic.submit", {
+      topicId,
+      title: topic.title,
+    });
+  } else if (topic.status === "published") {
+    push(`publish:${topic.label}`, ownerId, "topic.publish", {
+      topicId,
+      title: topic.title,
+    });
+  } else if (topic.status === "unpublished") {
+    push(`unpublish:${topic.label}`, hostId, "topic.unpublish", {
+      topicId,
+      title: topic.title,
+    });
+  } else if (topic.status === "archived") {
+    const archivedHeartCount =
+      fixture.hearts.find((row) => row.topic === topic.label)?.people.length ??
+      0;
+    push(`archive:${topic.label}`, ownerId, "topic.archive", {
+      topicId,
+      title: topic.title,
+    });
+    push(`archive-hearts:${topic.label}`, ownerId, "hearts.cutoff", {
+      topicId,
+      title: topic.title,
+      count: archivedHeartCount,
+    });
+  }
+}
+
 function buildActivityRows(
   fixture: Fixture,
   timetableId: string,
@@ -1017,13 +1155,7 @@ function buildActivityRows(
 ): NewActivityEvent[] {
   const rows: NewActivityEvent[] = [];
 
-  function push(
-    key: string,
-    actorId: string | null,
-    action: string,
-    payload: Record<string, unknown>,
-    note: string | null = null,
-  ): void {
+  const push: ActivityPush = (key, actorId, action, payload, note = null) => {
     rows.push({
       id: stableUuid("activity", key),
       timetableId,
@@ -1033,40 +1165,10 @@ function buildActivityRows(
       note,
       createdAt: addMinutes(ACTIVITY_TIME, rows.length * 11),
     });
-  }
+  };
 
   for (const topic of fixture.topics) {
-    const topicId = topicIds.get(topic.label) ?? "";
-    const hostId = userIds.get(topic.host) ?? "";
-    if (topic.status === "submitted") {
-      push(`submit:${topic.label}`, hostId, "topic.submit", {
-        topicId,
-        title: topic.title,
-      });
-    } else if (topic.status === "published") {
-      push(`publish:${topic.label}`, ownerId, "topic.publish", {
-        topicId,
-        title: topic.title,
-      });
-    } else if (topic.status === "unpublished") {
-      push(`unpublish:${topic.label}`, hostId, "topic.unpublish", {
-        topicId,
-        title: topic.title,
-      });
-    } else if (topic.status === "archived") {
-      const archivedHeartCount =
-        fixture.hearts.find((row) => row.topic === topic.label)?.people
-          .length ?? 0;
-      push(`archive:${topic.label}`, ownerId, "topic.archive", {
-        topicId,
-        title: topic.title,
-      });
-      push(`archive-hearts:${topic.label}`, ownerId, "hearts.cutoff", {
-        topicId,
-        title: topic.title,
-        count: archivedHeartCount,
-      });
-    }
+    pushTopicActivity(push, topic, fixture, ownerId, topicIds, userIds);
   }
 
   for (const comment of fixture.comments) {
@@ -1141,6 +1243,116 @@ function buildSlotRows(
   return { timeslotRows, availabilityRows, slotCommentRows, slotTopicRows };
 }
 
+function createSeedDb(databaseUrl: string) {
+  const sql = postgres(databaseUrl, {
+    max: 1,
+    ssl: process.env.DATABASE_SSL === "require" ? "require" : undefined,
+  });
+  const db = drizzle(sql, { schema, casing: "snake_case" });
+  return { sql, db };
+}
+
+type SeedDb = ReturnType<typeof createSeedDb>["db"];
+type SeedTx = Parameters<Parameters<SeedDb["transaction"]>[0]>[0];
+
+/**
+ * Shadow cleanup: a sample person who signed in before this fixture
+ * existed got a user row keyed by their raw Clerk id with the same
+ * email. Left in place it violates the email unique constraint below
+ * (aborting the whole seed) and shadows the fixture at sign-in, since
+ * auth returns an existing row by id before consulting externalId.
+ * Delete such rows (their content cascades) — unless they own a
+ * timetable (ownerId is ON DELETE RESTRICT), which needs a human.
+ */
+async function removeShadowUsers(
+  tx: SeedTx,
+  seedUsers: NewUser[],
+): Promise<void> {
+  const ownerIds = new Set(
+    (await tx.select({ ownerId: timetables.ownerId }).from(timetables)).map(
+      (r) => r.ownerId,
+    ),
+  );
+  for (const user of seedUsers) {
+    if (!user.email || !user.id) continue;
+    const clashes = await tx
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.email, user.email), ne(users.id, user.id)));
+    for (const clash of clashes) {
+      if (ownerIds.has(clash.id)) {
+        throw new Error(
+          `Cannot seed user "${user.id}": existing user "${clash.id}" holds ` +
+            `email ${user.email} and owns a timetable. Transfer or delete ` +
+            `that timetable, or run with SEED_DEV_RESET_DATABASE=true.`,
+        );
+      }
+      console.warn(
+        `Removing shadow user "${clash.id}" holding sample email ${user.email}.`,
+      );
+      await tx.delete(users).where(eq(users.id, clash.id));
+    }
+  }
+}
+
+async function upsertUsers(tx: SeedTx, seedUsers: NewUser[]): Promise<void> {
+  for (const user of seedUsers) {
+    await tx
+      .insert(users)
+      .values(user)
+      .onConflictDoUpdate({
+        target: users.id,
+        set: {
+          name: user.name,
+          email: user.email,
+          emailVerified: user.emailVerified,
+          image: user.image,
+          bio: user.bio,
+          notificationSettings: user.notificationSettings,
+          lastDigestAt: user.lastDigestAt,
+          icsToken: user.icsToken,
+          createdAt: user.createdAt,
+        },
+      });
+  }
+}
+
+/** Replace the fixture timetable (delete cascades) and insert its rows. */
+async function insertFixtureRows(
+  tx: SeedTx,
+  fixture: Fixture,
+  rows: ReturnType<typeof buildRows>,
+): Promise<void> {
+  await tx
+    .delete(timetables)
+    .where(eq(timetables.slug, fixture.timetable.slug));
+  await tx.insert(timetables).values(rows.timetable);
+  await tx.insert(timetableMemberships).values(rows.memberships);
+  await tx.insert(topics).values(rows.topics);
+
+  if (rows.comments.length > 0) {
+    await tx.insert(comments).values(rows.comments);
+  }
+  if (rows.hearts.length > 0) {
+    await tx.insert(hearts).values(rows.hearts);
+  }
+  if (rows.activities.length > 0) {
+    await tx.insert(activityEvents).values(rows.activities);
+  }
+  if (rows.timeslotRows.length > 0) {
+    await tx.insert(timeslots).values(rows.timeslotRows);
+  }
+  if (rows.availabilityRows.length > 0) {
+    await tx.insert(availability).values(rows.availabilityRows);
+  }
+  if (rows.slotCommentRows.length > 0) {
+    await tx.insert(slotComments).values(rows.slotCommentRows);
+  }
+  if (rows.slotTopicRows.length > 0) {
+    await tx.insert(slotTopics).values(rows.slotTopicRows);
+  }
+}
+
 async function main(): Promise<void> {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
@@ -1152,99 +1364,16 @@ async function main(): Promise<void> {
   const rows = buildRows(fixture);
   const resetDevDatabase = shouldResetDevDatabase();
 
-  const sql = postgres(databaseUrl, {
-    max: 1,
-    ssl: process.env.DATABASE_SSL === "require" ? "require" : undefined,
-  });
-  const db = drizzle(sql, { schema, casing: "snake_case" });
+  const { sql, db } = createSeedDb(databaseUrl);
 
   try {
     await db.transaction(async (tx) => {
       if (resetDevDatabase) {
         await tx.execute(drizzleSql.raw(resetDatabaseSql()));
       }
-
-      // Shadow cleanup: a sample person who signed in before this fixture
-      // existed got a user row keyed by their raw Clerk id with the same
-      // email. Left in place it violates the email unique constraint below
-      // (aborting the whole seed) and shadows the fixture at sign-in, since
-      // auth returns an existing row by id before consulting externalId.
-      // Delete such rows (their content cascades) — unless they own a
-      // timetable (ownerId is ON DELETE RESTRICT), which needs a human.
-      const ownerIds = new Set(
-        (await tx.select({ ownerId: timetables.ownerId }).from(timetables)).map(
-          (r) => r.ownerId,
-        ),
-      );
-      for (const user of rows.users) {
-        if (!user.email || !user.id) continue;
-        const clashes = await tx
-          .select({ id: users.id })
-          .from(users)
-          .where(and(eq(users.email, user.email), ne(users.id, user.id)));
-        for (const clash of clashes) {
-          if (ownerIds.has(clash.id)) {
-            throw new Error(
-              `Cannot seed user "${user.id}": existing user "${clash.id}" holds ` +
-                `email ${user.email} and owns a timetable. Transfer or delete ` +
-                `that timetable, or run with SEED_DEV_RESET_DATABASE=true.`,
-            );
-          }
-          console.warn(
-            `Removing shadow user "${clash.id}" holding sample email ${user.email}.`,
-          );
-          await tx.delete(users).where(eq(users.id, clash.id));
-        }
-      }
-
-      for (const user of rows.users) {
-        await tx
-          .insert(users)
-          .values(user)
-          .onConflictDoUpdate({
-            target: users.id,
-            set: {
-              name: user.name,
-              email: user.email,
-              emailVerified: user.emailVerified,
-              image: user.image,
-              bio: user.bio,
-              notificationSettings: user.notificationSettings,
-              lastDigestAt: user.lastDigestAt,
-              icsToken: user.icsToken,
-              createdAt: user.createdAt,
-            },
-          });
-      }
-
-      await tx
-        .delete(timetables)
-        .where(eq(timetables.slug, fixture.timetable.slug));
-      await tx.insert(timetables).values(rows.timetable);
-      await tx.insert(timetableMemberships).values(rows.memberships);
-      await tx.insert(topics).values(rows.topics);
-
-      if (rows.comments.length > 0) {
-        await tx.insert(comments).values(rows.comments);
-      }
-      if (rows.hearts.length > 0) {
-        await tx.insert(hearts).values(rows.hearts);
-      }
-      if (rows.activities.length > 0) {
-        await tx.insert(activityEvents).values(rows.activities);
-      }
-      if (rows.timeslotRows.length > 0) {
-        await tx.insert(timeslots).values(rows.timeslotRows);
-      }
-      if (rows.availabilityRows.length > 0) {
-        await tx.insert(availability).values(rows.availabilityRows);
-      }
-      if (rows.slotCommentRows.length > 0) {
-        await tx.insert(slotComments).values(rows.slotCommentRows);
-      }
-      if (rows.slotTopicRows.length > 0) {
-        await tx.insert(slotTopics).values(rows.slotTopicRows);
-      }
+      await removeShadowUsers(tx, rows.users);
+      await upsertUsers(tx, rows.users);
+      await insertFixtureRows(tx, fixture, rows);
     });
   } finally {
     await sql.end();

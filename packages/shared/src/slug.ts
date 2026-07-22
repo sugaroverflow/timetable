@@ -1,12 +1,18 @@
-/** URL-safe slug for timetables, derived from a name. */
-export function slugify(input: string): string {
-  const base = input
+/**
+ * URL-safe slug from arbitrary text (timetable names, topic titles, user
+ * display names). Lowercases, collapses runs of non-alphanumerics to single
+ * hyphens, strips leading/trailing hyphens, and truncates to 60 chars
+ * without leaving a dangling hyphen. Returns `fallback` when nothing
+ * slug-worthy remains.
+ */
+export function slugify(value: string, fallback = "timetable"): string {
+  const base = value
     .toLowerCase()
-    .trim()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
-    .slice(0, 60);
-  return base || "timetable";
+    .slice(0, 60)
+    .replace(/-+$/, "");
+  return base || fallback;
 }
 
 /** Append a short random suffix to keep slugs unique on collision. */

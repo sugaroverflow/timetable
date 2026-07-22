@@ -6,6 +6,17 @@ const roleEnum = z.enum(ROLES);
 const assignableRoleEnum = z.enum(ASSIGNABLE_ROLES);
 const privacyEnum = z.enum(PRIVACY_LEVELS);
 
+/**
+ * Canonical email form used everywhere emails are stored or compared
+ * (invites, membership claims, Clerk lookups). Kept as a plain helper rather
+ * than a zod `.transform()`: the core functions that need it are also called
+ * with inputs that never pass through these schemas, so they must normalize
+ * regardless.
+ */
+export function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
 export const createTimetableSchema = z.object({
   name: z.string().min(1, "Name is required").max(120),
   slug: z

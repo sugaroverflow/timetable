@@ -1,9 +1,9 @@
-/* eslint-disable complexity -- audit debt (2026-07-22): decomposition queued — remove this disable when refactoring */
 import { createClerkClient, verifyToken } from "@clerk/backend";
 import { eq } from "drizzle-orm";
 
 import { claimInvitesForUser } from "@timetable/core";
 import { db, users } from "@timetable/db";
+import { normalizeEmail } from "@timetable/shared";
 
 import { env } from "../env";
 import { parseCookies } from "../http/cookies";
@@ -47,6 +47,81 @@ async function loadLocalUser(id: string): Promise<SessionUser | null> {
   return user ?? null;
 }
 
+/** Verify the session JWT and return the Clerk user id, or null. */
+async function verifySessionToken(token: string): Promise<string | null> {
+  try {
+    const claims = await verifyToken(token, { secretKey });
+    return claims.sub || null;
+  } catch {
+    return null;
+  }
+}
+
+type ClerkProfile = {
+  email: string | null;
+  name: string | null;
+  image: string | null;
+  externalId: string | null;
+};
+
+/** Mirror of the Clerk profile fields we copy into the local user row.
+ * Falls back to an all-null profile (a bare row) if the lookup fails. */
+async function fetchClerkProfile(clerkUserId: string): Promise<ClerkProfile> {
+  try {
+    const cu = await clerkClient.users.getUser(clerkUserId);
+    return {
+      externalId: cu.externalId ?? null,
+      email:
+        cu.primaryEmailAddress?.emailAddress ??
+        cu.emailAddresses[0]?.emailAddress ??
+        null,
+      name:
+        [cu.firstName, cu.lastName].filter(Boolean).join(" ") ||
+        cu.username ||
+        null,
+      image: cu.imageUrl ?? null,
+    };
+  } catch {
+    return { email: null, name: null, image: null, externalId: null };
+  }
+}
+
+/** Dev seed users set Clerk externalId to the deterministic local fixture
+ * user id — sign-ins map onto that row (claiming invites) instead of
+ * creating a new one. */
+async function resolveSeedMappedUser(
+  externalId: string,
+  email: string | null,
+): Promise<SessionUser | null> {
+  const externalUser = await loadLocalUser(externalId);
+  if (!externalUser) return null;
+  if (email) await claimInvitesForUser(externalUser.id, email);
+  return externalUser;
+}
+
+/** First sign-in: create the local row (an existing row wins the race) and
+ * claim any invites pending for the profile email. */
+async function createUserFromClerkProfile(
+  clerkUserId: string,
+  profile: ClerkProfile,
+): Promise<SessionUser | null> {
+  await db
+    .insert(users)
+    .values({
+      id: clerkUserId,
+      email: profile.email,
+      name: profile.name,
+      image: profile.image,
+    })
+    .onConflictDoNothing();
+
+  if (profile.email) {
+    await claimInvitesForUser(clerkUserId, profile.email);
+  }
+
+  return loadLocalUser(clerkUserId);
+}
+
 /**
  * Verify a Clerk session token and return the local user, creating it on first
  * sign-in (mirroring Clerk profile fields) and claiming any pending invites.
@@ -59,58 +134,23 @@ export async function getUserFromRequest(
   const token = extractToken(authHeader, cookieHeader);
   if (!token) return null;
 
-  let clerkUserId: string;
-  try {
-    const claims = await verifyToken(token, { secretKey });
-    clerkUserId = claims.sub;
-  } catch {
-    return null;
-  }
+  const clerkUserId = await verifySessionToken(token);
   if (!clerkUserId) return null;
 
   const existing = await loadLocalUser(clerkUserId);
   if (existing) return existing;
 
-  // First sign-in: mirror the Clerk profile into a local user row. Dev seed
-  // users set Clerk externalId to the deterministic local fixture user id.
-  let email: string | null = null;
-  let name: string | null = null;
-  let image: string | null = null;
-  let externalId: string | null = null;
-  try {
-    const cu = await clerkClient.users.getUser(clerkUserId);
-    externalId = cu.externalId ?? null;
-    email =
-      cu.primaryEmailAddress?.emailAddress ??
-      cu.emailAddresses[0]?.emailAddress ??
-      null;
-    name =
-      [cu.firstName, cu.lastName].filter(Boolean).join(" ") ||
-      cu.username ||
-      null;
-    image = cu.imageUrl ?? null;
-  } catch {
-    // Fall back to a bare row if the Clerk lookup fails.
+  const profile = await fetchClerkProfile(clerkUserId);
+
+  if (profile.externalId && env.devSeedUserMapping) {
+    const seedUser = await resolveSeedMappedUser(
+      profile.externalId,
+      profile.email,
+    );
+    if (seedUser) return seedUser;
   }
 
-  if (externalId && env.devSeedUserMapping) {
-    const externalUser = await loadLocalUser(externalId);
-    if (externalUser) {
-      if (email) await claimInvitesForUser(externalUser.id, email);
-      return externalUser;
-    }
-  }
-
-  await db
-    .insert(users)
-    .values({ id: clerkUserId, email, name, image })
-    .onConflictDoNothing();
-
-  if (email) {
-    await claimInvitesForUser(clerkUserId, email);
-  }
-
-  return loadLocalUser(clerkUserId);
+  return createUserFromClerkProfile(clerkUserId, profile);
 }
 
 /**
@@ -122,7 +162,7 @@ export async function getOrCreateClerkUser(
   email: string,
   name: string | null,
 ): Promise<{ id: string; created: boolean }> {
-  const normalized = email.trim().toLowerCase();
+  const normalized = normalizeEmail(email);
   const existing = await clerkClient.users.getUserList({
     emailAddress: [normalized],
   });

@@ -1,6 +1,7 @@
 import { and, eq, isNull, ne } from "drizzle-orm";
 
 import { db, topics, users } from "@timetable/db";
+import { slugify } from "@timetable/shared";
 
 /** Route segments under /t/[slug]/ that a user slug must never shadow —
  * the permalink route's [hostSlug] segment lives at the same level. */
@@ -18,16 +19,6 @@ const RESERVED_SEGMENTS = new Set([
   "sign-in",
   "sign-up",
 ]);
-
-export function slugify(value: string, fallback: string): string {
-  const base = value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 60)
-    .replace(/-+$/, "");
-  return base || fallback;
-}
 
 /** Unique-per-timetable topic slug from a title ("-2", "-3"… on collision). */
 export async function ensureTopicSlug(

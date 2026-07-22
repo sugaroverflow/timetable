@@ -1,4 +1,3 @@
-/* eslint-disable complexity, max-lines-per-function -- audit debt (2026-07-22): decomposition queued — remove this disable when refactoring */
 import { and, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 
 import {
@@ -274,6 +273,54 @@ export async function setHeartsCountFrom(
   });
 }
 
+/** Ids of every published topic in the timetable — weight denominators
+ * always span the whole timetable, even for filtered views. */
+async function loadPublishedTopicIds(
+  timetableId: string,
+): Promise<Set<string>> {
+  const rows = await db
+    .select({ id: topics.id })
+    .from(topics)
+    .where(
+      and(eq(topics.timetableId, timetableId), eq(topics.status, "published")),
+    );
+  return new Set(rows.map((r) => r.id));
+}
+
+type PublishedHeart = {
+  topicId: string;
+  electorId: string;
+  createdAt: Date;
+};
+
+/**
+ * All post-cutoff hearts on published topics in the timetable (optionally
+ * one user's). The single source for heart-weight inputs — buildFeed,
+ * getWeightedBreakdown and countViewerPublishedHearts share its query and
+ * cutoff semantics.
+ */
+async function loadPublishedHearts(
+  timetableId: string,
+  opts: { userId?: string } = {},
+): Promise<PublishedHeart[]> {
+  const cutoff = await getHeartsCountFrom(timetableId);
+  const conds = [
+    eq(topics.timetableId, timetableId),
+    eq(topics.status, "published"),
+  ];
+  if (opts.userId) conds.push(eq(hearts.userId, opts.userId));
+  if (cutoff) conds.push(gte(hearts.createdAt, cutoff));
+  return db
+    .select({
+      topicId: hearts.topicId,
+      electorId: hearts.userId,
+      createdAt: hearts.createdAt,
+    })
+    .from(hearts)
+    .innerJoin(topics, eq(topics.id, hearts.topicId))
+    .where(and(...conds));
+}
+
 /**
  * Number of published topics this user currently hearts (post-cutoff).
  * The user's per-heart vote weight is 1/count — shown to them in the feed.
@@ -282,19 +329,8 @@ export async function countViewerPublishedHearts(
   timetableId: string,
   userId: string,
 ): Promise<number> {
-  const cutoff = await getHeartsCountFrom(timetableId);
-  const conds = [
-    eq(topics.timetableId, timetableId),
-    eq(topics.status, "published"),
-    eq(hearts.userId, userId),
-  ];
-  if (cutoff) conds.push(gte(hearts.createdAt, cutoff));
-  const [row] = await db
-    .select({ n: sql<number>`count(*)::int` })
-    .from(hearts)
-    .innerJoin(topics, eq(topics.id, hearts.topicId))
-    .where(and(...conds));
-  return row?.n ?? 0;
+  const viewerHearts = await loadPublishedHearts(timetableId, { userId });
+  return viewerHearts.length;
 }
 
 /**
@@ -351,6 +387,183 @@ function seededRank(seed: string, id: string): number {
   return hash;
 }
 
+type FeedComparator = (a: FeedTopic, b: FeedTopic) => number;
+
+/** "Newest" counts content edits, not just publication (QA #59). */
+function recency(t: FeedTopic): number {
+  return Math.max(
+    t.publishedAt?.getTime() ?? t.createdAt.getTime(),
+    t.contentUpdatedAt?.getTime() ?? 0,
+  );
+}
+
+/** Normalisation sorts share a stable recency tie-break so equal scores
+ * don't jitter between requests. */
+function byScore(score: (t: FeedTopic) => number): FeedComparator {
+  return (a, b) => {
+    const diff = score(b) - score(a);
+    return diff !== 0 ? diff : recency(b) - recency(a);
+  };
+}
+
+const FEED_COMPARATORS: Record<FeedSort, (seed: string) => FeedComparator> = {
+  // "hearts" is a legacy alias for "l1" (the original weighted score).
+  hearts: () => byScore((t) => t.weightedScore),
+  l1: () => byScore((t) => t.weightedScore),
+  raw: () => byScore((t) => t.heartCount),
+  l2: () => byScore((t) => t.l2Score),
+  devotion: () => byScore((t) => t.devotionScore),
+  comments: () => (a, b) => {
+    const at = a.latestCommentAt?.getTime() ?? 0;
+    const bt = b.latestCommentAt?.getTime() ?? 0;
+    if (bt !== at) return bt - at;
+    return b.commentCount - a.commentCount;
+  },
+  recent: () => (a, b) => recency(b) - recency(a),
+  random: (seed) => (a, b) => seededRank(seed, a.id) - seededRank(seed, b.id),
+};
+
+function comparatorFor(sort: FeedSort, seed: string): FeedComparator {
+  // Out-of-enum values fall back to the default weighted ranking, matching
+  // the old switch's default branch.
+  return (FEED_COMPARATORS[sort] ?? FEED_COMPARATORS.hearts)(seed);
+}
+
+/** Per-topic elector lists from the flat heart rows. */
+function groupHeartsByTopic(
+  heartRows: { topicId: string; electorId: string }[],
+): Map<string, string[]> {
+  const byTopic = new Map<string, string[]>();
+  for (const h of heartRows) {
+    const list = byTopic.get(h.topicId) ?? [];
+    list.push(h.electorId);
+    byTopic.set(h.topicId, list);
+  }
+  return byTopic;
+}
+
+/** Displayed topics (optionally filtered to one host/topic) with host
+ * profile fields joined in. */
+async function loadDisplayedTopicRows(
+  timetableId: string,
+  opts: { hostId?: string; topicId?: string },
+): Promise<
+  {
+    topic: Topic;
+    hostName: string | null;
+    hostImage: string | null;
+    hostSlug: string | null;
+  }[]
+> {
+  const displayConds = [
+    eq(topics.timetableId, timetableId),
+    eq(topics.status, "published"),
+  ];
+  if (opts.hostId) displayConds.push(eq(topics.hostId, opts.hostId));
+  if (opts.topicId) displayConds.push(eq(topics.id, opts.topicId));
+
+  return db
+    .select({
+      topic: topics,
+      hostName: users.name,
+      hostImage: users.image,
+      hostSlug: users.slug,
+    })
+    .from(topics)
+    .innerJoin(users, eq(users.id, topics.hostId))
+    .where(and(...displayConds));
+}
+
+type CommentStat = { count: number; latestCommentAt: Date | null };
+
+/** Public, non-hidden comment counts and latest-comment timestamps. */
+async function loadCommentStats(
+  topicIds: string[],
+): Promise<Map<string, CommentStat>> {
+  const commentStats = new Map<string, CommentStat>();
+  if (topicIds.length === 0) return commentStats;
+
+  const statRows = await db
+    .select({
+      topicId: comments.topicId,
+      count: sql<number>`count(*)::int`,
+      latestCommentAt: sql<Date | null>`max(${comments.createdAt})`,
+    })
+    .from(comments)
+    .where(
+      and(
+        inArray(comments.topicId, topicIds),
+        eq(comments.visibility, "public"),
+        isNull(comments.hiddenAt),
+      ),
+    )
+    .groupBy(comments.topicId);
+  for (const c of statRows) {
+    commentStats.set(c.topicId, {
+      count: c.count,
+      latestCommentAt: coerceDate(c.latestCommentAt),
+    });
+  }
+  return commentStats;
+}
+
+function toFeedTopic(
+  row: {
+    topic: Topic;
+    hostName: string | null;
+    hostImage: string | null;
+    hostSlug: string | null;
+  },
+  ctx: {
+    heartsByTopic: Map<string, string[]>;
+    heartCounts: Map<string, number>;
+    commentStats: Map<string, CommentStat>;
+    viewerUserId: string | null;
+  },
+): FeedTopic {
+  const { topic, hostName, hostImage, hostSlug } = row;
+  const topicHearts = (ctx.heartsByTopic.get(topic.id) ?? []).map(
+    (electorId) => ({ topicId: topic.id, electorId }),
+  );
+  const norms = topicNormScores(topicHearts, ctx.heartCounts);
+  return {
+    id: topic.id,
+    timetableId: topic.timetableId,
+    hostId: topic.hostId,
+    hostName,
+    hostImage,
+    hostSlug,
+    title: topic.title,
+    slug: topic.slug,
+    bodyMd: topic.bodyMd,
+    coverImageUrl: topic.coverImageUrl,
+    status: topic.status,
+    publishedAt: topic.publishedAt,
+    contentUpdatedAt: topic.contentUpdatedAt,
+    createdAt: topic.createdAt,
+    heartCount: norms.raw,
+    weightedScore: norms.l1,
+    l2Score: norms.l2,
+    devotionScore: norms.devotion,
+    viewerHasHearted: ctx.viewerUserId
+      ? topicHearts.some((h) => h.electorId === ctx.viewerUserId)
+      : false,
+    commentCount: ctx.commentStats.get(topic.id)?.count ?? 0,
+    latestCommentAt: ctx.commentStats.get(topic.id)?.latestCommentAt ?? null,
+  };
+}
+
+function paginate(
+  feed: FeedTopic[],
+  opts: { limit?: number; offset?: number },
+): FeedTopic[] {
+  const offset = Math.max(0, opts.offset ?? 0);
+  if (opts.limit === undefined) return feed.slice(offset);
+
+  const limit = Math.max(1, Math.min(opts.limit, 50));
+  return feed.slice(offset, offset + limit);
+}
+
 /**
  * Build the published-topic feed for a timetable.
  *
@@ -373,120 +586,23 @@ export async function buildFeed(
   } = {},
 ): Promise<FeedTopic[]> {
   // All published topic ids (for correct weight denominators).
-  const allPublished = await db
-    .select({ id: topics.id })
-    .from(topics)
-    .where(
-      and(eq(topics.timetableId, timetableId), eq(topics.status, "published")),
-    );
-  const publishedIdSet = new Set(allPublished.map((r) => r.id));
-
+  const publishedIdSet = await loadPublishedTopicIds(timetableId);
   if (publishedIdSet.size === 0) return [];
 
-  // All post-cutoff hearts on published topics in the timetable.
-  const cutoff = await getHeartsCountFrom(timetableId);
-  const heartConds = [
-    eq(topics.timetableId, timetableId),
-    eq(topics.status, "published"),
-  ];
-  if (cutoff) heartConds.push(gte(hearts.createdAt, cutoff));
-  const heartRows = await db
-    .select({ topicId: hearts.topicId, electorId: hearts.userId })
-    .from(hearts)
-    .innerJoin(topics, eq(topics.id, hearts.topicId))
-    .where(and(...heartConds));
-
+  const heartRows = await loadPublishedHearts(timetableId);
   const heartCounts = computeElectorHeartCounts(heartRows, publishedIdSet);
+  const heartsByTopic = groupHeartsByTopic(heartRows);
 
-  const heartsByTopic = new Map<string, string[]>();
-  for (const h of heartRows) {
-    const list = heartsByTopic.get(h.topicId) ?? [];
-    list.push(h.electorId);
-    heartsByTopic.set(h.topicId, list);
-  }
+  const rows = await loadDisplayedTopicRows(timetableId, opts);
+  const commentStats = await loadCommentStats(rows.map((r) => r.topic.id));
 
-  // Displayed topics (optionally filtered to one host).
-  const displayConds = [
-    eq(topics.timetableId, timetableId),
-    eq(topics.status, "published"),
-  ];
-  if (opts.hostId) displayConds.push(eq(topics.hostId, opts.hostId));
-  if (opts.topicId) displayConds.push(eq(topics.id, opts.topicId));
-
-  const rows = await db
-    .select({
-      topic: topics,
-      hostName: users.name,
-      hostImage: users.image,
-      hostSlug: users.slug,
-    })
-    .from(topics)
-    .innerJoin(users, eq(users.id, topics.hostId))
-    .where(and(...displayConds));
-
-  const displayedIds = rows.map((r) => r.topic.id);
-
-  // Public, non-hidden comment counts and latest-comment timestamps.
-  const commentStats = new Map<
-    string,
-    { count: number; latestCommentAt: Date | null }
-  >();
-  if (displayedIds.length > 0) {
-    const statRows = await db
-      .select({
-        topicId: comments.topicId,
-        count: sql<number>`count(*)::int`,
-        latestCommentAt: sql<Date | null>`max(${comments.createdAt})`,
-      })
-      .from(comments)
-      .where(
-        and(
-          inArray(comments.topicId, displayedIds),
-          eq(comments.visibility, "public"),
-          isNull(comments.hiddenAt),
-        ),
-      )
-      .groupBy(comments.topicId);
-    for (const c of statRows) {
-      commentStats.set(c.topicId, {
-        count: c.count,
-        latestCommentAt: coerceDate(c.latestCommentAt),
-      });
-    }
-  }
-
-  const feed: FeedTopic[] = rows.map(
-    ({ topic, hostName, hostImage, hostSlug }) => {
-      const topicHearts = (heartsByTopic.get(topic.id) ?? []).map(
-        (electorId) => ({ topicId: topic.id, electorId }),
-      );
-      const norms = topicNormScores(topicHearts, heartCounts);
-      return {
-        id: topic.id,
-        timetableId: topic.timetableId,
-        hostId: topic.hostId,
-        hostName,
-        hostImage,
-        hostSlug,
-        title: topic.title,
-        slug: topic.slug,
-        bodyMd: topic.bodyMd,
-        coverImageUrl: topic.coverImageUrl,
-        status: topic.status,
-        publishedAt: topic.publishedAt,
-        contentUpdatedAt: topic.contentUpdatedAt,
-        createdAt: topic.createdAt,
-        heartCount: norms.raw,
-        weightedScore: norms.l1,
-        l2Score: norms.l2,
-        devotionScore: norms.devotion,
-        viewerHasHearted: viewerUserId
-          ? topicHearts.some((h) => h.electorId === viewerUserId)
-          : false,
-        commentCount: commentStats.get(topic.id)?.count ?? 0,
-        latestCommentAt: commentStats.get(topic.id)?.latestCommentAt ?? null,
-      };
-    },
+  const feed = rows.map((row) =>
+    toFeedTopic(row, {
+      heartsByTopic,
+      heartCounts,
+      commentStats,
+      viewerUserId,
+    }),
   );
 
   const visibleFeed =
@@ -494,50 +610,9 @@ export async function buildFeed(
       ? feed.filter((t) => t.viewerHasHearted)
       : feed;
 
-  const sort = opts.sort ?? "hearts";
-  const seed = opts.seed ?? "";
-  // "Newest" counts content edits, not just publication (QA #59).
-  const recency = (t: FeedTopic) =>
-    Math.max(
-      t.publishedAt?.getTime() ?? t.createdAt.getTime(),
-      t.contentUpdatedAt?.getTime() ?? 0,
-    );
-  // Score used by the normalisation sorts ("hearts" is a legacy alias for L1).
-  const normScore = (t: FeedTopic): number => {
-    switch (sort) {
-      case "raw":
-        return t.heartCount;
-      case "l2":
-        return t.l2Score;
-      case "devotion":
-        return t.devotionScore;
-      default:
-        return t.weightedScore; // "l1" and legacy "hearts"
-    }
-  };
-  visibleFeed.sort((a, b) => {
-    if (sort === "comments") {
-      const at = a.latestCommentAt?.getTime() ?? 0;
-      const bt = b.latestCommentAt?.getTime() ?? 0;
-      if (bt !== at) return bt - at;
-      return b.commentCount - a.commentCount;
-    }
-    if (sort === "recent") {
-      return recency(b) - recency(a);
-    }
-    if (sort === "random") {
-      return seededRank(seed, a.id) - seededRank(seed, b.id);
-    }
-    const diff = normScore(b) - normScore(a);
-    // Stable tie-break so equal scores don't jitter between requests.
-    return diff !== 0 ? diff : recency(b) - recency(a);
-  });
+  visibleFeed.sort(comparatorFor(opts.sort ?? "hearts", opts.seed ?? ""));
 
-  const offset = Math.max(0, opts.offset ?? 0);
-  if (opts.limit === undefined) return visibleFeed.slice(offset);
-
-  const limit = Math.max(1, Math.min(opts.limit, 50));
-  return visibleFeed.slice(offset, offset + limit);
+  return paginate(visibleFeed, opts);
 }
 
 export type WeightedHeartEntry = {
@@ -559,29 +634,8 @@ export async function getWeightedBreakdown(
   timetableId: string,
   topicId: string,
 ): Promise<WeightedHeartEntry[]> {
-  const allPublished = await db
-    .select({ id: topics.id })
-    .from(topics)
-    .where(
-      and(eq(topics.timetableId, timetableId), eq(topics.status, "published")),
-    );
-  const publishedIdSet = new Set(allPublished.map((r) => r.id));
-
-  const cutoff = await getHeartsCountFrom(timetableId);
-  const heartConds = [
-    eq(topics.timetableId, timetableId),
-    eq(topics.status, "published"),
-  ];
-  if (cutoff) heartConds.push(gte(hearts.createdAt, cutoff));
-  const heartRows = await db
-    .select({
-      topicId: hearts.topicId,
-      electorId: hearts.userId,
-      createdAt: hearts.createdAt,
-    })
-    .from(hearts)
-    .innerJoin(topics, eq(topics.id, hearts.topicId))
-    .where(and(...heartConds));
+  const publishedIdSet = await loadPublishedTopicIds(timetableId);
+  const heartRows = await loadPublishedHearts(timetableId);
   const weights = computeElectorWeights(heartRows, publishedIdSet);
   const heartCounts = computeElectorHeartCounts(heartRows, publishedIdSet);
 
