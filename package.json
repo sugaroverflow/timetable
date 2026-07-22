@@ -14,7 +14,8 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present && npm run lint:node",
+    "lint:node": "eslint apps/api packages tests scripts",
     "test": "npm run test --workspaces --if-present",
     "test:e2e": "playwright test",
     "dev": "npm run dev --workspace @timetable/api & npm run dev --workspace @timetable/web",
@@ -31,7 +32,9 @@
   "devDependencies": {
     "@playwright/test": "^1.61.1",
     "@types/node": "^26.0.0",
+    "eslint": "^9.39.5",
     "prettier": "^3.8.4",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.65.0"
   }
 }

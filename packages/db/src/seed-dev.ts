@@ -521,7 +521,12 @@ function parseSlots(markdown: string): SlotFixture[] {
 
     // Parse Availability table
     const availabilityEntries: SlotAvailability[] = [];
-    const availMatch = /^Availability:\s*$([\s\S]*?)(?=^(?:Discussion:|###|\Z))/m.exec(rest);
+    // \Z (PCRE end-of-string) doesn't exist in JS regexes — it matched a
+    // literal "Z". $(?![\s\S]) is the real end-of-input anchor.
+    const availMatch =
+      /^Availability:\s*$([\s\S]*?)(?=^(?:Discussion:|###)|$(?![\s\S]))/m.exec(
+        rest,
+      );
     if (availMatch) {
       for (const line of availMatch[1]!.split("\n")) {
         if (!line.trim().startsWith("|")) continue;
