@@ -5,6 +5,11 @@ topic proposals, weighted interest signals, availability collection, moderation,
 and planning analytics. It is a multi-tenant web app where each timetable is its
 own workspace with members, roles, and independent settings.
 
+Since the 2026-07 rebrand the product is branded **Topic** (future domain
+topic.forum, 📚 logo) and a timetable is called a **forum** everywhere in the
+UI. This document keeps the historical "timetable" term, matching the code
+identifiers, routes, and schema, which deliberately keep the old name.
+
 ## Core Model
 
 A timetable is an independent workspace. One user can belong to many timetables
@@ -32,40 +37,51 @@ People page (the owner can never be removed).
 
 ## Topic Feed
 
-Hosts (and admins) draft topics in a rich-text editor — markdown stays the
-stored format — and submit them for moderation. Admins publish, request
-changes (threaded feedback the host can reply to), unpublish, edit inline,
-reassign a topic's owner, and hide comments. Pending Topics shows the
-submitted queue ("Ready to publish") plus a read-only list of every host's
-drafts so forgotten drafts stay visible.
+Hosts (and admins) write topics in a rich-text editor — markdown stays the
+stored format. There is no separate draft status: a new topic is created as
+`submitted` and is immediately publishable by an admin. Admins publish,
+unpublish, edit inline, reassign a topic's owner (and can create a topic on
+behalf of another host), and hide comments; pre-publish feedback happens in
+the topic's drafting thread (admin-only comments the owner can reply to).
+Pending Topics shows the submitted queue.
 
 Published topics get stable permalinks (`/t/{timetable}/{host}/{topic}`;
 slugs freeze at first publish). The feed is single-column with infinite
-scroll and sorts by most hearts, latest comments, newest (content edits count
-as new, without triggering email), or seeded random. Topics published or
-edited since the member's last visit are highlighted. Filtering by a host
-shows their profile card above their topics.
+scroll and sorts by hearts (any of the four normalisations below), latest
+comments, newest (content edits count as new, without triggering email), or
+seeded random (the default). Topics published or edited since the member's
+last visit are highlighted. Filtering by a host shows their profile card
+above their topics.
 
 Electors can heart and comment on published topics; each hearted card shows
 the elector their own "your vote: 1/n" weight. Hosts and admins can see
 weighted scores and per-elector breakdowns; electors see only the public feed.
 
-Heart weighting:
+Heart weighting comes in four normalisations, shared by the feed sort control
+and the Analysis leaderboard:
 
-```txt
-weight = 1 / number of published topics that elector hearted
-```
+| Mode | Formula | Meaning |
+| --- | --- | --- |
+| Total hearts | Σ❤️ | Every heart counts equally (L∞) |
+| Enthusiasm (L2) | Σ 1/√n | Discounted by the square root of each elector's total hearts |
+| One vote each (L1) | Σ 1/n | Each elector splits one unit of influence across their hearts |
+| Average devotion | (Σ 1/n)/Σ❤️ | The mean share of their hearts that this topic's supporters gave it |
 
-This means each elector distributes a total influence of 1 across all published
-topics they heart.
+where `n` is the number of published topics that elector hearted.
+
+The per-elector breakdown is a sortable table: one row per elector with their
+L1, L2, and devotion contributions plus when they hearted, with footer sums
+that match the topic's scores; elector names open their profile card. The
+same table appears on feed cards (for hosts and admins) and in the dashboard.
 
 Admins can set a timetable-wide hearts cutoff: hearts created before it are
 ignored in every count and weight (this replaced per-topic heart archiving).
 
-Topic comments support threaded public threads (auto-collapsed) and a
-separate host-only thread with its own composer, labelled with the
-timetable's host label. Admin feedback for requested changes lives in the
-host-only thread.
+Topic comments support threaded public threads (auto-collapsed), a separate
+host-only thread with its own composer, labelled with the timetable's host
+label, and an admin-only drafting thread (visible to admins and the topic's
+owner only, never rendered in the feed) where pre-publish feedback lives.
+Comments support @mentions, which notify the mentioned member.
 
 ## Availability Calendar
 
@@ -98,7 +114,8 @@ Admin surfaces include:
 - activity timeline: grouped by week and day with a date-range filter,
   actor avatars/roles, filters by action type, actor, and role, and enriched
   entries (comment text with a link to the comment, invites, first sign-ins)
-- member and role management from the People page (roles + markdown bios)
+- member and role management from the People page (roles + markdown bios),
+  including adding people and sending their invite emails
 - timetable profile: name, description, visibility, custom role labels with a
   live preview sentence, digest defaults, and the custom domain field
   (marked "coming soon" — routing is not wired up yet)
@@ -106,6 +123,15 @@ Admin surfaces include:
   curated font pairings, a dark-mode palette, cover image, and icon
 - hearts cutoff
 - dashboard analytics, including host-scoped elector activity
+
+Adding a member is a two-step flow so their first sign-in lands in a
+ready-made account. An admin adds the person from the People page — this
+silently creates their account and membership, with no email sent — then
+populates their profile and creates topics on their behalf. When everything
+is ready, the admin explicitly sends the invite email (which mentions how
+many topics are waiting). Each member card shows its invite state ("Not
+invited yet" / "Invited 12 Jul") with a Send/Resend button, alongside
+View as and Edit profile actions.
 
 Everyone gets a personal light/dark/auto mode toggle in the topbar; the
 timetable's theme defines both palettes.
@@ -136,8 +162,9 @@ Members always see everything their role allows, regardless of level.
 ## Notifications And Sync
 
 In-app: each timetable has a Notifications pane listing comments on the
-member's topics and replies to their comments, each linking to the comment;
-an unread badge in the sidebar clears when the pane is opened.
+member's topics, replies to their comments, and @mentions of them, each
+linking to the comment; an unread badge in the sidebar clears when the pane
+is opened.
 
 For email, users can opt into digest sections:
 
@@ -151,7 +178,9 @@ never customized their own preferences.
 Email digests are the first supported notification channel. The digest
 computation, REST job endpoint, scheduled GitHub Actions caller, and Resend env
 plumbing exist; production delivery still requires a verified sender identity in
-the Resend dashboard.
+the Resend dashboard. Invite emails from the add-person flow go through the
+same Resend plumbing and are only ever sent when an admin explicitly triggers
+them.
 
 Calendar sync is one-way ICS export through:
 
@@ -176,6 +205,8 @@ configuration remain environment setup tasks.
 | Phase 4: Notifications, domains, analytics | Partial | Dashboard analytics, conflict alerts, digest computation/job, custom domain field/routing, ICS export, initial API hardening, and S3-compatible object storage uploads |
 | QA round 1 (issue #42, PR #56) | Done | Sidebar nav + switcher, permalinks, infinite scroll, People page + bios, admin topic management, hearts cutoff, five-level visibility, My hearted topics, enriched activity log, rich seed data |
 | QA round 2 (issue #59, PR #60) | Done | Status-aware moderation actions, role-label copy, Profile nav, sidebar-footer switcher, People grouping + member editing, random sort + edits-as-new, admin drafts, activity grouping/filters, full theming + dark mode + fonts, TipTap editor, My Topics feed parity, notifications pane |
+| Product feedback round 1 (PRs #64/#66/#67) | Done | Design-token theming + Base UI, draft-status removal, the four vote normalisations + Random default sort, @mention notifications, nav/People/Analysis polish |
+| Product feedback round 2 (PRs #75/#76/#78/#81/#85) | Done | Sortable per-elector breakdown table, mobile slide-in drawer, "Topic"/forum rebrand (code phase), add-person + deferred invite email flow |
 
 ## Go-Live Checklist
 
@@ -196,6 +227,7 @@ Before opening to real users:
 
 **Product gaps**
 
+- The rebrand shipped its code phase only: the topic.forum domain cutover (DO domains, Clerk domain, Resend domain, DNS) is pending, so the app still lives at timetable.love; API error strings, ICS identifiers, and a proper favicon are decided at cutover.
 - Custom-domain hostname routing is wired in the web proxy; production DNS/Clerk domain setup must still be configured per environment (the settings field is labelled "coming soon").
 - Email digest is the only email channel; Slack, push, and others are not started. No immediate email on topic reassignment yet (#57).
 - The in-app notifications pane has no per-item read state or mark-all-read.

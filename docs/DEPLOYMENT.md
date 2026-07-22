@@ -75,10 +75,14 @@ Important variables:
 
 | Workflow | Trigger | Target |
 | --- | --- | --- |
-| `.github/workflows/ci.yml` | Push to `main`, pull requests | Build, typecheck, lint, test, migrate against throwaway Postgres |
-| `.github/workflows/deploy-dev.yml` | CI success on `main`, manual | Deploys `timetable-dev` from `.do/app.dev.yaml`; manual runs can optionally seed sample data |
+| `.github/workflows/ci.yml` | Push to `main`, pull requests | Build, typecheck, lint, format check, unit + e2e tests, migrate against throwaway Postgres |
+| `.github/workflows/deploy-dev.yml` | CI success on `main`, manual | Builds the web Docker image, pushes it to the DO container registry, deploys `timetable-dev` from `.do/app.dev.yaml`, then prunes the registry; manual runs can optionally seed sample data |
 | `.github/workflows/deploy-production.yml` | Manual only | Deploys `timetable` from `.do/app.yaml` |
 | `.github/workflows/run-digests.yml` | Daily schedule, manual | Calls `POST /api/jobs/digests` with `CRON_SECRET` |
+| `.github/workflows/claude-review.yml` | PR opened / ready for review | Automated Claude PR review; inert until the `ANTHROPIC_API_KEY` secret and the `CLAUDE_REVIEW_ENABLED=true` repo variable are set |
+
+There is no per-PR review-app system: it was removed on 2026-07-22 (dev is
+where QA happens), so no PR label provisions any environment.
 
 CI runs on pull requests, but `main` pushes are path-filtered to app, package,
 GitHub workflow, DigitalOcean app spec, deploy, and root build files.
@@ -88,6 +92,16 @@ trigger dev deploys.
 The dev deploy workflow is serialized with a single `deploy-dev` concurrency
 group. After DigitalOcean reports a successful deploy, GitHub Actions verifies
 that `/health`, `/`, and `/graphql` are reachable on `https://dev.timetable.love`.
+
+Every dev deploy pushes a sha-tagged `web` image to the
+`registry.digitalocean.com/timetable-reg` container registry, and DigitalOcean
+never expires tags — the 500 MiB Starter registry filled in weeks (2026-07-22
+quota incident: pushes failed with `invalid content range`). The workflow
+therefore ends by pruning the registry to the newest 5 `web` tags and starting
+a garbage collection of untagged manifests. GC briefly makes the registry
+read-only, so a deploy racing that window fails on `docker push`; it needs no
+diagnosis beyond `gh run rerun <id> --failed`.
+
 Manual `Deploy Dev` runs include a `seed_sample_data` checkbox. When checked,
 the dev App Platform post-deploy job resets hosted dev app data, runs
 `npm run db:seed` against the `timetable-dev` database, and then runs
@@ -114,10 +128,19 @@ Per-environment secrets for `timetable-dev` and `production`:
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
 - `CRON_SECRET`
 - `RESEND_API_KEY` when digest email sending is enabled
+- `SPACES_KEY` and `SPACES_SECRET` for object-storage uploads
 
 Per-environment variables:
 
 - `EMAIL_FROM` for the Resend sender identity
+
+Both deploy workflows must pass `SPACES_KEY`/`SPACES_SECRET` through to the
+`digitalocean/app_action` env so the `${SPACES_KEY}`/`${SPACES_SECRET}`
+placeholders in `.do/app.dev.yaml` and `.do/app.yaml` resolve. The API refuses
+to boot when `SPACES_BUCKET` is set without `SPACES_KEY`/`SPACES_SECRET`, so
+an app spec that grows a `SPACES_*` variable without the matching workflow env
+takes the whole deployment down (this bit the first production spec — fixed in
+PR #72). Keep app specs and workflow env in sync.
 
 ## DigitalOcean App Platform
 
@@ -366,7 +389,14 @@ deployment; `503` means object-storage env vars are missing.
 
 - Missing DigitalOcean API scopes.
 - Missing environment secrets in the selected GitHub environment.
-- `.do/app*.yaml` placeholder substitution errors.
+- `.do/app*.yaml` placeholder substitution errors, including `SPACES_*`
+  placeholders without the matching workflow env passthrough (the API refuses
+  to boot when `SPACES_BUCKET` is set without `SPACES_KEY`/`SPACES_SECRET`).
+- A `docker push` failing during the registry's brief read-only
+  garbage-collection window after the previous deploy's prune — rerun the
+  failed job.
+- A full container registry (`invalid content range` on push) if the
+  post-deploy prune has not been running.
 - Clerk keys from the wrong instance.
 - Missing production Clerk domain/DNS setup.
 - Database migration failure in the pre-deploy job.

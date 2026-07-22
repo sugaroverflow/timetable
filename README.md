@@ -13,16 +13,18 @@ A [Newspeak House](https://newspeak.house/) x
 
 ## What It Does
 
-Timetable is a multi-tenant web app. Each timetable is its own workspace with
-members, roles, topics, comments, hearts, availability slots, moderation, and
-dashboard analytics.
+Topic is a multi-tenant web app. Each forum (a "timetable" in code — package
+names, routes, and the GraphQL schema keep the old name on purpose) is its own
+workspace with members, roles, topics, comments, hearts, availability slots,
+moderation, and dashboard analytics.
 
 Core workflows:
 
 - Hosts draft topics in a rich-text (TipTap) editor and submit them for review.
-- Admins moderate from Pending Topics (with every host's drafts visible),
-  create and reassign topics, manage members from the People page, create
-  slots, and tag topics to slots.
+- Admins moderate from Pending Topics, create topics (including on behalf of
+  another host) and reassign them, manage members from the People page —
+  pre-creating accounts silently, populating their profile and topics, then
+  sending the invite email when ready — create slots, and tag topics to slots.
 - Electors heart topics (weighted votes), comment in threaded discussions,
   collect "My hearted topics", and mark availability.
 - Hosts and admins use weighted-heart scores, a hearts cutoff, elector
@@ -108,7 +110,9 @@ pull requests with code changes.
   implementation status, go-live checklist, and known gaps.
 
 Static README screenshots live in [docs/assets/readme](docs/assets/readme).
-The web app logo lives in [apps/web/public/assets](apps/web/public/assets).
+The logo is the 📚 emoji rendered inline; the old image asset in
+[apps/web/public/assets](apps/web/public/assets) is unreferenced and will be
+removed at the domain cutover.
 
 ## Scripts
 
@@ -119,7 +123,9 @@ The web app logo lives in [apps/web/public/assets](apps/web/public/assets).
 | `npm run typecheck` | Type-check every workspace |
 | `npm run test` | Run unit tests |
 | `npm run test:e2e` | Run Playwright anonymous browser smoke tests |
-| `npm run lint` | Lint the web app |
+| `npm run lint` | Lint every workspace (web's own Next config, then `lint:node`) |
+| `npm run lint:node` | Lint `apps/api`, `packages/*`, `tests`, and `scripts` with the root `eslint.config.mjs` |
+| `npm run format` / `npm run format:check` | Prettier write / check (defaults; YAML and Markdown are exempt) |
 | `npm run build` | Build all workspaces |
 | `npm run db:generate` | Generate a SQL migration from the schema |
 | `npm run db:migrate` | Apply migrations |
@@ -134,7 +140,9 @@ Pull requests should keep the full verification path green:
 
 - `npm run build`
 - `npm run typecheck`
-- `npm run lint`
+- `npm run lint` (covers every workspace: web's Next config plus the root
+  `eslint.config.mjs` for `apps/api`, `packages/*`, `tests`, and `scripts`)
+- `npm run format:check`
 - `npm run test`
 - `npm run test:e2e`
 - `npm run db:migrate` when migrations or schema-adjacent config change
@@ -155,7 +163,11 @@ Hosted post-deploy checks and rate-limit smoke commands live in
 
 Phases 0-4 are substantially implemented, plus two product-owner QA rounds
 (issue #42 → PR #56, issue #59 → PR #60) covering navigation, profiles,
-theming, and moderation UX. The tracked app includes:
+theming, and moderation UX, and two product-feedback rounds: round 1
+(draft-status removal, vote normalisations, @mention notifications) and
+round 2 (sortable heart-breakdown table, mobile drawer navigation, the
+"Topic"/forum rebrand, and the add-person → populate → send-invite flow).
+The tracked app includes:
 
 - sidebar navigation with a timetable switcher, per-timetable icons, and an
   in-app notifications pane with unread badge
@@ -177,10 +189,14 @@ theming, and moderation UX. The tracked app includes:
   logging, and database-backed hosted rate limiting
 - S3-compatible uploads for profile images, topic covers, icons, and
   timetable covers
+- admin add-person flow: silently pre-create an account, populate its profile
+  and topics, then explicitly send the invite email (Resend), with per-member
+  invite state on the People page
 
 Remaining major gaps include verified production email delivery, multi-channel
 notifications, hosted media bucket/CDN configuration, production DNS/Clerk
-verification, custom-domain routing completion, authenticated browser test
-coverage, traffic-based tuning, and feed/dashboard scalability work.
+verification, the topic.forum domain cutover, custom-domain routing
+completion, authenticated browser test coverage, traffic-based tuning, and
+feed/dashboard scalability work.
 
 See [Product](docs/PRODUCT.md) for the full implementation status, go-live checklist, and known gaps.
