@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useSetSearchParam } from "@/lib/useSearchParamNav";
 
 /** Filter activity entries by the actor's role (QA #59). */
 export function ActivityRoleFilter({
@@ -10,16 +10,7 @@ export function ActivityRoleFilter({
   value: string;
   options: { role: string; label: string }[];
 }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
-  function change(next: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    if (next) params.set("role", next);
-    else params.delete("role");
-    router.push(`${pathname}?${params.toString()}`);
-  }
+  const setParam = useSetSearchParam();
 
   return (
     <>
@@ -28,7 +19,7 @@ export function ActivityRoleFilter({
         id="activity-role"
         aria-label="Filter by actor role"
         value={value}
-        onChange={(e) => change(e.target.value)}
+        onChange={(e) => setParam("role", e.target.value)}
       >
         <option value="">All roles</option>
         {options.map((o) => (

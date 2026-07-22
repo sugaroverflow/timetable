@@ -3,6 +3,7 @@ import { isAdmin, isHost, type Role } from "@timetable/shared";
 import { CreateTopicForm } from "@/components/CreateTopicForm";
 import { TopicManager } from "@/components/TopicManager";
 import type { ManagedTopic } from "@/lib/feedTypes";
+import { commentTree } from "@/lib/gqlFragments";
 import { gqlFetch } from "@/lib/graphql";
 import { displayRolesFromCookies } from "@/lib/previewRoles.server";
 import { parseTimetableSettings, roleLabel } from "@/lib/timetableSettings";
@@ -14,10 +15,6 @@ type Data = {
   hostDashboard: ManagedTopic[];
 };
 
-const COMMENT_FIELDS = `
-  id parentId authorId authorName authorImage body visibility hidden createdAt
-`;
-
 const QUERY = `
   query HostDashboard($s: String!) {
     timetable(idOrSlug: $s) { viewerRoles settings }
@@ -25,9 +22,9 @@ const QUERY = `
     timetableHosts(idOrSlug: $s) { id name }
     hostDashboard(idOrSlug: $s) {
       id title slug hostSlug status bodyMd bodyHtml coverImageUrl updatedAt
-      comments { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} } } }
-      hostOnlyComments { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} } } }
-      adminComments { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} } } }
+      ${commentTree()}
+      ${commentTree("hostOnlyComments")}
+      ${commentTree("adminComments")}
     }
   }
 `;

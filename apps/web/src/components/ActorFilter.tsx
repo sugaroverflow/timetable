@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useSetSearchParam } from "@/lib/useSearchParamNav";
 
 export function ActorFilter({
   value,
@@ -9,16 +9,7 @@ export function ActorFilter({
   value: string;
   actors: { id: string; name: string | null }[];
 }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
-  function change(next: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    if (next) params.set("actor", next);
-    else params.delete("actor");
-    router.push(`${pathname}?${params.toString()}`);
-  }
+  const setParam = useSetSearchParam();
 
   return (
     <>
@@ -27,7 +18,7 @@ export function ActorFilter({
         id="actor-filter"
         aria-label="Filter by user"
         value={value}
-        onChange={(e) => change(e.target.value)}
+        onChange={(e) => setParam("actor", e.target.value)}
       >
         <option value="">All users</option>
         {actors.map((actor) => (

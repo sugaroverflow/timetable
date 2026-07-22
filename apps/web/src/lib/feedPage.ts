@@ -2,6 +2,7 @@ import { isAdmin, isElector, isHost, type Role } from "@timetable/shared";
 
 import type { FeedPerms } from "@/components/TopicCard";
 import type { FeedTopic } from "@/lib/feedTypes";
+import { TOPIC_FEED_FIELDS } from "@/lib/gqlFragments";
 import { gqlFetch } from "@/lib/graphql";
 import { displayRolesFromCookies } from "@/lib/previewRoles.server";
 import {
@@ -42,10 +43,6 @@ type Data = {
   timetableHosts: { id: string; name: string | null }[];
 };
 
-const COMMENT_FIELDS = `
-  id parentId authorId authorName authorImage body visibility hidden createdAt
-`;
-
 const QUERY = `
   query Feed($s: String!, $sort: String, $seed: String, $host: String, $hearted: Boolean, $limit: Int, $offset: Int) {
     timetable(idOrSlug: $s) { viewerRoles settings viewerHeartedPublishedCount }
@@ -53,11 +50,8 @@ const QUERY = `
     myFeedLastSeenAt(idOrSlug: $s)
     timetableHosts(idOrSlug: $s) { id name }
     topicFeed(idOrSlug: $s, sort: $sort, seed: $seed, hostId: $host, heartedByMe: $hearted, limit: $limit, offset: $offset) {
-      id timetableId hostId hostName hostImage hostSlug title slug bodyMd bodyHtml coverImageUrl status
-      heartCount weightedScore viewerHasHearted commentCount
-      publishedAt contentUpdatedAt createdAt
-      comments { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} } } }
-      weightedBreakdown { electorId electorName weight l2Weight devotionWeight heartedAt }
+      ${TOPIC_FEED_FIELDS}
+      contentUpdatedAt
     }
   }
 `;

@@ -1,26 +1,24 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-
 import { NORM_MODES } from "@/lib/normModes";
+import { useSetSearchParam } from "@/lib/useSearchParamNav";
 
 export function FeedSortControl({ value }: { value: string }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const setParam = useSetSearchParam();
 
   function change(next: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("sort", next);
-    params.delete("page");
-    // Random sort gets a fresh shuffle seed per selection; the seed rides
-    // in the URL so infinite-scroll pages stay consistent (QA #59).
-    if (next === "random") {
-      params.set("seed", Math.random().toString(36).slice(2, 10));
-    } else {
-      params.delete("seed");
-    }
-    router.push(`${pathname}?${params.toString()}`);
+    setParam("sort", next, {
+      resetPage: true,
+      // Random sort gets a fresh shuffle seed per selection; the seed rides
+      // in the URL so infinite-scroll pages stay consistent (QA #59).
+      mutate: (params) => {
+        if (next === "random") {
+          params.set("seed", Math.random().toString(36).slice(2, 10));
+        } else {
+          params.delete("seed");
+        }
+      },
+    });
   }
 
   return (

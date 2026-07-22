@@ -4,20 +4,13 @@ import { useState } from "react";
 
 import { Avatar } from "@/components/Avatar";
 import { PersonChip } from "@/components/PersonChip";
+import { formatShortDate } from "@/lib/dates";
 import type { WeightedHeart } from "@/lib/feedTypes";
 
 type SortKey = "name" | "l1" | "l2" | "devotion" | "heartedAt";
 
 function fmt(n: number): string {
   return n.toFixed(2);
-}
-
-function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "2-digit",
-  });
 }
 
 /**
@@ -122,7 +115,9 @@ export function BreakdownTable({
               <td className="mono">{fmt(w.weight)}</td>
               <td className="mono">{fmt(w.l2Weight)}</td>
               <td className="mono">{fmt(w.devotionWeight)}</td>
-              <td className="mono">{fmtDate(w.heartedAt)}</td>
+              <td className="mono">
+                {formatShortDate(w.heartedAt, { year: true })}
+              </td>
             </tr>
           ))}
         </tbody>

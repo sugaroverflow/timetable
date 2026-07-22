@@ -46,3 +46,14 @@ export function isElector(roles: readonly Role[]): boolean {
 export function isMember(roles: readonly Role[]): boolean {
   return roles.length > 0;
 }
+
+/** Primary role for grouping/display: admins first (owners count as
+ * admins), then hosts, then electors — a multi-role member counts under
+ * their highest role. */
+export function primaryRole(
+  roles: readonly Role[],
+): "admin" | "host" | "elector" {
+  if (roles.includes("owner") || roles.includes("admin")) return "admin";
+  if (roles.includes("host")) return "host";
+  return "elector";
+}

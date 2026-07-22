@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { isAdmin, type Role } from "@timetable/shared";
+
 import { Avatar } from "@/components/Avatar";
 import { EmptyState } from "@/components/EmptyState";
 import { MarkNotificationsSeen } from "@/components/MarkNotificationsSeen";
@@ -49,8 +51,7 @@ export default async function NotificationsPage({
   if (viewerRoles.length === 0) {
     return <div className="notice">Members only.</div>;
   }
-  const viewerIsAdmin =
-    viewerRoles.includes("admin") || viewerRoles.includes("owner");
+  const viewerIsAdmin = isAdmin(viewerRoles as Role[]);
 
   return (
     <div className="stack">

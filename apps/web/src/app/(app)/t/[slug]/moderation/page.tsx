@@ -3,6 +3,7 @@ import { isAdmin, type Role } from "@timetable/shared";
 import { EmptyState } from "@/components/EmptyState";
 import { ModerationCard } from "@/components/ModerationCard";
 import type { ManagedTopic } from "@/lib/feedTypes";
+import { commentTree } from "@/lib/gqlFragments";
 import { gqlFetch } from "@/lib/graphql";
 import { displayRolesFromCookies } from "@/lib/previewRoles.server";
 import { parseTimetableSettings, roleLabel } from "@/lib/timetableSettings";
@@ -12,16 +13,12 @@ type Data = {
   moderationQueue: ManagedTopic[];
 };
 
-const COMMENT_FIELDS = `
-  id parentId authorId authorName authorImage body visibility hidden createdAt
-`;
-
 const QUERY = `
   query Moderation($s: String!) {
     timetable(idOrSlug: $s) { viewerRoles settings }
     moderationQueue(idOrSlug: $s) {
       id title slug hostSlug hostName status bodyMd bodyHtml coverImageUrl updatedAt
-      adminComments { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} } } }
+      ${commentTree("adminComments")}
     }
   }
 `;

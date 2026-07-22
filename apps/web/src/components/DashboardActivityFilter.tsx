@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useSetSearchParam } from "@/lib/useSearchParamNav";
 
 const OPTIONS = [
   { value: "all", label: "All electors" },
@@ -12,23 +12,17 @@ const OPTIONS = [
 ];
 
 export function DashboardActivityFilter({ value }: { value: string }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
-  function change(next: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    if (next === "all") params.delete("activity");
-    else params.set("activity", next);
-    const query = params.toString();
-    router.push(query ? `${pathname}?${query}` : pathname);
-  }
+  const setParam = useSetSearchParam();
 
   return (
     <select
       aria-label="Filter elector activity"
       value={value}
-      onChange={(e) => change(e.target.value)}
+      onChange={(e) => {
+        // "all" is the default: it rides as no param at all.
+        const next = e.target.value;
+        setParam("activity", next === "all" ? "" : next);
+      }}
     >
       {OPTIONS.map((option) => (
         <option key={option.value} value={option.value}>

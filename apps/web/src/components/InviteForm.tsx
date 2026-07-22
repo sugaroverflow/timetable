@@ -3,9 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { RoleCheckboxGroup } from "@/components/RoleCheckboxGroup";
 import { clientApi } from "@/lib/clientApi";
-
-const ASSIGNABLE = ["admin", "host", "elector"] as const;
 
 export function InviteForm({ timetableId }: { timetableId: string }) {
   const router = useRouter();
@@ -13,12 +12,6 @@ export function InviteForm({ timetableId }: { timetableId: string }) {
   const [roles, setRoles] = useState<string[]>(["elector"]);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-
-  function toggleRole(role: string) {
-    setRoles((prev) =>
-      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role],
-    );
-  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -83,19 +76,7 @@ export function InviteForm({ timetableId }: { timetableId: string }) {
 
       <div className="field">
         <label>Roles</label>
-        <div className="row wrap">
-          {ASSIGNABLE.map((role) => (
-            <label key={role} className="pill" style={{ cursor: "pointer" }}>
-              <input
-                type="checkbox"
-                checked={roles.includes(role)}
-                onChange={() => toggleRole(role)}
-                style={{ width: "auto", marginRight: 6 }}
-              />
-              {role}
-            </label>
-          ))}
-        </div>
+        <RoleCheckboxGroup value={roles} onChange={setRoles} variant="pill" />
       </div>
 
       {message ? (
