@@ -84,7 +84,9 @@ export type DashboardData = {
 
 type Stat = { count: number; latestAt: Date | null };
 
-function latestDate(...dates: (Date | string | null | undefined)[]): Date | null {
+function latestDate(
+  ...dates: (Date | string | null | undefined)[]
+): Date | null {
   let latest: Date | null = null;
   for (const raw of dates) {
     const date = coerceDate(raw);
@@ -309,9 +311,7 @@ export async function getDashboard(
     .where(
       and(
         eq(timeslots.timetableId, timetableId),
-        ...(activitySince
-          ? [gte(availability.updatedAt, activitySince)]
-          : []),
+        ...(activitySince ? [gte(availability.updatedAt, activitySince)] : []),
       ),
     )
     .groupBy(availability.userId);
@@ -391,7 +391,12 @@ export async function getDashboard(
   const taggedTopicIds = new Set(tagRows.map((r) => r.topicId));
   const unallocatedTopics = feed
     .filter((t) => !taggedTopicIds.has(t.id))
-    .map((t) => ({ id: t.id, title: t.title, slug: t.slug, hostSlug: t.hostSlug }));
+    .map((t) => ({
+      id: t.id,
+      title: t.title,
+      slug: t.slug,
+      hostSlug: t.hostSlug,
+    }));
 
   // Slots with more than one tagged topic = conflicts.
   const bySlot = new Map<
@@ -404,13 +409,12 @@ export async function getDashboard(
     }
   >();
   for (const r of tagRows) {
-    const entry =
-      bySlot.get(r.slotId) ?? {
-        slotId: r.slotId,
-        startsAt: r.startsAt,
-        location: r.location,
-        topics: [],
-      };
+    const entry = bySlot.get(r.slotId) ?? {
+      slotId: r.slotId,
+      startsAt: r.startsAt,
+      location: r.location,
+      topics: [],
+    };
     entry.topics.push({ id: r.topicId, title: r.title, hostId: r.hostId });
     bySlot.set(r.slotId, entry);
   }
@@ -418,13 +422,17 @@ export async function getDashboard(
     .filter(
       (s) =>
         s.topics.length > 1 &&
-        (!opts.hostId || s.topics.some((topic) => topic.hostId === opts.hostId)),
+        (!opts.hostId ||
+          s.topics.some((topic) => topic.hostId === opts.hostId)),
     )
     .map((slot) => ({
       slotId: slot.slotId,
       startsAt: slot.startsAt,
       location: slot.location,
-      topics: slot.topics.map((topic) => ({ id: topic.id, title: topic.title })),
+      topics: slot.topics.map((topic) => ({
+        id: topic.id,
+        title: topic.title,
+      })),
     }));
 
   return {

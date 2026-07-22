@@ -110,7 +110,10 @@ export default async function NotificationsPage({
                     >
                       &ldquo;{n.body.slice(0, 160)}&rdquo;
                     </div>
-                    <div className="faint" style={{ fontSize: 11, marginTop: 2 }}>
+                    <div
+                      className="faint"
+                      style={{ fontSize: 11, marginTop: 2 }}
+                    >
                       {new Date(n.createdAt).toLocaleString()}
                     </div>
                   </div>

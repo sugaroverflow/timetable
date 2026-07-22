@@ -2,7 +2,10 @@ import type { IcsSlot } from "@timetable/core";
 
 /** Format a Date as an ICS UTC timestamp: YYYYMMDDTHHMMSSZ. */
 function icsDate(d: Date): string {
-  return d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  return d
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d{3}/, "");
 }
 
 function escapeText(s: string): string {
@@ -26,9 +29,7 @@ export function buildIcs(calendarName: string, slots: IcsSlot[]): string {
 
   for (const slot of slots) {
     const summary =
-      slot.topicTitles.length > 0
-        ? slot.topicTitles.join(", ")
-        : "Open slot";
+      slot.topicTitles.length > 0 ? slot.topicTitles.join(", ") : "Open slot";
     lines.push(
       "BEGIN:VEVENT",
       `UID:${slot.id}@timetable`,

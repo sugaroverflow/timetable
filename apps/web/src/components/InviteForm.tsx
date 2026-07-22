@@ -67,8 +67,8 @@ export function InviteForm({ timetableId }: { timetableId: string }) {
     <form onSubmit={onSubmit} className="card">
       <h2 style={{ marginTop: 0, fontSize: 18 }}>Invite people</h2>
       <p className="muted" style={{ marginTop: 0 }}>
-        Existing users are added immediately. Unknown emails get a pending invite
-        claimed when they sign up.
+        Existing users are added immediately. Unknown emails get a pending
+        invite claimed when they sign up.
       </p>
 
       <div className="field">

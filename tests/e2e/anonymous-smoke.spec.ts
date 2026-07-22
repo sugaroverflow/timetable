@@ -15,7 +15,9 @@ test.describe("anonymous web smoke", () => {
     ).toBeVisible();
   });
 
-  test("renders the sign-in shell instead of a blank page", async ({ page }) => {
+  test("renders the sign-in shell instead of a blank page", async ({
+    page,
+  }) => {
     await goto("/sign-in", page);
 
     await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
@@ -25,7 +27,9 @@ test.describe("anonymous web smoke", () => {
     await expect(page.locator("main")).toBeVisible();
   });
 
-  test("renders the sign-up shell instead of a blank page", async ({ page }) => {
+  test("renders the sign-up shell instead of a blank page", async ({
+    page,
+  }) => {
     await goto("/sign-up", page);
 
     await expect(

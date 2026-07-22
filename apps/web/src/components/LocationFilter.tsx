@@ -25,7 +25,9 @@ export function LocationFilter({
     <select value={value} onChange={onChange} aria-label="Filter by location">
       <option value="">All locations</option>
       {locations.map((loc) => (
-        <option key={loc} value={loc}>{loc}</option>
+        <option key={loc} value={loc}>
+          {loc}
+        </option>
       ))}
     </select>
   );

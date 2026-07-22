@@ -61,14 +61,18 @@ async function signIn(page, email) {
 const browser = await chromium.launch();
 try {
   // ---- Act 1: admin pre-creates and populates the account --------------
-  const adminCtx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const adminCtx = await browser.newContext({
+    viewport: { width: 1280, height: 900 },
+  });
   const page = await adminCtx.newPage();
   await signIn(page, ADMIN);
 
   page.on("response", async (res) => {
     if (res.url().includes("/api/") && res.request().method() !== "GET") {
       const body = await res.text().catch(() => "<unreadable>");
-      console.log(`  ↳ ${res.request().method()} ${res.url()} → ${res.status()} ${body.slice(0, 300)}`);
+      console.log(
+        `  ↳ ${res.request().method()} ${res.url()} → ${res.status()} ${body.slice(0, 300)}`,
+      );
     }
   });
 
@@ -78,10 +82,15 @@ try {
   // host role is the default — leave checkboxes as-is
   await page.getByRole("button", { name: "Add person" }).click();
   try {
-    await page.getByText("Person added", { exact: false }).waitFor({ timeout: 20000 });
+    await page
+      .getByText("Person added", { exact: false })
+      .waitFor({ timeout: 20000 });
   } catch (err) {
     await shot(page, "add-person-FAILED");
-    const toastText = await page.locator(".toast").allTextContents().catch(() => []);
+    const toastText = await page
+      .locator(".toast")
+      .allTextContents()
+      .catch(() => []);
     console.log("  toasts:", JSON.stringify(toastText));
     throw err;
   }
@@ -91,7 +100,8 @@ try {
   const card = page.locator("li.card", { hasText: INVITEE_NAME });
   await card.waitFor({ timeout: 15000 });
   const chipBefore = await card.getByText(/Not invited yet/).count();
-  if (chipBefore === 0) throw new Error("expected 'Not invited yet' chip on the new member");
+  if (chipBefore === 0)
+    throw new Error("expected 'Not invited yet' chip on the new member");
   console.log("✓ member card shows 'Not invited yet'");
   await shot(page, "person-added");
 
@@ -101,7 +111,9 @@ try {
   await page.waitForSelector("#topic-host", { timeout: 10000 });
   await page.selectOption("#topic-host", { label: INVITEE_NAME });
   await page.getByRole("button", { name: "Create topic" }).click();
-  await page.getByText(`Topic created for ${INVITEE_NAME}`).waitFor({ timeout: 15000 });
+  await page
+    .getByText(`Topic created for ${INVITEE_NAME}`)
+    .waitFor({ timeout: 15000 });
   console.log(`✓ created "${TOPIC_TITLE}" owned by ${INVITEE_NAME}`);
   await shot(page, "topic-created-for-invitee");
 
@@ -109,7 +121,9 @@ try {
   await page.goto(`${BASE}/t/${SLUG}/people`, { waitUntil: "networkidle" });
   const card2 = page.locator("li.card", { hasText: INVITEE_NAME });
   await card2.getByRole("button", { name: "Send invite" }).click();
-  await page.getByText("Invite sent", { exact: false }).waitFor({ timeout: 15000 });
+  await page
+    .getByText("Invite sent", { exact: false })
+    .waitFor({ timeout: 15000 });
   console.log("✓ invite sent");
   await page.reload({ waitUntil: "networkidle" });
   await page
@@ -121,17 +135,23 @@ try {
   await adminCtx.close();
 
   // ---- Act 2: the invitee's first sign-in ------------------------------
-  const inviteeCtx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const inviteeCtx = await browser.newContext({
+    viewport: { width: 1280, height: 900 },
+  });
   const page2 = await inviteeCtx.newPage();
   await signIn(page2, INVITEE_EMAIL);
 
   await page2.goto(`${BASE}/t/${SLUG}/topics`, { waitUntil: "networkidle" });
   await page2.getByText(TOPIC_TITLE).first().waitFor({ timeout: 15000 });
-  console.log(`✓ invitee's first sign-in: "${TOPIC_TITLE}" is waiting in My Topics`);
+  console.log(
+    `✓ invitee's first sign-in: "${TOPIC_TITLE}" is waiting in My Topics`,
+  );
   await shot(page2, "invitee-sees-topic");
   await inviteeCtx.close();
 
-  console.log("\n🎉 QA PASS: add person → topic as them → send invite → first sign-in has the topic");
+  console.log(
+    "\n🎉 QA PASS: add person → topic as them → send invite → first sign-in has the topic",
+  );
 } finally {
   await browser.close();
 }

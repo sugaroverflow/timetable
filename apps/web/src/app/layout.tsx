@@ -38,9 +38,5 @@ export default function RootLayout({
 
   if (process.env.E2E_TEST_MODE === "1") return content;
 
-  return (
-    <ClerkProvider>
-      {content}
-    </ClerkProvider>
-  );
+  return <ClerkProvider>{content}</ClerkProvider>;
 }

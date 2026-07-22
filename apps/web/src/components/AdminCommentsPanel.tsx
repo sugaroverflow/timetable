@@ -10,10 +10,7 @@ import { CommentComposer } from "./CommentComposer";
 import { CommentList } from "./CommentList";
 
 function countNested(comments: FeedComment[]): number {
-  return comments.reduce(
-    (sum, c) => sum + 1 + countNested(c.replies ?? []),
-    0,
-  );
+  return comments.reduce((sum, c) => sum + 1 + countNested(c.replies ?? []), 0);
 }
 
 /** The drafting thread (QA #59 round 3): "{Admin} comments", visible to

@@ -155,7 +155,13 @@ export async function setWeekdayAvailability(
 // --------------------------------------------------------------------------
 
 export async function listSlotComments(slotId: string): Promise<
-  { id: string; authorId: string; authorName: string | null; body: string; createdAt: Date }[]
+  {
+    id: string;
+    authorId: string;
+    authorName: string | null;
+    body: string;
+    createdAt: Date;
+  }[]
 > {
   const rows = await db
     .select({

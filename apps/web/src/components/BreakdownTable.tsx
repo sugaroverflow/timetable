@@ -72,7 +72,9 @@ export function BreakdownTable({
     const active = sortKey === key;
     return (
       <th
-        aria-sort={active ? (dir === "asc" ? "ascending" : "descending") : "none"}
+        aria-sort={
+          active ? (dir === "asc" ? "ascending" : "descending") : "none"
+        }
       >
         <button
           type="button"
@@ -108,7 +110,10 @@ export function BreakdownTable({
             <tr key={w.electorId}>
               <td>
                 <PersonChip slug={slug} userId={w.electorId}>
-                  <span className="row" style={{ gap: 6, alignItems: "center" }}>
+                  <span
+                    className="row"
+                    style={{ gap: 6, alignItems: "center" }}
+                  >
                     <Avatar name={w.electorName} small />
                     {w.electorName ?? "Elector"}
                   </span>

@@ -31,9 +31,7 @@ export function AudienceFilter({
       onChange={(e) => change(e.target.value)}
     >
       <option value="all">All electors</option>
-      {isHost ? (
-        <option value="hearted_mine">Hearted my topics</option>
-      ) : null}
+      {isHost ? <option value="hearted_mine">Hearted my topics</option> : null}
       {topics.map((tp) => (
         <option key={tp.id} value={`hearted_topic:${tp.id}`}>
           Hearted: {tp.title}

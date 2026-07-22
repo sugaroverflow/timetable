@@ -2,12 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { eq } from "drizzle-orm";
 
-import {
-  db,
-  users,
-  type NotificationSettings,
-  type User,
-} from "@timetable/db";
+import { db, users, type NotificationSettings, type User } from "@timetable/db";
 
 import { ensureUserSlug } from "./slugs";
 

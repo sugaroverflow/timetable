@@ -4,13 +4,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 /** Start/end date pickers for the activity log (QA #59). Values ride in
  * the URL so the server filters the query. */
-export function ActivityDateFilter({
-  from,
-  to,
-}: {
-  from: string;
-  to: string;
-}) {
+export function ActivityDateFilter({ from, to }: { from: string; to: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();

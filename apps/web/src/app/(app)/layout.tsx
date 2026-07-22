@@ -9,7 +9,9 @@ import { gqlFetch } from "@/lib/graphql";
 import { parseTimetableSettings } from "@/lib/timetableSettings";
 
 type MenuData = {
-  myTimetables: { timetable: { slug: string; name: string; settings: string } }[];
+  myTimetables: {
+    timetable: { slug: string; name: string; settings: string };
+  }[];
 };
 
 const MENU_QUERY = `

@@ -1,0 +1,14 @@
+# build output & generated artifacts
+.next/
+node_modules/
+packages/db/drizzle/
+playwright-report/
+test-results/
+# deploy specs & workflows: exact line shapes matter (sed templating);
+# formatting them adds risk for no value
+*.yml
+*.yaml
+# prose & fixtures: keep docs churn out of the code baseline
+*.md
+prototype.html
+*.local-backup

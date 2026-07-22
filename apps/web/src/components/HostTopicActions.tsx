@@ -45,10 +45,7 @@ export function HostTopicActions({
 
   return (
     <div className="stack" style={{ gap: 8 }}>
-      <div
-        className="row wrap divider-top"
-        style={{ gap: 8, paddingTop: 10 }}
-      >
+      <div className="row wrap divider-top" style={{ gap: 8, paddingTop: 10 }}>
         <span className="faint" style={{ fontSize: 11 }}>
           {label}:
         </span>

@@ -53,20 +53,20 @@ export function DashboardBreakdownToggle({
       </Collapsible.Trigger>
       <Collapsible.Panel>
         {expanded ? (
-        failed ? (
-          <div className="faint" style={{ fontSize: 12 }}>
-            Couldn&rsquo;t load the breakdown.
-          </div>
-        ) : rows === null ? (
-          <div className="faint" style={{ fontSize: 12 }}>
-            Loading…
-          </div>
-        ) : rows.length === 0 ? (
-          <div className="faint" style={{ fontSize: 12 }}>
-            No hearts yet.
-          </div>
-        ) : (
-          <BreakdownTable slug={slug} rows={rows} />
+          failed ? (
+            <div className="faint" style={{ fontSize: 12 }}>
+              Couldn&rsquo;t load the breakdown.
+            </div>
+          ) : rows === null ? (
+            <div className="faint" style={{ fontSize: 12 }}>
+              Loading…
+            </div>
+          ) : rows.length === 0 ? (
+            <div className="faint" style={{ fontSize: 12 }}>
+              No hearts yet.
+            </div>
+          ) : (
+            <BreakdownTable slug={slug} rows={rows} />
           )
         ) : null}
       </Collapsible.Panel>

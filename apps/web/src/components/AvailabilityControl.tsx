@@ -34,7 +34,9 @@ export function AvailabilityControl({
       await clientGql(MUTATION, { id: slotId, state: value });
       startTransition(() => router.refresh());
     } catch (err) {
-      toastError(err instanceof Error ? err.message : "Could not set availability");
+      toastError(
+        err instanceof Error ? err.message : "Could not set availability",
+      );
     }
   }
 

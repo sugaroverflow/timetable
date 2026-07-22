@@ -111,7 +111,12 @@ type GqlMember = {
   membershipId: string;
   roles: string[];
   inviteSentAt: Date | null;
-  user: { id: string; name: string | null; email: string | null; image: string | null };
+  user: {
+    id: string;
+    name: string | null;
+    email: string | null;
+    image: string | null;
+  };
 };
 type GqlTopic = FeedTopic & {
   canSeeHostOnly: boolean;
@@ -269,13 +274,15 @@ const TimetableRouteType = builder
     }),
   });
 
-const MembershipType = builder.objectRef<GqlMembership>("Membership").implement({
-  fields: (t) => ({
-    id: t.exposeID("id"),
-    roles: t.exposeStringList("roles"),
-    timetable: t.field({ type: TimetableType, resolve: (m) => m.timetable }),
-  }),
-});
+const MembershipType = builder
+  .objectRef<GqlMembership>("Membership")
+  .implement({
+    fields: (t) => ({
+      id: t.exposeID("id"),
+      roles: t.exposeStringList("roles"),
+      timetable: t.field({ type: TimetableType, resolve: (m) => m.timetable }),
+    }),
+  });
 
 const MemberType = builder.objectRef<GqlMember>("Member").implement({
   fields: (t) => ({
@@ -475,44 +482,48 @@ const ManagedTopicType = builder.objectRef<Topic>("ManagedTopic").implement({
   }),
 });
 
-const ActivityType = builder.objectRef<ActivityEntry>("ActivityEvent").implement({
-  fields: (t) => ({
-    id: t.exposeID("id"),
-    action: t.exposeString("action"),
-    note: t.exposeString("note", { nullable: true }),
-    actorId: t.exposeString("actorId", { nullable: true }),
-    actorName: t.exposeString("actorName", { nullable: true }),
-    actorImage: t.exposeString("actorImage", { nullable: true }),
-    actorRoles: t.exposeStringList("actorRoles"),
-    createdAt: t.string({ resolve: (a) => a.createdAt.toISOString() }),
-    // Enrichment (QA #42): which topic the event refers to, and what was
-    // said/done — all sourced from the event payload + a slug join.
-    topicTitle: t.string({
-      nullable: true,
-      resolve: (a) => (a.payload["title"] as string | undefined) ?? null,
+const ActivityType = builder
+  .objectRef<ActivityEntry>("ActivityEvent")
+  .implement({
+    fields: (t) => ({
+      id: t.exposeID("id"),
+      action: t.exposeString("action"),
+      note: t.exposeString("note", { nullable: true }),
+      actorId: t.exposeString("actorId", { nullable: true }),
+      actorName: t.exposeString("actorName", { nullable: true }),
+      actorImage: t.exposeString("actorImage", { nullable: true }),
+      actorRoles: t.exposeStringList("actorRoles"),
+      createdAt: t.string({ resolve: (a) => a.createdAt.toISOString() }),
+      // Enrichment (QA #42): which topic the event refers to, and what was
+      // said/done — all sourced from the event payload + a slug join.
+      topicTitle: t.string({
+        nullable: true,
+        resolve: (a) => (a.payload["title"] as string | undefined) ?? null,
+      }),
+      topicSlug: t.exposeString("topicSlug", { nullable: true }),
+      topicHostSlug: t.exposeString("topicHostSlug", { nullable: true }),
+      topicHostName: t.exposeString("topicHostName", { nullable: true }),
+      snippet: t.string({
+        nullable: true,
+        resolve: (a) => (a.payload["snippet"] as string | undefined) ?? null,
+      }),
+      /** For comment events: anchors the timeline link to the comment. */
+      commentId: t.string({
+        nullable: true,
+        resolve: (a) => (a.payload["commentId"] as string | undefined) ?? null,
+      }),
+      /** For member.invite events (QA #59). */
+      invitedEmail: t.string({
+        nullable: true,
+        resolve: (a) =>
+          (a.payload["invitedEmail"] as string | undefined) ?? null,
+      }),
+      invitedRoles: t.stringList({
+        resolve: (a) =>
+          (a.payload["invitedRoles"] as string[] | undefined) ?? [],
+      }),
     }),
-    topicSlug: t.exposeString("topicSlug", { nullable: true }),
-    topicHostSlug: t.exposeString("topicHostSlug", { nullable: true }),
-    topicHostName: t.exposeString("topicHostName", { nullable: true }),
-    snippet: t.string({
-      nullable: true,
-      resolve: (a) => (a.payload["snippet"] as string | undefined) ?? null,
-    }),
-    /** For comment events: anchors the timeline link to the comment. */
-    commentId: t.string({
-      nullable: true,
-      resolve: (a) => (a.payload["commentId"] as string | undefined) ?? null,
-    }),
-    /** For member.invite events (QA #59). */
-    invitedEmail: t.string({
-      nullable: true,
-      resolve: (a) => (a.payload["invitedEmail"] as string | undefined) ?? null,
-    }),
-    invitedRoles: t.stringList({
-      resolve: (a) => (a.payload["invitedRoles"] as string[] | undefined) ?? [],
-    }),
-  }),
-});
+  });
 
 const NotificationType = builder
   .objectRef<import("@timetable/core").NotificationItem>("Notification")
@@ -815,7 +826,10 @@ builder.queryType({
         if (!readable) return [];
         const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
         if (!canModerate(viewer)) return [];
-        const parseDay = (value: string | null | undefined, endOfDay: boolean) => {
+        const parseDay = (
+          value: string | null | undefined,
+          endOfDay: boolean,
+        ) => {
           if (!value) return undefined;
           const parsed = Date.parse(value);
           if (Number.isNaN(parsed)) return undefined;
@@ -1157,9 +1171,7 @@ builder.mutationType({
         const ownerHost = topic.hostId === user.id && isHost(viewer.roles);
         if (!(ownerHost || isAdmin(viewer.roles))) forbidden();
         if (topic.status !== "unpublished") {
-          throw new GraphQLError(
-            "Only unpublished topics can be re-submitted",
-          );
+          throw new GraphQLError("Only unpublished topics can be re-submitted");
         }
         const updated = await submitTopic(topic, user.id);
         if (!updated) notFound("Topic not found");
@@ -1322,11 +1334,7 @@ builder.mutationType({
         if (!parent) notFound("Comment not found");
         const { viewer } = await loadTopicAndViewer(ctx, parent.topicId);
         if (!canModerate(viewer)) forbidden("Admins only");
-        const updated = await setCommentHidden(
-          parent.id,
-          args.hidden,
-          user.id,
-        );
+        const updated = await setCommentHidden(parent.id, args.hidden, user.id);
         if (!updated) notFound("Comment not found");
         const author = await getUserById(updated.authorId);
         return {
@@ -1432,9 +1440,7 @@ builder.mutationType({
           description: args.description ?? undefined,
           privacy,
           customDomain:
-            args.customDomain != null
-              ? args.customDomain.trim()
-              : undefined,
+            args.customDomain != null ? args.customDomain.trim() : undefined,
         });
         if (!updated) notFound("Timetable not found");
         return { ...updated, viewerRoles: readable.roles as string[] };
@@ -1542,9 +1548,7 @@ builder.mutationType({
             ...(args.roleLabelAdmin != null
               ? { admin: args.roleLabelAdmin }
               : {}),
-            ...(args.roleLabelHost != null
-              ? { host: args.roleLabelHost }
-              : {}),
+            ...(args.roleLabelHost != null ? { host: args.roleLabelHost } : {}),
             ...(args.roleLabelElector != null
               ? { elector: args.roleLabelElector }
               : {}),
@@ -1630,9 +1634,11 @@ const SlotTagType = builder
   });
 
 const AvailabilityCountsType = builder
-  .objectRef<{ green: number; yellow: number; red: number }>(
-    "AvailabilityCounts",
-  )
+  .objectRef<{
+    green: number;
+    yellow: number;
+    red: number;
+  }>("AvailabilityCounts")
   .implement({
     fields: (t) => ({
       green: t.exposeInt("green"),
@@ -1642,9 +1648,11 @@ const AvailabilityCountsType = builder
   });
 
 const SlotAvailabilityType = builder
-  .objectRef<{ userId: string; name: string | null; state: string }>(
-    "SlotAvailability",
-  )
+  .objectRef<{
+    userId: string;
+    name: string | null;
+    state: string;
+  }>("SlotAvailability")
   .implement({
     fields: (t) => ({
       userId: t.exposeID("userId"),
@@ -1709,7 +1717,10 @@ function parseAudience(
     return { kind: "hearted_mine", hostId: viewerUserId };
   }
   if (raw?.startsWith("hearted_topic:")) {
-    return { kind: "hearted_topic", topicId: raw.slice("hearted_topic:".length) };
+    return {
+      kind: "hearted_topic",
+      topicId: raw.slice("hearted_topic:".length),
+    };
   }
   return { kind: "all" };
 }
@@ -2053,40 +2064,38 @@ const ElectorActivityType = builder
     }),
   });
 
-const DashboardType = builder
-  .objectRef<DashboardData>("Dashboard")
-  .implement({
-    fields: (t) => ({
-      totalHearts: t.exposeInt("totalHearts"),
-      electorCount: t.exposeInt("electorCount"),
-      hostCount: t.exposeInt("hostCount"),
-      slotCount: t.exposeInt("slotCount"),
-      topicCounts: t.field({
-        type: TopicCountsType,
-        resolve: (d) => d.topicCounts,
-      }),
-      topicLeaderboard: t.field({
-        type: [TopicLeaderboardEntryType],
-        resolve: (d) => d.topicLeaderboard,
-      }),
-      hostLeaderboard: t.field({
-        type: [HostLeaderboardEntryType],
-        resolve: (d) => d.hostLeaderboard,
-      }),
-      unallocatedTopics: t.field({
-        type: [UnallocatedTopicType],
-        resolve: (d) => d.unallocatedTopics,
-      }),
-      conflicts: t.field({
-        type: [ConflictSlotType],
-        resolve: (d) => d.conflicts,
-      }),
-      electorActivity: t.field({
-        type: [ElectorActivityType],
-        resolve: (d) => d.electorActivity,
-      }),
+const DashboardType = builder.objectRef<DashboardData>("Dashboard").implement({
+  fields: (t) => ({
+    totalHearts: t.exposeInt("totalHearts"),
+    electorCount: t.exposeInt("electorCount"),
+    hostCount: t.exposeInt("hostCount"),
+    slotCount: t.exposeInt("slotCount"),
+    topicCounts: t.field({
+      type: TopicCountsType,
+      resolve: (d) => d.topicCounts,
     }),
-  });
+    topicLeaderboard: t.field({
+      type: [TopicLeaderboardEntryType],
+      resolve: (d) => d.topicLeaderboard,
+    }),
+    hostLeaderboard: t.field({
+      type: [HostLeaderboardEntryType],
+      resolve: (d) => d.hostLeaderboard,
+    }),
+    unallocatedTopics: t.field({
+      type: [UnallocatedTopicType],
+      resolve: (d) => d.unallocatedTopics,
+    }),
+    conflicts: t.field({
+      type: [ConflictSlotType],
+      resolve: (d) => d.conflicts,
+    }),
+    electorActivity: t.field({
+      type: [ElectorActivityType],
+      resolve: (d) => d.electorActivity,
+    }),
+  }),
+});
 
 function parseElectorActivityFilter(
   raw: string | null | undefined,

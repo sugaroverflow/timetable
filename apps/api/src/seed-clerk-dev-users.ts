@@ -50,7 +50,10 @@ type SeedResult = {
   warning: string | null;
 };
 
-function splitName(displayName: string): { firstName: string; lastName: string } {
+function splitName(displayName: string): {
+  firstName: string;
+  lastName: string;
+} {
   const [firstName = displayName, ...rest] = displayName.trim().split(/\s+/);
   return { firstName, lastName: rest.join(" ") };
 }
@@ -127,7 +130,9 @@ async function seedPerson(
       }),
     );
     await withRetry(() =>
-      client.users.updateUserMetadata(updated.id, { privateMetadata: metadata }),
+      client.users.updateUserMetadata(updated.id, {
+        privateMetadata: metadata,
+      }),
     );
 
     const existingEmail = primaryEmail(updated);
@@ -200,8 +205,12 @@ async function main(): Promise<void> {
     );
   }
 
-  const created = results.filter((result) => result.status === "created").length;
-  const updated = results.filter((result) => result.status === "updated").length;
+  const created = results.filter(
+    (result) => result.status === "created",
+  ).length;
+  const updated = results.filter(
+    (result) => result.status === "updated",
+  ).length;
 
   console.log(
     `${dryRun ? "Checked" : "Seeded"} ${results.length} Clerk dev users from ${sampleFile}`,

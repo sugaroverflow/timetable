@@ -9,10 +9,7 @@ import { buildContext, type ApiContext } from "./context";
 import { env } from "./env";
 import { useOperationLimits } from "./graphql/depth-limit";
 import { schema } from "./graphql/schema";
-import {
-  createDatabaseRateLimitStore,
-  rateLimit,
-} from "./http/rate-limit";
+import { createDatabaseRateLimitStore, rateLimit } from "./http/rate-limit";
 import { requestLog, structuredLogger } from "./http/request-log";
 import { restRouter } from "./rest/router";
 

@@ -21,7 +21,10 @@ export type InviteOutcome = {
 
 const INVITE_TTL_DAYS = 30;
 
-function mergeRoles(existing: readonly Role[], incoming: readonly Role[]): Role[] {
+function mergeRoles(
+  existing: readonly Role[],
+  incoming: readonly Role[],
+): Role[] {
   return Array.from(new Set<Role>([...existing, ...incoming]));
 }
 
