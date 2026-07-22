@@ -1,0 +1,43 @@
+# Automated PR review by Claude (audit follow-up: there is no human review
+# gate on this repo, so reviews are CI's job).
+#
+# INERT until two things are set by a repo admin:
+#   1. Repo secret  ANTHROPIC_API_KEY
+#   2. Repo variable CLAUDE_REVIEW_ENABLED = true
+name: Claude Review
+
+on:
+  pull_request:
+    types: [opened, ready_for_review]
+
+jobs:
+  review:
+    if: vars.CLAUDE_REVIEW_ENABLED == 'true' && !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Review this pull request as a senior engineer on this repo.
+            Read CLAUDE.md first and hold the diff to it: package boundary
+            rules (web never imports core/db; transport wrappers only),
+            user-facing copy says forum/Topic while code keeps timetable
+            naming, permission checks via packages/shared/src/permissions.ts,
+            design tokens over hardcoded colors, execution-journal entries
+            for notable changes, and the gotchas list.
+
+            Focus on real defects and convention violations, not style (CI
+            already enforces lint/format). If the PR looks good, say so
+            briefly. Post your review as a PR comment with inline file:line
+            references.
+          claude_args: "--allowedTools 'Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Grep,Glob'"
