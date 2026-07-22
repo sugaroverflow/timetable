@@ -110,9 +110,10 @@ jobs:
 
       # Every deploy pushes a new sha-tagged image and DO never expires them,
       # so the 500 MiB Starter registry fills in weeks (2026-07-22 quota
-      # incident: pushes die with "invalid content range"). Keep the newest
-      # 5 tags, then GC untagged manifests. GC briefly makes the registry
-      # read-only — a deploy racing it fails on push and just needs a rerun.
+      # incident). Keep the newest 5 tags here; the space itself is reclaimed
+      # by the NIGHTLY GC (registry-gc.yml) — GC makes the registry read-only
+      # while it runs, and starting one per deploy locked out the next deploy
+      # on busy merge days (pushes fail with a bare "unauthorized:").
       - name: Prune old web images from the registry
         run: |
           set -euo pipefail
@@ -120,4 +121,3 @@ jobs:
             | sort -k2,3 -r \
             | awk 'NR>5 {print $1}' \
             | xargs -r -n1 -I{} doctl registry repository delete-tag web {} --force
-          doctl registry garbage-collection start --include-untagged-manifests --force || true
