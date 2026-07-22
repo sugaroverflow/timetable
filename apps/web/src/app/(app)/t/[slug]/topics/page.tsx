@@ -21,7 +21,7 @@ const QUERY = `
     me { id }
     timetableHosts(idOrSlug: $s) { id name }
     hostDashboard(idOrSlug: $s) {
-      id title slug hostSlug status bodyMd bodyHtml coverImageUrl updatedAt
+      id title slug hostId hostSlug status bodyMd bodyHtml coverImageUrl updatedAt
       ${commentTree()}
       ${commentTree("hostOnlyComments")}
       ${commentTree("adminComments")}
@@ -42,8 +42,9 @@ export default async function MyTopicsPage({
   const settings = parseTimetableSettings(data.timetable?.settings);
   const hostLabel = roleLabel(settings.roleLabels, "host");
   const adminLabel = roleLabel(settings.roleLabels, "admin");
+  const admin = isAdmin(roles);
 
-  if (!isHost(roles) && !isAdmin(roles)) {
+  if (!isHost(roles) && !admin) {
     return (
       <div className="notice">
         You need the host or admin role in this forum to propose topics.
@@ -53,7 +54,7 @@ export default async function MyTopicsPage({
 
   // Admins can create a topic owned by another host (round 2: populate a
   // pre-created account before its invite email goes out).
-  const otherHosts = isAdmin(roles)
+  const otherHosts = admin
     ? data.timetableHosts.filter((h) => h.id !== data.me?.id)
     : undefined;
 
@@ -77,6 +78,8 @@ export default async function MyTopicsPage({
                 slug={slug}
                 hostLabel={hostLabel}
                 adminLabel={adminLabel}
+                isAdmin={admin}
+                hosts={admin ? data.timetableHosts : []}
               />
             ))}
           </ul>
