@@ -1,4 +1,3 @@
-/* eslint-disable max-lines-per-function -- audit debt (2026-07-22): decomposition queued — remove this disable when refactoring */
 "use client";
 
 import Link from "next/link";
@@ -42,6 +41,45 @@ function groupByHost(topics: HeartedTopic[]) {
     map.set(t.hostId, group);
   }
   return Array.from(map.values());
+}
+
+/** The expanded row under an elector when "Show ❤️s" is on: the topics they
+ * hearted, grouped by host. */
+function HeartsRow({ slug, topics }: { slug: string; topics: HeartedTopic[] }) {
+  return (
+    <tr className="elector-hearts-row">
+      <td colSpan={5}>
+        {topics.length === 0 ? (
+          <span className="faint" style={{ fontSize: 12 }}>
+            No hearts in range.
+          </span>
+        ) : (
+          <div className="elector-hearts">
+            {groupByHost(topics).map((group) => (
+              <div
+                key={group.hostSlug ?? group.hostName ?? "host"}
+                className="elector-hearts-group"
+              >
+                <div className="faint" style={{ fontSize: 12 }}>
+                  {group.hostName ?? "Host"}
+                </div>
+                <ul>
+                  {group.topics.map((t) => {
+                    const href = topicPath(slug, t.hostSlug, t.slug);
+                    return (
+                      <li key={t.topicId}>
+                        {href ? <Link href={href}>{t.title}</Link> : t.title}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
+        )}
+      </td>
+    </tr>
+  );
 }
 
 /**
@@ -166,46 +204,7 @@ export function ElectorActivityTable({
                 </td>
               </tr>
               {showHearts ? (
-                <tr className="elector-hearts-row">
-                  <td colSpan={5}>
-                    {elector.heartedTopics.length === 0 ? (
-                      <span className="faint" style={{ fontSize: 12 }}>
-                        No hearts in range.
-                      </span>
-                    ) : (
-                      <div className="elector-hearts">
-                        {groupByHost(elector.heartedTopics).map((group) => (
-                          <div
-                            key={group.hostSlug ?? group.hostName ?? "host"}
-                            className="elector-hearts-group"
-                          >
-                            <div className="faint" style={{ fontSize: 12 }}>
-                              {group.hostName ?? "Host"}
-                            </div>
-                            <ul>
-                              {group.topics.map((t) => {
-                                const href = topicPath(
-                                  slug,
-                                  t.hostSlug,
-                                  t.slug,
-                                );
-                                return (
-                                  <li key={t.topicId}>
-                                    {href ? (
-                                      <Link href={href}>{t.title}</Link>
-                                    ) : (
-                                      t.title
-                                    )}
-                                  </li>
-                                );
-                              })}
-                            </ul>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </td>
-                </tr>
+                <HeartsRow slug={slug} topics={elector.heartedTopics} />
               ) : null}
             </Fragment>
           ))}

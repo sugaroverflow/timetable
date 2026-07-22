@@ -1,4 +1,3 @@
-/* eslint-disable complexity -- audit debt (2026-07-22): decomposition queued — remove this disable when refactoring */
 import { TriangleAlert } from "lucide-react";
 import Link from "next/link";
 
@@ -118,6 +117,87 @@ function Stat({ label, value }: { label: string; value: number }) {
   );
 }
 
+/** Unknown filter values fall back to safe defaults rather than erroring. */
+function normalizeFilters(sp: {
+  host?: string;
+  activity?: string;
+  since?: string;
+}) {
+  const host = sp.host ?? "";
+  const activity =
+    sp.activity && ACTIVITY_FILTERS.has(sp.activity) ? sp.activity : "all";
+  const since = sp.since && !Number.isNaN(Date.parse(sp.since)) ? sp.since : "";
+  return { host, activity, since };
+}
+
+/** Picker shows the explicit choice, or the hearts-cutoff default. */
+function sincePickerValue(since: string, timetable: Data["timetable"]): string {
+  return (
+    since ||
+    (timetable?.heartsCountFrom ? timetable.heartsCountFrom.slice(0, 10) : "")
+  );
+}
+
+function ConflictsCard({ conflicts }: { conflicts: Dashboard["conflicts"] }) {
+  if (conflicts.length === 0) return null;
+  return (
+    <div className="card" style={{ borderColor: "var(--yellow)" }}>
+      <h3 style={{ marginTop: 0, fontSize: 15 }}>
+        <TriangleAlert size={14} aria-hidden /> Slot conflicts (
+        {conflicts.length})
+      </h3>
+      <ul className="list">
+        {conflicts.map((c) => (
+          <li key={c.slotId} className="faint" style={{ fontSize: 13 }}>
+            {new Date(c.startsAt).toLocaleString()} · {c.location || "—"} —{" "}
+            {c.topics.map((t) => t.title).join(", ")}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function HostLeaderboardCard({
+  slug,
+  hostsPlural,
+  entries,
+}: {
+  slug: string;
+  hostsPlural: string;
+  entries: Dashboard["hostLeaderboard"];
+}) {
+  return (
+    <div className="card">
+      <h3 style={{ marginTop: 0, fontSize: 15 }}>
+        All {hostsPlural} by weighted votes
+      </h3>
+      {entries.length === 0 ? (
+        <p className="faint" style={{ fontSize: 13 }}>
+          No data yet.
+        </p>
+      ) : (
+        <ul className="list">
+          {entries.map((h) => (
+            <li
+              key={h.hostId}
+              className="row"
+              style={{ justifyContent: "space-between", fontSize: 14 }}
+            >
+              <span>
+                <Link href={`/t/${slug}/feed?host=${h.hostId}`}>
+                  {h.hostName ?? "Host"}
+                </Link>
+              </span>
+              <span className="mono">{h.weightedScore.toFixed(2)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export default async function DashboardPage({
   params,
   searchParams,
@@ -126,18 +206,7 @@ export default async function DashboardPage({
   searchParams: Promise<{ host?: string; activity?: string; since?: string }>;
 }) {
   const { slug } = await params;
-  const {
-    host: hostParam,
-    activity: activityParam,
-    since: sinceParam,
-  } = await searchParams;
-  const host = hostParam ?? "";
-  const activity =
-    activityParam && ACTIVITY_FILTERS.has(activityParam)
-      ? activityParam
-      : "all";
-  const since =
-    sinceParam && !Number.isNaN(Date.parse(sinceParam)) ? sinceParam : "";
+  const { host, activity, since } = normalizeFilters(await searchParams);
   const data = await gqlFetch<Data>(QUERY, {
     s: slug,
     host: host || null,
@@ -158,12 +227,7 @@ export default async function DashboardPage({
   const hostsPlural = pluralLabel(hostLabel);
   const electorLabel = roleLabel(settings.roleLabels, "elector");
   const viewerIsAdmin = isAdmin(roles);
-  // Picker shows the explicit choice, or the hearts-cutoff default.
-  const sinceValue =
-    since ||
-    (data.timetable?.heartsCountFrom
-      ? data.timetable.heartsCountFrom.slice(0, 10)
-      : "");
+  const sinceValue = sincePickerValue(since, data.timetable);
 
   return (
     <div className="stack">
@@ -191,22 +255,7 @@ export default async function DashboardPage({
         <Stat label="Timeslots" value={d.slotCount} />
       </div>
 
-      {d.conflicts.length > 0 ? (
-        <div className="card" style={{ borderColor: "var(--yellow)" }}>
-          <h3 style={{ marginTop: 0, fontSize: 15 }}>
-            <TriangleAlert size={14} aria-hidden /> Slot conflicts (
-            {d.conflicts.length})
-          </h3>
-          <ul className="list">
-            {d.conflicts.map((c) => (
-              <li key={c.slotId} className="faint" style={{ fontSize: 13 }}>
-                {new Date(c.startsAt).toLocaleString()} · {c.location || "—"} —{" "}
-                {c.topics.map((t) => t.title).join(", ")}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+      <ConflictsCard conflicts={d.conflicts} />
 
       <div className="grid grid-2">
         <TopicLeaderboard
@@ -216,33 +265,11 @@ export default async function DashboardPage({
         />
 
         {viewerIsAdmin ? (
-          <div className="card">
-            <h3 style={{ marginTop: 0, fontSize: 15 }}>
-              All {hostsPlural} by weighted votes
-            </h3>
-            {d.hostLeaderboard.length === 0 ? (
-              <p className="faint" style={{ fontSize: 13 }}>
-                No data yet.
-              </p>
-            ) : (
-              <ul className="list">
-                {d.hostLeaderboard.map((h) => (
-                  <li
-                    key={h.hostId}
-                    className="row"
-                    style={{ justifyContent: "space-between", fontSize: 14 }}
-                  >
-                    <span>
-                      <Link href={`/t/${slug}/feed?host=${h.hostId}`}>
-                        {h.hostName ?? "Host"}
-                      </Link>
-                    </span>
-                    <span className="mono">{h.weightedScore.toFixed(2)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          <HostLeaderboardCard
+            slug={slug}
+            hostsPlural={hostsPlural}
+            entries={d.hostLeaderboard}
+          />
         ) : null}
       </div>
 

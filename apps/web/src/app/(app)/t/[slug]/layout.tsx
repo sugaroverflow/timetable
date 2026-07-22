@@ -1,4 +1,3 @@
-/* eslint-disable complexity, max-lines-per-function, sonarjs/cognitive-complexity -- audit debt (2026-07-22): decomposition queued — remove this disable when refactoring */
 import { auth } from "@clerk/nextjs/server";
 import { Flag, Heart } from "lucide-react";
 import { cookies } from "next/headers";
@@ -55,6 +54,93 @@ const UNREAD_QUERY = `
   }
 `;
 
+/** Under a view-as-user preview the API already resolves every query as
+ * the target member, so viewerRoles are the target's roles — no client-side
+ * role games needed (QA #59 round 3). This resolves who is being previewed. */
+async function loadPreview(slug: string) {
+  const previewUserId = parseViewAs(
+    (await cookies()).get(VIEW_AS_COOKIE)?.value,
+    slug,
+  );
+  if (!previewUserId) {
+    return { previewUserId: null, previewName: null };
+  }
+  const data = await gqlFetch<{ person: { name: string | null } | null }>(
+    `query($s: String!, $u: String!){ person(idOrSlug: $s, userId: $u){ name } }`,
+    { s: slug, u: previewUserId },
+  );
+  return { previewUserId, previewName: data.person?.name ?? null };
+}
+
+async function loadSwitcherAndUnread(
+  isAuthed: boolean,
+  isMember: boolean,
+  slug: string,
+): Promise<{ switcherItems: SwitcherItem[]; unread: number }> {
+  if (!isAuthed) return { switcherItems: [], unread: 0 };
+  const [mine, unreadData] = await Promise.all([
+    getMyTimetables(),
+    isMember
+      ? gqlFetch<{ notificationsUnread: number }>(UNREAD_QUERY, { s: slug })
+      : Promise.resolve({ notificationsUnread: 0 }),
+  ]);
+  const switcherItems = mine.map((t) => {
+    const s = parseTimetableSettings(t.settings);
+    return {
+      slug: t.slug,
+      name: t.name,
+      privacy: t.privacy,
+      iconUrl: s.iconUrl ?? null,
+      iconEmoji: s.iconEmoji ?? null,
+    };
+  });
+  return { switcherItems, unread: unreadData.notificationsUnread };
+}
+
+function SideNav({
+  base,
+  isAuthed,
+  isMember,
+  elector,
+  hostOrAdmin,
+  admin,
+  unread,
+}: {
+  base: string;
+  isAuthed: boolean;
+  isMember: boolean;
+  elector: boolean;
+  hostOrAdmin: boolean;
+  admin: boolean;
+  unread: number;
+}) {
+  return (
+    <nav className="nav side-nav">
+      <NavLink href={`${base}/feed`}>Topic Feed</NavLink>
+      {hostOrAdmin && <NavLink href={`${base}/topics`}>My Topics</NavLink>}
+      {elector && (
+        <NavLink href={`${base}/feed?hearted=me`}>
+          <Heart size={14} fill="currentColor" aria-hidden /> Topics
+        </NavLink>
+      )}
+      {isMember && (
+        <NavLink href={`${base}/notifications`}>
+          Notifications
+          {unread > 0 ? (
+            <span className="nav-badge">{unread > 99 ? "99+" : unread}</span>
+          ) : null}
+        </NavLink>
+      )}
+      {isMember && <NavLink href={`${base}/people`}>People</NavLink>}
+      {isAuthed && <NavLink href={`${base}/profile`}>Profile</NavLink>}
+      {hostOrAdmin && <NavLink href={`${base}/dashboard`}>Analysis</NavLink>}
+      {admin && <NavLink href={`${base}/moderation`}>Pending Topics</NavLink>}
+      {admin && <NavLink href={`${base}/activity`}>Activity Log</NavLink>}
+      {admin && <NavLink href={`${base}/settings`}>Settings</NavLink>}
+    </nav>
+  );
+}
+
 export default async function TimetableLayout({
   children,
   params,
@@ -77,47 +163,17 @@ export default async function TimetableLayout({
     notFound();
   }
 
-  // Under a view-as-user preview the API already resolves every query as
-  // the target member, so these are the target's roles — no client-side
-  // role games needed (QA #59 round 3).
   const roles = timetable.viewerRoles as Role[];
-  const previewUserId = parseViewAs(
-    (await cookies()).get(VIEW_AS_COOKIE)?.value,
-    slug,
-  );
-  let previewName: string | null = null;
-  if (previewUserId) {
-    const data = await gqlFetch<{ person: { name: string | null } | null }>(
-      `query($s: String!, $u: String!){ person(idOrSlug: $s, userId: $u){ name } }`,
-      { s: slug, u: previewUserId },
-    );
-    previewName = data.person?.name ?? null;
-  }
+  const isMember = roles.length > 0;
+  const { previewUserId, previewName } = await loadPreview(slug);
   const settings = parseTimetableSettings(timetable.settings);
   const base = `/t/${slug}`;
   const privacy = privacyBadge(timetable.privacy);
-
-  let switcherItems: SwitcherItem[] = [];
-  let unread = 0;
-  if (isAuthed) {
-    const [mine, unreadData] = await Promise.all([
-      getMyTimetables(),
-      roles.length > 0
-        ? gqlFetch<{ notificationsUnread: number }>(UNREAD_QUERY, { s: slug })
-        : Promise.resolve({ notificationsUnread: 0 }),
-    ]);
-    switcherItems = mine.map((t) => {
-      const s = parseTimetableSettings(t.settings);
-      return {
-        slug: t.slug,
-        name: t.name,
-        privacy: t.privacy,
-        iconUrl: s.iconUrl ?? null,
-        iconEmoji: s.iconEmoji ?? null,
-      };
-    });
-    unread = unreadData.notificationsUnread;
-  }
+  const { switcherItems, unread } = await loadSwitcherAndUnread(
+    isAuthed,
+    isMember,
+    slug,
+  );
 
   const themeCss = buildThemeCss(settings);
 
@@ -146,43 +202,15 @@ export default async function TimetableLayout({
             ) : null}
           </div>
 
-          <nav className="nav side-nav">
-            <NavLink href={`${base}/feed`}>Topic Feed</NavLink>
-            {(isHost(roles) || isAdmin(roles)) && (
-              <NavLink href={`${base}/topics`}>My Topics</NavLink>
-            )}
-            {isElector(roles) && (
-              <NavLink href={`${base}/feed?hearted=me`}>
-                <Heart size={14} fill="currentColor" aria-hidden /> Topics
-              </NavLink>
-            )}
-            {roles.length > 0 && (
-              <NavLink href={`${base}/notifications`}>
-                Notifications
-                {unread > 0 ? (
-                  <span className="nav-badge">
-                    {unread > 99 ? "99+" : unread}
-                  </span>
-                ) : null}
-              </NavLink>
-            )}
-            {roles.length > 0 && (
-              <NavLink href={`${base}/people`}>People</NavLink>
-            )}
-            {isAuthed && <NavLink href={`${base}/profile`}>Profile</NavLink>}
-            {(isHost(roles) || isAdmin(roles)) && (
-              <NavLink href={`${base}/dashboard`}>Analysis</NavLink>
-            )}
-            {isAdmin(roles) && (
-              <NavLink href={`${base}/moderation`}>Pending Topics</NavLink>
-            )}
-            {isAdmin(roles) && (
-              <NavLink href={`${base}/activity`}>Activity Log</NavLink>
-            )}
-            {isAdmin(roles) && (
-              <NavLink href={`${base}/settings`}>Settings</NavLink>
-            )}
-          </nav>
+          <SideNav
+            base={base}
+            isAuthed={isAuthed}
+            isMember={isMember}
+            elector={isElector(roles)}
+            hostOrAdmin={isHost(roles) || isAdmin(roles)}
+            admin={isAdmin(roles)}
+            unread={unread}
+          />
 
           {previewUserId ? (
             <div className="sidebar-foot">

@@ -1,4 +1,3 @@
-/* eslint-disable complexity -- audit debt (2026-07-22): decomposition queued — remove this disable when refactoring */
 import type {
   NotificationSettings,
   RoleLabels,
@@ -140,30 +139,17 @@ function withAlpha(hex: string, aa: string): string {
   return /^#[0-9a-fA-F]{6}$/.test(hex) ? hex + aa : hex;
 }
 
-/**
- * The single theme→CSS-variable mapping, used for both server render
- * (buildThemeCss) and the settings page's live preview. Primary drives the
- * accent colours; secondary drives the host-only panel colours; background,
- * topbar, and text override the base tokens.
- */
-export function themeVars(
-  theme: ThemeSettings | undefined,
-  mode: "light" | "dark" = "light",
+/** Accents carry into dark mode (with optional dark overrides): primary
+ * drives the accent colours, secondary the host-only panel colours. */
+function accentVars(
+  theme: ThemeSettings,
+  dark: boolean,
 ): Record<string, string> {
   const vars: Record<string, string> = {};
-  if (!theme) return vars;
-  const dark = mode === "dark";
-  // Accents carry into dark mode (with optional dark overrides); base
-  // colours (background/topbar/text) apply in dark mode only when a dark
-  // override is set — light values would wreck the built-in dark palette.
   const primary = dark ? (theme.dark?.primary ?? theme.primary) : theme.primary;
   const secondary = dark
     ? (theme.dark?.secondary ?? theme.secondary)
     : theme.secondary;
-  const background = dark ? theme.dark?.background : theme.background;
-  const topbar = dark ? theme.dark?.topbar : theme.topbar;
-  const topbarText = dark ? theme.dark?.topbarText : theme.topbarText;
-  const text = dark ? theme.dark?.text : theme.text;
   if (primary) {
     vars["--primary"] = primary;
     vars["--primary-soft"] = withAlpha(primary, "1a");
@@ -174,16 +160,44 @@ export function themeVars(
     vars["--host-wash"] = withAlpha(secondary, "15");
     vars["--host-line"] = withAlpha(secondary, "40");
   }
-  if (background) vars["--bg"] = background;
-  if (topbar) vars["--topbar"] = topbar;
-  if (topbarText) vars["--topbar-ink"] = topbarText;
-  if (text) vars["--ink"] = text;
-  const font = theme.font ? FONT_PAIRINGS[theme.font] : undefined;
-  if (font) {
-    vars["--serif"] = font.serif;
-    vars["--sans"] = font.sans;
-  }
   return vars;
+}
+
+/** Base colours (background/topbar/text) apply in dark mode only when a dark
+ * override is set — light values would wreck the built-in dark palette. */
+function baseVars(theme: ThemeSettings, dark: boolean): Record<string, string> {
+  const source = (dark ? theme.dark : theme) ?? {};
+  const vars: Record<string, string> = {};
+  if (source.background) vars["--bg"] = source.background;
+  if (source.topbar) vars["--topbar"] = source.topbar;
+  if (source.topbarText) vars["--topbar-ink"] = source.topbarText;
+  if (source.text) vars["--ink"] = source.text;
+  return vars;
+}
+
+function fontVars(theme: ThemeSettings): Record<string, string> {
+  const font = theme.font ? FONT_PAIRINGS[theme.font] : undefined;
+  if (!font) return {};
+  return { "--serif": font.serif, "--sans": font.sans };
+}
+
+/**
+ * The single theme→CSS-variable mapping, used for both server render
+ * (buildThemeCss) and the settings page's live preview. Composed from the
+ * accent/base/font helpers above; the spread order fixes the emitted key
+ * order, which buildThemeCss serializes verbatim.
+ */
+export function themeVars(
+  theme: ThemeSettings | undefined,
+  mode: "light" | "dark" = "light",
+): Record<string, string> {
+  if (!theme) return {};
+  const dark = mode === "dark";
+  return {
+    ...accentVars(theme, dark),
+    ...baseVars(theme, dark),
+    ...fontVars(theme),
+  };
 }
 
 function cssBlock(selector: string, vars: Record<string, string>): string {

@@ -1,4 +1,3 @@
-/* eslint-disable max-lines-per-function -- audit debt (2026-07-22): decomposition queued — remove this disable when refactoring */
 "use client";
 
 import { useState } from "react";
@@ -23,30 +22,10 @@ const PILL_CLASS: Record<AssignableRole, string> = {
   elector: "pill-elector",
 };
 
-export function MemberRolesEditor({
-  membershipId,
-  userId,
-  slug,
-  name,
-  email,
-  roles: initialRoles,
-  roleLabels,
-}: {
-  membershipId: string;
-  userId: string;
-  slug: string;
-  name: string | null;
-  email: string | null;
-  roles: string[];
-  roleLabels?: { admin?: string; host?: string; elector?: string };
-}) {
-  const router = useRouter();
-  const { toast, toastError } = useToast();
+/** Admins can edit any member's bio (markdown, QA #42). Bio text is fetched
+ * lazily on first open so the People page doesn't load every bio up front. */
+function BioEditor({ slug, userId }: { slug: string; userId: string }) {
   const { run, busy: bioBusy } = useGqlAction();
-  const isOwner = initialRoles.includes("owner");
-  const [roles, setRoles] = useState<string[]>(initialRoles);
-  const [busy, setBusy] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [bio, setBio] = useState<string | null>(null);
   const [bioOpen, setBioOpen] = useState(false);
 
@@ -75,6 +54,75 @@ export function MemberRolesEditor({
       },
     );
   }
+
+  return (
+    <div className="stack" style={{ marginTop: 12, gap: 8 }}>
+      {bioOpen ? (
+        <>
+          <textarea
+            value={bio ?? ""}
+            onChange={(e) => setBio(e.target.value)}
+            placeholder={
+              bio === null ? "Loading…" : "Member bio (markdown supported)"
+            }
+            aria-label="Member bio"
+            disabled={bio === null}
+          />
+          <div className="row">
+            <button
+              className="btn btn-primary"
+              type="button"
+              onClick={saveBio}
+              disabled={bioBusy || bio === null}
+            >
+              {bioBusy ? "Saving…" : "Save bio"}
+            </button>
+            <button
+              className="btn btn-ghost"
+              type="button"
+              onClick={() => setBioOpen(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        </>
+      ) : (
+        <button
+          className="btn btn-ghost"
+          type="button"
+          style={{ alignSelf: "flex-start" }}
+          onClick={openBio}
+        >
+          Edit bio
+        </button>
+      )}
+    </div>
+  );
+}
+
+export function MemberRolesEditor({
+  membershipId,
+  userId,
+  slug,
+  name,
+  email,
+  roles: initialRoles,
+  roleLabels,
+}: {
+  membershipId: string;
+  userId: string;
+  slug: string;
+  name: string | null;
+  email: string | null;
+  roles: string[];
+  roleLabels?: { admin?: string; host?: string; elector?: string };
+}) {
+  const router = useRouter();
+  const { toast, toastError } = useToast();
+  const isOwner = initialRoles.includes("owner");
+  const [roles, setRoles] = useState<string[]>(initialRoles);
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   function toggleRole(role: string) {
     setSaved(false);
@@ -151,48 +199,7 @@ export function MemberRolesEditor({
         </button>
       </div>
 
-      {/* Admins can edit any member's bio (markdown, QA #42). */}
-      <div className="stack" style={{ marginTop: 12, gap: 8 }}>
-        {bioOpen ? (
-          <>
-            <textarea
-              value={bio ?? ""}
-              onChange={(e) => setBio(e.target.value)}
-              placeholder={
-                bio === null ? "Loading…" : "Member bio (markdown supported)"
-              }
-              aria-label="Member bio"
-              disabled={bio === null}
-            />
-            <div className="row">
-              <button
-                className="btn btn-primary"
-                type="button"
-                onClick={saveBio}
-                disabled={bioBusy || bio === null}
-              >
-                {bioBusy ? "Saving…" : "Save bio"}
-              </button>
-              <button
-                className="btn btn-ghost"
-                type="button"
-                onClick={() => setBioOpen(false)}
-              >
-                Cancel
-              </button>
-            </div>
-          </>
-        ) : (
-          <button
-            className="btn btn-ghost"
-            type="button"
-            style={{ alignSelf: "flex-start" }}
-            onClick={openBio}
-          >
-            Edit bio
-          </button>
-        )}
-      </div>
+      <BioEditor slug={slug} userId={userId} />
     </div>
   );
 }

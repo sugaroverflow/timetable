@@ -12,6 +12,12 @@ import { PersonChip } from "./PersonChip";
 
 const VISIBLE_TOP_LEVEL = 3;
 
+/** Restricted-visibility badge next to the author name. */
+const VISIBILITY_PILLS: Record<string, { className: string; label: string }> = {
+  host_only: { className: "pill pill-host", label: "hosts" },
+  admin_only: { className: "pill pill-admin", label: "admins" },
+};
+
 function countNested(comments: FeedComment[]): number {
   return comments.reduce((sum, c) => sum + 1 + countNested(c.replies ?? []), 0);
 }
@@ -42,6 +48,7 @@ function CommentItem({
     subtreeContains(replies, searchParams.get("reply")),
   );
   const replyCount = countNested(replies);
+  const visibilityPill = VISIBILITY_PILLS[comment.visibility];
 
   return (
     <div
@@ -60,20 +67,12 @@ function CommentItem({
               (comment.authorName ?? "Someone")
             )}
           </span>
-          {comment.visibility === "host_only" ? (
+          {visibilityPill ? (
             <span
-              className="pill pill-host"
+              className={visibilityPill.className}
               style={{ marginLeft: 6, fontSize: 10 }}
             >
-              hosts
-            </span>
-          ) : null}
-          {comment.visibility === "admin_only" ? (
-            <span
-              className="pill pill-admin"
-              style={{ marginLeft: 6, fontSize: 10 }}
-            >
-              admins
+              {visibilityPill.label}
             </span>
           ) : null}
           {comment.hidden ? (
