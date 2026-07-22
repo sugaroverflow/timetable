@@ -3,7 +3,7 @@
 Collaborative timetables for proposing topics, voting with hearts, sharing
 availability, and shaping a schedule together.
 
-A [Newspeak House](https://www.newspeak.house/) x
+A [Newspeak House](https://newspeak.house/) x
 [Sparkle Bureaucracy](https://www.sparklebureaucracy.org/) production.
 
 ![Timetable topic feed showing proposed sessions, hearts, and comments](docs/assets/readme/topics-view.png)
