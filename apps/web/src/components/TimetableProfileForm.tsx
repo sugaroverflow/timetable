@@ -1,12 +1,11 @@
 /* eslint-disable complexity, max-lines-per-function -- audit debt (2026-07-22): decomposition queued — remove this disable when refactoring */
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 
-import { useToast } from "@/components/Toast";
 import { clientGql } from "@/lib/clientGraphql";
 import type { DigestSettings, RoleLabels } from "@/lib/timetableSettings";
+import { useGqlAction } from "@/lib/useGqlAction";
 
 const MUTATION = `mutation($s: String!, $name: String, $desc: String, $privacy: String, $cd: String) {
   updateTimetableProfile(idOrSlug: $s, name: $name, description: $desc, privacy: $privacy, customDomain: $cd) { id }
@@ -47,8 +46,7 @@ export function TimetableProfileForm({
   roleLabels?: RoleLabels;
   digestDefaults?: DigestSettings;
 }) {
-  const router = useRouter();
-  const { toast, toastError } = useToast();
+  const { run, busy } = useGqlAction();
   const [name, setName] = useState(initialName);
   const [description, setDescription] = useState(initialDescription ?? "");
   const [privacy, setPrivacy] = useState(initialPrivacy);
@@ -65,35 +63,34 @@ export function TimetableProfileForm({
   const [digestActivity, setDigestActivity] = useState(
     digestDefaults?.digestActivity ?? false,
   );
-  const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
 
-  async function submit(e: React.FormEvent) {
+  function submit(e: React.FormEvent) {
     e.preventDefault();
     setSaved(false);
-    try {
-      await clientGql(MUTATION, {
-        s: slug,
-        name,
-        desc: description,
-        privacy,
-        cd: customDomain,
-      });
-      await clientGql(SETTINGS_MUTATION, {
-        s: slug,
-        ra: admin,
-        rh: host,
-        re: elector,
-        dnt: digestTopics,
-        dr: digestReplies,
-        da: digestActivity,
-      });
-      setSaved(true);
-      toast("Forum profile saved");
-      startTransition(() => router.refresh());
-    } catch (err) {
-      toastError(err instanceof Error ? err.message : "Could not save");
-    }
+    void run(
+      MUTATION,
+      { s: slug, name, desc: description, privacy, cd: customDomain },
+      {
+        success: "Forum profile saved",
+        errorFallback: "Could not save",
+        // Second write rides inside onSuccess so a failure in either
+        // mutation lands in the same error toast, and the success toast
+        // only fires once both have landed.
+        onSuccess: async () => {
+          await clientGql(SETTINGS_MUTATION, {
+            s: slug,
+            ra: admin,
+            rh: host,
+            re: elector,
+            dnt: digestTopics,
+            dr: digestReplies,
+            da: digestActivity,
+          });
+          setSaved(true);
+        },
+      },
+    );
   }
 
   return (
@@ -211,8 +208,8 @@ export function TimetableProfileForm({
         Activity on their topics (hosts)
       </label>
 
-      <button className="btn btn-primary" type="submit" disabled={pending}>
-        {pending ? "Saving…" : saved ? "Saved" : "Save"}
+      <button className="btn btn-primary" type="submit" disabled={busy}>
+        {busy ? "Saving…" : saved ? "Saved" : "Save"}
       </button>
     </form>
   );

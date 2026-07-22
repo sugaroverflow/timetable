@@ -10,6 +10,7 @@ import { useToast } from "@/components/Toast";
 import { clientApi } from "@/lib/clientApi";
 import { clientGql } from "@/lib/clientGraphql";
 import { roleLabel } from "@/lib/timetableSettings";
+import { useGqlAction } from "@/lib/useGqlAction";
 
 const PERSON_BIO = `query($s: String!, $u: String!) { person(idOrSlug: $s, userId: $u) { bio } }`;
 const UPDATE_BIO = `mutation($s: String!, $u: String!, $bio: String!) {
@@ -41,13 +42,13 @@ export function MemberRolesEditor({
 }) {
   const router = useRouter();
   const { toast, toastError } = useToast();
+  const { run, busy: bioBusy } = useGqlAction();
   const isOwner = initialRoles.includes("owner");
   const [roles, setRoles] = useState<string[]>(initialRoles);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [bio, setBio] = useState<string | null>(null);
   const [bioOpen, setBioOpen] = useState(false);
-  const [bioBusy, setBioBusy] = useState(false);
 
   async function openBio() {
     setBioOpen(true);
@@ -63,18 +64,16 @@ export function MemberRolesEditor({
     }
   }
 
-  async function saveBio() {
-    setBioBusy(true);
-    try {
-      await clientGql(UPDATE_BIO, { s: slug, u: userId, bio: bio ?? "" });
-      toast("Bio updated");
-      setBioOpen(false);
-      router.refresh();
-    } catch (err) {
-      toastError(err instanceof Error ? err.message : "Could not save bio");
-    } finally {
-      setBioBusy(false);
-    }
+  function saveBio() {
+    void run(
+      UPDATE_BIO,
+      { s: slug, u: userId, bio: bio ?? "" },
+      {
+        success: "Bio updated",
+        errorFallback: "Could not save bio",
+        onSuccess: () => setBioOpen(false),
+      },
+    );
   }
 
   function toggleRole(role: string) {

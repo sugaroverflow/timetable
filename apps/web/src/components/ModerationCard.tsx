@@ -1,16 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 import { AdminCommentsPanel } from "@/components/AdminCommentsPanel";
 import { Avatar } from "@/components/Avatar";
-import { useToast } from "@/components/Toast";
 import { TopicEditForm } from "@/components/TopicEditForm";
-import { clientGql } from "@/lib/clientGraphql";
 import type { ManagedTopic } from "@/lib/feedTypes";
 import { topicPath } from "@/lib/topicPath";
+import { useGqlAction } from "@/lib/useGqlAction";
 
 const MUTATION = `mutation Moderate($id: String!, $action: String!) {
   moderateTopic(topicId: $id, action: $action) { id status }
@@ -30,19 +28,15 @@ export function ModerationCard({
   hostLabel?: string;
   adminLabel?: string;
 }) {
-  const router = useRouter();
-  const { toast, toastError } = useToast();
-  const [pending, startTransition] = useTransition();
+  const { run, busy } = useGqlAction();
   const [editing, setEditing] = useState(false);
 
-  async function publish() {
-    try {
-      await clientGql(MUTATION, { id: topic.id, action: "publish" });
-      toast("Topic published");
-      startTransition(() => router.refresh());
-    } catch (err) {
-      toastError(err instanceof Error ? err.message : "Moderation failed");
-    }
+  function publish() {
+    void run(
+      MUTATION,
+      { id: topic.id, action: "publish" },
+      { success: "Topic published", errorFallback: "Moderation failed" },
+    );
   }
 
   const permalink = topicPath(slug, topic.hostSlug ?? null, topic.slug ?? null);
@@ -89,7 +83,7 @@ export function ModerationCard({
         <button
           className="btn btn-primary"
           type="button"
-          disabled={pending}
+          disabled={busy}
           onClick={publish}
         >
           Publish
@@ -97,7 +91,7 @@ export function ModerationCard({
         <button
           className="btn"
           type="button"
-          disabled={pending}
+          disabled={busy}
           onClick={() => setEditing((v) => !v)}
         >
           {editing ? "Cancel edit" : "Edit"}

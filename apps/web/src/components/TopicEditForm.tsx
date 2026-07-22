@@ -1,13 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { RichTextEditor } from "@/components/RichTextEditor";
-import { useToast } from "@/components/Toast";
-import { clientGql } from "@/lib/clientGraphql";
 import type { ManagedTopic } from "@/lib/feedTypes";
+import { useGqlAction } from "@/lib/useGqlAction";
 
 const UPDATE_MUTATION = `mutation Update($id: String!, $title: String!, $body: String!, $cover: String) {
   updateTopic(topicId: $id, title: $title, bodyMd: $body, coverImageUrl: $cover) { id }
@@ -24,30 +22,29 @@ export function TopicEditForm({
   slug: string;
   onDone: () => void;
 }) {
-  const router = useRouter();
-  const { toast, toastError } = useToast();
-  const [pending, startTransition] = useTransition();
+  const { run, busy } = useGqlAction();
   const [title, setTitle] = useState(topic.title);
   const [body, setBody] = useState(topic.bodyMd);
   const [cover, setCover] = useState(topic.coverImageUrl ?? "");
   const [uploadingCover, setUploadingCover] = useState(false);
 
-  async function saveEdit(e: React.FormEvent) {
+  function saveEdit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
-    try {
-      await clientGql(UPDATE_MUTATION, {
+    void run(
+      UPDATE_MUTATION,
+      {
         id: topic.id,
         title: title.trim(),
         body,
         cover: cover.trim() || null,
-      });
-      onDone();
-      toast("Topic updated");
-      startTransition(() => router.refresh());
-    } catch (err) {
-      toastError(err instanceof Error ? err.message : "Could not save changes");
-    }
+      },
+      {
+        success: "Topic updated",
+        errorFallback: "Could not save changes",
+        onSuccess: onDone,
+      },
+    );
   }
 
   return (
@@ -77,9 +74,9 @@ export function TopicEditForm({
         <button
           className="btn btn-primary"
           type="submit"
-          disabled={pending || uploadingCover}
+          disabled={busy || uploadingCover}
         >
-          {uploadingCover ? "Uploading…" : pending ? "Saving…" : "Save changes"}
+          {uploadingCover ? "Uploading…" : busy ? "Saving…" : "Save changes"}
         </button>
         <button className="btn btn-ghost" type="button" onClick={onDone}>
           Cancel

@@ -1,11 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 
-import { useToast } from "@/components/Toast";
-import { clientGql } from "@/lib/clientGraphql";
 import type { TopicStatus } from "@/lib/feedTypes";
+import { useGqlAction } from "@/lib/useGqlAction";
 
 import { TopicEditForm } from "./TopicEditForm";
 
@@ -28,19 +26,15 @@ export function HostTopicActions({
   slug: string;
   label?: string;
 }) {
-  const router = useRouter();
-  const { toast, toastError } = useToast();
-  const [pending, startTransition] = useTransition();
+  const { run, busy } = useGqlAction();
   const [editing, setEditing] = useState(false);
 
-  async function unpublish() {
-    try {
-      await clientGql(UNPUBLISH, { id: topic.id });
-      toast("Topic unpublished");
-      startTransition(() => router.refresh());
-    } catch (err) {
-      toastError(err instanceof Error ? err.message : "Action failed");
-    }
+  function unpublish() {
+    void run(
+      UNPUBLISH,
+      { id: topic.id },
+      { success: "Topic unpublished", errorFallback: "Action failed" },
+    );
   }
 
   return (
@@ -60,7 +54,7 @@ export function HostTopicActions({
           <button
             className="btn btn-ghost"
             type="button"
-            disabled={pending}
+            disabled={busy}
             onClick={unpublish}
           >
             Unpublish

@@ -1,10 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 
-import { useToast } from "@/components/Toast";
-import { clientGql } from "@/lib/clientGraphql";
+import { useGqlAction } from "@/lib/useGqlAction";
 
 const SINGLE = `mutation($s: String!, $a: String!, $b: String!, $loc: String) {
   createTimeslot(idOrSlug: $s, startsAt: $a, endsAt: $b, location: $loc) { id }
@@ -14,34 +12,34 @@ const WEEKLY = `mutation($s: String!, $a: String!, $b: String!, $loc: String, $c
 }`;
 
 export function SlotAdminForm({ slug }: { slug: string }) {
-  const router = useRouter();
-  const { toast, toastError } = useToast();
+  const { run, busy } = useGqlAction();
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [location, setLocation] = useState("");
   const [weeks, setWeeks] = useState(1);
-  const [pending, startTransition] = useTransition();
 
-  async function submit(e: React.FormEvent) {
+  function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!start || !end) return;
     const a = new Date(start).toISOString();
     const b = new Date(end).toISOString();
-    try {
-      if (weeks > 1) {
-        await clientGql(WEEKLY, { s: slug, a, b, loc: location, c: weeks });
-      } else {
-        await clientGql(SINGLE, { s: slug, a, b, loc: location });
-      }
-      setStart("");
-      setEnd("");
-      setLocation("");
-      setWeeks(1);
-      toast(weeks > 1 ? `${weeks} weekly slots created` : "Slot created");
-      startTransition(() => router.refresh());
-    } catch (err) {
-      toastError(err instanceof Error ? err.message : "Could not create slot");
-    }
+    const weekly = weeks > 1;
+    void run(
+      weekly ? WEEKLY : SINGLE,
+      weekly
+        ? { s: slug, a, b, loc: location, c: weeks }
+        : { s: slug, a, b, loc: location },
+      {
+        success: weekly ? `${weeks} weekly slots created` : "Slot created",
+        errorFallback: "Could not create slot",
+        onSuccess: () => {
+          setStart("");
+          setEnd("");
+          setLocation("");
+          setWeeks(1);
+        },
+      },
+    );
   }
 
   return (
@@ -85,7 +83,7 @@ export function SlotAdminForm({ slug }: { slug: string }) {
           onChange={(e) => setWeeks(Number(e.target.value) || 1)}
         />
       </div>
-      <button className="btn btn-primary" type="submit" disabled={pending}>
+      <button className="btn btn-primary" type="submit" disabled={busy}>
         {weeks > 1 ? `Create ${weeks} slots` : "Create slot"}
       </button>
     </form>

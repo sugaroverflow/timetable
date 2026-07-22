@@ -1,12 +1,9 @@
 /* eslint-disable complexity, max-lines-per-function -- audit debt (2026-07-22): decomposition queued — remove this disable when refactoring */
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ImageUploadField } from "@/components/ImageUploadField";
-import { useToast } from "@/components/Toast";
-import { clientGql } from "@/lib/clientGraphql";
 import {
   DEFAULT_THEME_DARK,
   DEFAULT_THEME_LIGHT,
@@ -15,6 +12,7 @@ import {
   type DigestSettings,
   type ThemeSettings,
 } from "@/lib/timetableSettings";
+import { useGqlAction } from "@/lib/useGqlAction";
 
 const MUTATION = `mutation Theme($s: String!, $theme: String, $cover: String, $icon: String, $emoji: String) {
   updateTimetableSettings(
@@ -73,9 +71,7 @@ export function SettingsForm({
   slug: string;
   current: SettingsValues;
 }) {
-  const router = useRouter();
-  const { toast, toastError } = useToast();
-  const [pending, startTransition] = useTransition();
+  const { run, busy } = useGqlAction();
   const [saved, setSaved] = useState(false);
 
   // Single source for both the initial state and what Discard restores.
@@ -238,23 +234,24 @@ export function SettingsForm({
     setSaved(false);
   }
 
-  async function submit(e: React.FormEvent) {
+  function submit(e: React.FormEvent) {
     e.preventDefault();
     setSaved(false);
-    try {
-      await clientGql(MUTATION, {
+    void run(
+      MUTATION,
+      {
         s: slug,
         theme: JSON.stringify(toTheme(currentState())),
         cover: cover.trim() || null,
         icon: icon.trim() || null,
         emoji: iconEmoji.trim() || null,
-      });
-      setSaved(true);
-      toast("Theme saved");
-      startTransition(() => router.refresh());
-    } catch (err) {
-      toastError(err instanceof Error ? err.message : "Could not save theme");
-    }
+      },
+      {
+        success: "Theme saved",
+        errorFallback: "Could not save theme",
+        onSuccess: () => setSaved(true),
+      },
+    );
   }
 
   const colourField = (
@@ -422,11 +419,11 @@ export function SettingsForm({
         <button
           className="btn btn-primary"
           type="submit"
-          disabled={pending || uploadingCover || uploadingIcon}
+          disabled={busy || uploadingCover || uploadingIcon}
         >
           {uploadingCover || uploadingIcon
             ? "Uploading…"
-            : pending
+            : busy
               ? "Saving…"
               : saved
                 ? "Saved"
@@ -436,7 +433,7 @@ export function SettingsForm({
           className="btn btn-ghost"
           type="button"
           onClick={discard}
-          disabled={pending}
+          disabled={busy}
         >
           Discard
         </button>

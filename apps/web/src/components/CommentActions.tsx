@@ -1,11 +1,10 @@
 "use client";
 
 import { Send } from "lucide-react";
-import { useEffect, useRef, useState, useTransition } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
-import { useToast } from "@/components/Toast";
-import { clientGql } from "@/lib/clientGraphql";
+import { useGqlAction } from "@/lib/useGqlAction";
 
 const REPLY = `mutation Reply($id: String!, $body: String!) {
   replyToComment(commentId: $id, body: $body) { id }
@@ -26,15 +25,13 @@ export function CommentActions({
   canModerate: boolean;
   hidden: boolean;
 }) {
-  const router = useRouter();
-  const { toast, toastError } = useToast();
+  const { run, busy } = useGqlAction();
   const searchParams = useSearchParams();
   // Deep link from the notifications pane (QA #59 round 3): ?reply=<id>
   // opens and focuses this comment's reply composer.
   const deepLinked = canReply && searchParams.get("reply") === commentId;
   const [open, setOpen] = useState(deepLinked);
   const [body, setBody] = useState("");
-  const [pending, startTransition] = useTransition();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -43,31 +40,33 @@ export function CommentActions({
     textareaRef.current?.scrollIntoView({ block: "center" });
   }, [deepLinked]);
 
-  async function reply(e: React.FormEvent) {
+  function reply(e: React.FormEvent) {
     e.preventDefault();
     const text = body.trim();
     if (!text) return;
-    try {
-      await clientGql(REPLY, { id: commentId, body: text });
-      setBody("");
-      setOpen(false);
-      toast("Reply posted");
-      startTransition(() => router.refresh());
-    } catch (err) {
-      toastError(err instanceof Error ? err.message : "Could not reply");
-    }
+    void run(
+      REPLY,
+      { id: commentId, body: text },
+      {
+        success: "Reply posted",
+        errorFallback: "Could not reply",
+        onSuccess: () => {
+          setBody("");
+          setOpen(false);
+        },
+      },
+    );
   }
 
-  async function toggleHidden() {
-    try {
-      await clientGql(HIDE, { id: commentId, hidden: !hidden });
-      toast(hidden ? "Comment unhidden" : "Comment hidden");
-      startTransition(() => router.refresh());
-    } catch (err) {
-      toastError(
-        err instanceof Error ? err.message : "Could not update comment",
-      );
-    }
+  function toggleHidden() {
+    void run(
+      HIDE,
+      { id: commentId, hidden: !hidden },
+      {
+        success: hidden ? "Comment unhidden" : "Comment hidden",
+        errorFallback: "Could not update comment",
+      },
+    );
   }
 
   return (
@@ -79,7 +78,7 @@ export function CommentActions({
           </button>
         ) : null}
         {canModerate ? (
-          <button type="button" onClick={toggleHidden} disabled={pending}>
+          <button type="button" onClick={toggleHidden} disabled={busy}>
             {hidden ? "Unhide" : "Hide"}
           </button>
         ) : null}
@@ -96,7 +95,7 @@ export function CommentActions({
           <button
             className="btn btn-primary btn-send"
             type="submit"
-            disabled={pending}
+            disabled={busy}
             aria-label="Post reply"
             title="Reply"
           >
