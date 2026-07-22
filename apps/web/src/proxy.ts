@@ -33,6 +33,10 @@ function canonicalHosts(): Set<string> {
       "localhost",
       "127.0.0.1",
       "0.0.0.0",
+      "topic.forum",
+      "www.topic.forum",
+      // Old domain — kept canonical through the transition so existing
+      // links keep working; remove once timetable.love redirects/lapses.
       "timetable.love",
       "dev.timetable.love",
       ...configured.split(","),

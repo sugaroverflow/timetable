@@ -8,9 +8,15 @@
 name: timetable
 region: lon
 
+# topic.forum is PRIMARY (APP_URL and all NEXT_PUBLIC_* URLs follow it);
+# timetable.love stays as an alias through the transition.
 domains:
-  - domain: timetable.love
+  - domain: topic.forum
     type: PRIMARY
+  - domain: www.topic.forum
+    type: ALIAS
+  - domain: timetable.love
+    type: ALIAS
   - domain: www.timetable.love
     type: ALIAS
 
