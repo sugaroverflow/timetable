@@ -1,10 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 
-import { useToast } from "@/components/Toast";
-import { clientGql } from "@/lib/clientGraphql";
+import { useGqlAction } from "@/lib/useGqlAction";
 
 const MUTATION = `mutation($s: String!, $wd: Int!, $state: String!) {
   setWeekdayAvailability(idOrSlug: $s, weekday: $wd, state: $state)
@@ -29,29 +27,26 @@ const ICON: Record<string, string> = {
 };
 
 export function WeekdayPatternControl({ slug }: { slug: string }) {
-  const router = useRouter();
-  const { toast, toastError } = useToast();
-  const [pending, startTransition] = useTransition();
+  const { run, busy } = useGqlAction();
   const [states, setStates] = useState<Record<number, string>>({});
 
-  async function cycle(wd: number) {
+  function cycle(wd: number) {
     const current = states[wd] ?? "";
     const idx = CYCLE.indexOf(current as (typeof CYCLE)[number]);
     const next = CYCLE[(idx + 1) % CYCLE.length] ?? "";
     setStates((prev) => ({ ...prev, [wd]: next }));
     if (!next) return;
-    try {
-      await clientGql(MUTATION, { s: slug, wd, state: next });
-      const day = DAYS.find((d) => d.wd === wd)?.label ?? "day";
-      const word =
-        next === "green" ? "available" : next === "yellow" ? "maybe" : "can't";
-      toast(`Every ${day} set to “${word}”`);
-      startTransition(() => router.refresh());
-    } catch (err) {
-      toastError(
-        err instanceof Error ? err.message : "Could not apply pattern",
-      );
-    }
+    const day = DAYS.find((d) => d.wd === wd)?.label ?? "day";
+    const word =
+      next === "green" ? "available" : next === "yellow" ? "maybe" : "can't";
+    void run(
+      MUTATION,
+      { s: slug, wd, state: next },
+      {
+        success: `Every ${day} set to “${word}”`,
+        errorFallback: "Could not apply pattern",
+      },
+    );
   }
 
   return (
@@ -70,7 +65,7 @@ export function WeekdayPatternControl({ slug }: { slug: string }) {
               type="button"
               className={`avail-btn ${s} ${s ? "on" : ""}`}
               style={{ width: "auto", padding: "0 10px" }}
-              disabled={pending}
+              disabled={busy}
               onClick={() => cycle(d.wd)}
             >
               {d.label} {s ? ICON[s] : ""}

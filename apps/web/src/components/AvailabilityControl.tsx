@@ -2,11 +2,8 @@
 
 import { Toggle } from "@base-ui/react/toggle";
 import { ToggleGroup } from "@base-ui/react/toggle-group";
-import { useTransition } from "react";
-import { useRouter } from "next/navigation";
 
-import { useToast } from "@/components/Toast";
-import { clientGql } from "@/lib/clientGraphql";
+import { useGqlAction } from "@/lib/useGqlAction";
 
 const MUTATION = `mutation($id: String!, $state: String!) {
   setAvailability(slotId: $id, state: $state)
@@ -25,19 +22,14 @@ export function AvailabilityControl({
   slotId: string;
   state: string | null;
 }) {
-  const router = useRouter();
-  const { toastError } = useToast();
-  const [pending, startTransition] = useTransition();
+  const { run, busy } = useGqlAction();
 
-  async function set(value: string) {
-    try {
-      await clientGql(MUTATION, { id: slotId, state: value });
-      startTransition(() => router.refresh());
-    } catch (err) {
-      toastError(
-        err instanceof Error ? err.message : "Could not set availability",
-      );
-    }
+  function set(value: string) {
+    void run(
+      MUTATION,
+      { id: slotId, state: value },
+      { errorFallback: "Could not set availability" },
+    );
   }
 
   // Unsaved availability counts as "maybe" server-side, so reflect that here.
@@ -60,7 +52,7 @@ export function AvailabilityControl({
           key={s.value}
           value={s.value}
           className={effective === s.value ? s.onClass : ""}
-          disabled={pending}
+          disabled={busy}
         >
           {s.label}
         </Toggle>

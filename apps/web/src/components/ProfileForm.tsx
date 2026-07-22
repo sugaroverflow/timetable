@@ -1,11 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 import { ImageUploadField } from "@/components/ImageUploadField";
-import { useToast } from "@/components/Toast";
-import { clientGql } from "@/lib/clientGraphql";
+import { useGqlAction } from "@/lib/useGqlAction";
 
 const MUTATION = `mutation($name: String, $bio: String, $image: String) {
   updateMyProfile(name: $name, bio: $bio, image: $image) { id }
@@ -20,30 +18,25 @@ export function ProfileForm({
   bio: string | null;
   image: string | null;
 }) {
-  const router = useRouter();
-  const { toast, toastError } = useToast();
+  const { run, busy } = useGqlAction();
   const [name, setName] = useState(initialName ?? "");
   const [bio, setBio] = useState(initialBio ?? "");
   const [image, setImage] = useState(initialImage ?? "");
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
 
-  async function submit(e: React.FormEvent) {
+  function submit(e: React.FormEvent) {
     e.preventDefault();
     setSaved(false);
-    try {
-      await clientGql(MUTATION, {
-        name,
-        bio,
-        image: image.trim() || null,
-      });
-      setSaved(true);
-      toast("Profile saved");
-      startTransition(() => router.refresh());
-    } catch (err) {
-      toastError(err instanceof Error ? err.message : "Could not save profile");
-    }
+    void run(
+      MUTATION,
+      { name, bio, image: image.trim() || null },
+      {
+        success: "Profile saved",
+        errorFallback: "Could not save profile",
+        onSuccess: () => setSaved(true),
+      },
+    );
   }
 
   return (
@@ -77,11 +70,11 @@ export function ProfileForm({
       <button
         className="btn btn-primary"
         type="submit"
-        disabled={pending || uploadingImage}
+        disabled={busy || uploadingImage}
       >
         {uploadingImage
           ? "Uploading…"
-          : pending
+          : busy
             ? "Saving…"
             : saved
               ? "Saved"

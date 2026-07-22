@@ -1,11 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 
-import { useToast } from "@/components/Toast";
-import { clientGql } from "@/lib/clientGraphql";
 import type { DigestSettings } from "@/lib/timetableSettings";
+import { useGqlAction } from "@/lib/useGqlAction";
 
 const MUTATION = `mutation($t: Boolean, $r: Boolean, $a: Boolean) {
   updateMyNotificationSettings(
@@ -16,27 +14,24 @@ const MUTATION = `mutation($t: Boolean, $r: Boolean, $a: Boolean) {
 export type { DigestSettings };
 
 export function DigestSettingsForm({ current }: { current: DigestSettings }) {
-  const router = useRouter();
-  const { toast, toastError } = useToast();
+  const { run, busy } = useGqlAction();
   const [topics, setTopics] = useState(current.digestNewTopics ?? false);
   const [replies, setReplies] = useState(current.digestReplies ?? false);
   const [activity, setActivity] = useState(current.digestActivity ?? false);
-  const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
 
-  async function submit(e: React.FormEvent) {
+  function submit(e: React.FormEvent) {
     e.preventDefault();
     setSaved(false);
-    try {
-      await clientGql(MUTATION, { t: topics, r: replies, a: activity });
-      setSaved(true);
-      toast("Digest settings saved");
-      startTransition(() => router.refresh());
-    } catch (err) {
-      toastError(
-        err instanceof Error ? err.message : "Could not save settings",
-      );
-    }
+    void run(
+      MUTATION,
+      { t: topics, r: replies, a: activity },
+      {
+        success: "Digest settings saved",
+        errorFallback: "Could not save settings",
+        onSuccess: () => setSaved(true),
+      },
+    );
   }
 
   return (
@@ -73,8 +68,8 @@ export function DigestSettingsForm({ current }: { current: DigestSettings }) {
         />
         Activity on my topics (hosts)
       </label>
-      <button className="btn btn-primary" type="submit" disabled={pending}>
-        {pending ? "Saving…" : saved ? "Saved" : "Save preferences"}
+      <button className="btn btn-primary" type="submit" disabled={busy}>
+        {busy ? "Saving…" : saved ? "Saved" : "Save preferences"}
       </button>
     </form>
   );

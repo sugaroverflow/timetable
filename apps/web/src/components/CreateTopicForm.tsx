@@ -1,12 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { RichTextEditor } from "@/components/RichTextEditor";
-import { useToast } from "@/components/Toast";
-import { clientGql } from "@/lib/clientGraphql";
+import { useGqlAction } from "@/lib/useGqlAction";
 
 const MUTATION = `mutation Create($s: String!, $title: String!, $body: String, $cover: String, $host: String) {
   createTopic(idOrSlug: $s, title: $title, bodyMd: $body, coverImageUrl: $cover, hostId: $host) { id }
@@ -22,36 +20,37 @@ export function CreateTopicForm({
   hosts?: { id: string; name: string | null }[];
   hostLabel?: string;
 }) {
-  const router = useRouter();
-  const { toast, toastError } = useToast();
+  const { run, busy } = useGqlAction();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [cover, setCover] = useState("");
   const [host, setHost] = useState("");
   const [uploadingCover, setUploadingCover] = useState(false);
-  const [pending, startTransition] = useTransition();
 
-  async function submit(e: React.FormEvent) {
+  function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
-    try {
-      await clientGql(MUTATION, {
+    const owner = hosts?.find((h) => h.id === host)?.name;
+    void run(
+      MUTATION,
+      {
         s: slug,
         title: title.trim(),
         body,
         cover: cover.trim() || null,
         host: host || null,
-      });
-      const owner = hosts?.find((h) => h.id === host)?.name;
-      setTitle("");
-      setBody("");
-      setCover("");
-      setHost("");
-      toast(owner ? `Topic created for ${owner}` : "Topic created");
-      startTransition(() => router.refresh());
-    } catch (err) {
-      toastError(err instanceof Error ? err.message : "Could not create topic");
-    }
+      },
+      {
+        success: owner ? `Topic created for ${owner}` : "Topic created",
+        errorFallback: "Could not create topic",
+        onSuccess: () => {
+          setTitle("");
+          setBody("");
+          setCover("");
+          setHost("");
+        },
+      },
+    );
   }
 
   return (
@@ -103,9 +102,9 @@ export function CreateTopicForm({
       <button
         className="btn btn-primary"
         type="submit"
-        disabled={pending || uploadingCover}
+        disabled={busy || uploadingCover}
       >
-        {uploadingCover ? "Uploading…" : pending ? "Creating…" : "Create topic"}
+        {uploadingCover ? "Uploading…" : busy ? "Creating…" : "Create topic"}
       </button>
     </form>
   );

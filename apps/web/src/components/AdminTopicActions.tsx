@@ -1,10 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 
-import { useToast } from "@/components/Toast";
-import { clientGql } from "@/lib/clientGraphql";
+import { useGqlAction } from "@/lib/useGqlAction";
 
 import { TopicEditForm } from "./TopicEditForm";
 
@@ -32,34 +30,34 @@ export function AdminTopicActions({
   currentHostId?: string;
 }) {
   const topicId = topic.id;
-  const router = useRouter();
-  const { toast, toastError } = useToast();
-  const [pending, startTransition] = useTransition();
+  const { run, busy } = useGqlAction();
   const [editing, setEditing] = useState(false);
   const [newHost, setNewHost] = useState("");
 
   const published = topic.status == null || topic.status === "published";
 
-  async function togglePublished() {
-    try {
-      await clientGql(published ? UNPUBLISH : PUBLISH, { id: topicId });
-      toast(published ? "Topic unpublished" : "Topic published");
-      startTransition(() => router.refresh());
-    } catch (err) {
-      toastError(err instanceof Error ? err.message : "Action failed");
-    }
+  function togglePublished() {
+    void run(
+      published ? UNPUBLISH : PUBLISH,
+      { id: topicId },
+      {
+        success: published ? "Topic unpublished" : "Topic published",
+        errorFallback: "Action failed",
+      },
+    );
   }
 
-  async function reassign() {
+  function reassign() {
     if (!newHost) return;
-    try {
-      await clientGql(REASSIGN, { id: topicId, host: newHost });
-      toast("Topic reassigned");
-      setNewHost("");
-      startTransition(() => router.refresh());
-    } catch (err) {
-      toastError(err instanceof Error ? err.message : "Action failed");
-    }
+    void run(
+      REASSIGN,
+      { id: topicId, host: newHost },
+      {
+        success: "Topic reassigned",
+        errorFallback: "Action failed",
+        onSuccess: () => setNewHost(""),
+      },
+    );
   }
 
   const reassignOptions = hosts.filter((h) => h.id !== currentHostId);
@@ -80,7 +78,7 @@ export function AdminTopicActions({
         <button
           className="btn btn-ghost"
           type="button"
-          disabled={pending}
+          disabled={busy}
           onClick={togglePublished}
         >
           {published ? "Unpublish" : "Publish"}
@@ -103,7 +101,7 @@ export function AdminTopicActions({
             <button
               className="btn btn-ghost"
               type="button"
-              disabled={pending || !newHost}
+              disabled={busy || !newHost}
               onClick={reassign}
             >
               Assign

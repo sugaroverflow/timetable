@@ -2,18 +2,16 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 import { AdminCommentsPanel } from "@/components/AdminCommentsPanel";
 import { CommentComposer } from "@/components/CommentComposer";
 import { CommentList } from "@/components/CommentList";
 import { HostOnlyPanel } from "@/components/HostOnlyPanel";
-import { useToast } from "@/components/Toast";
 import { TopicEditForm } from "@/components/TopicEditForm";
-import { clientGql } from "@/lib/clientGraphql";
 import type { ManagedTopic } from "@/lib/feedTypes";
 import { topicPath } from "@/lib/topicPath";
+import { useGqlAction } from "@/lib/useGqlAction";
 
 const SUBMIT = `mutation($id: String!){ submitTopic(topicId: $id){ id } }`;
 const UNPUBLISH = `mutation($id: String!){ unpublishTopic(topicId: $id){ id } }`;
@@ -31,23 +29,18 @@ export function TopicManager({
   hostLabel?: string;
   adminLabel?: string;
 }) {
-  const router = useRouter();
-  const { toast, toastError } = useToast();
-  const [pending, startTransition] = useTransition();
+  const { run: runAction, busy } = useGqlAction();
   const [editing, setEditing] = useState(false);
 
-  async function run(
+  function run(
     query: string,
     variables: Record<string, unknown>,
     successMessage: string,
   ) {
-    try {
-      await clientGql(query, variables);
-      toast(successMessage);
-      startTransition(() => router.refresh());
-    } catch (err) {
-      toastError(err instanceof Error ? err.message : "Action failed");
-    }
+    void runAction(query, variables, {
+      success: successMessage,
+      errorFallback: "Action failed",
+    });
   }
 
   const permalink =
@@ -130,7 +123,7 @@ export function TopicManager({
             <button
               className="btn btn-primary"
               type="button"
-              disabled={pending}
+              disabled={busy}
               onClick={() =>
                 run(SUBMIT, { id: topic.id }, "Submitted for review")
               }
@@ -142,7 +135,7 @@ export function TopicManager({
             <button
               className="btn"
               type="button"
-              disabled={pending}
+              disabled={busy}
               onClick={() =>
                 run(UNPUBLISH, { id: topic.id }, "Topic unpublished")
               }

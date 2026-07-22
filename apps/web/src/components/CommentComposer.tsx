@@ -1,15 +1,14 @@
 "use client";
 
 import { Send } from "lucide-react";
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 import {
   MentionTextarea,
   type MentionCandidate,
 } from "@/components/MentionTextarea";
-import { useToast } from "@/components/Toast";
 import { clientGql } from "@/lib/clientGraphql";
+import { useGqlAction } from "@/lib/useGqlAction";
 
 const MUTATION = `mutation AddComment($id: String!, $body: String!, $visibility: String) {
   addComment(topicId: $id, body: $body, visibility: $visibility) { id }
@@ -36,10 +35,8 @@ export function CommentComposer({
   /** Timetable slug — enables @mention autocomplete on the public composer. */
   mentionSlug?: string;
 }) {
-  const router = useRouter();
-  const { toast, toastError } = useToast();
+  const { run, busy } = useGqlAction();
   const [body, setBody] = useState("");
-  const [pending, startTransition] = useTransition();
   const mentionsEnabled = visibility === "public" && Boolean(mentionSlug);
   const [candidates, setCandidates] = useState<MentionCandidate[]>([]);
   const [loadedCandidates, setLoadedCandidates] = useState(false);
@@ -64,18 +61,19 @@ export function CommentComposer({
         ? adminLabel
         : null;
 
-  async function submit(e: React.FormEvent) {
+  function submit(e: React.FormEvent) {
     e.preventDefault();
     const text = body.trim();
     if (!text) return;
-    try {
-      await clientGql(MUTATION, { id: topicId, body: text, visibility });
-      setBody("");
-      toast(scopeLabel ? `${scopeLabel} note added` : "Comment added");
-      startTransition(() => router.refresh());
-    } catch (err) {
-      toastError(err instanceof Error ? err.message : "Could not post comment");
-    }
+    void run(
+      MUTATION,
+      { id: topicId, body: text, visibility },
+      {
+        success: scopeLabel ? `${scopeLabel} note added` : "Comment added",
+        errorFallback: "Could not post comment",
+        onSuccess: () => setBody(""),
+      },
+    );
   }
 
   return (
@@ -105,7 +103,7 @@ export function CommentComposer({
       <button
         className="btn btn-primary btn-send"
         type="submit"
-        disabled={pending}
+        disabled={busy}
         aria-label={scopeLabel ? `Post ${scopeLabel} note` : "Post comment"}
         title="Post"
       >
