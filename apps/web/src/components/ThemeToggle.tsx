@@ -41,8 +41,7 @@ export function ThemeToggle() {
   }
 
   const Icon = mode === "dark" ? Moon : mode === "light" ? Sun : Monitor;
-  const label =
-    mode === "dark" ? "Dark" : mode === "light" ? "Light" : "Auto";
+  const label = mode === "dark" ? "Dark" : mode === "light" ? "Light" : "Auto";
 
   return (
     <button

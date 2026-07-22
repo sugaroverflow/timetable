@@ -85,8 +85,7 @@ export const env = {
    * production build, so it opts in explicitly via DEV_SEED_USER_MAPPING.
    * Never set this in the production app spec.
    */
-  devSeedUserMapping:
-    process.env.DEV_SEED_USER_MAPPING === "true" || !isProd,
+  devSeedUserMapping: process.env.DEV_SEED_USER_MAPPING === "true" || !isProd,
   trustProxyHops: intEnv("TRUST_PROXY_HOPS", 1),
   rateLimitBackend,
   rateLimitKeyPrefix:

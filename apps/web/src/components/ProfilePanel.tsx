@@ -12,7 +12,12 @@ export function ProfilePanel({
   me,
   digest,
 }: {
-  me: { name: string | null; bio: string | null; email: string | null; image: string | null };
+  me: {
+    name: string | null;
+    bio: string | null;
+    email: string | null;
+    image: string | null;
+  };
   digest: DigestSettings;
 }) {
   return (

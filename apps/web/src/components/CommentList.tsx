@@ -13,10 +13,7 @@ import { PersonChip } from "./PersonChip";
 const VISIBLE_TOP_LEVEL = 3;
 
 function countNested(comments: FeedComment[]): number {
-  return comments.reduce(
-    (sum, c) => sum + 1 + countNested(c.replies ?? []),
-    0,
-  );
+  return comments.reduce((sum, c) => sum + 1 + countNested(c.replies ?? []), 0);
 }
 
 /** True when the deep-linked comment lives in this subtree — collapsed
@@ -64,12 +61,18 @@ function CommentItem({
             )}
           </span>
           {comment.visibility === "host_only" ? (
-            <span className="pill pill-host" style={{ marginLeft: 6, fontSize: 10 }}>
+            <span
+              className="pill pill-host"
+              style={{ marginLeft: 6, fontSize: 10 }}
+            >
               hosts
             </span>
           ) : null}
           {comment.visibility === "admin_only" ? (
-            <span className="pill pill-admin" style={{ marginLeft: 6, fontSize: 10 }}>
+            <span
+              className="pill pill-admin"
+              style={{ marginLeft: 6, fontSize: 10 }}
+            >
               admins
             </span>
           ) : null}

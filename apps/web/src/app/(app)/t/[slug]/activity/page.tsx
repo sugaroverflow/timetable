@@ -98,7 +98,10 @@ export default async function ActivityPage({
     new Map(
       data.activityTimeline
         .filter((e) => e.actorId)
-        .map((e) => [e.actorId as string, { id: e.actorId as string, name: e.actorName }]),
+        .map((e) => [
+          e.actorId as string,
+          { id: e.actorId as string, name: e.actorName },
+        ]),
     ).values(),
   ).sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
   const roleOptions = (["admin", "host", "elector"] as const).map((r) => ({
@@ -159,7 +162,8 @@ export default async function ActivityPage({
               <Fragment key={event.id}>
                 {showWeek ? (
                   <div className="tl-week">
-                    Week of {weekStart(created).toLocaleDateString(undefined, {
+                    Week of{" "}
+                    {weekStart(created).toLocaleDateString(undefined, {
                       day: "numeric",
                       month: "long",
                       year: "numeric",
@@ -182,7 +186,10 @@ export default async function ActivityPage({
                       minute: "2-digit",
                     })}
                   </div>
-                  <div className="tl-text row" style={{ gap: 8, alignItems: "center" }}>
+                  <div
+                    className="tl-text row"
+                    style={{ gap: 8, alignItems: "center" }}
+                  >
                     {event.actorId ? (
                       <PersonChip slug={slug} userId={event.actorId}>
                         <Avatar name={event.actorName} small />
@@ -199,7 +206,10 @@ export default async function ActivityPage({
                         <b>{event.actorName ?? "Someone"}</b>
                       )}
                       {actorRole ? (
-                        <span className={`pill pill-${actorRole}`} style={{ marginLeft: 6, fontSize: 10 }}>
+                        <span
+                          className={`pill pill-${actorRole}`}
+                          style={{ marginLeft: 6, fontSize: 10 }}
+                        >
                           {roleLabel(settings.roleLabels, actorRole)}
                         </span>
                       ) : null}{" "}
@@ -228,7 +238,10 @@ export default async function ActivityPage({
                             event.topicTitle
                           )}
                           {event.topicHostName ? (
-                            <span className="faint"> ({event.topicHostName})</span>
+                            <span className="faint">
+                              {" "}
+                              ({event.topicHostName})
+                            </span>
                           ) : null}
                         </>
                       ) : null}
@@ -240,7 +253,8 @@ export default async function ActivityPage({
                   {event.note ? (
                     <div className="tl-note">
                       <span className="tn-by">
-                        {event.actorName ?? adminLabel} ({adminLabel.toLowerCase()})
+                        {event.actorName ?? adminLabel} (
+                        {adminLabel.toLowerCase()})
                       </span>
                       <br />
                       {event.note}

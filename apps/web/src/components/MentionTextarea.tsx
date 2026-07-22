@@ -60,8 +60,11 @@ export function MentionTextarea({
     const caret = el.selectionStart ?? value.length;
     const before = value.slice(0, caret);
     const after = value.slice(caret);
-    const replaced = before.replace(ACTIVE_MENTION_RE, (full, handle) =>
-      full.slice(0, full.length - `@${handle}`.length) + `@${candidate.slug} `,
+    const replaced = before.replace(
+      ACTIVE_MENTION_RE,
+      (full, handle) =>
+        full.slice(0, full.length - `@${handle}`.length) +
+        `@${candidate.slug} `,
     );
     const next = replaced + after;
     onChange(next);
@@ -112,7 +115,9 @@ export function MentionTextarea({
             <li key={c.slug}>
               <button
                 type="button"
-                className={i === active ? "mention-option on" : "mention-option"}
+                className={
+                  i === active ? "mention-option on" : "mention-option"
+                }
                 // Use onMouseDown so it fires before the textarea's blur.
                 onMouseDown={(e) => {
                   e.preventDefault();

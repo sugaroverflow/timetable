@@ -38,8 +38,9 @@ export async function sendEmail(args: {
 }
 
 const esc = (s: string) =>
-  s.replace(/[&<>"]/g, (c) =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] ?? c,
+  s.replace(
+    /[&<>"]/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] ?? c,
   );
 
 /** Digest links use the first configured web origin as their base. */
@@ -49,7 +50,9 @@ const linkBase = (process.env.WEB_ORIGIN ?? "http://localhost:3000")
   .replace(/\/$/, "");
 
 const linked = (label: string, path: string | null): string =>
-  path ? `<a href="${esc(`${linkBase}${path}`)}">${esc(label)}</a>` : esc(label);
+  path
+    ? `<a href="${esc(`${linkBase}${path}`)}">${esc(label)}</a>`
+    : esc(label);
 
 export function renderDigest(digest: UserDigest): {
   subject: string;

@@ -72,7 +72,10 @@ export function PersonChip({
       <Dialog.Trigger className="person-trigger">{children}</Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Backdrop className="modal-backdrop" />
-        <Dialog.Popup className="card stack person-modal" aria-label="Member bio">
+        <Dialog.Popup
+          className="card stack person-modal"
+          aria-label="Member bio"
+        >
           {loading || !data ? (
             <p className="faint" style={{ margin: 0 }}>
               Loading…

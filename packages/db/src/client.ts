@@ -25,8 +25,7 @@ const globalForDb = globalThis as unknown as {
 };
 
 const queryClient =
-  globalForDb.__timetablePg ??
-  postgres(connectionString, { ssl, max: 10 });
+  globalForDb.__timetablePg ?? postgres(connectionString, { ssl, max: 10 });
 
 if (process.env.NODE_ENV !== "production") {
   globalForDb.__timetablePg = queryClient;

@@ -28,8 +28,17 @@ export type UserDigest = {
    * mailer prefixes the web origin. Null when slugs are missing. */
   newTopics: { title: string; timetableName: string; path: string | null }[];
   replies: { topicTitle: string; by: string | null; snippet: string }[];
-  hostActivity: { topicTitle: string; kind: "heart" | "comment"; count: number; path: string | null }[];
-  assignedTopics: { topicTitle: string; timetableName: string; path: string | null }[];
+  hostActivity: {
+    topicTitle: string;
+    kind: "heart" | "comment";
+    count: number;
+    path: string | null;
+  }[];
+  assignedTopics: {
+    topicTitle: string;
+    timetableName: string;
+    path: string | null;
+  }[];
 };
 
 function topicPath(
@@ -60,7 +69,10 @@ export async function listDigestRecipients(): Promise<DigestRecipient[]> {
   });
 }
 
-export async function markDigestSent(userId: string, when: Date): Promise<void> {
+export async function markDigestSent(
+  userId: string,
+  when: Date,
+): Promise<void> {
   await db
     .update(users)
     .set({ lastDigestAt: when })
@@ -88,8 +100,12 @@ export async function computeUserDigest(
     .innerJoin(timetables, eq(timetables.id, timetableMemberships.timetableId))
     .where(eq(timetableMemberships.userId, recipient.id));
 
-  const timetableName = new Map(memberships.map((m) => [m.timetableId, m.name]));
-  const timetableSlug = new Map(memberships.map((m) => [m.timetableId, m.slug]));
+  const timetableName = new Map(
+    memberships.map((m) => [m.timetableId, m.name]),
+  );
+  const timetableSlug = new Map(
+    memberships.map((m) => [m.timetableId, m.slug]),
+  );
   const [recipientRow] = await db
     .select({ slug: users.slug })
     .from(users)
@@ -187,7 +203,9 @@ export async function computeUserDigest(
       const heartRows = await db
         .select({ topicId: hearts.topicId, n: sql<number>`count(*)::int` })
         .from(hearts)
-        .where(and(inArray(hearts.topicId, myTopicIds), gt(hearts.createdAt, since)))
+        .where(
+          and(inArray(hearts.topicId, myTopicIds), gt(hearts.createdAt, since)),
+        )
         .groupBy(hearts.topicId);
       const commentRows = await db
         .select({ topicId: comments.topicId, n: sql<number>`count(*)::int` })

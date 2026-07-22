@@ -12,10 +12,15 @@ function clerkGlobal(): ClerkGlobal | undefined {
  * Wait for the Clerk browser bundle to initialize. Without this, mutations
  * fired right after page load see no session and fail as unauthenticated.
  */
-async function waitForClerk(timeoutMs = 5000): Promise<ClerkGlobal | undefined> {
+async function waitForClerk(
+  timeoutMs = 5000,
+): Promise<ClerkGlobal | undefined> {
   const deadline = Date.now() + timeoutMs;
   let clerk = clerkGlobal();
-  while ((!clerk || (!clerk.loaded && !clerk.session)) && Date.now() < deadline) {
+  while (
+    (!clerk || (!clerk.loaded && !clerk.session)) &&
+    Date.now() < deadline
+  ) {
     await new Promise((r) => setTimeout(r, 100));
     clerk = clerkGlobal();
   }

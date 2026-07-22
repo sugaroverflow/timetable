@@ -44,8 +44,10 @@ do not unify the surfaces.**
   "Resend (n)", click it, then type the code)
 
 Every PR must keep green (CI enforces this):
-`npm run build` · `npm run typecheck` · `npm run lint` · `npm run test` ·
-`npm run test:e2e` · `npm run db:migrate` when schema/migrations change.
+`npm run build` · `npm run typecheck` · `npm run lint` · `npm run format:check`
+· `npm run test` · `npm run test:e2e` · `npm run db:migrate` when
+schema/migrations change. Run `npm run format` before committing (Prettier
+defaults; YAML/Markdown are exempt — deploy specs are sed-templated).
 
 Tests are vitest (`packages/shared`, `apps/api`, `apps/web`) + one Playwright
 smoke suite (`tests/e2e/`). Follow existing patterns:

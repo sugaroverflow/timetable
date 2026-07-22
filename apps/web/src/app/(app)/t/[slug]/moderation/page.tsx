@@ -49,8 +49,8 @@ export default async function ModerationPage({
       <div className="page-head">
         <h2 className="section-title">Pending topics</h2>
         <p>
-          Review submitted topics: publish, edit, or discuss in the{" "}
-          {adminLabel} comments.
+          Review submitted topics: publish, edit, or discuss in the {adminLabel}{" "}
+          comments.
         </p>
       </div>
       <h3 className="people-heading">Unpublished Topics</h3>

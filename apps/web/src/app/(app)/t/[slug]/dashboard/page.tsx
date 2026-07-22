@@ -132,8 +132,11 @@ export default async function DashboardPage({
   } = await searchParams;
   const host = hostParam ?? "";
   const activity =
-    activityParam && ACTIVITY_FILTERS.has(activityParam) ? activityParam : "all";
-  const since = sinceParam && !Number.isNaN(Date.parse(sinceParam)) ? sinceParam : "";
+    activityParam && ACTIVITY_FILTERS.has(activityParam)
+      ? activityParam
+      : "all";
+  const since =
+    sinceParam && !Number.isNaN(Date.parse(sinceParam)) ? sinceParam : "";
   const data = await gqlFetch<Data>(QUERY, {
     s: slug,
     host: host || null,
@@ -190,7 +193,8 @@ export default async function DashboardPage({
       {d.conflicts.length > 0 ? (
         <div className="card" style={{ borderColor: "var(--yellow)" }}>
           <h3 style={{ marginTop: 0, fontSize: 15 }}>
-            <TriangleAlert size={14} aria-hidden /> Slot conflicts ({d.conflicts.length})
+            <TriangleAlert size={14} aria-hidden /> Slot conflicts (
+            {d.conflicts.length})
           </h3>
           <ul className="list">
             {d.conflicts.map((c) => (
@@ -211,33 +215,33 @@ export default async function DashboardPage({
         />
 
         {viewerIsAdmin ? (
-        <div className="card">
-          <h3 style={{ marginTop: 0, fontSize: 15 }}>
-            All {hostsPlural} by weighted votes
-          </h3>
-          {d.hostLeaderboard.length === 0 ? (
-            <p className="faint" style={{ fontSize: 13 }}>
-              No data yet.
-            </p>
-          ) : (
-            <ul className="list">
-              {d.hostLeaderboard.map((h) => (
-                <li
-                  key={h.hostId}
-                  className="row"
-                  style={{ justifyContent: "space-between", fontSize: 14 }}
-                >
-                  <span>
-                    <Link href={`/t/${slug}/feed?host=${h.hostId}`}>
-                      {h.hostName ?? "Host"}
-                    </Link>
-                  </span>
-                  <span className="mono">{h.weightedScore.toFixed(2)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+          <div className="card">
+            <h3 style={{ marginTop: 0, fontSize: 15 }}>
+              All {hostsPlural} by weighted votes
+            </h3>
+            {d.hostLeaderboard.length === 0 ? (
+              <p className="faint" style={{ fontSize: 13 }}>
+                No data yet.
+              </p>
+            ) : (
+              <ul className="list">
+                {d.hostLeaderboard.map((h) => (
+                  <li
+                    key={h.hostId}
+                    className="row"
+                    style={{ justifyContent: "space-between", fontSize: 14 }}
+                  >
+                    <span>
+                      <Link href={`/t/${slug}/feed?host=${h.hostId}`}>
+                        {h.hostName ?? "Host"}
+                      </Link>
+                    </span>
+                    <span className="mono">{h.weightedScore.toFixed(2)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         ) : null}
       </div>
 
@@ -263,7 +267,6 @@ export default async function DashboardPage({
           />
         )}
       </div>
-
     </div>
   );
 }

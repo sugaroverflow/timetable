@@ -99,7 +99,11 @@ export function ElectorActivityTable({
   function header(key: SortKey, label: string) {
     const active = sortKey === key;
     return (
-      <th aria-sort={active ? (dir === "asc" ? "ascending" : "descending") : "none"}>
+      <th
+        aria-sort={
+          active ? (dir === "asc" ? "ascending" : "descending") : "none"
+        }
+      >
         <button
           type="button"
           className={active ? "th-sort th-sort-active" : "th-sort"}
@@ -116,7 +120,10 @@ export function ElectorActivityTable({
 
   return (
     <div className="table-wrap">
-      <div className="row" style={{ justifyContent: "flex-end", marginBottom: 8 }}>
+      <div
+        className="row"
+        style={{ justifyContent: "flex-end", marginBottom: 8 }}
+      >
         <label
           className="row"
           style={{ gap: 6, alignItems: "center", fontSize: 13 }}
@@ -176,7 +183,11 @@ export function ElectorActivityTable({
                             </div>
                             <ul>
                               {group.topics.map((t) => {
-                                const href = topicPath(slug, t.hostSlug, t.slug);
+                                const href = topicPath(
+                                  slug,
+                                  t.hostSlug,
+                                  t.slug,
+                                );
                                 return (
                                   <li key={t.topicId}>
                                     {href ? (

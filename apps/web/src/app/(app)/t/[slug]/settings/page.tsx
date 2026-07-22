@@ -20,18 +20,16 @@ export default async function SettingsPage({
 
   // First resolve the timetable id (members query needs the uuid).
   const first = await gqlFetch<{
-    timetable:
-      | {
-          id: string;
-          name: string;
-          description: string | null;
-          privacy: string;
-          customDomain: string | null;
-          heartsCountFrom: string | null;
-          viewerRoles: string[];
-          settings: string;
-        }
-      | null;
+    timetable: {
+      id: string;
+      name: string;
+      description: string | null;
+      privacy: string;
+      customDomain: string | null;
+      heartsCountFrom: string | null;
+      viewerRoles: string[];
+      settings: string;
+    } | null;
   }>(
     `query($idOrSlug: String!) { timetable(idOrSlug: $idOrSlug) { id name description privacy customDomain heartsCountFrom viewerRoles settings } }`,
     { idOrSlug: slug },

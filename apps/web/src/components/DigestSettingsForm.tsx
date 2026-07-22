@@ -33,7 +33,9 @@ export function DigestSettingsForm({ current }: { current: DigestSettings }) {
       toast("Digest settings saved");
       startTransition(() => router.refresh());
     } catch (err) {
-      toastError(err instanceof Error ? err.message : "Could not save settings");
+      toastError(
+        err instanceof Error ? err.message : "Could not save settings",
+      );
     }
   }
 
@@ -41,7 +43,8 @@ export function DigestSettingsForm({ current }: { current: DigestSettings }) {
     <form onSubmit={submit} className="card">
       <h2 style={{ marginTop: 0, fontSize: 18 }}>Email digests</h2>
       <p className="faint" style={{ marginTop: 0, fontSize: 12 }}>
-        Preferences are saved here. Delivery runs when cron and email are configured.
+        Preferences are saved here. Delivery runs when cron and email are
+        configured.
       </p>
       <label className="row" style={{ marginBottom: 8 }}>
         <input

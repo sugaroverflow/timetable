@@ -66,7 +66,8 @@ async function lookupDomainSlug(host: string): Promise<string | null> {
 
   const graphqlUrl =
     process.env.GRAPHQL_ROUTE_URL ??
-    process.env.NEXT_PUBLIC_GRAPHQL_URL ?? "http://localhost:4000/graphql";
+    process.env.NEXT_PUBLIC_GRAPHQL_URL ??
+    "http://localhost:4000/graphql";
 
   try {
     const res = await fetch(graphqlUrl, {
@@ -100,7 +101,8 @@ async function lookupDomainSlug(host: string): Promise<string | null> {
 }
 
 async function customDomainRewrite(request: NextRequest) {
-  const host = normalizeHost(request.headers.get("x-forwarded-host")) ||
+  const host =
+    normalizeHost(request.headers.get("x-forwarded-host")) ||
     normalizeHost(request.headers.get("host"));
   const pathname = request.nextUrl.pathname;
   if (!isCustomHost(host) || !shouldRewritePath(pathname)) return undefined;

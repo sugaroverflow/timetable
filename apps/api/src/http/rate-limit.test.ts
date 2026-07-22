@@ -73,24 +73,30 @@ describe("createMemoryRateLimitStore", () => {
   it("increments requests inside a shared window", async () => {
     const store = createMemoryRateLimitStore(1_000);
 
-    await expect(Promise.resolve(store.hit("client", 10_000))).resolves.toEqual({
-      count: 1,
-      resetAt: 11_000,
-    });
-    await expect(Promise.resolve(store.hit("client", 10_500))).resolves.toEqual({
-      count: 2,
-      resetAt: 11_000,
-    });
+    await expect(Promise.resolve(store.hit("client", 10_000))).resolves.toEqual(
+      {
+        count: 1,
+        resetAt: 11_000,
+      },
+    );
+    await expect(Promise.resolve(store.hit("client", 10_500))).resolves.toEqual(
+      {
+        count: 2,
+        resetAt: 11_000,
+      },
+    );
   });
 
   it("starts a new bucket after the prior window expires", async () => {
     const store = createMemoryRateLimitStore(1_000);
 
     await store.hit("client", 10_000);
-    await expect(Promise.resolve(store.hit("client", 11_000))).resolves.toEqual({
-      count: 1,
-      resetAt: 12_000,
-    });
+    await expect(Promise.resolve(store.hit("client", 11_000))).resolves.toEqual(
+      {
+        count: 1,
+        resetAt: 12_000,
+      },
+    );
   });
 });
 
@@ -153,9 +159,9 @@ describe("createDatabaseRateLimitStore", () => {
     await store.hit("api:client", 1_000);
     await store.hit("api:client", 6_000);
 
-    expect(fakeDb.calls.filter((call) => call.method === "delete")).toHaveLength(
-      1,
-    );
+    expect(
+      fakeDb.calls.filter((call) => call.method === "delete"),
+    ).toHaveLength(1);
     expect(
       fakeDb.calls.filter((call) => call.method === "delete.where"),
     ).toHaveLength(1);

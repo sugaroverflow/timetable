@@ -10,7 +10,10 @@ export const createTimetableSchema = z.object({
   name: z.string().min(1, "Name is required").max(120),
   slug: z
     .string()
-    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Use lowercase letters, numbers, hyphens")
+    .regex(
+      /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+      "Use lowercase letters, numbers, hyphens",
+    )
     .max(60)
     .optional(),
   description: z.string().max(2000).optional(),
