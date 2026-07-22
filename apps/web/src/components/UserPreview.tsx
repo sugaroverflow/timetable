@@ -59,7 +59,7 @@ export function UserPreviewStart({
       type="button"
       disabled={pending}
       onClick={() => void start()}
-      title="Read-only preview of this timetable as this member sees it"
+      title="Read-only preview of this forum as this member sees it"
     >
       <Eye size={16} aria-hidden /> View as {name ?? "member"}
     </button>

@@ -56,8 +56,8 @@ export function TimetableSwitcher({
       <Menu.Trigger className="tt-switcher-trigger">
         {current ? <ItemIcon item={current} /> : null}
         <span className="tt-menu-name">
-          {current?.name ?? "Timetables"}
-          <span className="tt-switcher-hint">Switch timetable</span>
+          {current?.name ?? "Forums"}
+          <span className="tt-switcher-hint">Switch forum</span>
         </span>
         <ChevronsUpDown size={14} aria-hidden />
       </Menu.Trigger>
@@ -100,7 +100,7 @@ export function TimetableSwitcher({
               <span className="tt-menu-icon tt-menu-icon-fallback" aria-hidden>
                 <Plus size={14} />
               </span>
-              <span>New timetable</span>
+              <span>New forum</span>
             </Menu.Item>
           </Menu.Popup>
         </Menu.Positioner>

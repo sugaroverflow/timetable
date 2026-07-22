@@ -12,8 +12,8 @@ export default async function NewTimetablePage() {
   return (
     <main className="container" style={{ maxWidth: 560 }}>
       <div className="page-head" style={{ marginBottom: 18 }}>
-        <h1>New timetable</h1>
-        <p>Create a timetable to start collecting topics and availability.</p>
+        <h1>New forum</h1>
+        <p>Create a forum to start collecting topics and availability.</p>
       </div>
       <CreateTimetableForm />
     </main>

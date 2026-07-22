@@ -88,7 +88,7 @@ export function TimetableProfileForm({
         da: digestActivity,
       });
       setSaved(true);
-      toast("Timetable profile saved");
+      toast("Forum profile saved");
       startTransition(() => router.refresh());
     } catch (err) {
       toastError(err instanceof Error ? err.message : "Could not save");
@@ -97,7 +97,7 @@ export function TimetableProfileForm({
 
   return (
     <form onSubmit={submit} className="card">
-      <h2 style={{ marginTop: 0, fontSize: 18 }}>Timetable profile</h2>
+      <h2 style={{ marginTop: 0, fontSize: 18 }}>Forum profile</h2>
       <div className="field">
         <label htmlFor="tt-name">Name</label>
         <input
@@ -143,7 +143,7 @@ export function TimetableProfileForm({
           id="tt-domain"
           value={customDomain}
           onChange={(e) => setCustomDomain(e.target.value)}
-          placeholder="timetable.2026.newspeak.house"
+          placeholder="forum.2026.newspeak.house"
         />
         <p className="faint" style={{ margin: "4px 0 0", fontSize: 12 }}>
           Saved for later — custom-domain routing isn&rsquo;t wired up yet.

@@ -1,7 +1,8 @@
-# Timetable
+# Topic
 
-Collaborative timetables for proposing topics, voting with hearts, sharing
-availability, and shaping a schedule together.
+Collaborative forums (branded "Topic", topic.forum — formerly "Timetable")
+for proposing topics, voting with hearts, sharing availability, and shaping
+a schedule together.
 
 A [Newspeak House](https://newspeak.house/) x
 [Sparkle Bureaucracy](https://www.sparklebureaucracy.org/) production.

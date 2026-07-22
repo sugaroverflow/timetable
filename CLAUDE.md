@@ -6,6 +6,12 @@ Timetable ("Sparkle Bureaucracy") is a multi-tenant app where hosts propose
 topics, electors vote with weighted hearts, and admins publish and schedule.
 Product context: `docs/PRODUCT.md`. Architecture: `docs/ARCHITECTURE.md`.
 
+**Rebrand (2026-07):** the product is now branded **"Topic"** (topic.forum),
+and the tenant entity is a **"forum"** in ALL user-facing copy. Code
+identifiers, `@timetable/*` packages, routes (`/t/`, `/timetables`) and the
+GraphQL schema deliberately keep `timetable` naming — new user-visible
+strings must say forum/Topic.
+
 ## Monorepo map & boundary rules
 
 npm workspaces (Node ≥ 20):

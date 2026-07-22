@@ -30,7 +30,7 @@ export async function createTimetableAction(
 
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
-    return { error: body.error ?? "Failed to create timetable" };
+    return { error: body.error ?? "Failed to create forum" };
   }
 
   const timetable = (await res.json()) as { slug: string };

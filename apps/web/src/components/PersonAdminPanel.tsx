@@ -39,7 +39,7 @@ export function PersonAdminPanel({
       method: "DELETE",
     });
     if (res.ok) {
-      toast(`${name ?? email ?? "Member"} removed from the timetable`);
+      toast(`${name ?? email ?? "Member"} removed from the forum`);
       startTransition(() => router.refresh());
     } else {
       const body = (await res.json().catch(() => ({}))) as { error?: string };
@@ -76,7 +76,7 @@ export function PersonAdminPanel({
           confirming ? (
             <>
               <span className="faint" style={{ fontSize: 13 }}>
-                Remove {name ?? email ?? "this member"} from the timetable?
+                Remove {name ?? email ?? "this member"} from the forum?
               </span>
               <button
                 className="btn"
@@ -102,7 +102,7 @@ export function PersonAdminPanel({
               style={{ color: "var(--red)" }}
               onClick={() => setConfirming(true)}
             >
-              Remove from timetable
+              Remove from forum
             </button>
           )
         ) : null}
