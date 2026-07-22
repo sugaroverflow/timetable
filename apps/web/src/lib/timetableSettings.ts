@@ -174,12 +174,6 @@ export function themeVars(
     vars["--host-ink"] = secondary;
     vars["--host-wash"] = withAlpha(secondary, "15");
     vars["--host-line"] = withAlpha(secondary, "40");
-    // Insight-bar track/chip fills + gradient end, so themed coverage/voter
-    // bars pick up the timetable's accent (mirrors --host-track / --host-chip /
-    // --host-accent-2 in tokens.css).
-    vars["--host-track"] = withAlpha(secondary, "22");
-    vars["--host-chip"] = withAlpha(secondary, "22");
-    vars["--host-accent-2"] = secondary;
   }
   if (background) vars["--bg"] = background;
   if (topbar) vars["--topbar"] = topbar;

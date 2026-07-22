@@ -21,7 +21,14 @@ export type FeedComment = {
 export type WeightedHeart = {
   electorId: string;
   electorName: string | null;
+  /** L1 contribution (1/n). */
   weight: number;
+  /** L2 contribution (1/√n). */
+  l2Weight: number;
+  /** Share of the topic's devotion score; column-sums to it. */
+  devotionWeight: number;
+  /** ISO timestamp of when the elector hearted the topic. */
+  heartedAt: string;
 };
 
 export type FeedTopic = {

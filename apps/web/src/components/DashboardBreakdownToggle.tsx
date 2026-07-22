@@ -4,13 +4,13 @@ import { useState } from "react";
 import { Collapsible } from "@base-ui/react/collapsible";
 import { ChevronDown, ChevronRight, Heart } from "lucide-react";
 
-import { Avatar } from "@/components/Avatar";
+import { BreakdownTable } from "@/components/BreakdownTable";
 import { clientGql } from "@/lib/clientGraphql";
 import type { WeightedHeart } from "@/lib/feedTypes";
 
 const QUERY = `query Breakdown($s: String!, $t: String!) {
   topicWeightedBreakdown(idOrSlug: $s, topicId: $t) {
-    electorId electorName weight
+    electorId electorName weight l2Weight devotionWeight heartedAt
   }
 }`;
 
@@ -66,17 +66,7 @@ export function DashboardBreakdownToggle({
             No hearts yet.
           </div>
         ) : (
-          <ul className="dash-breakdown-list">
-            {rows.map((w) => (
-              <li key={w.electorId} className="row" style={{ gap: 8 }}>
-                <Avatar name={w.electorName} small />
-                <span style={{ flex: 1 }}>{w.electorName ?? "Elector"}</span>
-                <span className="mono">
-                  {w.weight > 0 ? `1/${Math.round(1 / w.weight)}` : "—"}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <BreakdownTable slug={slug} rows={rows} />
           )
         ) : null}
       </Collapsible.Panel>

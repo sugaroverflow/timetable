@@ -32,12 +32,7 @@
   --purple-100: #f4f1fc;
   --purple-200: #ddd4f5;
   --purple-300: #ab99ea;
-  --purple-350: #6f5bc0;
-  --purple-400: #8a73e0;
   --purple-600: #5a44b8;
-  --purple-track: #e7e1f7; /* light insight-bar track / chip fill */
-  --purple-chip: #efeafb;
-  --purple-track-d: #2e2650; /* dark insight-bar track / chip fill */
   --purple-950: #262038;
   --purple-900: #453a68;
 
@@ -114,9 +109,6 @@
   --host-ink: var(--purple-600);
   --host-wash: var(--purple-100);
   --host-line: var(--purple-200);
-  --host-track: var(--purple-track); /* insight coverage/voter bar track */
-  --host-chip: var(--purple-chip); /* voter-weight chip background */
-  --host-accent-2: var(--purple-400); /* coverage-fill gradient end */
 
   /* --- Heart --- */
   --heart: var(--pink-500);
@@ -250,9 +242,6 @@ html[data-theme="dark"] {
   --host-ink: var(--purple-300);
   --host-wash: var(--purple-950);
   --host-line: var(--purple-900);
-  --host-track: var(--purple-track-d);
-  --host-chip: var(--purple-track-d);
-  --host-accent-2: var(--purple-350);
 
   /* Heart */
   --heart: var(--pink-400);

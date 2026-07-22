@@ -139,8 +139,7 @@ export function TopicCard({
 
       {perms.canHostOnly && topic.weightedScore != null ? (
         <HostInsightsPanel
-          weightedScore={topic.weightedScore}
-          heartCount={topic.heartCount}
+          slug={slug}
           weightedBreakdown={topic.weightedBreakdown ?? []}
         />
       ) : null}
