@@ -398,6 +398,13 @@ textarea {
   padding: 2px 6px;
   line-height: 1;
 }
+/* Desktop never shows the drawer scrim (the rail is part of the grid);
+   the mobile block below turns it on. Kept before the media query so the
+   override wins the equal-specificity cascade. */
+.sidebar-backdrop {
+  display: none;
+}
+
 @media (max-width: 860px) {
   .shell {
     /* minmax(0, 1fr), not 1fr: a bare 1fr track's min-size is min-content,
@@ -409,15 +416,38 @@ textarea {
   .topbar-hamburger {
     display: inline-flex;
   }
+  /* True drawer (product feedback round 2): slides in from the left over a
+     scrim. Closed state is off-canvas and hidden so its links leave the tab
+     order; `visibility` flips at the end of the slide-out transition. */
   .sidebar {
-    display: none;
-    position: static;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: calc(var(--z-modal) + 1);
+    width: min(78vw, 300px);
     max-height: none;
-    overflow-y: visible;
-    margin-bottom: 16px;
+    margin: 0;
+    padding: 18px 16px;
+    background: var(--bg);
+    border-right: 1px solid var(--line);
+    box-shadow: var(--shadow-pop);
+    transform: translateX(-105%);
+    visibility: hidden;
+    transition:
+      transform 220ms ease,
+      visibility 220ms;
   }
   .sidebar.open {
-    display: flex;
+    transform: translateX(0);
+    visibility: visible;
+  }
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-modal);
+    background: var(--scrim);
   }
 }
 
@@ -1419,6 +1449,7 @@ textarea {
 
 @media (prefers-reduced-motion: reduce) {
   .toast, .heart-pop { animation: none !important; }
+  .sidebar { transition: none !important; }
 }
 
 /* Availability segmented control (prototype .avseg) */
