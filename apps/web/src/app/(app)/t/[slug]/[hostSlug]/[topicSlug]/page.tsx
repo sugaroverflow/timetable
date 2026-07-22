@@ -20,6 +20,7 @@ type Data = {
     viewerHeartedPublishedCount: number | null;
   } | null;
   me: { id: string } | null;
+  timetableHosts: { id: string; name: string | null }[];
   topicPermalink: FeedTopic | null;
 };
 
@@ -27,6 +28,7 @@ const QUERY = `
   query TopicPermalink($s: String!, $topic: String!) {
     timetable(idOrSlug: $s) { viewerRoles settings viewerHeartedPublishedCount }
     me { id }
+    timetableHosts(idOrSlug: $s) { id name }
     topicPermalink(idOrSlug: $s, topicSlug: $topic) {
       ${TOPIC_FEED_FIELDS}
     }
@@ -76,6 +78,7 @@ export default async function TopicPermalinkPage({
         hostLabel={roleLabel(settings.roleLabels, "host")}
         adminLabel={roleLabel(settings.roleLabels, "admin")}
         viewerHeartCount={data.timetable?.viewerHeartedPublishedCount ?? null}
+        hosts={data.timetableHosts}
       />
     </div>
   );
