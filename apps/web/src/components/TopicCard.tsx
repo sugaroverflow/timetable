@@ -7,11 +7,11 @@ import { topicPath } from "@/lib/topicPath";
 
 import { AdminTopicActions } from "./AdminTopicActions";
 import { Avatar } from "./Avatar";
+import { BreakdownToggle } from "./BreakdownToggle";
 import { CommentComposer } from "./CommentComposer";
 import { CommentList } from "./CommentList";
 import { FocusCommentButton } from "./FocusCommentButton";
 import { HeartButton } from "./HeartButton";
-import { HostInsightsPanel } from "./HostInsightsPanel";
 import { HostOnlyPanel } from "./HostOnlyPanel";
 import { HostTopicActions } from "./HostTopicActions";
 import { PersonChip } from "./PersonChip";
@@ -139,9 +139,11 @@ export function TopicCard({
       ) : null}
 
       {perms.canHostOnly && topic.weightedScore != null ? (
-        <HostInsightsPanel
+        <BreakdownToggle
           slug={slug}
-          weightedBreakdown={topic.weightedBreakdown ?? []}
+          topicId={topic.id}
+          className="host-panel"
+          triggerClassName="host-panel-toggle"
         />
       ) : null}
 

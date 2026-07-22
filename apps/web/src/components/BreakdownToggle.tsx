@@ -14,14 +14,19 @@ const QUERY = `query Breakdown($s: String!, $t: String!) {
   }
 }`;
 
-/** "Show ❤️ breakdown" under a dashboard leaderboard topic (QA #59 round
- * 3). Fetches the per-elector weights lazily on first expand. */
-export function DashboardBreakdownToggle({
+/** "Show ❤️ breakdown" collapsible under a topic card or dashboard
+ * leaderboard entry. Fetches the per-elector weights lazily on first expand
+ * so the feed query never pays for a panel that's collapsed by default. */
+export function BreakdownToggle({
   slug,
   topicId,
+  className,
+  triggerClassName,
 }: {
   slug: string;
   topicId: string;
+  className: string;
+  triggerClassName: string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [rows, setRows] = useState<WeightedHeart[] | null>(null);
@@ -42,11 +47,11 @@ export function DashboardBreakdownToggle({
 
   return (
     <Collapsible.Root
-      className="dash-breakdown"
+      className={className}
       open={expanded}
       onOpenChange={(next) => void handleOpenChange(next)}
     >
-      <Collapsible.Trigger className="thread-toggle">
+      <Collapsible.Trigger className={triggerClassName}>
         {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}{" "}
         {expanded ? "Hide " : "Show "}
         <Heart size={14} fill="currentColor" aria-hidden /> breakdown

@@ -157,28 +157,43 @@ export type CommentNode = {
   replies: CommentNode[];
 };
 
-/** Threaded comments for a topic, filtered by the viewer's visibility scope.
- * admin_only (the drafting thread) is opt-in and never included by the feed
- * paths — only the Pending Topics / My Topics panels request it. */
-export async function listCommentTree(
-  topicId: string,
-  opts: {
-    includeHostOnly: boolean;
-    includeHidden: boolean;
-    includeAdminOnly?: boolean;
-  },
-): Promise<CommentNode[]> {
+export type CommentTreeOptions = {
+  includeHostOnly: boolean;
+  includeHidden: boolean;
+  includeAdminOnly?: boolean;
+};
+
+type CommentTreeRow = {
+  topicId: string;
+  id: string;
+  parentId: string | null;
+  authorId: string;
+  authorName: string | null;
+  authorImage: string | null;
+  body: string;
+  visibility: CommentVisibility;
+  hiddenAt: Date | null;
+  createdAt: Date;
+};
+
+/** The one comment-tree query, shared by the single-topic and batched
+ * readers so their filters/joins/order can't drift. */
+async function fetchCommentRows(
+  topicIds: string[],
+  opts: CommentTreeOptions,
+): Promise<CommentTreeRow[]> {
   const visibilities: CommentVisibility[] = ["public"];
   if (opts.includeHostOnly) visibilities.push("host_only");
   if (opts.includeAdminOnly) visibilities.push("admin_only");
   const conds = [
-    eq(comments.topicId, topicId),
+    inArray(comments.topicId, topicIds),
     inArray(comments.visibility, visibilities),
   ];
   if (!opts.includeHidden) conds.push(isNull(comments.hiddenAt));
 
-  const rows = await db
+  return db
     .select({
+      topicId: comments.topicId,
       id: comments.id,
       parentId: comments.parentId,
       authorId: comments.authorId,
@@ -193,7 +208,10 @@ export async function listCommentTree(
     .innerJoin(users, eq(users.id, comments.authorId))
     .where(and(...conds))
     .orderBy(asc(comments.createdAt));
+}
 
+/** Thread one topic's rows (already in createdAt order) into a tree. */
+function buildCommentTree(rows: CommentTreeRow[]): CommentNode[] {
   const nodes = new Map<string, CommentNode>();
   for (const r of rows) {
     nodes.set(r.id, {
@@ -219,4 +237,35 @@ export async function listCommentTree(
     else roots.push(node);
   }
   return roots;
+}
+
+/** Threaded comments for a topic, filtered by the viewer's visibility scope.
+ * admin_only (the drafting thread) is opt-in and never included by the feed
+ * paths — only the Pending Topics / My Topics panels request it. */
+export async function listCommentTree(
+  topicId: string,
+  opts: CommentTreeOptions,
+): Promise<CommentNode[]> {
+  return buildCommentTree(await fetchCommentRows([topicId], opts));
+}
+
+/** Batched {@link listCommentTree}: one query for a whole feed page's
+ * topics, grouped into per-topic trees. Topics without comments simply have
+ * no entry — callers should treat a miss as an empty thread. */
+export async function listCommentTreesForTopics(
+  topicIds: string[],
+  opts: CommentTreeOptions,
+): Promise<Map<string, CommentNode[]>> {
+  if (topicIds.length === 0) return new Map();
+  const rowsByTopic = new Map<string, CommentTreeRow[]>();
+  for (const row of await fetchCommentRows(topicIds, opts)) {
+    const list = rowsByTopic.get(row.topicId) ?? [];
+    list.push(row);
+    rowsByTopic.set(row.topicId, list);
+  }
+  const trees = new Map<string, CommentNode[]>();
+  for (const [topicId, rows] of rowsByTopic) {
+    trees.set(topicId, buildCommentTree(rows));
+  }
+  return trees;
 }
