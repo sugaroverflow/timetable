@@ -49,7 +49,7 @@ export default async function MyTopicsPage({
   if (!isHost(roles) && !isAdmin(roles)) {
     return (
       <div className="notice">
-        You need the host or admin role in this timetable to propose topics.
+        You need the host or admin role in this forum to propose topics.
       </div>
     );
   }

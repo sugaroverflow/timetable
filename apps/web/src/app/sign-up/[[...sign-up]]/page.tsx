@@ -5,7 +5,7 @@ export default function SignUpPage() {
     <main className="container auth-page">
       <div className="auth-fallback">
         <h1>Create account</h1>
-        <p>Create an account to create and join timetables.</p>
+        <p>Create an account to create and join forums.</p>
       </div>
       {process.env.E2E_TEST_MODE === "1" ? null : (
         <SignUp

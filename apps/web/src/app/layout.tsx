@@ -5,8 +5,8 @@ import "./tokens.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Timetable",
-  description: "Collaborative timetables — topic feeds, voting, and availability.",
+  title: "Topic",
+  description: "Collaborative forums — topic feeds, voting, and availability.",
 };
 
 export default function RootLayout({

@@ -1,6 +1,6 @@
 import type { UserDigest } from "@timetable/core";
 
-const EMAIL_FROM = process.env.EMAIL_FROM ?? "Timetable <no-reply@example.com>";
+const EMAIL_FROM = process.env.EMAIL_FROM ?? "Topic <no-reply@example.com>";
 
 /**
  * Send an email via Resend. With no RESEND_API_KEY (local dev), the message is
@@ -55,7 +55,7 @@ export function renderDigest(digest: UserDigest): {
   subject: string;
   html: string;
 } {
-  const parts: string[] = [`<h2>Your Timetable digest</h2>`];
+  const parts: string[] = [`<h2>Your Topic digest</h2>`];
 
   if (digest.newTopics.length > 0) {
     parts.push("<h3>New topics</h3><ul>");
@@ -101,7 +101,7 @@ export function renderDigest(digest: UserDigest): {
   }
 
   return {
-    subject: "Your Timetable digest",
+    subject: "Your Topic digest",
     html: parts.join("\n"),
   };
 }

@@ -8,12 +8,7 @@ test.describe("anonymous web smoke", () => {
   test("renders the public home page with auth links", async ({ page }) => {
     await goto("/", page);
 
-    await expect(
-      page.getByRole("heading", { name: "Make timetables, together." }),
-    ).toBeVisible();
-    await expect(
-      page.getByText("Sign in to create and join timetables."),
-    ).toBeVisible();
+    await expect(page.getByText("Topic", { exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
     await expect(
       page.getByRole("link", { name: "Create account" }),
@@ -25,7 +20,7 @@ test.describe("anonymous web smoke", () => {
 
     await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
     await expect(
-      page.getByText("Continue with your account to access your timetables."),
+      page.getByText("Continue with your account to access your forums."),
     ).toBeVisible();
     await expect(page.locator("main")).toBeVisible();
   });
@@ -37,7 +32,7 @@ test.describe("anonymous web smoke", () => {
       page.getByRole("heading", { name: "Create account" }),
     ).toBeVisible();
     await expect(
-      page.getByText("Create an account to create and join timetables."),
+      page.getByText("Create an account to create and join forums."),
     ).toBeVisible();
     await expect(page.locator("main")).toBeVisible();
   });

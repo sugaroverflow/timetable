@@ -54,7 +54,7 @@ export function HeartsCutoffForm({
         <h2 style={{ fontSize: 18, margin: 0 }}>Hearts count from</h2>
         <p>
           Hearts placed before this moment are ignored in every count and
-          vote weight. Default is the timetable&rsquo;s creation — everything
+          vote weight. Default is the forum&rsquo;s creation — everything
           counts.
         </p>
       </div>

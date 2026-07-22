@@ -165,7 +165,7 @@ export default async function DashboardPage({
     <div className="stack">
       <div className="page-head">
         <h2 className="section-title">Analysis</h2>
-        <p>Activity and standings across this timetable.</p>
+        <p>Activity and standings across this forum.</p>
       </div>
 
       <div className="toolbar">

@@ -23,7 +23,7 @@ export function CreateTimetableForm() {
 
   return (
     <form action={action} className="card">
-      <h2 style={{ marginTop: 0, fontSize: 18 }}>Create a timetable</h2>
+      <h2 style={{ marginTop: 0, fontSize: 18 }}>Create a forum</h2>
       <p className="muted" style={{ marginTop: 0 }}>
         You&rsquo;ll be the owner and admin.
       </p>
@@ -55,7 +55,7 @@ export function CreateTimetableForm() {
         />
         <p className="faint" style={{ fontSize: 12, margin: "4px 0 0" }}>
           {effectiveSlug
-            ? `Your timetable will live at /t/${effectiveSlug}`
+            ? `Your forum will live at /t/${effectiveSlug}`
             : "Lowercase letters, numbers, and hyphens. Set once — it can't be changed later."}
         </p>
       </div>
@@ -65,7 +65,7 @@ export function CreateTimetableForm() {
         <textarea
           id="description"
           name="description"
-          placeholder="What is this timetable for?"
+          placeholder="What is this forum for?"
         />
       </div>
 
@@ -91,7 +91,7 @@ export function CreateTimetableForm() {
       ) : null}
 
       <button className="btn btn-primary" type="submit" disabled={pending}>
-        {pending ? "Creating…" : "Create timetable"}
+        {pending ? "Creating…" : "Create forum"}
       </button>
     </form>
   );

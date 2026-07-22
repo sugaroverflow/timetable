@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -90,15 +89,10 @@ export function TopbarBrand({
 
   return (
     <Link className="brand" href={fallbackHref}>
-      <Image
-        className="brand-logo"
-        src="/assets/timetable.love-logo-transparent.png"
-        alt=""
-        width={30}
-        height={30}
-        priority
-      />
-      <span>Timetable</span>
+      <span className="brand-logo" aria-hidden>
+        📚
+      </span>
+      <span>Topic</span>
     </Link>
   );
 }

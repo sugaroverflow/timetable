@@ -131,7 +131,7 @@ export default async function ActivityPage({
     <div className="stack">
       <div className="page-head">
         <h2 className="section-title">Activity log</h2>
-        <p>Every moderation and lifecycle action in this timetable.</p>
+        <p>Every moderation and lifecycle action in this forum.</p>
       </div>
       <div className="toolbar wrap">
         <ActivityFilter value={action ?? ""} actions={uniqueActions} />
