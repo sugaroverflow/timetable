@@ -1,4 +1,3 @@
-/* eslint-disable complexity, sonarjs/cognitive-complexity -- audit debt (2026-07-22): decomposition queued — remove this disable when refactoring */
 import {
   Router,
   type NextFunction,
@@ -34,6 +33,7 @@ import {
   canProposeTopics,
   createTimetableSchema,
   inviteSchema,
+  normalizeEmail,
   updateMemberRolesSchema,
   type Role,
 } from "@timetable/shared";
@@ -48,6 +48,7 @@ import {
   isUploadPurpose,
   UploadsNotConfiguredError,
   UploadValidationError,
+  type UploadPurpose,
 } from "../uploads/storage";
 
 export const restRouter: Router = Router();
@@ -192,7 +193,7 @@ restRouter.post(
     const input = parseBody(addPersonSchema, req, res);
     if (!input) return;
 
-    const email = input.email.trim().toLowerCase();
+    const email = normalizeEmail(input.email);
     const clerkUser = await getOrCreateClerkUser(email, input.name ?? null);
     await createLocalUser({
       id: clerkUser.id,
@@ -331,6 +332,64 @@ restRouter.delete(
   }),
 );
 
+type UploadAuth =
+  | { ok: true; timetableId?: string }
+  | { ok: false; status: number; error: string };
+
+/** Cover uploads target a timetable: resolve it and check the viewer's
+ * role there (hosts for topic covers, admins for the timetable cover).
+ * Other purposes need no timetable. */
+async function authorizeUpload(
+  userId: string,
+  purpose: UploadPurpose,
+  timetableIdOrSlug: unknown,
+): Promise<UploadAuth> {
+  if (purpose !== "topic-cover" && purpose !== "timetable-cover") {
+    return { ok: true };
+  }
+
+  if (typeof timetableIdOrSlug !== "string" || !timetableIdOrSlug.trim()) {
+    return { ok: false, status: 400, error: "Timetable is required" };
+  }
+  const readable = await getReadableTimetable(userId, timetableIdOrSlug.trim());
+  if (!readable) {
+    return { ok: false, status: 404, error: "Timetable not found" };
+  }
+
+  const viewer = { userId, roles: readable.roles };
+  if (
+    purpose === "topic-cover" &&
+    !(canProposeTopics(viewer) || canModerate(viewer))
+  ) {
+    return { ok: false, status: 403, error: "Hosts only" };
+  }
+  if (purpose === "timetable-cover" && !canEditSettings(viewer)) {
+    return { ok: false, status: 403, error: "Admins only" };
+  }
+  return { ok: true, timetableId: readable.timetable.id };
+}
+
+/** Create the signed PUT URL, mapping upload errors to 503/400 responses. */
+async function sendSignedUpload(
+  res: Response,
+  args: Parameters<typeof createSignedUpload>[0],
+): Promise<void> {
+  try {
+    const upload = await createSignedUpload(args);
+    res.json(upload);
+  } catch (err) {
+    if (err instanceof UploadsNotConfiguredError) {
+      res.status(503).json({ error: "Object storage is not configured" });
+      return;
+    }
+    if (err instanceof UploadValidationError) {
+      res.status(400).json({ error: err.message });
+      return;
+    }
+    throw err;
+  }
+}
+
 /**
  * POST /api/uploads
  * Return a short-lived signed PUT URL for direct browser uploads to
@@ -357,59 +416,24 @@ restRouter.post(
       return;
     }
 
-    let uploadTimetableId: string | undefined;
-    if (body.purpose === "topic-cover" || body.purpose === "timetable-cover") {
-      if (
-        typeof body.timetableIdOrSlug !== "string" ||
-        !body.timetableIdOrSlug.trim()
-      ) {
-        res.status(400).json({ error: "Timetable is required" });
-        return;
-      }
-      const readable = await getReadableTimetable(
-        user.id,
-        body.timetableIdOrSlug.trim(),
-      );
-      if (!readable) {
-        res.status(404).json({ error: "Timetable not found" });
-        return;
-      }
-      uploadTimetableId = readable.timetable.id;
-      const viewer = { userId: user.id, roles: readable.roles };
-      if (
-        body.purpose === "topic-cover" &&
-        !(canProposeTopics(viewer) || canModerate(viewer))
-      ) {
-        res.status(403).json({ error: "Hosts only" });
-        return;
-      }
-      if (body.purpose === "timetable-cover" && !canEditSettings(viewer)) {
-        res.status(403).json({ error: "Admins only" });
-        return;
-      }
+    const auth = await authorizeUpload(
+      user.id,
+      body.purpose,
+      body.timetableIdOrSlug,
+    );
+    if (!auth.ok) {
+      res.status(auth.status).json({ error: auth.error });
+      return;
     }
 
-    try {
-      const upload = await createSignedUpload({
-        purpose: body.purpose,
-        userId: user.id,
-        timetableId: uploadTimetableId,
-        filename: body.filename,
-        contentType: body.contentType,
-        size: body.size,
-      });
-      res.json(upload);
-    } catch (err) {
-      if (err instanceof UploadsNotConfiguredError) {
-        res.status(503).json({ error: "Object storage is not configured" });
-        return;
-      }
-      if (err instanceof UploadValidationError) {
-        res.status(400).json({ error: err.message });
-        return;
-      }
-      throw err;
-    }
+    await sendSignedUpload(res, {
+      purpose: body.purpose,
+      userId: user.id,
+      timetableId: auth.timetableId,
+      filename: body.filename,
+      contentType: body.contentType,
+      size: body.size,
+    });
   }),
 );
 

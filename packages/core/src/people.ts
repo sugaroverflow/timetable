@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 
 import { db, timetableMemberships, users } from "@timetable/db";
+import { normalizeEmail } from "@timetable/shared";
 
 import { claimInvitesForUser } from "./invites";
 
@@ -17,7 +18,7 @@ export async function findUserByEmail(
   const [user] = await db
     .select({ id: users.id, name: users.name })
     .from(users)
-    .where(eq(users.email, email.trim().toLowerCase()))
+    .where(eq(users.email, normalizeEmail(email)))
     .limit(1);
   return user ?? null;
 }
@@ -32,7 +33,7 @@ export async function createLocalUser(args: {
   email: string;
   name: string | null;
 }): Promise<void> {
-  const email = args.email.trim().toLowerCase();
+  const email = normalizeEmail(args.email);
   await db
     .insert(users)
     .values({ id: args.id, email, name: args.name })
