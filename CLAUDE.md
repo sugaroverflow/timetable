@@ -57,8 +57,6 @@ Note: `lint` currently covers only `apps/web`.
 - **Never run `deploy-production.yml` or touch the `timetable` (prod) DO app —
   production deploys are human-triggered only.** Same for repo settings,
   rulesets, and DO infrastructure (`doctl`).
-- Adding the `preview` label to a PR provisions a review app with its own DB
-  (max 3 at once; sign in with OTP 424242; torn down on close/unlabel).
 - Never commit secrets. Env shape lives in `.env.example`.
 
 ## Conventions
