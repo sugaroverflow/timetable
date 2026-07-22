@@ -67,6 +67,8 @@ export async function setMemberRoles(
 export type MemberWithUser = {
   membershipId: string;
   roles: Role[];
+  /** When the invite email was last sent; null = never invited (round 2). */
+  inviteSentAt: Date | null;
   user: {
     id: string;
     name: string | null;
@@ -91,6 +93,7 @@ export async function listMembers(
     .select({
       membershipId: timetableMemberships.id,
       roles: timetableMemberships.roles,
+      inviteSentAt: timetableMemberships.inviteSentAt,
       userId: users.id,
       name: users.name,
       email: users.email,
@@ -103,6 +106,7 @@ export async function listMembers(
   return rows.map((r) => ({
     membershipId: r.membershipId,
     roles: r.roles,
+    inviteSentAt: r.inviteSentAt,
     user: { id: r.userId, name: r.name, email: r.email, image: r.image },
   }));
 }

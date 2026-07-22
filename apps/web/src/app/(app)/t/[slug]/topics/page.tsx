@@ -9,6 +9,8 @@ import { parseTimetableSettings, roleLabel } from "@/lib/timetableSettings";
 
 type Data = {
   timetable: { viewerRoles: string[]; settings: string } | null;
+  me: { id: string } | null;
+  timetableHosts: { id: string; name: string | null }[];
   hostDashboard: ManagedTopic[];
 };
 
@@ -19,6 +21,8 @@ const COMMENT_FIELDS = `
 const QUERY = `
   query HostDashboard($s: String!) {
     timetable(idOrSlug: $s) { viewerRoles settings }
+    me { id }
+    timetableHosts(idOrSlug: $s) { id name }
     hostDashboard(idOrSlug: $s) {
       id title slug hostSlug status bodyMd bodyHtml coverImageUrl updatedAt
       comments { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} } } }
@@ -50,9 +54,15 @@ export default async function MyTopicsPage({
     );
   }
 
+  // Admins can create a topic owned by another host (round 2: populate a
+  // pre-created account before its invite email goes out).
+  const otherHosts = isAdmin(roles)
+    ? data.timetableHosts.filter((h) => h.id !== data.me?.id)
+    : undefined;
+
   return (
     <div className="grid grid-2">
-      <CreateTopicForm slug={slug} />
+      <CreateTopicForm slug={slug} hosts={otherHosts} hostLabel={hostLabel} />
 
       <div className="stack">
         <div className="page-head">
