@@ -1,0 +1,28 @@
+# Nightly garbage collection for the container registry (timetable-reg).
+#
+# Deploy Dev prunes old image tags after each deploy; this reclaims the
+# untagged blobs once a day at a quiet hour. GC puts the registry in
+# read-only mode while it runs — that's why it is NOT part of the deploy
+# workflow (per-deploy GCs locked out subsequent pushes on busy days,
+# 2026-07-22).
+name: Registry GC
+
+on:
+  schedule:
+    - cron: "47 4 * * *"
+  workflow_dispatch:
+
+jobs:
+  gc:
+    runs-on: ubuntu-latest
+    environment: timetable-dev
+    steps:
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Start garbage collection
+        run: |
+          doctl registry garbage-collection start \
+            --include-untagged-manifests --force
