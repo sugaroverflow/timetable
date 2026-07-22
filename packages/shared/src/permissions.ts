@@ -3,7 +3,6 @@ import {
   isElector,
   isHost,
   isMember,
-  isOwner,
   type Privacy,
   type Role,
 } from "./roles";
@@ -100,8 +99,4 @@ export function canManageMembers(viewer: Viewer): boolean {
 
 export function canEditSettings(viewer: Viewer): boolean {
   return isAdmin(viewer.roles);
-}
-
-export function canTransferOwnership(viewer: Viewer): boolean {
-  return isOwner(viewer.roles);
 }

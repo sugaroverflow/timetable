@@ -65,10 +65,7 @@ const QUERY = `
 /** True when the topic was published, edited, or picked up new comments
  * after the viewer's last feed visit. Never-seen (null) shows no
  * highlights. */
-export function isTopicNew(
-  topic: FeedTopic,
-  lastSeenAt: string | null,
-): boolean {
+function isTopicNew(topic: FeedTopic, lastSeenAt: string | null): boolean {
   if (!lastSeenAt) return false;
   const seen = Date.parse(lastSeenAt);
   if (topic.publishedAt && Date.parse(topic.publishedAt) > seen) return true;

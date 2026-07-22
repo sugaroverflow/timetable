@@ -1,5 +1,3 @@
-import type { CSSProperties } from "react";
-
 import type {
   NotificationSettings,
   RoleLabels,
@@ -201,8 +199,4 @@ export function buildThemeCss(settings: TimetableSettings): string {
     cssBlock(":root", themeVars(settings.theme, "light")) +
     cssBlock('html[data-theme="dark"]', themeVars(settings.theme, "dark"))
   );
-}
-
-export function themeStyle(settings: TimetableSettings): CSSProperties {
-  return themeVars(settings.theme, "light") as CSSProperties;
 }

@@ -81,32 +81,3 @@ export function topicNormScores(
   }
   return { raw, l2, l1, devotion: raw > 0 ? l1 / raw : 0 };
 }
-
-/** Total weighted score for a topic given precomputed elector weights. */
-export function topicWeightedScore(
-  topicHearts: readonly HeartRef[],
-  weights: ReadonlyMap<string, number>,
-): number {
-  return topicHearts.reduce(
-    (sum, heart) => sum + (weights.get(heart.electorId) ?? 0),
-    0,
-  );
-}
-
-/** Per-elector contribution to a topic, for the host-only breakdown panel. */
-export type WeightedHeart = {
-  electorId: string;
-  weight: number;
-};
-
-export function topicWeightedBreakdown(
-  topicHearts: readonly HeartRef[],
-  weights: ReadonlyMap<string, number>,
-): WeightedHeart[] {
-  return topicHearts
-    .map((heart) => ({
-      electorId: heart.electorId,
-      weight: weights.get(heart.electorId) ?? 0,
-    }))
-    .sort((a, b) => b.weight - a.weight);
-}

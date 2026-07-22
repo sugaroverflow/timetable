@@ -197,11 +197,3 @@ export function useOperationLimits(opts: {
     },
   };
 }
-
-export function useDepthLimit(maxDepth: number): Plugin {
-  return {
-    onValidate({ addValidationRule }) {
-      addValidationRule(maxDepthRule(maxDepth));
-    },
-  };
-}

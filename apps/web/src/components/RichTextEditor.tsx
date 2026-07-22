@@ -69,21 +69,18 @@ export function RichTextEditor({
     <div className="rte">
       <div className="rte-toolbar" role="toolbar" aria-label="Formatting">
         <ToolButton
-          editor={editor}
           active={editor.isActive("bold")}
           label={<Bold size={16} aria-hidden />}
           title="Bold"
           onClick={() => editor.chain().focus().toggleBold().run()}
         />
         <ToolButton
-          editor={editor}
           active={editor.isActive("italic")}
           label={<Italic size={16} aria-hidden />}
           title="Italic"
           onClick={() => editor.chain().focus().toggleItalic().run()}
         />
         <ToolButton
-          editor={editor}
           active={editor.isActive("heading", { level: 2 })}
           label={<Heading2 size={16} aria-hidden />}
           title="Heading"
@@ -92,7 +89,6 @@ export function RichTextEditor({
           }
         />
         <ToolButton
-          editor={editor}
           active={editor.isActive("heading", { level: 3 })}
           label={<Heading3 size={16} aria-hidden />}
           title="Subheading"
@@ -101,28 +97,24 @@ export function RichTextEditor({
           }
         />
         <ToolButton
-          editor={editor}
           active={editor.isActive("bulletList")}
           label={<List size={16} aria-hidden />}
           title="Bullet list"
           onClick={() => editor.chain().focus().toggleBulletList().run()}
         />
         <ToolButton
-          editor={editor}
           active={editor.isActive("orderedList")}
           label={<ListOrdered size={16} aria-hidden />}
           title="Numbered list"
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
         />
         <ToolButton
-          editor={editor}
           active={editor.isActive("blockquote")}
           label={<Quote size={16} aria-hidden />}
           title="Quote"
           onClick={() => editor.chain().focus().toggleBlockquote().run()}
         />
         <ToolButton
-          editor={editor}
           active={editor.isActive("link")}
           label={<Link2 size={16} aria-hidden />}
           title="Link"
@@ -138,7 +130,6 @@ export function RichTextEditor({
           }}
         />
         <ToolButton
-          editor={editor}
           active={false}
           label={<ImageIcon size={16} aria-hidden />}
           title="Image from URL"
@@ -168,14 +159,11 @@ function ToolButton({
   label,
   title,
   onClick,
-  style,
 }: {
-  editor: Editor;
   active: boolean;
   label: React.ReactNode;
   title: string;
   onClick: () => void;
-  style?: React.CSSProperties;
 }) {
   return (
     <button
@@ -185,7 +173,6 @@ function ToolButton({
       aria-pressed={active}
       onMouseDown={(e) => e.preventDefault()}
       onClick={onClick}
-      style={style}
     >
       {label}
     </button>

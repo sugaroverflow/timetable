@@ -3,7 +3,7 @@ export type TopicStatus =
   | "published"
   | "unpublished"
   | "archived";
-export type CommentVisibility = "public" | "host_only" | "admin_only";
+type CommentVisibility = "public" | "host_only" | "admin_only";
 
 export type FeedComment = {
   id: string;

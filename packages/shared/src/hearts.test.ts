@@ -4,8 +4,6 @@ import {
   computeElectorHeartCounts,
   computeElectorWeights,
   topicNormScores,
-  topicWeightedBreakdown,
-  topicWeightedScore,
   type HeartRef,
 } from "./hearts";
 
@@ -34,41 +32,6 @@ describe("computeElectorWeights", () => {
     const weights = computeElectorWeights(hearts, published);
 
     expect(weights.get("nick")).toBeCloseTo(1); // only the published one counts
-  });
-});
-
-describe("topicWeightedScore", () => {
-  it("sums elector weights for a topic", () => {
-    const hearts: HeartRef[] = [
-      { topicId: "a", electorId: "nick" }, // nick hearted 2 -> 0.5
-      { topicId: "b", electorId: "nick" },
-      { topicId: "a", electorId: "emily" }, // emily hearted 1 -> 1
-    ];
-    const published = new Set(["a", "b"]);
-    const weights = computeElectorWeights(hearts, published);
-
-    const topicAHearts = hearts.filter((h) => h.topicId === "a");
-    expect(topicWeightedScore(topicAHearts, weights)).toBeCloseTo(1.5);
-  });
-});
-
-describe("topicWeightedBreakdown", () => {
-  it("returns per-elector weights sorted descending", () => {
-    const hearts: HeartRef[] = [
-      { topicId: "a", electorId: "nick" },
-      { topicId: "b", electorId: "nick" },
-      { topicId: "a", electorId: "emily" },
-    ];
-    const published = new Set(["a", "b"]);
-    const weights = computeElectorWeights(hearts, published);
-
-    const breakdown = topicWeightedBreakdown(
-      hearts.filter((h) => h.topicId === "a"),
-      weights,
-    );
-
-    expect(breakdown[0]).toEqual({ electorId: "emily", weight: 1 });
-    expect(breakdown[1]).toEqual({ electorId: "nick", weight: 0.5 });
   });
 });
 
@@ -110,12 +73,10 @@ describe("topicNormScores", () => {
     expect(a.devotion).toBeCloseTo(0.75); // l1 / raw
   });
 
-  it("l1 equals the legacy weightedScore", () => {
-    const weights = computeElectorWeights(hearts, published);
+  it("l1 equals the legacy weightedScore (sum of 1/n per elector)", () => {
     const topicAHearts = hearts.filter((h) => h.topicId === "a");
-    expect(topicNormScores(topicAHearts, counts).l1).toBeCloseTo(
-      topicWeightedScore(topicAHearts, weights),
-    );
+    // nick hearted 2 published topics (1/2) + emily hearted 1 (1/1) = 1.5
+    expect(topicNormScores(topicAHearts, counts).l1).toBeCloseTo(1.5);
   });
 
   it("returns zero devotion for a topic with no hearts", () => {
