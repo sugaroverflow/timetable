@@ -5,13 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { useToast } from "@/components/Toast";
 import { clientApi } from "@/lib/clientApi";
-
-function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-  });
-}
+import { formatShortDate } from "@/lib/dates";
 
 /** Invite state + send/resend action for a member card (round 2): admins
  * add people silently, populate their account, then send the email here. */
@@ -51,7 +45,9 @@ export function InviteSendButton({
   return (
     <span className="row" style={{ gap: 8, alignItems: "center" }}>
       <span className="pill">
-        {inviteSentAt ? `Invited ${fmtDate(inviteSentAt)}` : "Not invited yet"}
+        {inviteSentAt
+          ? `Invited ${formatShortDate(inviteSentAt)}`
+          : "Not invited yet"}
       </span>
       <button
         type="button"

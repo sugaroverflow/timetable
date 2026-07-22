@@ -1,8 +1,7 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-
 import type { TopicOption } from "@/lib/calendarTypes";
+import { useSetSearchParam } from "@/lib/useSearchParamNav";
 
 export function AudienceFilter({
   value,
@@ -13,22 +12,17 @@ export function AudienceFilter({
   isHost: boolean;
   topics: TopicOption[];
 }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
-  function change(next: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    if (next && next !== "all") params.set("audience", next);
-    else params.delete("audience");
-    router.push(`${pathname}?${params.toString()}`);
-  }
+  const setParam = useSetSearchParam();
 
   return (
     <select
       aria-label="Audience"
       value={value}
-      onChange={(e) => change(e.target.value)}
+      onChange={(e) => {
+        // "all" is the default: it rides as no param at all.
+        const next = e.target.value;
+        setParam("audience", next === "all" ? "" : next);
+      }}
     >
       <option value="all">All electors</option>
       {isHost ? <option value="hearted_mine">Hearted my topics</option> : null}

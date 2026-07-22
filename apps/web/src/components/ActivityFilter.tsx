@@ -1,8 +1,7 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-
 import { ACTION_LABELS } from "@/lib/activityLabels";
+import { useSetSearchParam } from "@/lib/useSearchParamNav";
 
 export function ActivityFilter({
   value,
@@ -11,16 +10,7 @@ export function ActivityFilter({
   value: string;
   actions: string[];
 }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
-  function change(next: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    if (next) params.set("action", next);
-    else params.delete("action");
-    router.push(`${pathname}?${params.toString()}`);
-  }
+  const setParam = useSetSearchParam();
 
   return (
     <>
@@ -29,7 +19,7 @@ export function ActivityFilter({
         id="activity-filter"
         aria-label="Filter by action type"
         value={value}
-        onChange={(e) => change(e.target.value)}
+        onChange={(e) => setParam("action", e.target.value)}
       >
         <option value="">All actions</option>
         {actions.map((action) => (

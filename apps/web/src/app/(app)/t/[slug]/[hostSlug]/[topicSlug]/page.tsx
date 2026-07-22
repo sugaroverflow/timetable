@@ -6,6 +6,7 @@ import { type Role } from "@timetable/shared";
 import { TopicCard } from "@/components/TopicCard";
 import { topicPerms } from "@/lib/feedPage";
 import type { FeedTopic } from "@/lib/feedTypes";
+import { TOPIC_FEED_FIELDS } from "@/lib/gqlFragments";
 import { gqlFetch } from "@/lib/graphql";
 import { displayRolesFromCookies } from "@/lib/previewRoles.server";
 import { parseTimetableSettings, roleLabel } from "@/lib/timetableSettings";
@@ -21,20 +22,12 @@ type Data = {
   topicPermalink: FeedTopic | null;
 };
 
-const COMMENT_FIELDS = `
-  id parentId authorId authorName authorImage body visibility hidden createdAt
-`;
-
 const QUERY = `
   query TopicPermalink($s: String!, $topic: String!) {
     timetable(idOrSlug: $s) { viewerRoles settings viewerHeartedPublishedCount }
     me { id }
     topicPermalink(idOrSlug: $s, topicSlug: $topic) {
-      id timetableId hostId hostName hostImage hostSlug title slug bodyMd bodyHtml coverImageUrl status
-      heartCount weightedScore viewerHasHearted commentCount
-      publishedAt createdAt
-      comments { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} } } }
-      weightedBreakdown { electorId electorName weight l2Weight devotionWeight heartedAt }
+      ${TOPIC_FEED_FIELDS}
     }
   }
 `;

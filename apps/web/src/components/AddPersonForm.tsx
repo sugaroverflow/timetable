@@ -3,11 +3,10 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
+import { RoleCheckboxGroup } from "@/components/RoleCheckboxGroup";
 import { useToast } from "@/components/Toast";
 import { clientApi } from "@/lib/clientApi";
-import { roleLabel, type RoleLabels } from "@/lib/timetableSettings";
-
-const ASSIGNABLE = ["admin", "host", "elector"] as const;
+import { type RoleLabels } from "@/lib/timetableSettings";
 
 /**
  * Admin "Add person" (product feedback round 2): pre-creates the account
@@ -28,14 +27,6 @@ export function AddPersonForm({
   const [roles, setRoles] = useState<string[]>(["host"]);
   const [busy, setBusy] = useState(false);
   const [pending, startTransition] = useTransition();
-
-  function toggleRole(role: string) {
-    setRoles((current) =>
-      current.includes(role)
-        ? current.filter((r) => r !== role)
-        : [...current, role],
-    );
-  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -94,23 +85,12 @@ export function AddPersonForm({
       </div>
       <div className="field">
         <label>Roles</label>
-        <div className="row" style={{ gap: 12 }}>
-          {ASSIGNABLE.map((role) => (
-            <label
-              key={role}
-              className="row"
-              style={{ gap: 5, alignItems: "center", fontSize: 13 }}
-            >
-              <input
-                type="checkbox"
-                checked={roles.includes(role)}
-                onChange={() => toggleRole(role)}
-                style={{ width: "auto" }}
-              />
-              {roleLabel(roleLabels, role)}
-            </label>
-          ))}
-        </div>
+        <RoleCheckboxGroup
+          value={roles}
+          onChange={setRoles}
+          roleLabels={roleLabels}
+          variant="inline"
+        />
       </div>
       <button
         className="btn btn-primary"

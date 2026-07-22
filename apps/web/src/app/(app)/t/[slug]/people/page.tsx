@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { isAdmin, type Role } from "@timetable/shared";
+import { isAdmin, primaryRole, type Role } from "@timetable/shared";
 
 import { AddPersonForm } from "@/components/AddPersonForm";
 import { Avatar } from "@/components/Avatar";
@@ -61,14 +61,6 @@ const MEMBERS_QUERY = `
   }
 `;
 
-/** Primary role for grouping: admins first, then hosts, then electors —
- * a multi-role member counts under their first (highest) role (QA #59). */
-function primaryRole(roles: string[]): "admin" | "host" | "elector" {
-  if (roles.includes("owner") || roles.includes("admin")) return "admin";
-  if (roles.includes("host")) return "host";
-  return "elector";
-}
-
 export default async function PeoplePage({
   params,
 }: {
@@ -96,7 +88,9 @@ export default async function PeoplePage({
   const sections = (["admin", "host", "elector"] as const).map((role) => ({
     role,
     heading: pluralLabel(roleLabel(settings.roleLabels, role)),
-    people: data.timetablePeople.filter((p) => primaryRole(p.roles) === role),
+    people: data.timetablePeople.filter(
+      (p) => primaryRole(p.roles as Role[]) === role,
+    ),
   }));
 
   return (

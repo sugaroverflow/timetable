@@ -1,20 +1,11 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useSetSearchParam } from "@/lib/useSearchParamNav";
 
 /** Start/end date pickers for the activity log (QA #59). Values ride in
  * the URL so the server filters the query. */
 export function ActivityDateFilter({ from, to }: { from: string; to: string }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
-  function change(key: "from" | "to", value: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    if (value) params.set(key, value);
-    else params.delete(key);
-    router.push(`${pathname}?${params.toString()}`);
-  }
+  const setParam = useSetSearchParam();
 
   return (
     <>
@@ -24,7 +15,7 @@ export function ActivityDateFilter({ from, to }: { from: string; to: string }) {
         type="date"
         value={from}
         max={to || undefined}
-        onChange={(e) => change("from", e.target.value)}
+        onChange={(e) => setParam("from", e.target.value)}
       />
       <label htmlFor="activity-to">To</label>
       <input
@@ -32,7 +23,7 @@ export function ActivityDateFilter({ from, to }: { from: string; to: string }) {
         type="date"
         value={to}
         min={from || undefined}
-        onChange={(e) => change("to", e.target.value)}
+        onChange={(e) => setParam("to", e.target.value)}
       />
     </>
   );

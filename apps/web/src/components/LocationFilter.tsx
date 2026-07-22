@@ -1,5 +1,6 @@
 "use client";
-import { useRouter, useSearchParams } from "next/navigation";
+
+import { useSetSearchParam } from "@/lib/useSearchParamNav";
 
 export function LocationFilter({
   value,
@@ -8,21 +9,14 @@ export function LocationFilter({
   value: string;
   locations: string[];
 }) {
-  const router = useRouter();
-  const params = useSearchParams();
-
-  function onChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const p = new URLSearchParams(params.toString());
-    if (e.target.value) {
-      p.set("location", e.target.value);
-    } else {
-      p.delete("location");
-    }
-    router.push(`?${p.toString()}`);
-  }
+  const setParam = useSetSearchParam();
 
   return (
-    <select value={value} onChange={onChange} aria-label="Filter by location">
+    <select
+      value={value}
+      onChange={(e) => setParam("location", e.target.value)}
+      aria-label="Filter by location"
+    >
       <option value="">All locations</option>
       {locations.map((loc) => (
         <option key={loc} value={loc}>

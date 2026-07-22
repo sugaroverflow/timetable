@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Fragment } from "react";
 
-import { isAdmin, type Role } from "@timetable/shared";
+import { isAdmin, primaryRole, type Role } from "@timetable/shared";
 
 import { ActivityDateFilter } from "@/components/ActivityDateFilter";
 import { ActivityFilter } from "@/components/ActivityFilter";
@@ -43,12 +43,10 @@ function actionClass(action: string): string {
   return "";
 }
 
-/** Primary display role for an actor (highest wins). */
-function primaryRole(roles: string[]): string | null {
-  if (roles.includes("owner") || roles.includes("admin")) return "admin";
-  if (roles.includes("host")) return "host";
-  if (roles.includes("elector")) return "elector";
-  return null;
+/** Primary display role for an actor (highest wins); roleless actors get
+ * no role pill and never match the role filter. */
+function actorPrimaryRole(roles: string[]): string | null {
+  return roles.length > 0 ? primaryRole(roles as Role[]) : null;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -113,7 +111,7 @@ export default async function ActivityPage({
     (e) =>
       (!action || e.action === action) &&
       (!actor || e.actorId === actor) &&
-      (!role || primaryRole(e.actorRoles) === role),
+      (!role || actorPrimaryRole(e.actorRoles) === role),
   );
 
   // Group into weeks, then days (QA #59). Events arrive newest-first; a
@@ -151,7 +149,7 @@ export default async function ActivityPage({
       ) : (
         <div className="timeline">
           {grouped.map(({ event, created, showWeek, showDay }) => {
-            const actorRole = primaryRole(event.actorRoles);
+            const actorRole = actorPrimaryRole(event.actorRoles);
             const href = topicPath(slug, event.topicHostSlug, event.topicSlug);
             const commentHref =
               href && event.commentId

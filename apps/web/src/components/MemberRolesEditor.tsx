@@ -3,28 +3,22 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { ASSIGNABLE_ROLES, type AssignableRole } from "@timetable/shared";
+
 import { useToast } from "@/components/Toast";
 import { clientApi } from "@/lib/clientApi";
 import { clientGql } from "@/lib/clientGraphql";
+import { roleLabel } from "@/lib/timetableSettings";
 
 const PERSON_BIO = `query($s: String!, $u: String!) { person(idOrSlug: $s, userId: $u) { bio } }`;
 const UPDATE_BIO = `mutation($s: String!, $u: String!, $bio: String!) {
   updateMemberBio(idOrSlug: $s, userId: $u, bio: $bio) { userId }
 }`;
 
-const ASSIGNABLE = ["admin", "host", "elector"] as const;
-type AssignableRole = (typeof ASSIGNABLE)[number];
-
 const PILL_CLASS: Record<AssignableRole, string> = {
   admin: "pill-admin",
   host: "pill-host",
   elector: "pill-elector",
-};
-
-const DEFAULT_LABEL: Record<AssignableRole, string> = {
-  admin: "Admin",
-  host: "Host",
-  elector: "Elector",
 };
 
 export function MemberRolesEditor({
@@ -124,11 +118,11 @@ export function MemberRolesEditor({
       </div>
 
       <div className="row wrap" style={{ marginTop: 10 }}>
-        {ASSIGNABLE.map((role) => {
+        {ASSIGNABLE_ROLES.map((role) => {
           const active = roles.includes(role);
           const locked = isOwner && role === "admin";
           const customLabel = roleLabels?.[role];
-          const displayLabel = customLabel ?? DEFAULT_LABEL[role];
+          const displayLabel = roleLabel(roleLabels, role);
           const titleAttr = customLabel ? role : undefined;
 
           return (

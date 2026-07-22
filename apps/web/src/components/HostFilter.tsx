@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useSetSearchParam } from "@/lib/useSearchParamNav";
 
 export function HostFilter({
   value,
@@ -11,23 +11,13 @@ export function HostFilter({
   hosts: { id: string; name: string | null }[];
   allLabel?: string;
 }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
-  function change(next: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    if (next) params.set("host", next);
-    else params.delete("host");
-    params.delete("page");
-    router.push(`${pathname}?${params.toString()}`);
-  }
+  const setParam = useSetSearchParam();
 
   return (
     <select
       aria-label="Filter by host"
       value={value}
-      onChange={(e) => change(e.target.value)}
+      onChange={(e) => setParam("host", e.target.value, { resetPage: true })}
     >
       <option value="">{allLabel}</option>
       {hosts.map((h) => (
