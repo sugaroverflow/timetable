@@ -536,7 +536,15 @@ export async function buildFeed(
 export type WeightedHeartEntry = {
   electorId: string;
   electorName: string | null;
+  /** L1 contribution: 1/n where n = the elector's total published hearts. */
   weight: number;
+  /** L2 contribution: 1/√n. */
+  l2Weight: number;
+  /** Share of the topic's devotion score: weight / topic heart count —
+   * column-sums to the topic's devotion (L1/L∞) score. */
+  devotionWeight: number;
+  /** When the elector hearted this topic. */
+  heartedAt: Date;
 };
 
 /** Host-only per-elector weighted-heart breakdown for one topic. */
@@ -559,29 +567,44 @@ export async function getWeightedBreakdown(
   ];
   if (cutoff) heartConds.push(gte(hearts.createdAt, cutoff));
   const heartRows = await db
-    .select({ topicId: hearts.topicId, electorId: hearts.userId })
+    .select({
+      topicId: hearts.topicId,
+      electorId: hearts.userId,
+      createdAt: hearts.createdAt,
+    })
     .from(hearts)
     .innerJoin(topics, eq(topics.id, hearts.topicId))
     .where(and(...heartConds));
   const weights = computeElectorWeights(heartRows, publishedIdSet);
+  const heartCounts = computeElectorHeartCounts(heartRows, publishedIdSet);
 
-  const topicHeartUserIds = heartRows
-    .filter((h) => h.topicId === topicId)
-    .map((h) => h.electorId);
+  const topicHearts = heartRows.filter((h) => h.topicId === topicId);
 
-  if (topicHeartUserIds.length === 0) return [];
+  if (topicHearts.length === 0) return [];
 
   const electorRows = await db
     .select({ id: users.id, name: users.name })
     .from(users)
-    .where(inArray(users.id, topicHeartUserIds));
+    .where(
+      inArray(
+        users.id,
+        topicHearts.map((h) => h.electorId),
+      ),
+    );
   const nameById = new Map(electorRows.map((u) => [u.id, u.name]));
 
-  return topicHeartUserIds
-    .map((electorId) => ({
-      electorId,
-      electorName: nameById.get(electorId) ?? null,
-      weight: weights.get(electorId) ?? 0,
-    }))
+  return topicHearts
+    .map((h) => {
+      const n = heartCounts.get(h.electorId) ?? 0;
+      const weight = weights.get(h.electorId) ?? 0;
+      return {
+        electorId: h.electorId,
+        electorName: nameById.get(h.electorId) ?? null,
+        weight,
+        l2Weight: n > 0 ? 1 / Math.sqrt(n) : 0,
+        devotionWeight: weight / topicHearts.length,
+        heartedAt: h.createdAt,
+      };
+    })
     .sort((a, b) => b.weight - a.weight);
 }

@@ -782,20 +782,6 @@ textarea {
   max-width: 100%;
 }
 
-/* Dashboard ❤️ breakdown (QA #59 round 3) */
-.dash-breakdown-list {
-  list-style: none;
-  margin: 6px 0 0;
-  padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--wash);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: var(--text-sm);
-}
-
 /* People page (QA #59) */
 .people-heading {
   font-size: var(--text-base);
@@ -904,6 +890,14 @@ textarea {
 }
 .th-sort-arrow {
   font-size: 10px;
+}
+
+/* Per-elector ❤️ breakdown table: footer sums row */
+.breakdown-table tfoot td {
+  border-top: 2px solid var(--line);
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: var(--fw-semibold);
 }
 
 /* "Show ❤️s" expansion rows in the elector-activity table */
@@ -1212,62 +1206,6 @@ textarea {
   border: none;
   background: none;
   cursor: pointer;
-}
-.coverage-row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 10px 12px;
-  background: var(--card);
-  border: 1px solid var(--host-line);
-  border-radius: var(--radius-md);
-  margin-bottom: 10px;
-}
-.coverage-num {
-  font-family: var(--serif);
-  font-size: var(--text-4xl);
-  font-weight: var(--fw-semibold);
-  color: var(--host-ink);
-  line-height: 1;
-}
-.coverage-bar {
-  flex: 1;
-  height: 8px;
-  border-radius: var(--radius-pill);
-  background: var(--host-track);
-  overflow: hidden;
-}
-.coverage-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--host-ink), var(--host-accent-2));
-  border-radius: var(--radius-pill);
-}
-.voter-row {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  font-size: var(--text-sm);
-  padding: 4px 0;
-}
-.voter-bar {
-  width: 70px;
-  height: 6px;
-  border-radius: var(--radius-pill);
-  background: var(--host-track);
-  overflow: hidden;
-}
-.voter-bar-fill {
-  height: 100%;
-  background: var(--host-ink);
-}
-.voter-weight {
-  font-family: var(--mono);
-  font-size: var(--text-xs);
-  color: var(--host-ink);
-  background: var(--host-chip);
-  padding: 2px 7px;
-  border-radius: var(--radius-xs);
-  font-weight: var(--fw-semibold);
 }
 .host-thread {
   margin-top: 12px;

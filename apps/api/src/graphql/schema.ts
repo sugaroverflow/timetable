@@ -325,6 +325,9 @@ const WeightedHeartType = builder
       electorId: t.exposeID("electorId"),
       electorName: t.exposeString("electorName", { nullable: true }),
       weight: t.exposeFloat("weight"),
+      l2Weight: t.exposeFloat("l2Weight"),
+      devotionWeight: t.exposeFloat("devotionWeight"),
+      heartedAt: t.string({ resolve: (w) => w.heartedAt.toISOString() }),
     }),
   });
 

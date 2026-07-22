@@ -34,7 +34,7 @@ const QUERY = `
       heartCount weightedScore viewerHasHearted commentCount
       publishedAt createdAt
       comments { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} replies { ${COMMENT_FIELDS} } } }
-      weightedBreakdown { electorId electorName weight }
+      weightedBreakdown { electorId electorName weight l2Weight devotionWeight heartedAt }
     }
   }
 `;
