@@ -7,7 +7,7 @@ import { isAdmin, type Role, type Viewer } from "@timetable/shared";
 
 import { getUserFromRequest, type SessionUser } from "./auth/clerk";
 
-export type Impersonation = {
+type Impersonation = {
   /** The real signed-in admin driving the preview. */
   actorId: string;
   timetableId: string;

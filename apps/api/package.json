@@ -32,6 +32,7 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/markdown-it": "^14.1.2",
-    "@types/sanitize-html": "^2.16.1"
+    "@types/sanitize-html": "^2.16.1",
+    "vitest": "^4.1.9"
   }
 }

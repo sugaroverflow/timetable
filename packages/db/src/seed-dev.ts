@@ -1060,7 +1060,7 @@ function buildActivityRows(
         topicId,
         title: topic.title,
       });
-      push(`archive-hearts:${topic.label}`, ownerId, "hearts.archive", {
+      push(`archive-hearts:${topic.label}`, ownerId, "hearts.cutoff", {
         topicId,
         title: topic.title,
         count: archivedHeartCount,

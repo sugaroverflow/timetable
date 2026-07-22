@@ -15,7 +15,7 @@ const CONTENT_TYPE_EXTENSIONS = {
   "image/webp": "webp",
 } as const;
 
-export const uploadPurposes = [
+const uploadPurposes = [
   "profile-image",
   "topic-cover",
   "timetable-cover",
