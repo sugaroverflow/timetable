@@ -817,6 +817,17 @@ textarea {
 }
 
 /* People page (QA #59) */
+/* Member-card actions stack on their own lines (product feedback round 2):
+   View as user → Send invite → Edit profile. */
+.people-card-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
 .people-heading {
   font-size: var(--text-base);
   text-transform: uppercase;
