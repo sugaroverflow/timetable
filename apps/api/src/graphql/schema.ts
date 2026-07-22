@@ -206,6 +206,24 @@ async function requireUser(ctx: ApiContext): Promise<SessionUser> {
   return ctx.user;
 }
 
+/** The guard ladder shared by timetable-scoped resolvers: authenticated
+ * user → readable timetable (NOT_FOUND otherwise) → viewer for permission
+ * checks. */
+async function loadTimetableAndViewer(ctx: ApiContext, idOrSlug: string) {
+  const user = await requireUser(ctx);
+  const readable = await getReadableTimetable(user.id, idOrSlug);
+  if (!readable) notFound("Timetable not found");
+  const viewer = { userId: user.id, roles: readable.roles };
+  return { user, readable, viewer };
+}
+
+/** loadTimetableAndViewer plus the member-management gate ("Admins only"). */
+async function requireAdminTimetable(ctx: ApiContext, idOrSlug: string) {
+  const loaded = await loadTimetableAndViewer(ctx, idOrSlug);
+  if (!canManageMembers(loaded.viewer)) forbidden("Admins only");
+  return loaded;
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -969,15 +987,27 @@ async function loadTopicAndViewer(ctx: ApiContext, topicId: string) {
   return { topic, viewer };
 }
 
+/** Target-eligibility rule shared by createTopic(hostId) and reassignTopic:
+ * a topic's owner must already hold the host or admin role. */
+async function assertCanOwnTopic(userId: string, timetableId: string) {
+  const targetRoles = await getViewerRoles(userId, timetableId);
+  if (!(isHost(targetRoles) || isAdmin(targetRoles))) {
+    throw new GraphQLError(
+      "New owner must hold the host or admin role in this timetable",
+    );
+  }
+}
+
 builder.mutationType({
   fields: (t) => ({
     /** Bumps the viewer's feed watermark to now (no-op for non-members). */
     markFeedSeen: t.boolean({
       args: { idOrSlug: t.arg.string({ required: true }) },
       resolve: async (_p, args, ctx) => {
-        const user = await requireUser(ctx);
-        const readable = await getReadableTimetable(user.id, args.idOrSlug);
-        if (!readable) notFound("Timetable not found");
+        const { user, readable } = await loadTimetableAndViewer(
+          ctx,
+          args.idOrSlug,
+        );
         await markFeedSeen(user.id, readable.timetable.id);
         return true;
       },
@@ -992,10 +1022,10 @@ builder.mutationType({
         userId: t.arg.string({ required: true }),
       },
       resolve: async (_p, args, ctx) => {
-        const user = await requireUser(ctx);
-        const readable = await getReadableTimetable(user.id, args.idOrSlug);
-        if (!readable) notFound("Timetable not found");
-        const viewer = { userId: user.id, roles: readable.roles };
+        const { user, readable, viewer } = await loadTimetableAndViewer(
+          ctx,
+          args.idOrSlug,
+        );
         if (!canModerate(viewer)) forbidden("Admins only");
         const target = await getPerson(readable.timetable.id, args.userId);
         if (!target) notFound("Member not found");
@@ -1017,10 +1047,10 @@ builder.mutationType({
         userId: t.arg.string({ required: true }),
       },
       resolve: async (_p, args, ctx) => {
-        const user = await requireUser(ctx);
-        const readable = await getReadableTimetable(user.id, args.idOrSlug);
-        if (!readable) notFound("Timetable not found");
-        const viewer = { userId: user.id, roles: readable.roles };
+        const { user, readable, viewer } = await loadTimetableAndViewer(
+          ctx,
+          args.idOrSlug,
+        );
         if (!canModerate(viewer)) forbidden("Admins only");
         await logActivity({
           timetableId: readable.timetable.id,
@@ -1036,9 +1066,10 @@ builder.mutationType({
     markNotificationsSeen: t.boolean({
       args: { idOrSlug: t.arg.string({ required: true }) },
       resolve: async (_p, args, ctx) => {
-        const user = await requireUser(ctx);
-        const readable = await getReadableTimetable(user.id, args.idOrSlug);
-        if (!readable) notFound("Timetable not found");
+        const { user, readable } = await loadTimetableAndViewer(
+          ctx,
+          args.idOrSlug,
+        );
         await markNotificationsSeen(readable.timetable.id, user.id);
         return true;
       },
@@ -1056,24 +1087,16 @@ builder.mutationType({
         hostId: t.arg.string({ required: false }),
       },
       resolve: async (_p, args, ctx) => {
-        const user = await requireUser(ctx);
-        const readable = await getReadableTimetable(user.id, args.idOrSlug);
-        if (!readable) notFound("Timetable not found");
-        const viewer = { userId: user.id, roles: readable.roles };
+        const { user, readable, viewer } = await loadTimetableAndViewer(
+          ctx,
+          args.idOrSlug,
+        );
         if (!canProposeTopics(viewer)) forbidden("Hosts only");
 
         let hostId = user.id;
         if (args.hostId && args.hostId !== user.id) {
           if (!isAdmin(viewer.roles)) forbidden("Admins only");
-          const targetRoles = await getViewerRoles(
-            args.hostId,
-            readable.timetable.id,
-          );
-          if (!(isHost(targetRoles) || isAdmin(targetRoles))) {
-            throw new GraphQLError(
-              "Topic owner must hold the host or admin role in this timetable",
-            );
-          }
+          await assertCanOwnTopic(args.hostId, readable.timetable.id);
           hostId = args.hostId;
         }
 
@@ -1147,15 +1170,7 @@ builder.mutationType({
         const user = await requireUser(ctx);
         const { topic, viewer } = await loadTopicAndViewer(ctx, args.topicId);
         if (!isAdmin(viewer.roles)) forbidden();
-        const targetRoles = await getViewerRoles(
-          args.hostId,
-          topic.timetableId,
-        );
-        if (!(isHost(targetRoles) || isAdmin(targetRoles))) {
-          throw new GraphQLError(
-            "New owner must hold the host or admin role in this timetable",
-          );
-        }
+        await assertCanOwnTopic(args.hostId, topic.timetableId);
         const updated = await reassignTopic(topic, args.hostId, user.id);
         if (!updated) notFound("Topic not found");
         return updated;
@@ -1421,10 +1436,10 @@ builder.mutationType({
         customDomain: t.arg.string({ required: false }),
       },
       resolve: async (_p, args, ctx) => {
-        const user = await requireUser(ctx);
-        const readable = await getReadableTimetable(user.id, args.idOrSlug);
-        if (!readable) notFound("Timetable not found");
-        const viewer = { userId: user.id, roles: readable.roles };
+        const { readable, viewer } = await loadTimetableAndViewer(
+          ctx,
+          args.idOrSlug,
+        );
         if (!canEditSettings(viewer)) forbidden("Admins only");
 
         let privacy: Privacy | undefined;
@@ -1458,11 +1473,10 @@ builder.mutationType({
         bio: t.arg.string({ required: true }),
       },
       resolve: async (_p, args, ctx) => {
-        const user = await requireUser(ctx);
-        const readable = await getReadableTimetable(user.id, args.idOrSlug);
-        if (!readable) notFound("Timetable not found");
-        const viewer = { userId: user.id, roles: readable.roles };
-        if (!canManageMembers(viewer)) forbidden("Admins only");
+        const { user, readable } = await requireAdminTimetable(
+          ctx,
+          args.idOrSlug,
+        );
         const target = await getPerson(readable.timetable.id, args.userId);
         if (!target) notFound("Member not found");
         await updateUserProfile(args.userId, { bio: args.bio.trim() || null });
@@ -1486,10 +1500,10 @@ builder.mutationType({
         countFrom: t.arg.string({ required: false }),
       },
       resolve: async (_p, args, ctx) => {
-        const user = await requireUser(ctx);
-        const readable = await getReadableTimetable(user.id, args.idOrSlug);
-        if (!readable) notFound("Timetable not found");
-        const viewer = { userId: user.id, roles: readable.roles };
+        const { user, readable, viewer } = await loadTimetableAndViewer(
+          ctx,
+          args.idOrSlug,
+        );
         if (!canModerate(viewer)) forbidden("Admins only");
         let countFrom: Date | null = null;
         if (args.countFrom) {
@@ -1529,10 +1543,10 @@ builder.mutationType({
         digestActivity: t.arg.boolean({ required: false }),
       },
       resolve: async (_p, args, ctx) => {
-        const user = await requireUser(ctx);
-        const readable = await getReadableTimetable(user.id, args.idOrSlug);
-        if (!readable) notFound("Timetable not found");
-        const viewer = { userId: user.id, roles: readable.roles };
+        const { readable, viewer } = await loadTimetableAndViewer(
+          ctx,
+          args.idOrSlug,
+        );
         if (!canEditSettings(viewer)) forbidden("Admins only");
 
         const current = readable.timetable.settings;
@@ -1778,9 +1792,7 @@ builder.mutationFields((t) => ({
       location: t.arg.string({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
-      const user = await requireUser(ctx);
-      const readable = await getReadableTimetable(user.id, args.idOrSlug);
-      if (!readable) notFound("Timetable not found");
+      const { readable } = await loadTimetableAndViewer(ctx, args.idOrSlug);
       if (!isAdmin(readable.roles)) forbidden("Admins only");
       await createSlots(readable.timetable.id, [
         {
@@ -1804,9 +1816,7 @@ builder.mutationFields((t) => ({
       count: t.arg.int({ required: true }),
     },
     resolve: async (_p, args, ctx) => {
-      const user = await requireUser(ctx);
-      const readable = await getReadableTimetable(user.id, args.idOrSlug);
-      if (!readable) notFound("Timetable not found");
+      const { readable } = await loadTimetableAndViewer(ctx, args.idOrSlug);
       if (!isAdmin(readable.roles)) forbidden("Admins only");
       const start = new Date(args.startsAt);
       const end = new Date(args.endsAt);
@@ -1889,9 +1899,10 @@ builder.mutationFields((t) => ({
       state: t.arg.string({ required: true }),
     },
     resolve: async (_p, args, ctx) => {
-      const user = await requireUser(ctx);
-      const readable = await getReadableTimetable(user.id, args.idOrSlug);
-      if (!readable) notFound("Timetable not found");
+      const { user, readable } = await loadTimetableAndViewer(
+        ctx,
+        args.idOrSlug,
+      );
       if (!isElector(readable.roles)) forbidden("Electors only");
       const state = args.state as AvailabilityState;
       if (state !== "green" && state !== "yellow" && state !== "red") {
