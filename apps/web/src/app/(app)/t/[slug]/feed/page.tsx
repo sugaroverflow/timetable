@@ -1,4 +1,3 @@
-/* eslint-disable complexity -- audit debt (2026-07-22): decomposition queued — remove this disable when refactoring */
 import { Heart } from "lucide-react";
 import Link from "next/link";
 
@@ -31,6 +30,63 @@ const HOST_CARD_QUERY = `
     person(idOrSlug: $s, userId: $u) { userId name bioHtml }
   }
 `;
+
+/** Filtering to one host puts their profile card above the topics (QA #59). */
+function HostFilterCard({
+  hostCard,
+  hostLabel,
+}: {
+  hostCard: HostCard;
+  hostLabel: string;
+}) {
+  if (!hostCard) return null;
+  return (
+    <div className="card stack host-filter-card">
+      <div className="row" style={{ alignItems: "center" }}>
+        <Avatar name={hostCard.name} large />
+        <div>
+          <strong>{hostCard.name ?? hostLabel}</strong>
+          <div className="faint" style={{ fontSize: 12 }}>
+            {hostLabel} · topics below
+          </div>
+        </div>
+      </div>
+      {hostCard.bioHtml ? (
+        <div
+          className="topic-body"
+          dangerouslySetInnerHTML={{ __html: hostCard.bioHtml }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function FeedEmpty({
+  hearted,
+  hostLabel,
+  adminLabel,
+}: {
+  hearted: boolean;
+  hostLabel: string;
+  adminLabel: string;
+}) {
+  if (hearted) {
+    return (
+      <EmptyState
+        icon="♥"
+        title="No hearted topics yet"
+        hint="Heart topics in the feed and they'll collect here."
+      />
+    );
+  }
+  return (
+    <EmptyState
+      icon="◇"
+      title="No published topics yet"
+      hint={`${pluralLabel(hostLabel)} create topics from My Topics; ${pluralLabel(adminLabel).toLowerCase()} publish them from Pending Topics.`}
+    />
+  );
+}
 
 export default async function FeedPage({
   params,
@@ -69,7 +125,6 @@ export default async function FeedPage({
   const hostLabel = roleLabel(page.settings.roleLabels, "host");
   const adminLabel = roleLabel(page.settings.roleLabels, "admin");
 
-  // Filtering to one host puts their profile card above the topics (QA #59).
   let hostCard: HostCard = null;
   if (host) {
     const data = await gqlFetch<{ person: HostCard }>(HOST_CARD_QUERY, {
@@ -109,37 +164,13 @@ export default async function FeedPage({
         </div>
       ) : null}
 
-      {hostCard ? (
-        <div className="card stack host-filter-card">
-          <div className="row" style={{ alignItems: "center" }}>
-            <Avatar name={hostCard.name} large />
-            <div>
-              <strong>{hostCard.name ?? hostLabel}</strong>
-              <div className="faint" style={{ fontSize: 12 }}>
-                {hostLabel} · topics below
-              </div>
-            </div>
-          </div>
-          {hostCard.bioHtml ? (
-            <div
-              className="topic-body"
-              dangerouslySetInnerHTML={{ __html: hostCard.bioHtml }}
-            />
-          ) : null}
-        </div>
-      ) : null}
+      <HostFilterCard hostCard={hostCard} hostLabel={hostLabel} />
 
-      {page.topics.length === 0 && hearted ? (
-        <EmptyState
-          icon="♥"
-          title="No hearted topics yet"
-          hint="Heart topics in the feed and they'll collect here."
-        />
-      ) : page.topics.length === 0 ? (
-        <EmptyState
-          icon="◇"
-          title="No published topics yet"
-          hint={`${pluralLabel(hostLabel)} create topics from My Topics; ${pluralLabel(adminLabel).toLowerCase()} publish them from Pending Topics.`}
+      {page.topics.length === 0 ? (
+        <FeedEmpty
+          hearted={hearted}
+          hostLabel={hostLabel}
+          adminLabel={adminLabel}
         />
       ) : (
         <InfiniteFeed
