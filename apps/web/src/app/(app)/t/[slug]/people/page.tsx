@@ -183,23 +183,19 @@ export default async function PeoplePage({
                         </div>
                       ) : null}
                       {canPreview || canManage ? (
-                        <div
-                          className="row people-card-actions"
-                          style={{ alignItems: "center" }}
-                        >
-                          <span style={{ flex: 1 }} />
-                          {canManage && person.userId !== data.me?.id ? (
-                            <InviteSendButton
-                              membershipId={member!.membershipId}
-                              email={member!.email}
-                              inviteSentAt={member!.inviteSentAt}
-                            />
-                          ) : null}
+                        <div className="people-card-actions">
                           {canPreview ? (
                             <UserPreviewStart
                               slug={slug}
                               userId={person.userId}
                               name={person.name}
+                            />
+                          ) : null}
+                          {canManage && person.userId !== data.me?.id ? (
+                            <InviteSendButton
+                              membershipId={member!.membershipId}
+                              email={member!.email}
+                              inviteSentAt={member!.inviteSentAt}
                             />
                           ) : null}
                           {canManage ? (
