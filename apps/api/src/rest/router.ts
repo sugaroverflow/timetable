@@ -38,7 +38,7 @@ import {
 } from "@timetable/shared";
 
 import { getOrCreateClerkUser } from "../auth/clerk";
-import { buildContext } from "../context";
+import { buildContext, type ApiContext } from "../context";
 import { renderDigest, renderInvite, sendEmail } from "../email";
 import { getRequestId, logRequestError } from "../http/request-log";
 import { buildIcs } from "../ics";
@@ -67,6 +67,57 @@ function contextFromRequest(req: Request) {
   });
 }
 
+/** Send the 401 for unauthenticated requests; returns the user or null. */
+function requireUserCtx(ctx: ApiContext, res: Response) {
+  if (!ctx.user) {
+    res.status(401).json({ error: "Not authenticated" });
+    return null;
+  }
+  return ctx.user;
+}
+
+/** Load a membership by id (404 when missing) and require member-management
+ * rights on its timetable (403 otherwise). Null after an error was sent. */
+async function requireAdminMembership(
+  ctx: ApiContext,
+  membershipId: string,
+  res: Response,
+) {
+  const membership = await getMembershipById(membershipId);
+  if (!membership) {
+    res.status(404).json({ error: "Membership not found" });
+    return null;
+  }
+  const viewer = await ctx.getViewer(membership.timetableId);
+  if (!canManageMembers(viewer)) {
+    res.status(403).json({ error: "Admins only" });
+    return null;
+  }
+  return { membership, viewer };
+}
+
+/** Validate a request body; sends the 400 and returns null when invalid. */
+function parseBody<T>(
+  schema: {
+    safeParse: (
+      input: unknown,
+    ) =>
+      | { success: true; data: T }
+      | { success: false; error: { flatten: () => unknown } };
+  },
+  req: Request,
+  res: Response,
+): T | null {
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    res
+      .status(400)
+      .json({ error: "Invalid input", details: parsed.error.flatten() });
+    return null;
+  }
+  return parsed.data;
+}
+
 /**
  * POST /api/timetables
  * Create a timetable; the creator becomes owner + admin.
@@ -75,20 +126,13 @@ restRouter.post(
   "/timetables",
   h(async (req, res) => {
     const ctx = await contextFromRequest(req);
-    if (!ctx.user) {
-      res.status(401).json({ error: "Not authenticated" });
-      return;
-    }
+    const user = requireUserCtx(ctx, res);
+    if (!user) return;
 
-    const parsed = createTimetableSchema.safeParse(req.body);
-    if (!parsed.success) {
-      res
-        .status(400)
-        .json({ error: "Invalid input", details: parsed.error.flatten() });
-      return;
-    }
+    const input = parseBody(createTimetableSchema, req, res);
+    if (!input) return;
 
-    const timetable = await createTimetable(ctx.user.id, parsed.data);
+    const timetable = await createTimetable(user.id, input);
     res.status(201).json(timetable);
   }),
 );
@@ -101,10 +145,8 @@ restRouter.post(
   "/timetables/:id/invites",
   h(async (req, res) => {
     const ctx = await contextFromRequest(req);
-    if (!ctx.user) {
-      res.status(401).json({ error: "Not authenticated" });
-      return;
-    }
+    const user = requireUserCtx(ctx, res);
+    if (!user) return;
 
     const timetableId = req.params.id as string;
     const viewer = await ctx.getViewer(timetableId);
@@ -113,19 +155,14 @@ restRouter.post(
       return;
     }
 
-    const parsed = inviteSchema.safeParse(req.body);
-    if (!parsed.success) {
-      res
-        .status(400)
-        .json({ error: "Invalid input", details: parsed.error.flatten() });
-      return;
-    }
+    const input = parseBody(inviteSchema, req, res);
+    if (!input) return;
 
     const results = await inviteEmails(
       timetableId,
-      ctx.user.id,
-      parsed.data.emails,
-      parsed.data.roles,
+      user.id,
+      input.emails,
+      input.roles,
     );
     res.json({ results });
   }),
@@ -141,10 +178,8 @@ restRouter.post(
   "/timetables/:id/people",
   h(async (req, res) => {
     const ctx = await contextFromRequest(req);
-    if (!ctx.user) {
-      res.status(401).json({ error: "Not authenticated" });
-      return;
-    }
+    const user = requireUserCtx(ctx, res);
+    if (!user) return;
 
     const timetableId = req.params.id as string;
     const viewer = await ctx.getViewer(timetableId);
@@ -153,31 +188,23 @@ restRouter.post(
       return;
     }
 
-    const parsed = addPersonSchema.safeParse(req.body);
-    if (!parsed.success) {
-      res
-        .status(400)
-        .json({ error: "Invalid input", details: parsed.error.flatten() });
-      return;
-    }
+    const input = parseBody(addPersonSchema, req, res);
+    if (!input) return;
 
-    const email = parsed.data.email.trim().toLowerCase();
-    const clerkUser = await getOrCreateClerkUser(
-      email,
-      parsed.data.name ?? null,
-    );
+    const email = input.email.trim().toLowerCase();
+    const clerkUser = await getOrCreateClerkUser(email, input.name ?? null);
     await createLocalUser({
       id: clerkUser.id,
       email,
-      name: parsed.data.name ?? null,
+      name: input.name ?? null,
     });
     // The local row now exists, so inviteEmails attaches the membership
     // immediately (merging roles if they were already a member).
     const [outcome] = await inviteEmails(
       timetableId,
-      ctx.user.id,
+      user.id,
       [email],
-      parsed.data.roles,
+      input.roles,
     );
     const membership = await getMembership(timetableId, clerkUser.id);
 
@@ -199,21 +226,16 @@ restRouter.post(
   "/memberships/:id/invite",
   h(async (req, res) => {
     const ctx = await contextFromRequest(req);
-    if (!ctx.user) {
-      res.status(401).json({ error: "Not authenticated" });
-      return;
-    }
+    const user = requireUserCtx(ctx, res);
+    if (!user) return;
 
-    const membership = await getMembershipById(req.params.id as string);
-    if (!membership) {
-      res.status(404).json({ error: "Membership not found" });
-      return;
-    }
-    const viewer = await ctx.getViewer(membership.timetableId);
-    if (!canManageMembers(viewer)) {
-      res.status(403).json({ error: "Admins only" });
-      return;
-    }
+    const admin = await requireAdminMembership(
+      ctx,
+      req.params.id as string,
+      res,
+    );
+    if (!admin) return;
+    const { membership } = admin;
 
     const [member, timetable] = await Promise.all([
       getUserById(membership.userId),
@@ -229,7 +251,7 @@ restRouter.post(
       timetableName: timetable.name,
       timetableSlug: timetable.slug,
       inviteeName: member.name,
-      inviterName: ctx.user.name,
+      inviterName: user.name,
       topicsCount: topics.length,
     });
     await sendEmail({ to: member.email, subject, html });
@@ -249,33 +271,21 @@ restRouter.patch(
   "/memberships/:id/roles",
   h(async (req, res) => {
     const ctx = await contextFromRequest(req);
-    if (!ctx.user) {
-      res.status(401).json({ error: "Not authenticated" });
-      return;
-    }
+    if (!requireUserCtx(ctx, res)) return;
 
-    const membership = await getMembershipById(req.params.id as string);
-    if (!membership) {
-      res.status(404).json({ error: "Membership not found" });
-      return;
-    }
+    const admin = await requireAdminMembership(
+      ctx,
+      req.params.id as string,
+      res,
+    );
+    if (!admin) return;
+    const { membership } = admin;
 
-    const viewer = await ctx.getViewer(membership.timetableId);
-    if (!canManageMembers(viewer)) {
-      res.status(403).json({ error: "Admins only" });
-      return;
-    }
-
-    const parsed = updateMemberRolesSchema.safeParse(req.body);
-    if (!parsed.success) {
-      res
-        .status(400)
-        .json({ error: "Invalid input", details: parsed.error.flatten() });
-      return;
-    }
+    const input = parseBody(updateMemberRolesSchema, req, res);
+    if (!input) return;
 
     const timetable = await getTimetableById(membership.timetableId);
-    let roles: Role[] = parsed.data.roles;
+    let roles: Role[] = input.roles;
     if (timetable && membership.userId === timetable.ownerId) {
       // The owner always keeps owner + admin.
       roles = Array.from(new Set<Role>([...roles, "owner", "admin"]));
@@ -298,22 +308,16 @@ restRouter.delete(
   "/memberships/:id",
   h(async (req, res) => {
     const ctx = await contextFromRequest(req);
-    if (!ctx.user) {
-      res.status(401).json({ error: "Not authenticated" });
-      return;
-    }
+    const user = requireUserCtx(ctx, res);
+    if (!user) return;
 
-    const membership = await getMembershipById(req.params.id as string);
-    if (!membership) {
-      res.status(404).json({ error: "Membership not found" });
-      return;
-    }
-
-    const viewer = await ctx.getViewer(membership.timetableId);
-    if (!canManageMembers(viewer)) {
-      res.status(403).json({ error: "Admins only" });
-      return;
-    }
+    const admin = await requireAdminMembership(
+      ctx,
+      req.params.id as string,
+      res,
+    );
+    if (!admin) return;
+    const { membership } = admin;
 
     const timetable = await getTimetableById(membership.timetableId);
     if (timetable && membership.userId === timetable.ownerId) {
@@ -321,7 +325,7 @@ restRouter.delete(
       return;
     }
 
-    await removeMembership(membership, ctx.user.id);
+    await removeMembership(membership, user.id);
     res.json({ removed: true });
   }),
 );
@@ -336,10 +340,8 @@ restRouter.post(
   "/uploads",
   h(async (req, res) => {
     const ctx = await contextFromRequest(req);
-    if (!ctx.user) {
-      res.status(401).json({ error: "Not authenticated" });
-      return;
-    }
+    const user = requireUserCtx(ctx, res);
+    if (!user) return;
 
     const body = req.body as {
       purpose?: unknown;
@@ -364,7 +366,7 @@ restRouter.post(
         return;
       }
       const readable = await getReadableTimetable(
-        ctx.user.id,
+        user.id,
         body.timetableIdOrSlug.trim(),
       );
       if (!readable) {
@@ -372,7 +374,7 @@ restRouter.post(
         return;
       }
       uploadTimetableId = readable.timetable.id;
-      const viewer = { userId: ctx.user.id, roles: readable.roles };
+      const viewer = { userId: user.id, roles: readable.roles };
       if (
         body.purpose === "topic-cover" &&
         !(canProposeTopics(viewer) || canModerate(viewer))
@@ -389,7 +391,7 @@ restRouter.post(
     try {
       const upload = await createSignedUpload({
         purpose: body.purpose,
-        userId: ctx.user.id,
+        userId: user.id,
         timetableId: uploadTimetableId,
         filename: body.filename,
         contentType: body.contentType,
