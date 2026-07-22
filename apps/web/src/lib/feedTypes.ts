@@ -52,7 +52,6 @@ export type FeedTopic = {
   contentUpdatedAt: string | null;
   createdAt: string;
   comments: FeedComment[];
-  weightedBreakdown: WeightedHeart[] | null;
 };
 
 export type ManagedTopic = {

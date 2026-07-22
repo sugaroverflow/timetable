@@ -15,6 +15,7 @@ import {
 } from "@/components/TimetableSwitcher";
 import { UserPreviewExit } from "@/components/UserPreview";
 import { gqlFetch } from "@/lib/graphql";
+import { getMyTimetables } from "@/lib/myTimetables";
 import {
   buildThemeCss,
   parseTimetableSettings,
@@ -44,25 +45,6 @@ const TIMETABLE_QUERY = `
       customDomain
       viewerRoles
       settings
-    }
-  }
-`;
-
-type MineResult = {
-  myTimetables: {
-    timetable: {
-      slug: string;
-      name: string;
-      privacy: string;
-      settings: string;
-    };
-  }[];
-};
-
-const MINE_QUERY = `
-  query SidebarSwitcher {
-    myTimetables {
-      timetable { slug name privacy settings }
     }
   }
 `;
@@ -119,17 +101,17 @@ export default async function TimetableLayout({
   let unread = 0;
   if (isAuthed) {
     const [mine, unreadData] = await Promise.all([
-      gqlFetch<MineResult>(MINE_QUERY),
+      getMyTimetables(),
       roles.length > 0
         ? gqlFetch<{ notificationsUnread: number }>(UNREAD_QUERY, { s: slug })
         : Promise.resolve({ notificationsUnread: 0 }),
     ]);
-    switcherItems = mine.myTimetables.map((m) => {
-      const s = parseTimetableSettings(m.timetable.settings);
+    switcherItems = mine.map((t) => {
+      const s = parseTimetableSettings(t.settings);
       return {
-        slug: m.timetable.slug,
-        name: m.timetable.name,
-        privacy: m.timetable.privacy,
+        slug: t.slug,
+        name: t.name,
+        privacy: t.privacy,
         iconUrl: s.iconUrl ?? null,
         iconEmoji: s.iconEmoji ?? null,
       };

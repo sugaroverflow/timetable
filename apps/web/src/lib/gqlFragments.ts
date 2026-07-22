@@ -12,11 +12,12 @@ export function commentTree(field = "comments"): string {
 
 /** Topic selection shared by the feed (feedPage.ts) and the topic permalink
  * page — everything a TopicCard renders. The feed additionally selects
- * contentUpdatedAt for its "new since last visit" highlights. */
+ * contentUpdatedAt for its "new since last visit" highlights. The per-elector
+ * weightedBreakdown is deliberately NOT selected here: BreakdownToggle
+ * fetches it lazily on first expand (it costs ~4 queries per topic). */
 export const TOPIC_FEED_FIELDS = `
   id timetableId hostId hostName hostImage hostSlug title slug bodyMd bodyHtml coverImageUrl status
   heartCount weightedScore viewerHasHearted commentCount
   publishedAt createdAt
   ${commentTree()}
-  weightedBreakdown { electorId electorName weight l2Weight devotionWeight heartedAt }
 `;

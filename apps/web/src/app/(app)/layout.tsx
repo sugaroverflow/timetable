@@ -5,22 +5,8 @@ import Link from "next/link";
 import { TopbarBrand, type BrandItem } from "@/components/TopbarBrand";
 import { TopbarHamburger } from "@/components/TopbarHamburger";
 import { ToastProvider } from "@/components/Toast";
-import { gqlFetch } from "@/lib/graphql";
+import { getMyTimetables } from "@/lib/myTimetables";
 import { parseTimetableSettings } from "@/lib/timetableSettings";
-
-type MenuData = {
-  myTimetables: {
-    timetable: { slug: string; name: string; settings: string };
-  }[];
-};
-
-const MENU_QUERY = `
-  query TopbarMenu {
-    myTimetables {
-      timetable { slug name settings }
-    }
-  }
-`;
 
 export default async function AppLayout({
   children,
@@ -35,12 +21,12 @@ export default async function AppLayout({
 
   let brandItems: BrandItem[] = [];
   if (userId) {
-    const data = await gqlFetch<MenuData>(MENU_QUERY);
-    brandItems = data.myTimetables.map((m) => {
-      const s = parseTimetableSettings(m.timetable.settings);
+    const mine = await getMyTimetables();
+    brandItems = mine.map((t) => {
+      const s = parseTimetableSettings(t.settings);
       return {
-        slug: m.timetable.slug,
-        name: m.timetable.name,
+        slug: t.slug,
+        name: t.name,
         iconUrl: s.iconUrl ?? null,
         iconEmoji: s.iconEmoji ?? null,
       };

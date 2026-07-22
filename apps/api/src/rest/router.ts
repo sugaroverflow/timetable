@@ -438,15 +438,29 @@ restRouter.post(
     const recipients = await listDigestRecipients();
     let sent = 0;
 
-    for (const recipient of recipients) {
-      const since = recipient.lastDigestAt ?? new Date(now.getTime() - dayMs);
-      const digest = await computeUserDigest(recipient, since);
-      if (!isDigestEmpty(digest) && digest.email) {
-        const { subject, html } = renderDigest(digest);
-        await sendEmail({ to: digest.email, subject, html });
-        sent += 1;
-      }
-      await markDigestSent(recipient.id, now);
+    // Recipients are independent, so process them in concurrent chunks of
+    // 10. Failure semantics match the old sequential loop as closely as
+    // chunking allows: one recipient's compute/send throwing still aborts
+    // the whole run (previously everything after it; now its chunk).
+    const chunkSize = 10;
+    for (let i = 0; i < recipients.length; i += chunkSize) {
+      const chunk = recipients.slice(i, i + chunkSize);
+      const results = await Promise.all(
+        chunk.map(async (recipient) => {
+          const since =
+            recipient.lastDigestAt ?? new Date(now.getTime() - dayMs);
+          const digest = await computeUserDigest(recipient, since);
+          let didSend = false;
+          if (!isDigestEmpty(digest) && digest.email) {
+            const { subject, html } = renderDigest(digest);
+            await sendEmail({ to: digest.email, subject, html });
+            didSend = true;
+          }
+          await markDigestSent(recipient.id, now);
+          return didSend;
+        }),
+      );
+      sent += results.filter(Boolean).length;
     }
 
     res.json({ processed: recipients.length, sent });

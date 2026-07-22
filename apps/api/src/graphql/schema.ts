@@ -9,7 +9,6 @@ import {
   buildCalendar,
   buildFeed,
   type FeedSort,
-  claimInvitesForUser,
   countViewerPublishedHearts,
   createSlots,
   createTopic,
@@ -35,6 +34,7 @@ import {
   getWeightedBreakdown,
   listActivity,
   listCommentTree,
+  listCommentTreesForTopics,
   listHostTopics,
   listMembers,
   listMembershipsForUser,
@@ -123,6 +123,18 @@ type GqlTopic = FeedTopic & {
   canSeeHostOnly: boolean;
   canModerate: boolean;
   canSeeComments: boolean;
+  /** Comment trees prefetched in one batched query by list resolvers
+   * (topicFeed); single-topic paths leave it unset and the field resolver
+   * falls back to a per-topic query. */
+  prefetchedComments?: CommentNode[];
+};
+
+/** ManagedTopic rows with the three comment threads optionally prefetched
+ * (hostDashboard batches them; other paths fall back per topic). */
+type GqlManagedTopic = Topic & {
+  prefetchedComments?: CommentNode[];
+  prefetchedHostOnlyComments?: CommentNode[];
+  prefetchedAdminComments?: CommentNode[];
 };
 
 // ---------------------------------------------------------------------------
@@ -207,12 +219,21 @@ async function requireUser(ctx: ApiContext): Promise<SessionUser> {
   return ctx.user;
 }
 
+/** getReadableTimetable through the request-scoped memo when the context
+ * provides one (buildContext does; bare test contexts fall back to a direct
+ * call). Saves ~6 duplicate lookups on a multi-resolver feed document. */
+function readTimetable(ctx: ApiContext, idOrSlug: string) {
+  return ctx.readableTimetable
+    ? ctx.readableTimetable(idOrSlug)
+    : getReadableTimetable(ctx.user?.id ?? null, idOrSlug);
+}
+
 /** The guard ladder shared by timetable-scoped resolvers: authenticated
  * user → readable timetable (NOT_FOUND otherwise) → viewer for permission
  * checks. */
 async function loadTimetableAndViewer(ctx: ApiContext, idOrSlug: string) {
   const user = await requireUser(ctx);
-  const readable = await getReadableTimetable(user.id, idOrSlug);
+  const readable = await readTimetable(ctx, idOrSlug);
   if (!readable) notFound("Timetable not found");
   const viewer = { userId: user.id, roles: readable.roles };
   return { user, readable, viewer };
@@ -433,73 +454,116 @@ const TopicType = builder.objectRef<GqlTopic>("Topic").implement({
       type: [CommentType],
       resolve: (tp) => {
         if (!tp.canSeeComments) return [];
-        return listCommentTree(tp.id, {
-          includeHostOnly: tp.canSeeHostOnly,
-          includeHidden: tp.canModerate,
-        });
+        return (
+          tp.prefetchedComments ??
+          listCommentTree(tp.id, {
+            includeHostOnly: tp.canSeeHostOnly,
+            includeHidden: tp.canModerate,
+          })
+        );
       },
     }),
   }),
 });
 
-const ManagedTopicType = builder.objectRef<Topic>("ManagedTopic").implement({
-  fields: (t) => ({
-    id: t.exposeID("id"),
-    timetableId: t.exposeID("timetableId"),
-    hostId: t.exposeID("hostId"),
-    slug: t.exposeString("slug", { nullable: true }),
-    hostSlug: t.string({
-      nullable: true,
-      resolve: (tp) => getOrCreateUserSlug(tp.hostId),
+/** Prefetch the three ManagedTopic comment threads for a page of topics in
+ * three batched queries instead of three per topic (hostDashboard). Applies
+ * the same root-visibility filters as the per-field fallbacks below. */
+async function attachManagedCommentTrees(
+  rows: Topic[],
+): Promise<GqlManagedTopic[]> {
+  const ids = rows.map((tp) => tp.id);
+  const [publicTrees, hostTrees, adminTrees] = await Promise.all([
+    listCommentTreesForTopics(ids, {
+      includeHostOnly: false,
+      includeHidden: false,
     }),
-    title: t.exposeString("title"),
-    bodyMd: t.exposeString("bodyMd"),
-    bodyHtml: t.string({ resolve: (tp) => renderMarkdown(tp.bodyMd) }),
-    status: t.exposeString("status"),
-    updatedAt: t.string({ resolve: (tp) => tp.updatedAt.toISOString() }),
-    hostName: t.string({
-      nullable: true,
-      resolve: async (tp) => (await getUserById(tp.hostId))?.name ?? null,
+    listCommentTreesForTopics(ids, {
+      includeHostOnly: true,
+      includeHidden: false,
     }),
-    /** Public comment thread — lets My Topics render feed-identical cards
-     * (QA #59). */
-    comments: t.field({
-      type: [CommentType],
-      resolve: (tp) =>
-        listCommentTree(tp.id, {
-          includeHostOnly: false,
-          includeHidden: false,
-        }),
+    listCommentTreesForTopics(ids, {
+      includeHostOnly: false,
+      includeAdminOnly: true,
+      includeHidden: false,
     }),
-    /** Host-only thread. ManagedTopic is only ever served to the owning
-     * host or admins, so this is safe. */
-    hostOnlyComments: t.field({
-      type: [CommentType],
-      resolve: async (tp) => {
-        const tree = await listCommentTree(tp.id, {
-          includeHostOnly: true,
-          includeHidden: false,
-        });
-        return tree.filter((c) => c.visibility === "host_only");
-      },
+  ]);
+  return rows.map((tp) => ({
+    ...tp,
+    prefetchedComments: publicTrees.get(tp.id) ?? [],
+    prefetchedHostOnlyComments: (hostTrees.get(tp.id) ?? []).filter(
+      (c) => c.visibility === "host_only",
+    ),
+    prefetchedAdminComments: (adminTrees.get(tp.id) ?? []).filter(
+      (c) => c.visibility === "admin_only",
+    ),
+  }));
+}
+
+const ManagedTopicType = builder
+  .objectRef<GqlManagedTopic>("ManagedTopic")
+  .implement({
+    fields: (t) => ({
+      id: t.exposeID("id"),
+      timetableId: t.exposeID("timetableId"),
+      hostId: t.exposeID("hostId"),
+      slug: t.exposeString("slug", { nullable: true }),
+      hostSlug: t.string({
+        nullable: true,
+        resolve: (tp) => getOrCreateUserSlug(tp.hostId),
+      }),
+      title: t.exposeString("title"),
+      bodyMd: t.exposeString("bodyMd"),
+      bodyHtml: t.string({ resolve: (tp) => renderMarkdown(tp.bodyMd) }),
+      status: t.exposeString("status"),
+      updatedAt: t.string({ resolve: (tp) => tp.updatedAt.toISOString() }),
+      hostName: t.string({
+        nullable: true,
+        resolve: async (tp) => (await getUserById(tp.hostId))?.name ?? null,
+      }),
+      /** Public comment thread — lets My Topics render feed-identical cards
+       * (QA #59). */
+      comments: t.field({
+        type: [CommentType],
+        resolve: (tp) =>
+          tp.prefetchedComments ??
+          listCommentTree(tp.id, {
+            includeHostOnly: false,
+            includeHidden: false,
+          }),
+      }),
+      /** Host-only thread. ManagedTopic is only ever served to the owning
+       * host or admins, so this is safe. */
+      hostOnlyComments: t.field({
+        type: [CommentType],
+        resolve: async (tp) => {
+          if (tp.prefetchedHostOnlyComments)
+            return tp.prefetchedHostOnlyComments;
+          const tree = await listCommentTree(tp.id, {
+            includeHostOnly: true,
+            includeHidden: false,
+          });
+          return tree.filter((c) => c.visibility === "host_only");
+        },
+      }),
+      /** The drafting thread (QA #59 round 3): admins + topic owner only.
+       * Rendered on Pending Topics (admins) and My Topics (owner), never in
+       * the feed. */
+      adminComments: t.field({
+        type: [CommentType],
+        resolve: async (tp) => {
+          if (tp.prefetchedAdminComments) return tp.prefetchedAdminComments;
+          const tree = await listCommentTree(tp.id, {
+            includeHostOnly: false,
+            includeAdminOnly: true,
+            includeHidden: false,
+          });
+          return tree.filter((c) => c.visibility === "admin_only");
+        },
+      }),
+      coverImageUrl: t.exposeString("coverImageUrl", { nullable: true }),
     }),
-    /** The drafting thread (QA #59 round 3): admins + topic owner only.
-     * Rendered on Pending Topics (admins) and My Topics (owner), never in
-     * the feed. */
-    adminComments: t.field({
-      type: [CommentType],
-      resolve: async (tp) => {
-        const tree = await listCommentTree(tp.id, {
-          includeHostOnly: false,
-          includeAdminOnly: true,
-          includeHidden: false,
-        });
-        return tree.filter((c) => c.visibility === "admin_only");
-      },
-    }),
-    coverImageUrl: t.exposeString("coverImageUrl", { nullable: true }),
-  }),
-});
+  });
 
 const ActivityType = builder
   .objectRef<ActivityEntry>("ActivityEvent")
@@ -587,10 +651,10 @@ builder.queryType({
       type: [MembershipType],
       resolve: async (_p, _a, ctx) => {
         if (!ctx.user) return [];
-        // Claim any invites that arrived after the user's first sign-in.
-        if (ctx.user.email) {
-          await claimInvitesForUser(ctx.user.id, ctx.user.email);
-        }
+        // No invite-claim here: pending invites only exist for emails with
+        // no local account (inviteEmails adds memberships immediately
+        // otherwise), and both row-creation paths claim them — sign-in JIT
+        // creation (auth/clerk.ts) and admin pre-create (createLocalUser).
         const rows = await listMembershipsForUser(ctx.user.id);
         return rows.map((r) => ({
           id: r.membershipId,
@@ -605,10 +669,7 @@ builder.queryType({
       nullable: true,
       args: { idOrSlug: t.arg.string({ required: true }) },
       resolve: async (_p, args, ctx) => {
-        const result = await getReadableTimetable(
-          ctx.user?.id ?? null,
-          args.idOrSlug,
-        );
+        const result = await readTimetable(ctx, args.idOrSlug);
         if (!result) return null;
         return { ...result.timetable, viewerRoles: result.roles as string[] };
       },
@@ -630,10 +691,7 @@ builder.queryType({
       type: [PersonType],
       args: { idOrSlug: t.arg.string({ required: true }) },
       resolve: async (_p, args, ctx) => {
-        const readable = await getReadableTimetable(
-          ctx.user?.id ?? null,
-          args.idOrSlug,
-        );
+        const readable = await readTimetable(ctx, args.idOrSlug);
         if (!readable) return [];
         const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
         const people = await listPeople(readable.timetable.id);
@@ -656,10 +714,7 @@ builder.queryType({
         userId: t.arg.string({ required: true }),
       },
       resolve: async (_p, args, ctx) => {
-        const readable = await getReadableTimetable(
-          ctx.user?.id ?? null,
-          args.idOrSlug,
-        );
+        const readable = await readTimetable(ctx, args.idOrSlug);
         if (!readable) return null;
         const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
         const person = await getPerson(readable.timetable.id, args.userId);
@@ -692,7 +747,7 @@ builder.queryType({
       args: { idOrSlug: t.arg.string({ required: true }) },
       resolve: async (_p, args, ctx) => {
         if (!ctx.user) return null;
-        const readable = await getReadableTimetable(ctx.user.id, args.idOrSlug);
+        const readable = await readTimetable(ctx, args.idOrSlug);
         if (!readable) return null;
         const seen = await getFeedLastSeen(ctx.user.id, readable.timetable.id);
         return seen ? seen.toISOString() : null;
@@ -706,7 +761,7 @@ builder.queryType({
       args: { idOrSlug: t.arg.string({ required: true }) },
       resolve: async (_p, args, ctx) => {
         if (!ctx.user) return [];
-        const readable = await getReadableTimetable(ctx.user.id, args.idOrSlug);
+        const readable = await readTimetable(ctx, args.idOrSlug);
         if (!readable || readable.roles.length === 0) return [];
         return listNotifications(readable.timetable.id, ctx.user.id);
       },
@@ -717,7 +772,7 @@ builder.queryType({
       args: { idOrSlug: t.arg.string({ required: true }) },
       resolve: async (_p, args, ctx) => {
         if (!ctx.user) return 0;
-        const readable = await getReadableTimetable(ctx.user.id, args.idOrSlug);
+        const readable = await readTimetable(ctx, args.idOrSlug);
         if (!readable || readable.roles.length === 0) return 0;
         return countUnreadNotifications(readable.timetable.id, ctx.user.id);
       },
@@ -752,10 +807,7 @@ builder.queryType({
         offset: t.arg.int({ required: false }),
       },
       resolve: async (_p, args, ctx) => {
-        const readable = await getReadableTimetable(
-          ctx.user?.id ?? null,
-          args.idOrSlug,
-        );
+        const readable = await readTimetable(ctx, args.idOrSlug);
         if (!readable) return [];
         const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
         const hostOnly = canSeeHostOnly(viewer);
@@ -791,11 +843,20 @@ builder.queryType({
             offset: args.offset ?? undefined,
           },
         );
+        // Batch the page's comment trees into one query instead of one per
+        // topic; the Topic.comments resolver serves them from the prefetch.
+        const commentTrees = seeComments
+          ? await listCommentTreesForTopics(
+              feed.map((tp) => tp.id),
+              { includeHostOnly: hostOnly, includeHidden: moderate },
+            )
+          : new Map<string, CommentNode[]>();
         return feed.map((tp) => ({
           ...tp,
           canSeeHostOnly: hostOnly,
           canModerate: moderate,
           canSeeComments: seeComments,
+          prefetchedComments: commentTrees.get(tp.id) ?? [],
         }));
       },
     }),
@@ -806,9 +867,10 @@ builder.queryType({
       args: { idOrSlug: t.arg.string({ required: true }) },
       resolve: async (_p, args, ctx) => {
         if (!ctx.user) return [];
-        const readable = await getReadableTimetable(ctx.user.id, args.idOrSlug);
+        const readable = await readTimetable(ctx, args.idOrSlug);
         if (!readable) return [];
-        return listHostTopics(readable.timetable.id, ctx.user.id);
+        const rows = await listHostTopics(readable.timetable.id, ctx.user.id);
+        return attachManagedCommentTrees(rows);
       },
     }),
 
@@ -817,10 +879,7 @@ builder.queryType({
       type: [ManagedTopicType],
       args: { idOrSlug: t.arg.string({ required: true }) },
       resolve: async (_p, args, ctx) => {
-        const readable = await getReadableTimetable(
-          ctx.user?.id ?? null,
-          args.idOrSlug,
-        );
+        const readable = await readTimetable(ctx, args.idOrSlug);
         if (!readable) return [];
         const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
         if (!canModerate(viewer)) return [];
@@ -838,10 +897,7 @@ builder.queryType({
         to: t.arg.string({ required: false }),
       },
       resolve: async (_p, args, ctx) => {
-        const readable = await getReadableTimetable(
-          ctx.user?.id ?? null,
-          args.idOrSlug,
-        );
+        const readable = await readTimetable(ctx, args.idOrSlug);
         if (!readable) return [];
         const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
         if (!canModerate(viewer)) return [];
@@ -875,10 +931,7 @@ builder.queryType({
         topicSlug: t.arg.string({ required: true }),
       },
       resolve: async (_p, args, ctx) => {
-        const readable = await getReadableTimetable(
-          ctx.user?.id ?? null,
-          args.idOrSlug,
-        );
+        const readable = await readTimetable(ctx, args.idOrSlug);
         if (!readable) return null;
         const topic = await getTopicBySlug(
           readable.timetable.id,
@@ -946,10 +999,7 @@ builder.queryType({
       type: [HostOptionType],
       args: { idOrSlug: t.arg.string({ required: true }) },
       resolve: async (_p, args, ctx) => {
-        const readable = await getReadableTimetable(
-          ctx.user?.id ?? null,
-          args.idOrSlug,
-        );
+        const readable = await readTimetable(ctx, args.idOrSlug);
         if (!readable) return [];
         return listTimetableHosts(readable.timetable.id);
       },
@@ -1514,6 +1564,8 @@ builder.mutationType({
           }
         }
         await setHeartsCountFrom(readable.timetable.id, countFrom, user.id);
+        // Deliberately NOT the request memo: this re-read must observe the
+        // heartsCountFrom just written (the memo holds the pre-write row).
         const updated = await getReadableTimetable(user.id, args.idOrSlug);
         if (!updated) notFound("Timetable not found");
         return {
@@ -1749,10 +1801,7 @@ builder.queryFields((t) => ({
       audience: t.arg.string({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
-      const readable = await getReadableTimetable(
-        ctx.user?.id ?? null,
-        args.idOrSlug,
-      );
+      const readable = await readTimetable(ctx, args.idOrSlug);
       if (!readable) return [];
       const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
       const hostOnly = canSeeHostOnly(viewer);
@@ -1850,10 +1899,7 @@ builder.mutationFields((t) => ({
         endsAt: args.endsAt ? new Date(args.endsAt) : undefined,
         location: args.location ?? undefined,
       });
-      const readable = await getReadableTimetable(
-        ctx.user?.id ?? null,
-        slot.timetableId,
-      );
+      const readable = await readTimetable(ctx, slot.timetableId);
       if (!readable) notFound("Timetable not found");
       return { ...readable.timetable, viewerRoles: readable.roles as string[] };
     },
@@ -2136,10 +2182,7 @@ builder.queryFields((t) => ({
       activitySince: t.arg.string({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
-      const readable = await getReadableTimetable(
-        ctx.user?.id ?? null,
-        args.idOrSlug,
-      );
+      const readable = await readTimetable(ctx, args.idOrSlug);
       if (!readable) return null;
       const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
       if (!canSeeHostOnly(viewer)) return null;
@@ -2164,10 +2207,7 @@ builder.queryFields((t) => ({
       topicId: t.arg.string({ required: true }),
     },
     resolve: async (_p, args, ctx) => {
-      const readable = await getReadableTimetable(
-        ctx.user?.id ?? null,
-        args.idOrSlug,
-      );
+      const readable = await readTimetable(ctx, args.idOrSlug);
       if (!readable) return null;
       const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
       if (!canSeeHostOnly(viewer)) return null;
@@ -2193,10 +2233,7 @@ builder.queryFields((t) => ({
     resolve: async (_p, args, ctx) => {
       const timetable = await getTimetableByDomain(args.host);
       if (!timetable) return null;
-      const readable = await getReadableTimetable(
-        ctx.user?.id ?? null,
-        timetable.id,
-      );
+      const readable = await readTimetable(ctx, timetable.id);
       if (!readable) return null;
       return { ...readable.timetable, viewerRoles: readable.roles as string[] };
     },

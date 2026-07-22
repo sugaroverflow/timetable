@@ -2,6 +2,8 @@ import { and, eq } from "drizzle-orm";
 
 import { db, timetableMemberships, users } from "@timetable/db";
 
+import { claimInvitesForUser } from "./invites";
+
 /**
  * Admin "add person" support (product feedback round 2): accounts are
  * pre-created and populated before the person is ever emailed, so joining
@@ -30,14 +32,16 @@ export async function createLocalUser(args: {
   email: string;
   name: string | null;
 }): Promise<void> {
+  const email = args.email.trim().toLowerCase();
   await db
     .insert(users)
-    .values({
-      id: args.id,
-      email: args.email.trim().toLowerCase(),
-      name: args.name,
-    })
+    .values({ id: args.id, email, name: args.name })
     .onConflictDoNothing({ target: users.id });
+  // Other forums may hold pending invites for this email (queued while no
+  // account existed). Claim them now the row exists — the sign-in JIT claim
+  // in the API only runs when IT creates the row, so it would skip this
+  // pre-created account.
+  await claimInvitesForUser(args.id, email);
 }
 
 /** Record that the invite email went out (also used for resends). */

@@ -4,7 +4,7 @@ import { Heart } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
-import { DashboardBreakdownToggle } from "@/components/DashboardBreakdownToggle";
+import { BreakdownToggle } from "@/components/BreakdownToggle";
 import { NORM_MODES, type NormKey } from "@/lib/normModes";
 import { topicPath } from "@/lib/topicPath";
 
@@ -112,7 +112,12 @@ export function TopicLeaderboard({
                     ) : null}
                   </span>
                 </div>
-                <DashboardBreakdownToggle slug={slug} topicId={t.id} />
+                <BreakdownToggle
+                  slug={slug}
+                  topicId={t.id}
+                  className="dash-breakdown"
+                  triggerClassName="thread-toggle"
+                />
               </li>
             );
           })}
