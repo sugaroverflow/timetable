@@ -75,7 +75,7 @@ jobs:
         run: |
           sed -i "s/tag: DEPLOY_TAG/tag: ${{ github.sha }}/" .do/app.dev.yaml
 
-      - name: Deploy timetable-dev to App Platform
+      - name: Deploy topic-dev to App Platform
         uses: digitalocean/app_action/deploy@v2
         env:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
