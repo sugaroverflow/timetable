@@ -23,6 +23,7 @@ export function FeedSortControl({ value }: { value: string }) {
 
   return (
     <select
+      id="sort"
       aria-label="Sort topics"
       value={value}
       onChange={(e) => change(e.target.value)}

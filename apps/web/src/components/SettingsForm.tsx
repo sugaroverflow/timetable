@@ -330,9 +330,11 @@ export function SettingsForm({
       {
         s: slug,
         theme: JSON.stringify(toTheme(state)),
-        cover: state.cover.trim() || null,
-        icon: state.icon.trim() || null,
-        emoji: state.iconEmoji.trim() || null,
+        // Empty strings, not null: the API treats null as "leave unchanged",
+        // so clearing a field must send "" for the image/emoji to be removed.
+        cover: state.cover.trim(),
+        icon: state.icon.trim(),
+        emoji: state.iconEmoji.trim(),
       },
       {
         success: "Theme saved",
@@ -374,6 +376,7 @@ export function SettingsForm({
         <ImageUploadField
           id="cover"
           label="Cover image"
+          hint="Shown full-width above every page at its natural aspect ratio — you choose how tall. Around 1600px wide looks sharp; up to 5 MB."
           value={state.cover}
           onChange={(value) => setField("cover", value)}
           purpose="timetable-cover"
@@ -385,7 +388,8 @@ export function SettingsForm({
       <div style={{ marginTop: 12 }}>
         <ImageUploadField
           id="icon"
-          label="Icon (square, shown in the switcher and top bar)"
+          label="Icon"
+          hint="Square image, shown small in the switcher and top bar — 128×128px is plenty; up to 5 MB."
           value={state.icon}
           onChange={handleIconChange}
           purpose="timetable-icon"

@@ -145,7 +145,7 @@ export default async function FeedPage({
           <p>Published topics you currently heart.</p>
         </div>
       ) : null}
-      <div className="toolbar">
+      <div className="toolbar feed-toolbar">
         <label htmlFor="sort">Sort</label>
         <FeedSortControl value={sort} />
         {page.hosts.length > 0 ? (
