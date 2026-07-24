@@ -1,5 +1,10 @@
-# Deploy dev (timetable-dev @ dev.timetable.love) after CI passes on main.
+# Deploy dev (topic-dev @ dev.timetable.love) after CI passes on main.
 # Secrets: GitHub Environment "timetable-dev" — see README § Environments.
+#
+# CI (build-images job) pushes the web + api images tagged with the commit sha
+# before this workflow fires, so the normal path here is: point the app spec
+# at the tags and deploy. The build steps below are a fallback for manual
+# dispatches from commits whose CI didn't run (e.g. docs-only merges).
 
 name: Deploy Dev
 
@@ -18,6 +23,7 @@ on:
 
 permissions:
   contents: read
+  actions: write # self-cancel when a newer deploy supersedes this one
 
 concurrency:
   group: deploy-dev
@@ -30,22 +36,73 @@ jobs:
       github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     environment: timetable-dev
+    env:
+      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
     steps:
+      # GitHub keeps only the newest pending run in the concurrency group, but
+      # a newer run can queue in the moment between our promotion and job
+      # start. Deploying would be wasted work — bow out and let it ship.
+      # Manual dispatches always run (they may carry seed_sample_data).
+      - name: Cancel when superseded by a queued deploy
+        if: github.event_name == 'workflow_run'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          newer=$(gh run list --repo "$GITHUB_REPOSITORY" \
+            --workflow=deploy-dev.yml --json databaseId,status \
+            --jq "[.[] | select(.status != \"completed\" and .databaseId > $GITHUB_RUN_ID)] | length")
+          if [ "$newer" -gt 0 ]; then
+            echo "A newer Deploy Dev run is queued; cancelling this superseded run."
+            gh run cancel "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY"
+            sleep 300
+            echo "Cancellation did not take effect; failing to avoid a stale deploy."
+            exit 1
+          fi
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ env.DEPLOY_SHA }}
 
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Authenticate with DO Container Registry
+        run: doctl registry login --expiry-seconds 1200
+
+      - name: Check for images prebuilt by CI
+        id: images
+        run: |
+          set -euo pipefail
+          present=true
+          for repo in web api; do
+            if ! docker manifest inspect \
+              "registry.digitalocean.com/timetable-reg/$repo:$DEPLOY_SHA" \
+              >/dev/null 2>&1; then
+              echo "Missing timetable-reg/$repo:$DEPLOY_SHA — will build here."
+              present=false
+            fi
+          done
+          echo "present=$present" >> "$GITHUB_OUTPUT"
+
+      # ---- Fallback build (skipped when CI already pushed the images) ----
       - name: Set up Node.js
+        if: steps.images.outputs.present != 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
       - name: Install dependencies
+        if: steps.images.outputs.present != 'true'
         run: npm ci
 
+      # Keep this env in sync with the build-images job in ci.yml.
       - name: Build web app
+        if: steps.images.outputs.present != 'true'
         run: npm run build -w @timetable/web
         env:
           NEXT_PUBLIC_API_URL: "https://dev.timetable.love"
@@ -57,23 +114,20 @@ jobs:
           NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL: "/timetables"
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
 
-      - name: Install doctl
-        uses: digitalocean/action-doctl@v2
-        with:
-          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
-
-      - name: Authenticate with DO Container Registry
-        run: doctl registry login --expiry-seconds 1200
-
-      - name: Build and push web image
+      - name: Build and push web + api images
+        if: steps.images.outputs.present != 'true'
         run: |
-          IMAGE="registry.digitalocean.com/timetable-reg/web:${{ github.sha }}"
-          docker build -f apps/web/Dockerfile -t "$IMAGE" .
-          docker push "$IMAGE"
+          WEB="registry.digitalocean.com/timetable-reg/web:$DEPLOY_SHA"
+          API="registry.digitalocean.com/timetable-reg/api:$DEPLOY_SHA"
+          docker build -f apps/web/Dockerfile -t "$WEB" .
+          docker build -f apps/api/Dockerfile -t "$API" .
+          docker push "$WEB"
+          docker push "$API"
+      # ---- End fallback build ----
 
-      - name: Set image tag in app spec
+      - name: Set image tags in app spec
         run: |
-          sed -i "s/tag: DEPLOY_TAG/tag: ${{ github.sha }}/" .do/app.dev.yaml
+          sed -i "s/tag: DEPLOY_TAG/tag: $DEPLOY_SHA/" .do/app.dev.yaml
 
       - name: Deploy topic-dev to App Platform
         uses: digitalocean/app_action/deploy@v2
@@ -108,16 +162,19 @@ jobs:
             https://dev.timetable.love/graphql \
             | grep -q '"data"'
 
-      # Every deploy pushes a new sha-tagged image and DO never expires them,
-      # so the 500 MiB Starter registry fills in weeks (2026-07-22 quota
-      # incident). Keep the newest 5 tags here; the space itself is reclaimed
-      # by the NIGHTLY GC (registry-gc.yml) — GC makes the registry read-only
-      # while it runs, and starting one per deploy locked out the next deploy
-      # on busy merge days (pushes fail with a bare "unauthorized:").
-      - name: Prune old web images from the registry
+      # Every deploy pushes new sha-tagged web + api images and DO never
+      # expires them, so the 500 MiB Starter registry fills in weeks
+      # (2026-07-22 quota incident). Keep the newest 5 tags per repository;
+      # the space itself is reclaimed by the NIGHTLY GC (registry-gc.yml) —
+      # GC makes the registry read-only while it runs, and starting one per
+      # deploy locked out the next deploy on busy merge days (pushes fail
+      # with a bare "unauthorized:").
+      - name: Prune old images from the registry
         run: |
           set -euo pipefail
-          doctl registry repository list-tags web --format Tag,UpdatedAt --no-header \
-            | sort -k2,3 -r \
-            | awk 'NR>5 {print $1}' \
-            | xargs -r -n1 -I{} doctl registry repository delete-tag web {} --force
+          for repo in web api; do
+            doctl registry repository list-tags "$repo" --format Tag,UpdatedAt --no-header \
+              | sort -k2,3 -r \
+              | awk 'NR>5 {print $1}' \
+              | xargs -r -n1 -I{} doctl registry repository delete-tag "$repo" {} --force
+          done

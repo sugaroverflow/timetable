@@ -75,8 +75,8 @@ Important variables:
 
 | Workflow | Trigger | Target |
 | --- | --- | --- |
-| `.github/workflows/ci.yml` | Push to `main`, pull requests | Build, typecheck, lint, format check, unit + e2e tests, migrate against throwaway Postgres |
-| `.github/workflows/deploy-dev.yml` | CI success on `main`, manual | Builds the web Docker image, pushes it to the DO container registry, deploys the `topic-dev` app from `.do/app.dev.yaml`, then prunes the registry; manual runs can optionally seed sample data |
+| `.github/workflows/ci.yml` | Push to `main`, pull requests | Build, typecheck, lint, format check, unit + e2e tests, migrate against throwaway Postgres; on `main` pushes a parallel `build-images` job also builds and pushes the `web` + `api` Docker images to the DO container registry |
+| `.github/workflows/deploy-dev.yml` | CI success on `main`, manual | Deploys the `topic-dev` app from `.do/app.dev.yaml` using the sha-tagged images CI pushed (building them itself only as a fallback), then prunes the registry; manual runs can optionally seed sample data |
 | `.github/workflows/deploy-production.yml` | Manual only | Deploys `topic-prod` from `.do/app.yaml` |
 | `.github/workflows/run-digests.yml` | Daily schedule, manual | Calls `POST /api/jobs/digests` with `CRON_SECRET` |
 | `.github/workflows/claude-review.yml` | PR opened / ready for review | Automated Claude PR review; inert until the `ANTHROPIC_API_KEY` secret and the `CLAUDE_REVIEW_ENABLED=true` repo variable are set |
@@ -90,17 +90,19 @@ README/docs-only changes on `main` do not trigger CI and therefore do not
 trigger dev deploys.
 
 The dev deploy workflow is serialized with a single `deploy-dev` concurrency
-group. After DigitalOcean reports a successful deploy, GitHub Actions verifies
-that `/health`, `/`, and `/graphql` are reachable on `https://dev.timetable.love`.
+group; a run that finds a newer deploy already queued behind it cancels itself
+so only the newest commit ships. After DigitalOcean reports a successful
+deploy, GitHub Actions verifies that `/health`, `/`, and `/graphql` are
+reachable on `https://dev.timetable.love`.
 
-Every dev deploy pushes a sha-tagged `web` image to the
+Every `main` push has CI push sha-tagged `web` and `api` images to the
 `registry.digitalocean.com/timetable-reg` container registry, and DigitalOcean
 never expires tags — the 500 MiB Starter registry filled in weeks (2026-07-22
-quota incident: pushes failed with `invalid content range`). The workflow
-therefore ends by pruning the registry to the newest 5 `web` tags and starting
-a garbage collection of untagged manifests. GC briefly makes the registry
-read-only, so a deploy racing that window fails on `docker push`; it needs no
-diagnosis beyond `gh run rerun <id> --failed`.
+quota incident: pushes failed with `invalid content range`). The deploy
+workflow therefore ends by pruning each repository to its newest 5 tags and
+the nightly `registry-gc.yml` collects untagged manifests. GC briefly makes
+the registry read-only, so a deploy racing that window fails on `docker push`;
+it needs no diagnosis beyond `gh run rerun <id> --failed`.
 
 Manual `Deploy Dev` runs include a `seed_sample_data` checkbox. When checked,
 the dev App Platform post-deploy job resets hosted dev app data, runs
@@ -153,6 +155,12 @@ Each App Platform spec defines:
   runs `npm run db:seed`, and runs `npm run clerk:seed-dev-users` only when
   manually enabled through the `Deploy Dev` workflow
 - managed PostgreSQL binding exposed as `DATABASE_URL`
+
+In the dev spec nothing is built on App Platform: `web` runs the image from
+`apps/web/Dockerfile`, and `api`, `migrate`, and `seed-sample-data` all run
+the image from `apps/api/Dockerfile` with different run commands (the API
+ships TypeScript sources executed via `tsx`, so one image serves all three).
+Production (`.do/app.yaml`) still builds the API from source on App Platform.
 
 Ingress routes:
 
