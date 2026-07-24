@@ -52,6 +52,7 @@ export const WeightedHeartType = builder
     fields: (t) => ({
       electorId: t.exposeID("electorId"),
       electorName: t.exposeString("electorName", { nullable: true }),
+      electorImage: t.exposeString("electorImage", { nullable: true }),
       weight: t.exposeFloat("weight"),
       l2Weight: t.exposeFloat("l2Weight"),
       devotionWeight: t.exposeFloat("devotionWeight"),

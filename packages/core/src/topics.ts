@@ -618,6 +618,7 @@ export async function buildFeed(
 export type WeightedHeartEntry = {
   electorId: string;
   electorName: string | null;
+  electorImage: string | null;
   /** L1 contribution: 1/n where n = the elector's total published hearts. */
   weight: number;
   /** L2 contribution: 1/√n. */
@@ -644,7 +645,7 @@ export async function getWeightedBreakdown(
   if (topicHearts.length === 0) return [];
 
   const electorRows = await db
-    .select({ id: users.id, name: users.name })
+    .select({ id: users.id, name: users.name, image: users.image })
     .from(users)
     .where(
       inArray(
@@ -652,7 +653,7 @@ export async function getWeightedBreakdown(
         topicHearts.map((h) => h.electorId),
       ),
     );
-  const nameById = new Map(electorRows.map((u) => [u.id, u.name]));
+  const electorById = new Map(electorRows.map((u) => [u.id, u]));
 
   return topicHearts
     .map((h) => {
@@ -660,7 +661,8 @@ export async function getWeightedBreakdown(
       const weight = weights.get(h.electorId) ?? 0;
       return {
         electorId: h.electorId,
-        electorName: nameById.get(h.electorId) ?? null,
+        electorName: electorById.get(h.electorId)?.name ?? null,
+        electorImage: electorById.get(h.electorId)?.image ?? null,
         weight,
         l2Weight: n > 0 ? 1 / Math.sqrt(n) : 0,
         devotionWeight: weight / topicHearts.length,

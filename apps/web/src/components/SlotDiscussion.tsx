@@ -9,7 +9,7 @@ import { useGqlAction } from "@/lib/useGqlAction";
 import { Avatar } from "./Avatar";
 
 const QUERY = `query($id: String!) {
-  slotComments(slotId: $id) { id authorName body createdAt }
+  slotComments(slotId: $id) { id authorName authorImage body createdAt }
 }`;
 const ADD = `mutation($id: String!, $body: String!) {
   addSlotComment(slotId: $id, body: $body) { id }
@@ -18,6 +18,7 @@ const ADD = `mutation($id: String!, $body: String!) {
 type SlotComment = {
   id: string;
   authorName: string | null;
+  authorImage: string | null;
   body: string;
   createdAt: string;
 };
@@ -85,7 +86,7 @@ export function SlotDiscussion({
           <div className="host-thread">
             {comments?.map((c) => (
               <div key={c.id} className="hc">
-                <Avatar name={c.authorName} small />
+                <Avatar name={c.authorName} image={c.authorImage} small />
                 <div>
                   <div className="hc-name">{c.authorName ?? "Someone"}</div>
                   <div className="hc-bubble">{c.body}</div>

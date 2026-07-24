@@ -88,6 +88,7 @@ const SlotCommentType = builder
     id: string;
     authorId: string;
     authorName: string | null;
+    authorImage: string | null;
     body: string;
     createdAt: Date;
   }>("SlotComment")
@@ -96,6 +97,7 @@ const SlotCommentType = builder
       id: t.exposeID("id"),
       authorId: t.exposeID("authorId"),
       authorName: t.exposeString("authorName", { nullable: true }),
+      authorImage: t.exposeString("authorImage", { nullable: true }),
       body: t.exposeString("body"),
       createdAt: t.string({ resolve: (c) => c.createdAt.toISOString() }),
     }),
@@ -302,6 +304,7 @@ builder.mutationFields((t) => ({
         id: comment.id,
         authorId: comment.authorId,
         authorName: author?.name ?? null,
+        authorImage: author?.image ?? null,
         body: comment.body,
         createdAt: comment.createdAt,
       };

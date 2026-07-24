@@ -201,6 +201,10 @@ const ManagedTopicType = builder
         nullable: true,
         resolve: async (tp) => (await getUserById(tp.hostId))?.name ?? null,
       }),
+      hostImage: t.string({
+        nullable: true,
+        resolve: async (tp) => (await getUserById(tp.hostId))?.image ?? null,
+      }),
       /** Public comment thread — lets My Topics render feed-identical cards
        * (QA #59). */
       comments: t.field({

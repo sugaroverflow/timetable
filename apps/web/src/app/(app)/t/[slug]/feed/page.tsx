@@ -22,12 +22,13 @@ import { loadMoreFeed } from "./actions";
 type HostCard = {
   userId: string;
   name: string | null;
+  image: string | null;
   bioHtml: string | null;
 } | null;
 
 const HOST_CARD_QUERY = `
   query FeedHostCard($s: String!, $u: String!) {
-    person(idOrSlug: $s, userId: $u) { userId name bioHtml }
+    person(idOrSlug: $s, userId: $u) { userId name image bioHtml }
   }
 `;
 
@@ -43,7 +44,7 @@ function HostFilterCard({
   return (
     <div className="card stack host-filter-card">
       <div className="row" style={{ alignItems: "center" }}>
-        <Avatar name={hostCard.name} large />
+        <Avatar name={hostCard.name} image={hostCard.image} large />
         <div>
           <strong>{hostCard.name ?? hostLabel}</strong>
           <div className="faint" style={{ fontSize: 12 }}>

@@ -83,7 +83,7 @@ export function PersonChip({
           ) : person ? (
             <>
               <div className="row" style={{ alignItems: "center" }}>
-                <Avatar name={person.name} />
+                <Avatar name={person.name} image={person.image} />
                 <div>
                   <strong>{person.name ?? "Member"}</strong>
                   <div style={{ marginTop: "var(--space-1)" }}>

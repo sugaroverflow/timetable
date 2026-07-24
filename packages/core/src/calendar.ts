@@ -159,6 +159,7 @@ export async function listSlotComments(slotId: string): Promise<
     id: string;
     authorId: string;
     authorName: string | null;
+    authorImage: string | null;
     body: string;
     createdAt: Date;
   }[]
@@ -168,6 +169,7 @@ export async function listSlotComments(slotId: string): Promise<
       id: slotComments.id,
       authorId: slotComments.authorId,
       authorName: users.name,
+      authorImage: users.image,
       body: slotComments.body,
       createdAt: slotComments.createdAt,
     })

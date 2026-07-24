@@ -18,6 +18,7 @@ export type NotificationItem = {
   kind: "reply" | "comment" | "mention";
   authorId: string;
   authorName: string | null;
+  authorImage: string | null;
   body: string;
   visibility: string;
   createdAt: Date;
@@ -48,6 +49,7 @@ export async function listNotifications(
       mentionUserId: mentions.userId,
       authorId: comments.authorId,
       authorName: users.name,
+      authorImage: users.image,
       body: comments.body,
       visibility: comments.visibility,
       createdAt: comments.createdAt,
@@ -90,6 +92,7 @@ export async function listNotifications(
           : "mention",
     authorId: r.authorId,
     authorName: r.authorName,
+    authorImage: r.authorImage,
     body: r.body,
     visibility: r.visibility,
     createdAt: r.createdAt,

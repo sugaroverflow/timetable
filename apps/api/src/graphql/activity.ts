@@ -65,6 +65,7 @@ const NotificationType = builder
       kind: t.exposeString("kind"),
       authorId: t.exposeID("authorId"),
       authorName: t.exposeString("authorName", { nullable: true }),
+      authorImage: t.exposeString("authorImage", { nullable: true }),
       body: t.exposeString("body"),
       visibility: t.exposeString("visibility"),
       createdAt: t.string({ resolve: (n) => n.createdAt.toISOString() }),

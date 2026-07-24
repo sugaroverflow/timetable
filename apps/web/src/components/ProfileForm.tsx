@@ -30,7 +30,9 @@ export function ProfileForm({
     setSaved(false);
     void run(
       MUTATION,
-      { name, bio, image: image.trim() || null },
+      // Empty string, not null: the API treats null as "leave unchanged",
+      // so clearing the field must send "" for the image to be removed.
+      { name, bio, image: image.trim() },
       {
         success: "Profile saved",
         errorFallback: "Could not save profile",
@@ -61,7 +63,8 @@ export function ProfileForm({
       </div>
       <ImageUploadField
         id="image"
-        label="Profile image URL"
+        label="Profile image"
+        hint="Square works best — it's shown as a small round avatar. 256×256px is plenty; up to 5 MB."
         value={image}
         onChange={setImage}
         purpose="profile-image"

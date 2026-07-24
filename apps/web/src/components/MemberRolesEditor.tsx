@@ -5,15 +5,16 @@ import { useRouter } from "next/navigation";
 
 import { ASSIGNABLE_ROLES, type AssignableRole } from "@timetable/shared";
 
+import { ImageUploadField } from "@/components/ImageUploadField";
 import { useToast } from "@/components/Toast";
 import { clientApi } from "@/lib/clientApi";
 import { clientGql } from "@/lib/clientGraphql";
 import { roleLabel } from "@/lib/timetableSettings";
 import { useGqlAction } from "@/lib/useGqlAction";
 
-const PERSON_BIO = `query($s: String!, $u: String!) { person(idOrSlug: $s, userId: $u) { bio } }`;
-const UPDATE_BIO = `mutation($s: String!, $u: String!, $bio: String!) {
-  updateMemberBio(idOrSlug: $s, userId: $u, bio: $bio) { userId }
+const PERSON_BIO = `query($s: String!, $u: String!) { person(idOrSlug: $s, userId: $u) { bio image } }`;
+const UPDATE_BIO = `mutation($s: String!, $u: String!, $bio: String!, $image: String!) {
+  updateMemberBio(idOrSlug: $s, userId: $u, bio: $bio, image: $image) { userId }
 }`;
 
 const PILL_CLASS: Record<AssignableRole, string> = {
@@ -22,22 +23,25 @@ const PILL_CLASS: Record<AssignableRole, string> = {
   elector: "pill-elector",
 };
 
-/** Admins can edit any member's bio (markdown, QA #42). Bio text is fetched
- * lazily on first open so the People page doesn't load every bio up front. */
+/** Admins can edit any member's bio (markdown, QA #42) and profile picture
+ * (production QA). Fetched lazily on first open so the People page doesn't
+ * load every profile up front. */
 function BioEditor({ slug, userId }: { slug: string; userId: string }) {
   const { run, busy: bioBusy } = useGqlAction();
   const [bio, setBio] = useState<string | null>(null);
+  const [image, setImage] = useState("");
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [bioOpen, setBioOpen] = useState(false);
 
   async function openBio() {
     setBioOpen(true);
     if (bio !== null) return;
     try {
-      const d = await clientGql<{ person: { bio: string | null } | null }>(
-        PERSON_BIO,
-        { s: slug, u: userId },
-      );
+      const d = await clientGql<{
+        person: { bio: string | null; image: string | null } | null;
+      }>(PERSON_BIO, { s: slug, u: userId });
       setBio(d.person?.bio ?? "");
+      setImage(d.person?.image ?? "");
     } catch {
       setBio("");
     }
@@ -46,10 +50,12 @@ function BioEditor({ slug, userId }: { slug: string; userId: string }) {
   function saveBio() {
     void run(
       UPDATE_BIO,
-      { s: slug, u: userId, bio: bio ?? "" },
+      // Image sends "" (not null) when cleared — the API reads an omitted/
+      // null image as "leave unchanged" and "" as "remove".
+      { s: slug, u: userId, bio: bio ?? "", image: image.trim() },
       {
-        success: "Bio updated",
-        errorFallback: "Could not save bio",
+        success: "Profile updated",
+        errorFallback: "Could not save profile",
         onSuccess: () => setBioOpen(false),
       },
     );
@@ -68,14 +74,23 @@ function BioEditor({ slug, userId }: { slug: string; userId: string }) {
             aria-label="Member bio"
             disabled={bio === null}
           />
+          <ImageUploadField
+            id={`member-image-${userId}`}
+            label="Profile image"
+            hint="Square works best — shown as a small round avatar. 256×256px is plenty; up to 5 MB."
+            value={image}
+            onChange={setImage}
+            purpose="profile-image"
+            onUploadingChange={setUploadingImage}
+          />
           <div className="row">
             <button
               className="btn btn-primary"
               type="button"
               onClick={saveBio}
-              disabled={bioBusy || bio === null}
+              disabled={bioBusy || bio === null || uploadingImage}
             >
-              {bioBusy ? "Saving…" : "Save bio"}
+              {uploadingImage ? "Uploading…" : bioBusy ? "Saving…" : "Save"}
             </button>
             <button
               className="btn btn-ghost"
@@ -93,7 +108,7 @@ function BioEditor({ slug, userId }: { slug: string; userId: string }) {
           style={{ alignSelf: "flex-start" }}
           onClick={openBio}
         >
-          Edit bio
+          Edit bio & photo
         </button>
       )}
     </div>
