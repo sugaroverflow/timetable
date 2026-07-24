@@ -101,21 +101,22 @@ h3 {
   text-align: center;
 }
 
-.timetable-cover,
+/* Renders at the image's natural aspect ratio — the uploader decides how
+   tall the cover is. */
+.timetable-cover {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: -2px 0 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
 .topic-cover {
   width: 100%;
   background-position: center;
   background-size: cover;
   border: 1px solid var(--line);
-}
-
-.timetable-cover {
-  height: 75px;
-  margin: -2px 0 18px;
-  border-radius: var(--radius);
-}
-
-.topic-cover {
   aspect-ratio: 16 / 7;
   border-radius: var(--radius-sm);
 }
@@ -884,6 +885,24 @@ textarea {
 .toolbar select {
   width: auto;
   padding: 6px 9px;
+}
+
+/* Feed variant: a sticky header pinned under the topbar, flush on the page
+   background — no card surface, border, or radius — with compact controls. */
+.feed-toolbar {
+  position: sticky;
+  top: var(--topbar-h);
+  z-index: calc(var(--z-sticky) - 1); /* under the topbar and dropdowns */
+  background: var(--bg);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 8px 0 10px;
+  margin-bottom: 8px;
+}
+.feed-toolbar select {
+  font-size: var(--text-xs);
+  padding: 5px 8px;
 }
 
 .table-wrap {

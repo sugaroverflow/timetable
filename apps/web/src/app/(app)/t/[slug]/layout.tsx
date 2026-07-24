@@ -240,10 +240,11 @@ export default async function TimetableLayout({
 
         <div className="shell-content">
           {settings.coverImageUrl ? (
-            <div
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
               className="timetable-cover"
-              style={{ backgroundImage: `url(${settings.coverImageUrl})` }}
-              aria-label={`${timetable.name} cover image`}
+              src={settings.coverImageUrl}
+              alt={`${timetable.name} cover image`}
             />
           ) : null}
           {children}

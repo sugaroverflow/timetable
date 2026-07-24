@@ -30,6 +30,7 @@ async function parseError(res: Response): Promise<string> {
 export function ImageUploadField({
   id,
   label,
+  hint,
   value,
   onChange,
   purpose,
@@ -38,6 +39,7 @@ export function ImageUploadField({
 }: {
   id: string;
   label: string;
+  hint?: string;
   value: string;
   onChange(value: string): void;
   purpose: UploadPurpose;
@@ -101,6 +103,11 @@ export function ImageUploadField({
   return (
     <div className="field">
       <label htmlFor={id}>{label}</label>
+      {hint ? (
+        <p className="faint" style={{ margin: "0 0 5px", fontSize: 12 }}>
+          {hint}
+        </p>
+      ) : null}
       <div className="media-input">
         <input
           id={id}
@@ -120,12 +127,23 @@ export function ImageUploadField({
         />
       </div>
       {value ? (
-        <div
-          className="media-preview"
-          role="img"
-          style={{ backgroundImage: `url(${value})` }}
-          aria-label={`${label} preview`}
-        />
+        <>
+          <div
+            className="media-preview"
+            role="img"
+            style={{ backgroundImage: `url(${value})` }}
+            aria-label={`${label} preview`}
+          />
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            style={{ marginTop: 8 }}
+            onClick={() => onChange("")}
+            disabled={uploading}
+          >
+            Remove image
+          </button>
+        </>
       ) : null}
       <div className="media-status" aria-live="polite">
         {uploading ? <span className="faint">Uploading...</span> : null}
