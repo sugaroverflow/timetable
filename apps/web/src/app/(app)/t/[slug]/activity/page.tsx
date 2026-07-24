@@ -188,7 +188,7 @@ function TimelineItem({
       </div>
       <div className="tl-text row" style={{ gap: 8, alignItems: "center" }}>
         <ChipWrap slug={slug} actorId={event.actorId}>
-          <Avatar name={event.actorName} small />
+          <Avatar name={event.actorName} image={event.actorImage} small />
         </ChipWrap>
         <span>
           <ChipWrap slug={slug} actorId={event.actorId}>

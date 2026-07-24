@@ -21,6 +21,7 @@ export type FeedComment = {
 export type WeightedHeart = {
   electorId: string;
   electorName: string | null;
+  electorImage: string | null;
   /** L1 contribution (1/n). */
   weight: number;
   /** L2 contribution (1/√n). */
@@ -67,6 +68,7 @@ export type ManagedTopic = {
   coverImageUrl: string | null;
   updatedAt: string;
   hostName?: string | null;
+  hostImage?: string | null;
   /** Public thread — My Topics renders feed-identical cards (QA #59). */
   comments?: FeedComment[];
   /** Faculty-only thread on published topics. */

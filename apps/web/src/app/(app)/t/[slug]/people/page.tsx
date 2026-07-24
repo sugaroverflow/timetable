@@ -22,6 +22,7 @@ import { topicPath } from "@/lib/topicPath";
 type Person = {
   userId: string;
   name: string | null;
+  image: string | null;
   slug: string | null;
   roles: string[];
   bioHtml: string | null;
@@ -39,7 +40,7 @@ const QUERY = `
     timetable(idOrSlug: $s) { id settings viewerRoles }
     me { id }
     timetablePeople(idOrSlug: $s) {
-      userId name slug roles bioHtml
+      userId name image slug roles bioHtml
       publishedTopics { id title slug }
     }
   }
@@ -153,7 +154,7 @@ function PersonCard({
   return (
     <li className="card stack">
       <div className="row" style={{ alignItems: "center" }}>
-        <Avatar name={person.name} large />
+        <Avatar name={person.name} image={person.image} large />
         <div>
           {hasTopics ? (
             <Link

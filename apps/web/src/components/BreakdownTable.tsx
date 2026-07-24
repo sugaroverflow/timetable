@@ -107,7 +107,7 @@ export function BreakdownTable({
                     className="row"
                     style={{ gap: 6, alignItems: "center" }}
                   >
-                    <Avatar name={w.electorName} small />
+                    <Avatar name={w.electorName} image={w.electorImage} small />
                     {w.electorName ?? "Elector"}
                   </span>
                 </PersonChip>

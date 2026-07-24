@@ -292,7 +292,8 @@ builder.mutationFields((t) => ({
   }),
 
   /** Admin: edit any member's bio (QA #42 — bios are editable from the
-   * Members section in Settings). Logged to the activity feed. */
+   * Members section in Settings) and profile image (production QA).
+   * Logged to the activity feed. */
   updateMemberBio: t.field({
     type: PersonType,
     nullable: true,
@@ -300,6 +301,8 @@ builder.mutationFields((t) => ({
       idOrSlug: t.arg.string({ required: true }),
       userId: t.arg.string({ required: true }),
       bio: t.arg.string({ required: true }),
+      /** Omit to leave unchanged; empty string clears. */
+      image: t.arg.string({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
       const { user, readable } = await requireAdminTimetable(
@@ -308,7 +311,10 @@ builder.mutationFields((t) => ({
       );
       const target = await getPerson(readable.timetable.id, args.userId);
       if (!target) notFound("Member not found");
-      await updateUserProfile(args.userId, { bio: args.bio.trim() || null });
+      await updateUserProfile(args.userId, {
+        bio: args.bio.trim() || null,
+        ...(args.image != null ? { image: args.image.trim() || null } : {}),
+      });
       await logActivity({
         timetableId: readable.timetable.id,
         actorId: user.id,

@@ -19,7 +19,7 @@ const QUERY = `
     timetable(idOrSlug: $s) { viewerRoles settings }
     timetableHosts(idOrSlug: $s) { id name }
     moderationQueue(idOrSlug: $s) {
-      id title slug hostId hostSlug hostName status bodyMd bodyHtml coverImageUrl updatedAt
+      id title slug hostId hostSlug hostName hostImage status bodyMd bodyHtml coverImageUrl updatedAt
       ${commentTree("adminComments")}
     }
   }

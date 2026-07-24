@@ -38,7 +38,7 @@ function TopicHead({
   return (
     <div className="row topic-head" style={{ alignItems: "flex-start" }}>
       <PersonChip slug={slug} userId={topic.hostId}>
-        <Avatar name={topic.hostName} />
+        <Avatar name={topic.hostName} image={topic.hostImage} />
       </PersonChip>
       <div>
         <h3 className="topic-title">

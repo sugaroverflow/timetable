@@ -30,15 +30,28 @@ function initials(name: string): string {
 
 export function Avatar({
   name,
+  image,
   small = false,
   large = false,
 }: {
   name: string | null;
+  image?: string | null;
   small?: boolean;
   large?: boolean;
 }) {
   const label = name ?? "?";
   const sizeClass = small ? " avatar-sm" : large ? " avatar-lg" : "";
+  if (image) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        className={`avatar avatar-img${sizeClass}`}
+        src={image}
+        alt={label}
+        title={label}
+      />
+    );
+  }
   return (
     <span
       className={`avatar${sizeClass}`}

@@ -770,6 +770,10 @@ textarea {
   height: 56px;
   font-size: var(--text-2xl);
 }
+.avatar-img {
+  object-fit: cover;
+  background: var(--wash);
+}
 
 /* Rich text editor (QA #59 — TipTap) */
 .rte {

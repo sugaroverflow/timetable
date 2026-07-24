@@ -55,7 +55,7 @@ function CommentItem({
       id={`comment-${comment.id}`}
       className={`comment ${comment.hidden ? "hidden" : ""}`}
     >
-      <Avatar name={comment.authorName} small />
+      <Avatar name={comment.authorName} image={comment.authorImage} small />
       <div className="comment-main">
         <div className="c-bubble">
           <span className="c-name">

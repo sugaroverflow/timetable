@@ -10,7 +10,7 @@ import type { WeightedHeart } from "@/lib/feedTypes";
 
 const QUERY = `query Breakdown($s: String!, $t: String!) {
   topicWeightedBreakdown(idOrSlug: $s, topicId: $t) {
-    electorId electorName weight l2Weight devotionWeight heartedAt
+    electorId electorName electorImage weight l2Weight devotionWeight heartedAt
   }
 }`;
 

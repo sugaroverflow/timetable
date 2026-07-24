@@ -14,6 +14,7 @@ type Notification = {
   kind: "reply" | "comment" | "mention";
   authorId: string;
   authorName: string | null;
+  authorImage: string | null;
   body: string;
   visibility: string;
   createdAt: string;
@@ -31,7 +32,7 @@ const QUERY = `
   query Notifications($s: String!) {
     timetable(idOrSlug: $s) { viewerRoles }
     notifications(idOrSlug: $s) {
-      commentId kind authorId authorName body visibility createdAt
+      commentId kind authorId authorName authorImage body visibility createdAt
       topicTitle topicSlug topicHostSlug
     }
   }
@@ -83,7 +84,7 @@ export default async function NotificationsPage({
               <li key={n.commentId} className="card">
                 <div className="row" style={{ alignItems: "flex-start" }}>
                   <PersonChip slug={slug} userId={n.authorId}>
-                    <Avatar name={n.authorName} small />
+                    <Avatar name={n.authorName} image={n.authorImage} small />
                   </PersonChip>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 14 }}>
