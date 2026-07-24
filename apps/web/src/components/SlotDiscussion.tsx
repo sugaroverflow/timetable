@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { Collapsible } from "@base-ui/react/collapsible";
 import { ChevronDown, ChevronRight, Send } from "lucide-react";
 
-import { useToast } from "@/components/Toast";
 import { clientGql } from "@/lib/clientGraphql";
+import { useGqlAction } from "@/lib/useGqlAction";
 import { Avatar } from "./Avatar";
 
 const QUERY = `query($id: String!) {
@@ -32,12 +31,10 @@ export function SlotDiscussion({
   count: number;
   canPost?: boolean;
 }) {
-  const router = useRouter();
-  const { toastError } = useToast();
+  const { run, busy } = useGqlAction();
   const [open, setOpen] = useState(false);
   const [comments, setComments] = useState<SlotComment[] | null>(null);
   const [body, setBody] = useState("");
-  const [pending, startTransition] = useTransition();
 
   async function handleOpenChange(next: boolean) {
     setOpen(next);
@@ -53,21 +50,24 @@ export function SlotDiscussion({
     }
   }
 
-  async function add(e: React.FormEvent) {
+  function add(e: React.FormEvent) {
     e.preventDefault();
     const text = body.trim();
     if (!text) return;
-    try {
-      await clientGql(ADD, { id: slotId, body: text });
-      setBody("");
-      const data = await clientGql<{ slotComments: SlotComment[] }>(QUERY, {
-        id: slotId,
-      });
-      setComments(data.slotComments);
-      startTransition(() => router.refresh());
-    } catch (err) {
-      toastError(err instanceof Error ? err.message : "Could not post");
-    }
+    void run(
+      ADD,
+      { id: slotId, body: text },
+      {
+        errorFallback: "Could not post",
+        onSuccess: async () => {
+          setBody("");
+          const data = await clientGql<{ slotComments: SlotComment[] }>(QUERY, {
+            id: slotId,
+          });
+          setComments(data.slotComments);
+        },
+      },
+    );
   }
 
   return (
@@ -119,7 +119,7 @@ export function SlotDiscussion({
                   <button
                     className="btn btn-primary btn-send"
                     type="submit"
-                    disabled={pending}
+                    disabled={busy}
                     aria-label="Send message"
                     title="Send"
                   >

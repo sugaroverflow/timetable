@@ -1,4 +1,3 @@
-/* eslint-disable complexity -- audit debt (2026-07-22): decomposition queued — remove this disable when refactoring */
 import { clerkMiddleware } from "@clerk/nextjs/server";
 import {
   NextResponse,
@@ -64,6 +63,36 @@ function shouldRewritePath(pathname: string): boolean {
   return true;
 }
 
+/** One GraphQL round-trip: host → timetable slug (null when unrouted).
+ * Network and GraphQL failures are logged by name and resolve to null. */
+async function fetchDomainSlug(
+  host: string,
+  graphqlUrl: string,
+): Promise<string | null> {
+  const res = await fetch(graphqlUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query: ROUTE_QUERY, variables: { host } }),
+  });
+  if (!res.ok) {
+    console.warn(
+      `[web] custom domain lookup failed for ${host}: GraphQL returned ${res.status}`,
+    );
+    return null;
+  }
+  const json = (await res.json()) as RouteLookup;
+  if (json.errors?.length) {
+    console.warn(
+      `[web] custom domain lookup failed for ${host}: ${json.errors
+        .map((error) => error.message)
+        .filter(Boolean)
+        .join("; ")}`,
+    );
+    return null;
+  }
+  return json.data?.timetableRouteByDomain?.slug ?? null;
+}
+
 async function lookupDomainSlug(host: string): Promise<string | null> {
   const now = Date.now();
   const cached = routeCache.get(host);
@@ -75,28 +104,7 @@ async function lookupDomainSlug(host: string): Promise<string | null> {
     "http://localhost:4000/graphql";
 
   try {
-    const res = await fetch(graphqlUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: ROUTE_QUERY, variables: { host } }),
-    });
-    if (!res.ok) {
-      console.warn(
-        `[web] custom domain lookup failed for ${host}: GraphQL returned ${res.status}`,
-      );
-      return null;
-    }
-    const json = (await res.json()) as RouteLookup;
-    if (json.errors?.length) {
-      console.warn(
-        `[web] custom domain lookup failed for ${host}: ${json.errors
-          .map((error) => error.message)
-          .filter(Boolean)
-          .join("; ")}`,
-      );
-      return null;
-    }
-    const slug = json.data?.timetableRouteByDomain?.slug ?? null;
+    const slug = await fetchDomainSlug(host, graphqlUrl);
     if (slug) routeCache.set(host, { slug, expiresAt: now + 60_000 });
     return slug;
   } catch (error) {

@@ -1,50 +1,30 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 
 import { AdminCommentsPanel } from "@/components/AdminCommentsPanel";
+import { AdminTopicActions } from "@/components/AdminTopicActions";
 import { Avatar } from "@/components/Avatar";
-import { useToast } from "@/components/Toast";
-import { TopicEditForm } from "@/components/TopicEditForm";
-import { clientGql } from "@/lib/clientGraphql";
 import type { ManagedTopic } from "@/lib/feedTypes";
 import { topicPath } from "@/lib/topicPath";
 
-const MUTATION = `mutation Moderate($id: String!, $action: String!) {
-  moderateTopic(topicId: $id, action: $action) { id status }
-}`;
-
-/** A submitted topic on Pending Topics. Moderation is Publish or Edit;
- * feedback happens in the admin comments thread (QA #59 round 3 — the
- * request-changes flow is gone). */
+/** A submitted topic on Pending Topics. Admins get the full shared action
+ * set (publish, edit, reassign owner — issue #59); feedback happens in the
+ * admin comments thread (QA #59 round 3 — the request-changes flow is
+ * gone). */
 export function ModerationCard({
   topic,
   slug,
   hostLabel = "Host",
   adminLabel = "Admin",
+  hosts = [],
 }: {
   topic: ManagedTopic;
   slug: string;
   hostLabel?: string;
   adminLabel?: string;
+  hosts?: { id: string; name: string | null }[];
 }) {
-  const router = useRouter();
-  const { toast, toastError } = useToast();
-  const [pending, startTransition] = useTransition();
-  const [editing, setEditing] = useState(false);
-
-  async function publish() {
-    try {
-      await clientGql(MUTATION, { id: topic.id, action: "publish" });
-      toast("Topic published");
-      startTransition(() => router.refresh());
-    } catch (err) {
-      toastError(err instanceof Error ? err.message : "Moderation failed");
-    }
-  }
-
   const permalink = topicPath(slug, topic.hostSlug ?? null, topic.slug ?? null);
 
   return (
@@ -85,31 +65,19 @@ export function ModerationCard({
         slug={slug}
         adminLabel={adminLabel}
       />
-      <div className="row wrap">
-        <button
-          className="btn btn-primary"
-          type="button"
-          disabled={pending}
-          onClick={publish}
-        >
-          Publish
-        </button>
-        <button
-          className="btn"
-          type="button"
-          disabled={pending}
-          onClick={() => setEditing((v) => !v)}
-        >
-          {editing ? "Cancel edit" : "Edit"}
-        </button>
-      </div>
-      {editing ? (
-        <TopicEditForm
-          topic={topic}
-          slug={slug}
-          onDone={() => setEditing(false)}
-        />
-      ) : null}
+      <AdminTopicActions
+        topic={{
+          id: topic.id,
+          title: topic.title,
+          bodyMd: topic.bodyMd,
+          coverImageUrl: topic.coverImageUrl,
+          status: topic.status,
+        }}
+        slug={slug}
+        label={adminLabel}
+        hosts={hosts}
+        currentHostId={topic.hostId}
+      />
     </li>
   );
 }

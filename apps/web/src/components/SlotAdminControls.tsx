@@ -1,12 +1,10 @@
 "use client";
 
 import { X } from "lucide-react";
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 
-import { useToast } from "@/components/Toast";
 import type { TopicOption } from "@/lib/calendarTypes";
-import { clientGql } from "@/lib/clientGraphql";
+import { useGqlAction } from "@/lib/useGqlAction";
 
 const TAG = `mutation($s: String!, $t: String!) { tagSlotTopic(slotId: $s, topicId: $t) }`;
 const UNTAG = `mutation($s: String!, $t: String!) { untagSlotTopic(slotId: $s, topicId: $t) }`;
@@ -23,23 +21,18 @@ export function SlotAdminControls({
   topicOptions: TopicOption[];
   label?: string;
 }) {
-  const router = useRouter();
-  const { toast, toastError } = useToast();
-  const [pending, startTransition] = useTransition();
+  const { run: runAction, busy } = useGqlAction();
   const [topicId, setTopicId] = useState("");
 
-  async function run(
+  function run(
     query: string,
     variables: Record<string, unknown>,
     successMessage: string,
   ) {
-    try {
-      await clientGql(query, variables);
-      toast(successMessage);
-      startTransition(() => router.refresh());
-    } catch (err) {
-      toastError(err instanceof Error ? err.message : "Action failed");
-    }
+    void runAction(query, variables, {
+      success: successMessage,
+      errorFallback: "Action failed",
+    });
   }
 
   return (
@@ -53,7 +46,7 @@ export function SlotAdminControls({
           type="button"
           className="pill"
           title="Remove tag"
-          disabled={pending}
+          disabled={busy}
           onClick={() => run(UNTAG, { s: slotId, t: tag.id }, "Tag removed")}
         >
           {tag.title} <X size={14} aria-hidden />
@@ -75,7 +68,7 @@ export function SlotAdminControls({
       <button
         type="button"
         className="btn"
-        disabled={pending || !topicId}
+        disabled={busy || !topicId}
         onClick={() => {
           if (topicId) run(TAG, { s: slotId, t: topicId }, "Topic tagged");
           setTopicId("");
@@ -86,7 +79,7 @@ export function SlotAdminControls({
       <button
         type="button"
         className="btn btn-ghost"
-        disabled={pending}
+        disabled={busy}
         onClick={() => {
           if (confirm("Delete this timeslot?"))
             run(DELETE, { s: slotId }, "Slot deleted");

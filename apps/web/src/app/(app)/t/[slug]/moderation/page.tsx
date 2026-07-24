@@ -10,14 +10,16 @@ import { parseTimetableSettings, roleLabel } from "@/lib/timetableSettings";
 
 type Data = {
   timetable: { viewerRoles: string[]; settings: string } | null;
+  timetableHosts: { id: string; name: string | null }[];
   moderationQueue: ManagedTopic[];
 };
 
 const QUERY = `
   query Moderation($s: String!) {
     timetable(idOrSlug: $s) { viewerRoles settings }
+    timetableHosts(idOrSlug: $s) { id name }
     moderationQueue(idOrSlug: $s) {
-      id title slug hostSlug hostName status bodyMd bodyHtml coverImageUrl updatedAt
+      id title slug hostId hostSlug hostName status bodyMd bodyHtml coverImageUrl updatedAt
       ${commentTree("adminComments")}
     }
   }
@@ -66,6 +68,7 @@ export default async function ModerationPage({
               slug={slug}
               hostLabel={hostLabel}
               adminLabel={adminLabel}
+              hosts={data.timetableHosts}
             />
           ))}
         </ul>

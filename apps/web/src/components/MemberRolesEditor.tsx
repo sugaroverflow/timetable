@@ -1,4 +1,3 @@
-/* eslint-disable max-lines-per-function -- audit debt (2026-07-22): decomposition queued — remove this disable when refactoring */
 "use client";
 
 import { useState } from "react";
@@ -10,6 +9,7 @@ import { useToast } from "@/components/Toast";
 import { clientApi } from "@/lib/clientApi";
 import { clientGql } from "@/lib/clientGraphql";
 import { roleLabel } from "@/lib/timetableSettings";
+import { useGqlAction } from "@/lib/useGqlAction";
 
 const PERSON_BIO = `query($s: String!, $u: String!) { person(idOrSlug: $s, userId: $u) { bio } }`;
 const UPDATE_BIO = `mutation($s: String!, $u: String!, $bio: String!) {
@@ -21,6 +21,84 @@ const PILL_CLASS: Record<AssignableRole, string> = {
   host: "pill-host",
   elector: "pill-elector",
 };
+
+/** Admins can edit any member's bio (markdown, QA #42). Bio text is fetched
+ * lazily on first open so the People page doesn't load every bio up front. */
+function BioEditor({ slug, userId }: { slug: string; userId: string }) {
+  const { run, busy: bioBusy } = useGqlAction();
+  const [bio, setBio] = useState<string | null>(null);
+  const [bioOpen, setBioOpen] = useState(false);
+
+  async function openBio() {
+    setBioOpen(true);
+    if (bio !== null) return;
+    try {
+      const d = await clientGql<{ person: { bio: string | null } | null }>(
+        PERSON_BIO,
+        { s: slug, u: userId },
+      );
+      setBio(d.person?.bio ?? "");
+    } catch {
+      setBio("");
+    }
+  }
+
+  function saveBio() {
+    void run(
+      UPDATE_BIO,
+      { s: slug, u: userId, bio: bio ?? "" },
+      {
+        success: "Bio updated",
+        errorFallback: "Could not save bio",
+        onSuccess: () => setBioOpen(false),
+      },
+    );
+  }
+
+  return (
+    <div className="stack" style={{ marginTop: 12, gap: 8 }}>
+      {bioOpen ? (
+        <>
+          <textarea
+            value={bio ?? ""}
+            onChange={(e) => setBio(e.target.value)}
+            placeholder={
+              bio === null ? "Loading…" : "Member bio (markdown supported)"
+            }
+            aria-label="Member bio"
+            disabled={bio === null}
+          />
+          <div className="row">
+            <button
+              className="btn btn-primary"
+              type="button"
+              onClick={saveBio}
+              disabled={bioBusy || bio === null}
+            >
+              {bioBusy ? "Saving…" : "Save bio"}
+            </button>
+            <button
+              className="btn btn-ghost"
+              type="button"
+              onClick={() => setBioOpen(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        </>
+      ) : (
+        <button
+          className="btn btn-ghost"
+          type="button"
+          style={{ alignSelf: "flex-start" }}
+          onClick={openBio}
+        >
+          Edit bio
+        </button>
+      )}
+    </div>
+  );
+}
 
 export function MemberRolesEditor({
   membershipId,
@@ -45,37 +123,6 @@ export function MemberRolesEditor({
   const [roles, setRoles] = useState<string[]>(initialRoles);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [bio, setBio] = useState<string | null>(null);
-  const [bioOpen, setBioOpen] = useState(false);
-  const [bioBusy, setBioBusy] = useState(false);
-
-  async function openBio() {
-    setBioOpen(true);
-    if (bio !== null) return;
-    try {
-      const d = await clientGql<{ person: { bio: string | null } | null }>(
-        PERSON_BIO,
-        { s: slug, u: userId },
-      );
-      setBio(d.person?.bio ?? "");
-    } catch {
-      setBio("");
-    }
-  }
-
-  async function saveBio() {
-    setBioBusy(true);
-    try {
-      await clientGql(UPDATE_BIO, { s: slug, u: userId, bio: bio ?? "" });
-      toast("Bio updated");
-      setBioOpen(false);
-      router.refresh();
-    } catch (err) {
-      toastError(err instanceof Error ? err.message : "Could not save bio");
-    } finally {
-      setBioBusy(false);
-    }
-  }
 
   function toggleRole(role: string) {
     setSaved(false);
@@ -152,48 +199,7 @@ export function MemberRolesEditor({
         </button>
       </div>
 
-      {/* Admins can edit any member's bio (markdown, QA #42). */}
-      <div className="stack" style={{ marginTop: 12, gap: 8 }}>
-        {bioOpen ? (
-          <>
-            <textarea
-              value={bio ?? ""}
-              onChange={(e) => setBio(e.target.value)}
-              placeholder={
-                bio === null ? "Loading…" : "Member bio (markdown supported)"
-              }
-              aria-label="Member bio"
-              disabled={bio === null}
-            />
-            <div className="row">
-              <button
-                className="btn btn-primary"
-                type="button"
-                onClick={saveBio}
-                disabled={bioBusy || bio === null}
-              >
-                {bioBusy ? "Saving…" : "Save bio"}
-              </button>
-              <button
-                className="btn btn-ghost"
-                type="button"
-                onClick={() => setBioOpen(false)}
-              >
-                Cancel
-              </button>
-            </div>
-          </>
-        ) : (
-          <button
-            className="btn btn-ghost"
-            type="button"
-            style={{ alignSelf: "flex-start" }}
-            onClick={openBio}
-          >
-            Edit bio
-          </button>
-        )}
-      </div>
+      <BioEditor slug={slug} userId={userId} />
     </div>
   );
 }

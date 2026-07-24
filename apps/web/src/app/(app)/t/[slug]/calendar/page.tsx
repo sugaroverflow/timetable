@@ -1,4 +1,3 @@
-/* eslint-disable complexity, sonarjs/cognitive-complexity -- audit debt (2026-07-22): decomposition queued — remove this disable when refactoring */
 import { auth } from "@clerk/nextjs/server";
 import { isAdmin, isElector, isHost, type Role } from "@timetable/shared";
 
@@ -45,6 +44,90 @@ const QUERY_AUTHED = `
   }
 `;
 
+function buildIcsUrl(slug: string, token: string | null | undefined): string {
+  return (
+    `${env.apiUrl}/api/timetables/${slug}/calendar.ics` +
+    (token ? `?token=${token}` : "")
+  );
+}
+
+function CalendarToolbar({
+  calendar,
+  topics,
+  perms,
+  hostView,
+  audience,
+  location,
+  icsUrl,
+}: {
+  calendar: CalendarSlot[];
+  topics: TopicOption[];
+  perms: CalendarPerms;
+  hostView: boolean;
+  audience?: string;
+  location?: string;
+  icsUrl: string;
+}) {
+  const locations = [
+    ...new Set(calendar.map((s) => s.location).filter(Boolean)),
+  ].sort();
+  // Every slot carries the full audience in perUser (host/admin only), so
+  // the audience size is the same across slots.
+  const audienceCount = calendar[0]?.perUser?.length ?? null;
+
+  return (
+    <div className="toolbar">
+      {perms.canSeeHostOnly ? (
+        <>
+          <label>Audience</label>
+          <AudienceFilter
+            value={audience ?? "all"}
+            isHost={hostView}
+            topics={topics}
+          />
+        </>
+      ) : null}
+      {locations.length > 0 ? (
+        <LocationFilter value={location ?? ""} locations={locations} />
+      ) : null}
+      <span className="spacer" />
+      {perms.canSeeHostOnly && audienceCount !== null ? (
+        <span className="faint" style={{ fontSize: 12 }}>
+          {audienceCount} elector{audienceCount === 1 ? "" : "s"} in view
+        </span>
+      ) : null}
+      <a className="btn btn-ghost" href={icsUrl}>
+        Subscribe (ICS)
+      </a>
+    </div>
+  );
+}
+
+function CalendarEmpty({
+  anySlots,
+  canAdmin,
+}: {
+  anySlots: boolean;
+  canAdmin: boolean;
+}) {
+  if (!anySlots) {
+    return (
+      <EmptyState
+        icon="▦"
+        title="No timeslots yet"
+        hint={canAdmin ? "Add one above to get started." : undefined}
+      />
+    );
+  }
+  return (
+    <EmptyState
+      icon="▦"
+      title="No slots match"
+      hint="Try a different location."
+    />
+  );
+}
+
 export default async function CalendarPage({
   params,
   searchParams,
@@ -71,49 +154,23 @@ export default async function CalendarPage({
   };
   const settings = parseTimetableSettings(data.timetable?.settings);
   const adminLabel = roleLabel(settings.roleLabels, "admin");
-
-  const icsUrl =
-    `${env.apiUrl}/api/timetables/${slug}/calendar.ics` +
-    (data.myIcsToken ? `?token=${data.myIcsToken}` : "");
-
-  const locations = [
-    ...new Set(data.calendar.map((s) => s.location).filter(Boolean)),
-  ].sort();
+  const icsUrl = buildIcsUrl(slug, data.myIcsToken);
 
   const visibleSlots = location
     ? data.calendar.filter((s) => s.location === location)
     : data.calendar;
 
-  // Every slot carries the full audience in perUser (host/admin only), so
-  // the audience size is the same across slots.
-  const audienceCount = data.calendar[0]?.perUser?.length ?? null;
-
   return (
     <div className="stack">
-      <div className="toolbar">
-        {perms.canSeeHostOnly ? (
-          <>
-            <label>Audience</label>
-            <AudienceFilter
-              value={audience ?? "all"}
-              isHost={isHost(roles)}
-              topics={data.topicFeed}
-            />
-          </>
-        ) : null}
-        {locations.length > 0 ? (
-          <LocationFilter value={location ?? ""} locations={locations} />
-        ) : null}
-        <span className="spacer" />
-        {perms.canSeeHostOnly && audienceCount !== null ? (
-          <span className="faint" style={{ fontSize: 12 }}>
-            {audienceCount} elector{audienceCount === 1 ? "" : "s"} in view
-          </span>
-        ) : null}
-        <a className="btn btn-ghost" href={icsUrl}>
-          Subscribe (ICS)
-        </a>
-      </div>
+      <CalendarToolbar
+        calendar={data.calendar}
+        topics={data.topicFeed}
+        perms={perms}
+        hostView={isHost(roles)}
+        audience={audience}
+        location={location}
+        icsUrl={icsUrl}
+      />
 
       {perms.canAdmin ? <SlotAdminForm slug={slug} /> : null}
       {perms.canSetAvailability ? <WeekdayPatternControl slug={slug} /> : null}
@@ -133,19 +190,10 @@ export default async function CalendarPage({
       ) : null}
 
       {visibleSlots.length === 0 ? (
-        data.calendar.length === 0 ? (
-          <EmptyState
-            icon="▦"
-            title="No timeslots yet"
-            hint={perms.canAdmin ? "Add one above to get started." : undefined}
-          />
-        ) : (
-          <EmptyState
-            icon="▦"
-            title="No slots match"
-            hint="Try a different location."
-          />
-        )
+        <CalendarEmpty
+          anySlots={data.calendar.length > 0}
+          canAdmin={perms.canAdmin}
+        />
       ) : (
         <ul className="list">
           {visibleSlots.map((slot) => (

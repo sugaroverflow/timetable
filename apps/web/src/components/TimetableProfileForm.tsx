@@ -1,12 +1,10 @@
-/* eslint-disable complexity, max-lines-per-function -- audit debt (2026-07-22): decomposition queued — remove this disable when refactoring */
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 
-import { useToast } from "@/components/Toast";
 import { clientGql } from "@/lib/clientGraphql";
 import type { DigestSettings, RoleLabels } from "@/lib/timetableSettings";
+import { useGqlAction } from "@/lib/useGqlAction";
 
 const MUTATION = `mutation($s: String!, $name: String, $desc: String, $privacy: String, $cd: String) {
   updateTimetableProfile(idOrSlug: $s, name: $name, description: $desc, privacy: $privacy, customDomain: $cd) { id }
@@ -26,6 +24,187 @@ const SETTINGS_MUTATION = `mutation Labels(
     digestActivity: $da
   ) { id }
 }`;
+
+type IdentityState = {
+  name: string;
+  description: string;
+  privacy: string;
+  customDomain: string;
+};
+
+type LabelsState = { admin: string; host: string; elector: string };
+
+type DigestState = { topics: boolean; replies: boolean; activity: boolean };
+
+function initialLabels(roleLabels: RoleLabels = {}): LabelsState {
+  return {
+    admin: roleLabels.admin ?? "Admin",
+    host: roleLabels.host ?? "Host",
+    elector: roleLabels.elector ?? "Elector",
+  };
+}
+
+function initialDigests(digestDefaults: DigestSettings = {}): DigestState {
+  return {
+    topics: digestDefaults.digestNewTopics ?? false,
+    replies: digestDefaults.digestReplies ?? false,
+    activity: digestDefaults.digestActivity ?? false,
+  };
+}
+
+function IdentityFields({
+  slug,
+  value,
+  onChange,
+}: {
+  slug: string;
+  value: IdentityState;
+  onChange: (patch: Partial<IdentityState>) => void;
+}) {
+  return (
+    <>
+      <div className="field">
+        <label htmlFor="tt-name">Name</label>
+        <input
+          id="tt-name"
+          value={value.name}
+          onChange={(e) => onChange({ name: e.target.value })}
+        />
+      </div>
+      <p className="faint" style={{ margin: "0 0 12px", fontSize: 12 }}>
+        URL: /t/{slug} (set at creation)
+      </p>
+      <div className="field">
+        <label htmlFor="tt-desc">Description</label>
+        <textarea
+          id="tt-desc"
+          value={value.description}
+          onChange={(e) => onChange({ description: e.target.value })}
+        />
+      </div>
+      <div className="field">
+        <label htmlFor="tt-privacy">Visibility</label>
+        <select
+          id="tt-privacy"
+          value={value.privacy}
+          onChange={(e) => onChange({ privacy: e.target.value })}
+        >
+          <option value="private">Private — members only</option>
+          <option value="public">
+            Public — all topics, comments, and bios
+          </option>
+          <option value="hosts_only">
+            Hosts only — topics and host bios public, no comments
+          </option>
+          <option value="no_comments">
+            No comments — topics and all bios public, no comments
+          </option>
+          <option value="deactivated">Deactivated — admins only</option>
+        </select>
+      </div>
+      <div className="field">
+        <label htmlFor="tt-domain">Custom domain (coming soon)</label>
+        <input
+          id="tt-domain"
+          value={value.customDomain}
+          onChange={(e) => onChange({ customDomain: e.target.value })}
+          placeholder="forum.2026.newspeak.house"
+        />
+        <p className="faint" style={{ margin: "4px 0 0", fontSize: 12 }}>
+          Saved for later — custom-domain routing isn&rsquo;t wired up yet.
+        </p>
+      </div>
+    </>
+  );
+}
+
+function RoleLabelFields({
+  value,
+  onChange,
+}: {
+  value: LabelsState;
+  onChange: (patch: Partial<LabelsState>) => void;
+}) {
+  return (
+    <>
+      <h3 style={{ fontSize: 15, margin: "18px 0 2px" }}>Role labels</h3>
+      <div className="field">
+        <label htmlFor="ra">Admin label</label>
+        <input
+          id="ra"
+          value={value.admin}
+          onChange={(e) => onChange({ admin: e.target.value })}
+        />
+      </div>
+      <div className="field">
+        <label htmlFor="rh">Host label</label>
+        <input
+          id="rh"
+          value={value.host}
+          onChange={(e) => onChange({ host: e.target.value })}
+        />
+      </div>
+      <div className="field">
+        <label htmlFor="re">Elector label</label>
+        <input
+          id="re"
+          value={value.elector}
+          onChange={(e) => onChange({ elector: e.target.value })}
+        />
+      </div>
+      <p className="preview-roles">
+        A <b>{value.host || "Host"}</b> proposes topics; an{" "}
+        <b>{value.elector || "Elector"}</b> hearts and comments; an{" "}
+        <b>{value.admin || "Admin"}</b> moderates and runs settings.
+      </p>
+    </>
+  );
+}
+
+function DigestFields({
+  value,
+  onChange,
+}: {
+  value: DigestState;
+  onChange: (patch: Partial<DigestState>) => void;
+}) {
+  return (
+    <>
+      <h3 style={{ fontSize: 15, margin: "18px 0 2px" }}>Default digest</h3>
+      <p className="faint" style={{ marginTop: 0, fontSize: 12 }}>
+        New members start with these. Each person can change their own from
+        their profile.
+      </p>
+      <label className="row" style={{ marginBottom: 8 }}>
+        <input
+          type="checkbox"
+          checked={value.topics}
+          onChange={(e) => onChange({ topics: e.target.checked })}
+          style={{ width: "auto" }}
+        />
+        New topics
+      </label>
+      <label className="row" style={{ marginBottom: 8 }}>
+        <input
+          type="checkbox"
+          checked={value.replies}
+          onChange={(e) => onChange({ replies: e.target.checked })}
+          style={{ width: "auto" }}
+        />
+        Replies to their comments
+      </label>
+      <label className="row" style={{ marginBottom: 12 }}>
+        <input
+          type="checkbox"
+          checked={value.activity}
+          onChange={(e) => onChange({ activity: e.target.checked })}
+          style={{ width: "auto" }}
+        />
+        Activity on their topics (hosts)
+      </label>
+    </>
+  );
+}
 
 /** Timetable profile section (QA #59 reorg): identity, visibility, role
  * labels with a live preview sentence, and digest defaults at the bottom.
@@ -47,172 +226,73 @@ export function TimetableProfileForm({
   roleLabels?: RoleLabels;
   digestDefaults?: DigestSettings;
 }) {
-  const router = useRouter();
-  const { toast, toastError } = useToast();
-  const [name, setName] = useState(initialName);
-  const [description, setDescription] = useState(initialDescription ?? "");
-  const [privacy, setPrivacy] = useState(initialPrivacy);
-  const [customDomain, setCustomDomain] = useState(initialCustomDomain ?? "");
-  const [admin, setAdmin] = useState(roleLabels?.admin ?? "Admin");
-  const [host, setHost] = useState(roleLabels?.host ?? "Host");
-  const [elector, setElector] = useState(roleLabels?.elector ?? "Elector");
-  const [digestTopics, setDigestTopics] = useState(
-    digestDefaults?.digestNewTopics ?? false,
+  const { run, busy } = useGqlAction();
+  const [identity, setIdentity] = useState<IdentityState>({
+    name: initialName,
+    description: initialDescription ?? "",
+    privacy: initialPrivacy,
+    customDomain: initialCustomDomain ?? "",
+  });
+  const [labels, setLabels] = useState<LabelsState>(() =>
+    initialLabels(roleLabels),
   );
-  const [digestReplies, setDigestReplies] = useState(
-    digestDefaults?.digestReplies ?? false,
+  const [digests, setDigests] = useState<DigestState>(() =>
+    initialDigests(digestDefaults),
   );
-  const [digestActivity, setDigestActivity] = useState(
-    digestDefaults?.digestActivity ?? false,
-  );
-  const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
 
-  async function submit(e: React.FormEvent) {
+  function submit(e: React.FormEvent) {
     e.preventDefault();
     setSaved(false);
-    try {
-      await clientGql(MUTATION, {
+    void run(
+      MUTATION,
+      {
         s: slug,
-        name,
-        desc: description,
-        privacy,
-        cd: customDomain,
-      });
-      await clientGql(SETTINGS_MUTATION, {
-        s: slug,
-        ra: admin,
-        rh: host,
-        re: elector,
-        dnt: digestTopics,
-        dr: digestReplies,
-        da: digestActivity,
-      });
-      setSaved(true);
-      toast("Forum profile saved");
-      startTransition(() => router.refresh());
-    } catch (err) {
-      toastError(err instanceof Error ? err.message : "Could not save");
-    }
+        name: identity.name,
+        desc: identity.description,
+        privacy: identity.privacy,
+        cd: identity.customDomain,
+      },
+      {
+        success: "Forum profile saved",
+        errorFallback: "Could not save",
+        // Second write rides inside onSuccess so a failure in either
+        // mutation lands in the same error toast, and the success toast
+        // only fires once both have landed.
+        onSuccess: async () => {
+          await clientGql(SETTINGS_MUTATION, {
+            s: slug,
+            ra: labels.admin,
+            rh: labels.host,
+            re: labels.elector,
+            dnt: digests.topics,
+            dr: digests.replies,
+            da: digests.activity,
+          });
+          setSaved(true);
+        },
+      },
+    );
   }
 
   return (
     <form onSubmit={submit} className="card">
       <h2 style={{ marginTop: 0, fontSize: 18 }}>Forum profile</h2>
-      <div className="field">
-        <label htmlFor="tt-name">Name</label>
-        <input
-          id="tt-name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-      </div>
-      <p className="faint" style={{ margin: "0 0 12px", fontSize: 12 }}>
-        URL: /t/{slug} (set at creation)
-      </p>
-      <div className="field">
-        <label htmlFor="tt-desc">Description</label>
-        <textarea
-          id="tt-desc"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-        />
-      </div>
-      <div className="field">
-        <label htmlFor="tt-privacy">Visibility</label>
-        <select
-          id="tt-privacy"
-          value={privacy}
-          onChange={(e) => setPrivacy(e.target.value)}
-        >
-          <option value="private">Private — members only</option>
-          <option value="public">
-            Public — all topics, comments, and bios
-          </option>
-          <option value="hosts_only">
-            Hosts only — topics and host bios public, no comments
-          </option>
-          <option value="no_comments">
-            No comments — topics and all bios public, no comments
-          </option>
-          <option value="deactivated">Deactivated — admins only</option>
-        </select>
-      </div>
-      <div className="field">
-        <label htmlFor="tt-domain">Custom domain (coming soon)</label>
-        <input
-          id="tt-domain"
-          value={customDomain}
-          onChange={(e) => setCustomDomain(e.target.value)}
-          placeholder="forum.2026.newspeak.house"
-        />
-        <p className="faint" style={{ margin: "4px 0 0", fontSize: 12 }}>
-          Saved for later — custom-domain routing isn&rsquo;t wired up yet.
-        </p>
-      </div>
-
-      <h3 style={{ fontSize: 15, margin: "18px 0 2px" }}>Role labels</h3>
-      <div className="field">
-        <label htmlFor="ra">Admin label</label>
-        <input
-          id="ra"
-          value={admin}
-          onChange={(e) => setAdmin(e.target.value)}
-        />
-      </div>
-      <div className="field">
-        <label htmlFor="rh">Host label</label>
-        <input id="rh" value={host} onChange={(e) => setHost(e.target.value)} />
-      </div>
-      <div className="field">
-        <label htmlFor="re">Elector label</label>
-        <input
-          id="re"
-          value={elector}
-          onChange={(e) => setElector(e.target.value)}
-        />
-      </div>
-      <p className="preview-roles">
-        A <b>{host || "Host"}</b> proposes topics; an{" "}
-        <b>{elector || "Elector"}</b> hearts and comments; an{" "}
-        <b>{admin || "Admin"}</b> moderates and runs settings.
-      </p>
-
-      <h3 style={{ fontSize: 15, margin: "18px 0 2px" }}>Default digest</h3>
-      <p className="faint" style={{ marginTop: 0, fontSize: 12 }}>
-        New members start with these. Each person can change their own from
-        their profile.
-      </p>
-      <label className="row" style={{ marginBottom: 8 }}>
-        <input
-          type="checkbox"
-          checked={digestTopics}
-          onChange={(e) => setDigestTopics(e.target.checked)}
-          style={{ width: "auto" }}
-        />
-        New topics
-      </label>
-      <label className="row" style={{ marginBottom: 8 }}>
-        <input
-          type="checkbox"
-          checked={digestReplies}
-          onChange={(e) => setDigestReplies(e.target.checked)}
-          style={{ width: "auto" }}
-        />
-        Replies to their comments
-      </label>
-      <label className="row" style={{ marginBottom: 12 }}>
-        <input
-          type="checkbox"
-          checked={digestActivity}
-          onChange={(e) => setDigestActivity(e.target.checked)}
-          style={{ width: "auto" }}
-        />
-        Activity on their topics (hosts)
-      </label>
-
-      <button className="btn btn-primary" type="submit" disabled={pending}>
-        {pending ? "Saving…" : saved ? "Saved" : "Save"}
+      <IdentityFields
+        slug={slug}
+        value={identity}
+        onChange={(patch) => setIdentity((s) => ({ ...s, ...patch }))}
+      />
+      <RoleLabelFields
+        value={labels}
+        onChange={(patch) => setLabels((s) => ({ ...s, ...patch }))}
+      />
+      <DigestFields
+        value={digests}
+        onChange={(patch) => setDigests((s) => ({ ...s, ...patch }))}
+      />
+      <button className="btn btn-primary" type="submit" disabled={busy}>
+        {busy ? "Saving…" : saved ? "Saved" : "Save"}
       </button>
     </form>
   );

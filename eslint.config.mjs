@@ -44,6 +44,12 @@ export default tseslint.config(
       ],
     },
   },
+  // Long describe blocks in tests are legitimate — a spec suite reads as one
+  // sequential story, so the per-function line budget doesn't apply there.
+  {
+    files: ["**/*.test.ts"],
+    rules: { "max-lines-per-function": "off" },
+  },
   {
     files: ["scripts/**/*.mjs"],
     languageOptions: { globals: globals.node },

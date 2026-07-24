@@ -1,4 +1,3 @@
-/* eslint-disable complexity -- audit debt (2026-07-22): decomposition queued — remove this disable when refactoring */
 import Link from "next/link";
 
 import { isAdmin, primaryRole, type Role } from "@timetable/shared";
@@ -16,6 +15,7 @@ import {
   parseTimetableSettings,
   pluralLabel,
   roleLabel,
+  type RoleLabels,
 } from "@/lib/timetableSettings";
 import { topicPath } from "@/lib/topicPath";
 
@@ -61,6 +61,134 @@ const MEMBERS_QUERY = `
     }
   }
 `;
+
+function PersonTopics({ slug, person }: { slug: string; person: Person }) {
+  if (person.publishedTopics.length === 0) return null;
+  return (
+    <div className="person-topics">
+      <div className="faint" style={{ fontSize: 12 }}>
+        Topics
+      </div>
+      <ul>
+        {person.publishedTopics.map((topic) => {
+          const href = topicPath(slug, person.slug, topic.slug);
+          return (
+            <li key={topic.id}>
+              {href ? <Link href={href}>{topic.title}</Link> : topic.title}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function PersonCardActions({
+  slug,
+  person,
+  member,
+  meId,
+  canPreview,
+  canManage,
+  roleLabels,
+}: {
+  slug: string;
+  person: Person;
+  member: Member | undefined;
+  meId: string | undefined;
+  canPreview: boolean;
+  canManage: boolean;
+  roleLabels?: RoleLabels;
+}) {
+  if (!canPreview && !canManage) return null;
+  return (
+    <div className="people-card-actions">
+      {canPreview ? (
+        <UserPreviewStart
+          slug={slug}
+          userId={person.userId}
+          name={person.name}
+        />
+      ) : null}
+      {canManage && person.userId !== meId ? (
+        <InviteSendButton
+          membershipId={member!.membershipId}
+          email={member!.email}
+          inviteSentAt={member!.inviteSentAt}
+        />
+      ) : null}
+      {canManage ? (
+        <PersonAdminPanel
+          membershipId={member!.membershipId}
+          userId={person.userId}
+          slug={slug}
+          name={member!.name}
+          email={member!.email}
+          roles={member!.roles}
+          roleLabels={roleLabels}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function PersonCard({
+  slug,
+  person,
+  member,
+  meId,
+  canEdit,
+  roleLabels,
+}: {
+  slug: string;
+  person: Person;
+  member: Member | undefined;
+  meId: string | undefined;
+  canEdit: boolean;
+  roleLabels?: RoleLabels;
+}) {
+  const hasTopics = person.publishedTopics.length > 0;
+  const canPreview = canEdit && person.userId !== meId;
+  const canManage = canEdit && member != null;
+  return (
+    <li className="card stack">
+      <div className="row" style={{ alignItems: "center" }}>
+        <Avatar name={person.name} large />
+        <div>
+          {hasTopics ? (
+            <Link
+              className="person-name-link"
+              href={`/t/${slug}/feed?host=${person.userId}`}
+            >
+              <strong>{person.name ?? "Member"}</strong>
+            </Link>
+          ) : (
+            <strong>{person.name ?? "Member"}</strong>
+          )}
+          <div style={{ marginTop: 4 }}>
+            <RolePills roles={person.roles} labels={roleLabels} />
+          </div>
+        </div>
+      </div>
+      {person.bioHtml ? (
+        <div
+          className="topic-body"
+          dangerouslySetInnerHTML={{ __html: person.bioHtml }}
+        />
+      ) : null}
+      <PersonTopics slug={slug} person={person} />
+      <PersonCardActions
+        slug={slug}
+        person={person}
+        member={member}
+        meId={meId}
+        canPreview={canPreview}
+        canManage={canManage}
+        roleLabels={roleLabels}
+      />
+    </li>
+  );
+}
 
 export default async function PeoplePage({
   params,
@@ -118,97 +246,17 @@ export default async function PeoplePage({
             <section key={section.role} className="stack">
               <h3 className="people-heading">{section.heading}</h3>
               <ul className="list">
-                {section.people.map((person) => {
-                  const member = membersByUser.get(person.userId);
-                  const hasTopics = person.publishedTopics.length > 0;
-                  const canPreview = canEdit && person.userId !== data.me?.id;
-                  const canManage = canEdit && member != null;
-                  return (
-                    <li key={person.userId} className="card stack">
-                      <div className="row" style={{ alignItems: "center" }}>
-                        <Avatar name={person.name} large />
-                        <div>
-                          {hasTopics ? (
-                            <Link
-                              className="person-name-link"
-                              href={`/t/${slug}/feed?host=${person.userId}`}
-                            >
-                              <strong>{person.name ?? "Member"}</strong>
-                            </Link>
-                          ) : (
-                            <strong>{person.name ?? "Member"}</strong>
-                          )}
-                          <div style={{ marginTop: 4 }}>
-                            <RolePills
-                              roles={person.roles}
-                              labels={settings.roleLabels}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                      {person.bioHtml ? (
-                        <div
-                          className="topic-body"
-                          dangerouslySetInnerHTML={{ __html: person.bioHtml }}
-                        />
-                      ) : null}
-                      {person.publishedTopics.length > 0 ? (
-                        <div className="person-topics">
-                          <div className="faint" style={{ fontSize: 12 }}>
-                            Topics
-                          </div>
-                          <ul>
-                            {person.publishedTopics.map((topic) => {
-                              const href = topicPath(
-                                slug,
-                                person.slug,
-                                topic.slug,
-                              );
-                              return (
-                                <li key={topic.id}>
-                                  {href ? (
-                                    <Link href={href}>{topic.title}</Link>
-                                  ) : (
-                                    topic.title
-                                  )}
-                                </li>
-                              );
-                            })}
-                          </ul>
-                        </div>
-                      ) : null}
-                      {canPreview || canManage ? (
-                        <div className="people-card-actions">
-                          {canPreview ? (
-                            <UserPreviewStart
-                              slug={slug}
-                              userId={person.userId}
-                              name={person.name}
-                            />
-                          ) : null}
-                          {canManage && person.userId !== data.me?.id ? (
-                            <InviteSendButton
-                              membershipId={member!.membershipId}
-                              email={member!.email}
-                              inviteSentAt={member!.inviteSentAt}
-                            />
-                          ) : null}
-                          {canManage ? (
-                            <PersonAdminPanel
-                              membershipId={member!.membershipId}
-                              userId={person.userId}
-                              slug={slug}
-                              name={member!.name}
-                              email={member!.email}
-                              roles={member!.roles}
-                              roleLabels={settings.roleLabels}
-                            />
-                          ) : null}
-                        </div>
-                      ) : null}
-                    </li>
-                  );
-                })}
+                {section.people.map((person) => (
+                  <PersonCard
+                    key={person.userId}
+                    slug={slug}
+                    person={person}
+                    member={membersByUser.get(person.userId)}
+                    meId={data.me?.id}
+                    canEdit={canEdit}
+                    roleLabels={settings.roleLabels}
+                  />
+                ))}
               </ul>
             </section>
           ))

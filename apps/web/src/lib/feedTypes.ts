@@ -58,6 +58,8 @@ export type ManagedTopic = {
   id: string;
   title: string;
   slug?: string | null;
+  /** Owner id — selected where the card shows the admin Reassign control. */
+  hostId?: string;
   hostSlug?: string | null;
   status: TopicStatus;
   bodyMd: string;

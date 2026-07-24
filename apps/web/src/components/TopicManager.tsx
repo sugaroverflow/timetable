@@ -1,55 +1,134 @@
-/* eslint-disable complexity -- audit debt (2026-07-22): decomposition queued — remove this disable when refactoring */
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 import { AdminCommentsPanel } from "@/components/AdminCommentsPanel";
+import { AdminTopicActions } from "@/components/AdminTopicActions";
 import { CommentComposer } from "@/components/CommentComposer";
 import { CommentList } from "@/components/CommentList";
 import { HostOnlyPanel } from "@/components/HostOnlyPanel";
-import { useToast } from "@/components/Toast";
 import { TopicEditForm } from "@/components/TopicEditForm";
-import { clientGql } from "@/lib/clientGraphql";
 import type { ManagedTopic } from "@/lib/feedTypes";
 import { topicPath } from "@/lib/topicPath";
+import { useGqlAction } from "@/lib/useGqlAction";
 
 const SUBMIT = `mutation($id: String!){ submitTopic(topicId: $id){ id } }`;
 const UNPUBLISH = `mutation($id: String!){ unpublishTopic(topicId: $id){ id } }`;
+
+/** The manage block under a My Topics card. Hosts get submit/unpublish/edit
+ * gated by status; admins get the shared admin set instead (publish, edit,
+ * reassign owner — issue #59), same precedence as the feed's TopicCard. */
+function ManageControls({
+  topic,
+  slug,
+  adminLabel,
+  isAdmin,
+  hosts,
+}: {
+  topic: ManagedTopic;
+  slug: string;
+  adminLabel: string;
+  isAdmin: boolean;
+  hosts: { id: string; name: string | null }[];
+}) {
+  const { run: runAction, busy } = useGqlAction();
+  const [editing, setEditing] = useState(false);
+
+  function run(
+    query: string,
+    variables: Record<string, unknown>,
+    successMessage: string,
+  ) {
+    void runAction(query, variables, {
+      success: successMessage,
+      errorFallback: "Action failed",
+    });
+  }
+
+  if (isAdmin) {
+    return (
+      <AdminTopicActions
+        topic={{
+          id: topic.id,
+          title: topic.title,
+          bodyMd: topic.bodyMd,
+          coverImageUrl: topic.coverImageUrl,
+          status: topic.status,
+        }}
+        slug={slug}
+        label={adminLabel}
+        hosts={hosts}
+        currentHostId={topic.hostId}
+      />
+    );
+  }
+
+  if (editing) {
+    return (
+      <TopicEditForm
+        topic={topic}
+        slug={slug}
+        onDone={() => setEditing(false)}
+      />
+    );
+  }
+
+  return (
+    <div className="row wrap divider-top" style={{ paddingTop: 10 }}>
+      {topic.status === "unpublished" && (
+        <button
+          className="btn btn-primary"
+          type="button"
+          disabled={busy}
+          onClick={() => run(SUBMIT, { id: topic.id }, "Submitted for review")}
+        >
+          Submit for review
+        </button>
+      )}
+      {topic.status === "published" && (
+        <button
+          className="btn"
+          type="button"
+          disabled={busy}
+          onClick={() => run(UNPUBLISH, { id: topic.id }, "Topic unpublished")}
+        >
+          Unpublish
+        </button>
+      )}
+      {topic.status === "submitted" && (
+        <span className="faint" style={{ fontSize: 13 }}>
+          Pending review…
+        </span>
+      )}
+      <button
+        className="btn btn-ghost"
+        type="button"
+        onClick={() => setEditing(true)}
+      >
+        Edit
+      </button>
+    </div>
+  );
+}
 
 /** A topic on My Topics — renders like a feed card (cover, description,
  * comments, {host}-only thread; QA #59) with the manage controls below. */
 export function TopicManager({
   topic,
   slug,
-  hostLabel = "Host",
-  adminLabel = "Admin",
+  hostLabel,
+  adminLabel,
+  isAdmin,
+  hosts,
 }: {
   topic: ManagedTopic;
   slug: string;
-  hostLabel?: string;
-  adminLabel?: string;
+  hostLabel: string;
+  adminLabel: string;
+  isAdmin: boolean;
+  hosts: { id: string; name: string | null }[];
 }) {
-  const router = useRouter();
-  const { toast, toastError } = useToast();
-  const [pending, startTransition] = useTransition();
-  const [editing, setEditing] = useState(false);
-
-  async function run(
-    query: string,
-    variables: Record<string, unknown>,
-    successMessage: string,
-  ) {
-    try {
-      await clientGql(query, variables);
-      toast(successMessage);
-      startTransition(() => router.refresh());
-    } catch (err) {
-      toastError(err instanceof Error ? err.message : "Action failed");
-    }
-  }
-
   const permalink =
     topic.status === "published"
       ? topicPath(slug, topic.hostSlug ?? null, topic.slug ?? null)
@@ -118,52 +197,13 @@ export function TopicManager({
         adminLabel={adminLabel}
       />
 
-      {editing ? (
-        <TopicEditForm
-          topic={topic}
-          slug={slug}
-          onDone={() => setEditing(false)}
-        />
-      ) : (
-        <div className="row wrap divider-top" style={{ paddingTop: 10 }}>
-          {topic.status === "unpublished" && (
-            <button
-              className="btn btn-primary"
-              type="button"
-              disabled={pending}
-              onClick={() =>
-                run(SUBMIT, { id: topic.id }, "Submitted for review")
-              }
-            >
-              Submit for review
-            </button>
-          )}
-          {topic.status === "published" && (
-            <button
-              className="btn"
-              type="button"
-              disabled={pending}
-              onClick={() =>
-                run(UNPUBLISH, { id: topic.id }, "Topic unpublished")
-              }
-            >
-              Unpublish
-            </button>
-          )}
-          {topic.status === "submitted" && (
-            <span className="faint" style={{ fontSize: 13 }}>
-              Pending review…
-            </span>
-          )}
-          <button
-            className="btn btn-ghost"
-            type="button"
-            onClick={() => setEditing(true)}
-          >
-            Edit
-          </button>
-        </div>
-      )}
+      <ManageControls
+        topic={topic}
+        slug={slug}
+        adminLabel={adminLabel}
+        isAdmin={isAdmin}
+        hosts={hosts}
+      />
     </li>
   );
 }

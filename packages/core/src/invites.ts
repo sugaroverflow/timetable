@@ -10,7 +10,11 @@ import {
   users,
   type NotificationSettings,
 } from "@timetable/db";
-import type { AssignableRole, Role } from "@timetable/shared";
+import {
+  normalizeEmail,
+  type AssignableRole,
+  type Role,
+} from "@timetable/shared";
 
 import { logActivity } from "./activity";
 
@@ -84,7 +88,7 @@ export async function inviteEmails(
 ): Promise<InviteOutcome[]> {
   const outcomes: InviteOutcome[] = [];
   const uniqueEmails = Array.from(
-    new Set(emails.map((e) => e.trim().toLowerCase()).filter(Boolean)),
+    new Set(emails.map(normalizeEmail).filter(Boolean)),
   );
   const digestDefaults = await getDigestDefaults(timetableId);
 
@@ -180,7 +184,7 @@ export async function claimInvitesForUser(
   userId: string,
   email: string,
 ): Promise<number> {
-  const normalized = email.trim().toLowerCase();
+  const normalized = normalizeEmail(email);
   const pending = await db
     .select()
     .from(timetableInvites)

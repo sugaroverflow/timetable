@@ -1,10 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 
-import { useToast } from "@/components/Toast";
-import { clientGql } from "@/lib/clientGraphql";
+import { useGqlAction } from "@/lib/useGqlAction";
 
 const MUTATION = `mutation($s: String!, $from: String) {
   setHeartsCountFrom(idOrSlug: $s, countFrom: $from) { id heartsCountFrom }
@@ -29,23 +27,21 @@ export function HeartsCutoffForm({
   slug: string;
   current: string | null;
 }) {
-  const router = useRouter();
-  const { toast, toastError } = useToast();
-  const [pending, startTransition] = useTransition();
+  const { run, busy } = useGqlAction();
   const [value, setValue] = useState(toLocalInputValue(current));
 
-  async function save(next: string | null) {
-    try {
-      await clientGql(MUTATION, {
-        s: slug,
-        from: next ? new Date(next).toISOString() : null,
-      });
-      toast(next ? "Hearts cutoff updated" : "Hearts cutoff cleared");
-      if (!next) setValue("");
-      startTransition(() => router.refresh());
-    } catch (err) {
-      toastError(err instanceof Error ? err.message : "Could not save cutoff");
-    }
+  function save(next: string | null) {
+    void run(
+      MUTATION,
+      { s: slug, from: next ? new Date(next).toISOString() : null },
+      {
+        success: next ? "Hearts cutoff updated" : "Hearts cutoff cleared",
+        errorFallback: "Could not save cutoff",
+        onSuccess: () => {
+          if (!next) setValue("");
+        },
+      },
+    );
   }
 
   return (
@@ -61,7 +57,7 @@ export function HeartsCutoffForm({
         className="row wrap"
         onSubmit={(e) => {
           e.preventDefault();
-          if (value) void save(value);
+          if (value) save(value);
         }}
       >
         <input
@@ -74,7 +70,7 @@ export function HeartsCutoffForm({
         <button
           className="btn btn-primary"
           type="submit"
-          disabled={pending || !value}
+          disabled={busy || !value}
         >
           Save cutoff
         </button>
@@ -82,8 +78,8 @@ export function HeartsCutoffForm({
           <button
             className="btn btn-ghost"
             type="button"
-            disabled={pending}
-            onClick={() => void save(null)}
+            disabled={busy}
+            onClick={() => save(null)}
           >
             Clear (count all hearts)
           </button>

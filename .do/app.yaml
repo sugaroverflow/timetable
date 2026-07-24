@@ -65,7 +65,7 @@ services:
       # Optionally also set SPACES_PUBLIC_BASE_URL for a CDN/custom domain.
       - { key: SPACES_ENDPOINT, value: "https://lon1.digitaloceanspaces.com", scope: RUN_TIME }
       - { key: SPACES_REGION, value: "lon1", scope: RUN_TIME }
-      - { key: SPACES_BUCKET, value: "timetable", scope: RUN_TIME }
+      - { key: SPACES_BUCKET, value: "topicforum", scope: RUN_TIME }
       - { key: SPACES_KEY_PREFIX, value: "uploads/production", scope: RUN_TIME }
       - { key: SPACES_PUBLIC_BASE_URL, scope: RUN_TIME }
       - { key: SPACES_KEY, value: "${SPACES_KEY}", scope: RUN_TIME, type: SECRET }

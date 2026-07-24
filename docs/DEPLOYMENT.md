@@ -278,23 +278,27 @@ Required API component variables:
 
 - `SPACES_ENDPOINT`, for example `https://lon1.digitaloceanspaces.com`
 - `SPACES_REGION`, for example `lon1`
-- `SPACES_BUCKET`, for example `timetable`
+- `SPACES_BUCKET`, for example `topicforum`
 - `SPACES_KEY`
 - `SPACES_SECRET`
 
-Dev (hosted and local) uses its own bucket; production uses `timetable`:
+Dev (hosted and local) uses its own bucket; production uses `topicforum`:
 
 | Environment | `SPACES_BUCKET` | `SPACES_KEY_PREFIX` |
 | --- | --- | --- |
 | Dev/local | `timetable-dev` | `uploads/dev` |
-| Production | `timetable` | `uploads/production` |
+| Production | `topicforum` | `uploads/production` |
 
-Dev originally shared the `timetable` bucket behind a key prefix, but that
-bucket rejects `PutBucketCors` with `501 NotImplemented` (a bucket-specific
-DigitalOcean quirk — `timetable-dev` accepts the same call), so dev moved to
-its own bucket, which also gives cleaner dev/prod isolation. Before go-live,
-production CORS on `timetable` must be set through the DigitalOcean console
-(Spaces → timetable → Settings → CORS) since the API path is refused.
+The original production bucket (`timetable`, lon1) turned out to be a
+**cold-storage** Space. Cold storage cannot serve app uploads at all: it has
+no CORS support (every `PutBucketCors` client got `501 NotImplemented` — what
+looked like a bucket-specific quirk was the storage class), it requires signed
+requests (so `public-read` objects aren't readable anonymously), and the class
+is fixed at creation with no conversion path. Production therefore moved to
+the standard-class `topicforum` bucket (created 2026-07-24); the old
+`timetable` bucket is unused and can be deleted after launch. This is also why
+dev has its own bucket: `timetable-dev` is standard-class and accepts CORS
+normally.
 
 `doctl apps update` can set these App Platform env values. The installed `doctl`
 Spaces commands manage Spaces access keys only; bucket creation and CORS still
@@ -303,11 +307,11 @@ need the DigitalOcean console or `s3cmd` with a Spaces key.
 If a Spaces key is created or rotated, set `SPACES_KEY` and `SPACES_SECRET` on
 the relevant DigitalOcean App Platform API components before testing uploads.
 
-Bucket CORS must allow `PUT` from the web origins (`https://dev.timetable.love`,
-`https://timetable.love`, and local dev if needed) with the `Content-Type` and
-`x-amz-acl` headers. The signed PUT uses `public-read`; public reads can be
-served either by the bucket URL or by `SPACES_PUBLIC_BASE_URL` pointing at a
-public CDN/custom domain.
+Bucket CORS must allow `PUT` from the web origins (`https://topic.forum` for
+production, `https://dev.timetable.love` for dev, and local dev if needed)
+with the `Content-Type` and `x-amz-acl` headers. The signed PUT uses
+`public-read`; public reads can be served either by the bucket URL or by
+`SPACES_PUBLIC_BASE_URL` pointing at a public CDN/custom domain.
 
 Configure bucket CORS with the helper script:
 
@@ -315,12 +319,14 @@ Configure bucket CORS with the helper script:
 brew install s3cmd
 export SPACES_KEY=...
 export SPACES_SECRET=...
-SPACES_BUCKET=timetable SPACES_REGION=lon1 scripts/configure-spaces-cors.sh
+SPACES_BUCKET=topicforum SPACES_REGION=lon1 scripts/configure-spaces-cors.sh
 ```
 
 The script writes the XML CORS configuration to a temporary file and applies it
 with `s3cmd setcors`. Do not use `aws s3api put-bucket-cors` for Spaces; this
 setup returned `NotImplemented` from DigitalOcean during the issue #8 rollout.
+(Any client — including this script — gets `NotImplemented` from a
+cold-storage bucket; the script works on standard-class buckets.)
 
 Optional API component variables:
 
