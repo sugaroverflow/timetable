@@ -8,7 +8,7 @@ migration job, and managed PostgreSQL. Clerk handles authentication.
 | | Local | Dev | Production |
 | --- | --- | --- | --- |
 | URL | `http://localhost:3000` | `https://dev.timetable.love` | `https://timetable.love` |
-| DO app | none | `timetable-dev` | `timetable` |
+| DO app | none | `topic-dev` | `topic-prod` |
 | App spec | none | `.do/app.dev.yaml` | `.do/app.yaml` |
 | Database | Docker Postgres | `timetable-db` | `timetable-db-prod` |
 | Clerk | Development keys | Development keys | Production keys |
@@ -76,8 +76,8 @@ Important variables:
 | Workflow | Trigger | Target |
 | --- | --- | --- |
 | `.github/workflows/ci.yml` | Push to `main`, pull requests | Build, typecheck, lint, format check, unit + e2e tests, migrate against throwaway Postgres |
-| `.github/workflows/deploy-dev.yml` | CI success on `main`, manual | Builds the web Docker image, pushes it to the DO container registry, deploys `timetable-dev` from `.do/app.dev.yaml`, then prunes the registry; manual runs can optionally seed sample data |
-| `.github/workflows/deploy-production.yml` | Manual only | Deploys `timetable` from `.do/app.yaml` |
+| `.github/workflows/deploy-dev.yml` | CI success on `main`, manual | Builds the web Docker image, pushes it to the DO container registry, deploys the `topic-dev` app from `.do/app.dev.yaml`, then prunes the registry; manual runs can optionally seed sample data |
+| `.github/workflows/deploy-production.yml` | Manual only | Deploys `topic-prod` from `.do/app.yaml` |
 | `.github/workflows/run-digests.yml` | Daily schedule, manual | Calls `POST /api/jobs/digests` with `CRON_SECRET` |
 | `.github/workflows/claude-review.yml` | PR opened / ready for review | Automated Claude PR review; inert until the `ANTHROPIC_API_KEY` secret and the `CLAUDE_REVIEW_ENABLED=true` repo variable are set |
 
@@ -104,7 +104,7 @@ diagnosis beyond `gh run rerun <id> --failed`.
 
 Manual `Deploy Dev` runs include a `seed_sample_data` checkbox. When checked,
 the dev App Platform post-deploy job resets hosted dev app data, runs
-`npm run db:seed` against the `timetable-dev` database, and then runs
+`npm run db:seed` against the dev app's database, and then runs
 `npm run clerk:seed-dev-users` against the Clerk development instance.
 Automatic deploys after `main` CI leave the checkbox unset and skip the seed
 job.
@@ -172,7 +172,7 @@ For dev deploys:
 
 1. Confirm the `CI` workflow passed for the `main` commit.
 2. Confirm the `Deploy Dev` workflow passed.
-3. Confirm DigitalOcean shows `timetable-dev` with no in-progress deployment.
+3. Confirm DigitalOcean shows `topic-dev` with no in-progress deployment.
 4. Open `https://dev.timetable.love/health`; it should return JSON with
    `ok: true`.
 5. Run a hosted GraphQL smoke request and confirm it returns `200` with a
@@ -193,7 +193,7 @@ users after the dev deployment completes; production has no seed job.
 
 If a deploy fails before DigitalOcean activates it, the previous active
 deployment should remain live. If a deploy activates but is bad, roll back to
-the previous `timetable-dev` deployment in DigitalOcean App Platform, then
+the previous `topic-dev` deployment in DigitalOcean App Platform, then
 re-run the health checks above. Code/config rollback does not roll back database
 state, so migration-related incidents require restoring from a managed database
 backup or applying a forward fix.

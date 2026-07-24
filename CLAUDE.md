@@ -63,7 +63,7 @@ Lint covers everything: `apps/web` has its own Next config; the root
 - Merging to `main` **auto-deploys dev** (dev.timetable.love) when CI is green.
   A red CI on main makes Deploy Dev show as `skipped`, not failed — check
   `gh run list --workflow=deploy-dev.yml` after merging.
-- **Never run `deploy-production.yml` or touch the `timetable` (prod) DO app —
+- **Never run `deploy-production.yml` or touch the `topic-prod` (prod) DO app —
   production deploys are human-triggered only.** Same for repo settings,
   rulesets, and DO infrastructure (`doctl`).
 - Never commit secrets. Env shape lives in `.env.example`.

@@ -1,9 +1,10 @@
 # DigitalOcean App Platform spec — DEV (dev.timetable.love)
 #
-# App name: timetable-dev
-# Deployed by deploy-dev.yml. GitHub Environment "timetable-dev", Clerk Development keys.
+# App name: topic-dev (renamed in the DO console 2026-07-24; was "timetable-dev").
+# Deployed by deploy-dev.yml. GitHub Environment "timetable-dev" (unrenamed),
+# Clerk Development keys.
 
-name: timetable-dev
+name: topic-dev
 region: lon
 
 domains:
@@ -110,7 +111,7 @@ jobs:
       - { key: SEED_DEV_SAMPLE_DATA, value: "${SEED_DEV_SAMPLE_DATA}", scope: RUN_TIME }
 
 databases:
-  # Existing cluster (currently attached to the app you are renaming to timetable-dev).
+  # Existing cluster (attached to the dev app; cluster name is independent of the app rename).
   - name: timetable-db
     engine: PG
     version: "16"

@@ -1,11 +1,12 @@
-# DigitalOcean App Platform spec — PRODUCTION (timetable.love)
+# DigitalOcean App Platform spec — PRODUCTION (topic.forum)
 #
-# App name: timetable (new app). Deployed manually via deploy-production.yml.
+# App name: topic-prod (renamed in the DO console 2026-07-24; was "timetable").
+# Deployed manually via deploy-production.yml.
 # GitHub Environment "production", Clerk Production live keys.
 #
-# Dev uses .do/app.dev.yaml → app timetable-dev @ dev.timetable.love
+# Dev uses .do/app.dev.yaml → app topic-dev @ dev.timetable.love
 
-name: timetable
+name: topic-prod
 region: lon
 
 # topic.forum is PRIMARY (APP_URL and all NEXT_PUBLIC_* URLs follow it);
