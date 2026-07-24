@@ -22,7 +22,7 @@ export function buildIcs(calendarName: string, slots: IcsSlot[]): string {
   const lines: string[] = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//Sparkle Bureaucracy//Timetable//EN",
+    "PRODID:-//Sparkle Bureaucracy//Topic//EN",
     "CALSCALE:GREGORIAN",
     `X-WR-CALNAME:${escapeText(calendarName)}`,
   ];
@@ -32,7 +32,7 @@ export function buildIcs(calendarName: string, slots: IcsSlot[]): string {
       slot.topicTitles.length > 0 ? slot.topicTitles.join(", ") : "Open slot";
     lines.push(
       "BEGIN:VEVENT",
-      `UID:${slot.id}@timetable`,
+      `UID:${slot.id}@topic.forum`,
       `DTSTAMP:${now}`,
       `DTSTART:${icsDate(slot.startsAt)}`,
       `DTEND:${icsDate(slot.endsAt)}`,
