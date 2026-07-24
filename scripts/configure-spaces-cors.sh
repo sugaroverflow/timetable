@@ -5,12 +5,12 @@
 #   scripts/configure-spaces-cors.sh
 #
 # Optional env:
-#   SPACES_BUCKET=timetable
+#   SPACES_BUCKET=topicforum
 #   SPACES_REGION=lon1
 #   SPACES_ENDPOINT=https://lon1.digitaloceanspaces.com
 #   SPACES_KEY=...
 #   SPACES_SECRET=...
-#   CORS_ORIGINS=https://dev.timetable.love,https://timetable.love
+#   CORS_ORIGINS=https://topic.forum,https://dev.timetable.love
 
 set -euo pipefail
 
@@ -62,7 +62,7 @@ prompt_if_missing() {
 
 need s3cmd "brew install s3cmd"
 
-bucket="${SPACES_BUCKET:-timetable}"
+bucket="${SPACES_BUCKET:-topicforum}"
 region="${SPACES_REGION:-lon1}"
 endpoint="${SPACES_ENDPOINT:-https://${region}.digitaloceanspaces.com}"
 host_base="${endpoint#http://}"
@@ -82,7 +82,7 @@ fi
 [[ -n "$spaces_key" ]] || die "missing Spaces access key"
 [[ -n "$spaces_secret" ]] || die "missing Spaces secret key"
 
-origins_csv="${CORS_ORIGINS:-https://dev.timetable.love,https://timetable.love,https://www.timetable.love,http://localhost:3000,http://127.0.0.1:3000}"
+origins_csv="${CORS_ORIGINS:-https://topic.forum,https://www.topic.forum,https://timetable.love,https://dev.timetable.love,http://localhost:3000,http://127.0.0.1:3000}"
 IFS=, read -r -a origins <<< "$origins_csv"
 [[ "${#origins[@]}" -gt 0 ]] || die "no CORS origins configured"
 
