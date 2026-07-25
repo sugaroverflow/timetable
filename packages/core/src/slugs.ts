@@ -1,6 +1,6 @@
-import { and, eq, isNull, ne } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 
-import { db, topics, users } from "@timetable/db";
+import { db, timetableMemberships, topics } from "@timetable/db";
 import { slugify } from "@timetable/shared";
 
 /** Route segments under /t/[slug]/ that a user slug must never shadow —
@@ -43,41 +43,30 @@ export async function ensureTopicSlug(
   }
 }
 
-/** Globally unique user slug from a display name, avoiding reserved route
- * segments. Cosmetic in permalinks, so regenerating on rename is safe. */
-export async function ensureUserSlug(
+/** Unique-per-timetable member slug from a display name, avoiding reserved
+ * route segments. Person pages (/t/[slug]/[userSlug]) resolve by this;
+ * in topic permalinks it stays cosmetic (stale segments 301). */
+export async function ensureMemberSlug(
+  timetableId: string,
   name: string | null,
-  opts: { excludeUserId?: string } = {},
+  opts: { excludeMembershipId?: string } = {},
 ): Promise<string> {
   let base = slugify(name ?? "", "user");
   if (RESERVED_SEGMENTS.has(base)) base = `${base}-u`;
   for (let n = 1; ; n++) {
     const candidate = n === 1 ? base : `${base}-${n}`;
-    const conds = [eq(users.slug, candidate)];
-    if (opts.excludeUserId) conds.push(ne(users.id, opts.excludeUserId));
+    const conds = [
+      eq(timetableMemberships.timetableId, timetableId),
+      eq(timetableMemberships.slug, candidate),
+    ];
+    if (opts.excludeMembershipId) {
+      conds.push(ne(timetableMemberships.id, opts.excludeMembershipId));
+    }
     const [taken] = await db
-      .select({ id: users.id })
-      .from(users)
+      .select({ id: timetableMemberships.id })
+      .from(timetableMemberships)
       .where(and(...conds))
       .limit(1);
     if (!taken) return candidate;
   }
-}
-
-/** Backstop for users created before slugs existed (or via paths that skip
- * slug assignment): generates and stores one on demand. */
-export async function getOrCreateUserSlug(userId: string): Promise<string> {
-  const [row] = await db
-    .select({ slug: users.slug, name: users.name })
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
-  if (!row) return userId;
-  if (row.slug) return row.slug;
-  const slug = await ensureUserSlug(row.name, { excludeUserId: userId });
-  await db
-    .update(users)
-    .set({ slug })
-    .where(and(eq(users.id, userId), isNull(users.slug)));
-  return slug;
 }

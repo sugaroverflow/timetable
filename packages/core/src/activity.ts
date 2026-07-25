@@ -6,7 +6,6 @@ import {
   db,
   timetableMemberships,
   topics,
-  users,
 } from "@timetable/db";
 
 export type ActivityInput = {
@@ -53,7 +52,7 @@ export async function listActivity(
     limit?: number;
   } = {},
 ): Promise<ActivityEntry[]> {
-  const hostUsers = alias(users, "host_users");
+  const hostMembers = alias(timetableMemberships, "host_memberships");
   const conds = [eq(activityEvents.timetableId, timetableId)];
   if (opts.actorId) conds.push(eq(activityEvents.actorId, opts.actorId));
   if (opts.from) conds.push(gte(activityEvents.createdAt, opts.from));
@@ -67,15 +66,14 @@ export async function listActivity(
       note: activityEvents.note,
       createdAt: activityEvents.createdAt,
       actorId: activityEvents.actorId,
-      actorName: users.name,
-      actorImage: users.image,
+      actorName: timetableMemberships.name,
+      actorImage: timetableMemberships.image,
       actorRoles: timetableMemberships.roles,
       topicSlug: topics.slug,
-      topicHostSlug: hostUsers.slug,
-      topicHostName: hostUsers.name,
+      topicHostSlug: hostMembers.slug,
+      topicHostName: hostMembers.name,
     })
     .from(activityEvents)
-    .leftJoin(users, eq(users.id, activityEvents.actorId))
     .leftJoin(
       timetableMemberships,
       and(
@@ -87,7 +85,13 @@ export async function listActivity(
       topics,
       sql`${topics.id}::text = ${activityEvents.payload}->>'topicId'`,
     )
-    .leftJoin(hostUsers, eq(hostUsers.id, topics.hostId))
+    .leftJoin(
+      hostMembers,
+      and(
+        eq(hostMembers.userId, topics.hostId),
+        eq(hostMembers.timetableId, activityEvents.timetableId),
+      ),
+    )
     .where(and(...conds))
     .orderBy(desc(activityEvents.createdAt))
     .limit(opts.limit ?? 200);

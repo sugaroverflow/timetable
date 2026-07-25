@@ -5,8 +5,8 @@ import {
   listMembers,
   listPeople,
   logActivity,
+  updateMemberProfile,
   updateUserNotificationSettings,
-  updateUserProfile,
   type Person,
 } from "@timetable/core";
 import {
@@ -136,8 +136,9 @@ builder.queryFields((t) => ({
     },
   }),
 
-  /** One member's public profile — powers the bio modal and the person
-   * pages. Lookup is by userId or (exactly one required) by user slug. */
+  /** One member's public profile — powers the bio modal, the person pages,
+   * and (with no user args) the viewer's own per-forum profile editor.
+   * Lookup: userId, or user slug, or the signed-in viewer. */
   person: t.field({
     type: PersonType,
     nullable: true,
@@ -150,8 +151,9 @@ builder.queryFields((t) => ({
       const readable = await readTimetable(ctx, args.idOrSlug);
       if (!readable) return null;
       const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
-      const person = args.userId
-        ? await getPerson(readable.timetable.id, args.userId)
+      const targetId = args.userId ?? (args.userSlug ? null : ctx.user?.id);
+      const person = targetId
+        ? await getPerson(readable.timetable.id, targetId)
         : args.userSlug
           ? await getPersonBySlug(readable.timetable.id, args.userSlug)
           : null;
@@ -240,29 +242,33 @@ builder.mutationFields((t) => ({
     },
   }),
 
-  /** Edit the current user's own profile (name, bio). */
+  /** Edit the current user's own profile in one forum (per-forum profiles:
+   * name/photo/bio/slug live on the membership, not the account). */
   updateMyProfile: t.field({
-    type: UserType,
+    type: PersonType,
+    nullable: true,
     args: {
+      idOrSlug: t.arg.string({ required: true }),
       name: t.arg.string({ required: false }),
       bio: t.arg.string({ required: false }),
       image: t.arg.string({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
-      const user = await requireUser(ctx);
-      const updated = await updateUserProfile(user.id, {
-        name: args.name ?? undefined,
-        bio: args.bio ?? undefined,
-        image: args.image != null ? args.image.trim() || null : undefined,
-      });
-      if (!updated) notFound("User not found");
-      return {
-        id: updated.id,
-        email: updated.email,
-        name: updated.name,
-        image: updated.image,
-        bio: updated.bio,
-      };
+      const { user, readable } = await loadTimetableAndViewer(
+        ctx,
+        args.idOrSlug,
+      );
+      const updated = await updateMemberProfile(
+        readable.timetable.id,
+        user.id,
+        {
+          name: args.name ?? undefined,
+          bio: args.bio ?? undefined,
+          image: args.image != null ? args.image.trim() || null : undefined,
+        },
+      );
+      if (!updated) notFound("Membership not found");
+      return getPerson(readable.timetable.id, user.id);
     },
   }),
 
@@ -318,7 +324,7 @@ builder.mutationFields((t) => ({
       );
       const target = await getPerson(readable.timetable.id, args.userId);
       if (!target) notFound("Member not found");
-      await updateUserProfile(args.userId, {
+      await updateMemberProfile(readable.timetable.id, args.userId, {
         bio: args.bio.trim() || null,
         ...(args.image != null ? { image: args.image.trim() || null } : {}),
       });

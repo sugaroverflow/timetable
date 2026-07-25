@@ -52,6 +52,16 @@ export const timetableMemberships = pgTable(
       .notNull()
       .references(() => timetables.id, { onDelete: "cascade" }),
     roles: roleEnum().array().notNull(),
+    // Per-forum profile (2026-07): identity is forum-scoped — the same
+    // person can present differently in different forums. The users row
+    // keeps account data only (email, Clerk-synced defaults used to seed
+    // these fields on membership creation).
+    name: text(),
+    image: text(),
+    bio: text(),
+    /** URL slug, unique per timetable (person pages /t/[slug]/[userSlug]
+     * and the cosmetic host segment in topic permalinks). */
+    slug: text(),
     // Watermark for the feed's "new since your last visit" highlight;
     // null until the member first views the feed.
     lastSeenFeedAt: timestamp({ withTimezone: true }),
@@ -68,6 +78,7 @@ export const timetableMemberships = pgTable(
   (t) => [
     uniqueIndex("memberships_user_timetable_uq").on(t.userId, t.timetableId),
     index("memberships_timetable_idx").on(t.timetableId),
+    uniqueIndex("memberships_timetable_slug_uq").on(t.timetableId, t.slug),
   ],
 );
 

@@ -1,10 +1,17 @@
 import { randomUUID } from "node:crypto";
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
-import { db, users, type NotificationSettings, type User } from "@timetable/db";
+import {
+  db,
+  timetableMemberships,
+  users,
+  type NotificationSettings,
+  type TimetableMembership,
+  type User,
+} from "@timetable/db";
 
-import { ensureUserSlug } from "./slugs";
+import { ensureMemberSlug } from "./slugs";
 
 /** Return the user's ICS subscription token, creating one on first use. */
 export async function getOrCreateIcsToken(
@@ -40,26 +47,44 @@ export async function getUserProfile(userId: string): Promise<User | null> {
   return user ?? null;
 }
 
-export async function updateUserProfile(
+/** Update a member's per-forum profile (2026-07: name/photo/bio/slug are
+ * forum-scoped; only the account itself — email, auth — stays global).
+ * The slug follows renames within this forum only. */
+export async function updateMemberProfile(
+  timetableId: string,
   userId: string,
   patch: { name?: string; bio?: string | null; image?: string | null },
-): Promise<User | null> {
-  // Keep the (cosmetic) permalink slug in step with renames.
+): Promise<TimetableMembership | null> {
+  const [membership] = await db
+    .select({ id: timetableMemberships.id })
+    .from(timetableMemberships)
+    .where(
+      and(
+        eq(timetableMemberships.timetableId, timetableId),
+        eq(timetableMemberships.userId, userId),
+      ),
+    )
+    .limit(1);
+  if (!membership) return null;
+
   const slug =
     patch.name !== undefined
-      ? await ensureUserSlug(patch.name, { excludeUserId: userId })
+      ? await ensureMemberSlug(timetableId, patch.name, {
+          excludeMembershipId: membership.id,
+        })
       : undefined;
-  const [user] = await db
-    .update(users)
+  const [updated] = await db
+    .update(timetableMemberships)
     .set({
       ...(patch.name !== undefined ? { name: patch.name } : {}),
       ...(slug !== undefined ? { slug } : {}),
       ...(patch.bio !== undefined ? { bio: patch.bio } : {}),
       ...(patch.image !== undefined ? { image: patch.image } : {}),
+      updatedAt: new Date(),
     })
-    .where(eq(users.id, userId))
+    .where(eq(timetableMemberships.id, membership.id))
     .returning();
-  return user ?? null;
+  return updated ?? null;
 }
 
 export async function getUserNotificationSettings(

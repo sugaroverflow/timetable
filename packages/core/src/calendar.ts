@@ -9,7 +9,6 @@ import {
   timeslots,
   timetableMemberships,
   topics,
-  users,
   type AvailabilityState,
   type SlotComment,
   type Timeslot,
@@ -164,17 +163,26 @@ export async function listSlotComments(slotId: string): Promise<
     createdAt: Date;
   }[]
 > {
+  // Author profile from their membership in the slot's timetable
+  // (per-forum profiles); left join tolerates ex-members.
   const rows = await db
     .select({
       id: slotComments.id,
       authorId: slotComments.authorId,
-      authorName: users.name,
-      authorImage: users.image,
+      authorName: timetableMemberships.name,
+      authorImage: timetableMemberships.image,
       body: slotComments.body,
       createdAt: slotComments.createdAt,
     })
     .from(slotComments)
-    .innerJoin(users, eq(users.id, slotComments.authorId))
+    .innerJoin(timeslots, eq(timeslots.id, slotComments.slotId))
+    .leftJoin(
+      timetableMemberships,
+      and(
+        eq(timetableMemberships.userId, slotComments.authorId),
+        eq(timetableMemberships.timetableId, timeslots.timetableId),
+      ),
+    )
     .where(eq(slotComments.slotId, slotId))
     .orderBy(asc(slotComments.createdAt));
   return rows;
@@ -319,9 +327,17 @@ export async function buildCalendar(
   const audienceNameById = new Map<string, string | null>();
   if (audienceIds.length > 0) {
     const nameRows = await db
-      .select({ id: users.id, name: users.name })
-      .from(users)
-      .where(inArray(users.id, audienceIds));
+      .select({
+        id: timetableMemberships.userId,
+        name: timetableMemberships.name,
+      })
+      .from(timetableMemberships)
+      .where(
+        and(
+          eq(timetableMemberships.timetableId, timetableId),
+          inArray(timetableMemberships.userId, audienceIds),
+        ),
+      );
     for (const u of nameRows) audienceNameById.set(u.id, u.name);
   }
 

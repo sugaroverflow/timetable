@@ -9,7 +9,6 @@ import {
   timeslots,
   timetableMemberships,
   topics,
-  users,
   type TopicStatus,
 } from "@timetable/db";
 
@@ -148,10 +147,9 @@ async function loadMembers(timetableId: string): Promise<{
     .select({
       userId: timetableMemberships.userId,
       roles: timetableMemberships.roles,
-      name: users.name,
+      name: timetableMemberships.name,
     })
     .from(timetableMemberships)
-    .innerJoin(users, eq(users.id, timetableMemberships.userId))
     .where(eq(timetableMemberships.timetableId, timetableId));
   const electorRows = memberRows.filter((m) => m.roles.includes("elector"));
   const hostCount = memberRows.filter((m) => m.roles.includes("host")).length;
@@ -248,8 +246,9 @@ type HeartActivityRow = {
 /** One scan of the counted hearts (post-cutoff, activity window, optional
  * host filter). Per-elector stats, per-topic last-heart timestamps and the
  * per-elector hearted-topic lists are all derived from it in JS — this
- * replaces three queries that shared the same WHERE clause. The host join
- * can't drop rows: topics.hostId is NOT NULL with an FK to users. */
+ * replaces three queries that shared the same WHERE clause. Host profile
+ * fields come from the host's membership (per-forum profiles); the left
+ * join keeps rows when the host has left the forum. */
 async function loadHeartActivity(
   heartCountConds: SQL[],
 ): Promise<HeartActivityRow[]> {
@@ -260,13 +259,19 @@ async function loadHeartActivity(
       title: topics.title,
       slug: topics.slug,
       hostId: topics.hostId,
-      hostName: users.name,
-      hostSlug: users.slug,
+      hostName: timetableMemberships.name,
+      hostSlug: timetableMemberships.slug,
       createdAt: hearts.createdAt,
     })
     .from(hearts)
     .innerJoin(topics, eq(topics.id, hearts.topicId))
-    .innerJoin(users, eq(users.id, topics.hostId))
+    .leftJoin(
+      timetableMemberships,
+      and(
+        eq(timetableMemberships.userId, topics.hostId),
+        eq(timetableMemberships.timetableId, topics.timetableId),
+      ),
+    )
     .where(and(...heartCountConds));
 }
 
