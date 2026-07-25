@@ -1,7 +1,10 @@
 "use client";
 
 import { Dialog } from "@base-ui/react/dialog";
+import Link from "next/link";
 import { useState } from "react";
+
+import { isHost, type Role } from "@timetable/shared";
 
 import { clientGql } from "@/lib/clientGraphql";
 import {
@@ -29,6 +32,48 @@ type PersonData = {
     bioHtml: string | null;
   } | null;
 };
+
+/** Modal header: large photo (avatar fallback), name, role pills. A host's
+ * name links to their filtered feed; Dialog.Close makes the modal drop even
+ * when only the search params change. */
+function PersonHeader({
+  slug,
+  person,
+  labels,
+}: {
+  slug: string;
+  person: NonNullable<PersonData["person"]>;
+  labels: RoleLabels | undefined;
+}) {
+  const name = person.name ?? "Member";
+  return (
+    <div className="row" style={{ alignItems: "center" }}>
+      {person.image ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img className="person-modal-photo" src={person.image} alt={name} />
+      ) : (
+        <Avatar name={person.name} image={null} large />
+      )}
+      <div>
+        <strong>
+          {isHost(person.roles as Role[]) ? (
+            <Dialog.Close
+              render={<Link href={`/t/${slug}/feed?host=${person.userId}`} />}
+              className="person-host-link"
+            >
+              {name}
+            </Dialog.Close>
+          ) : (
+            name
+          )}
+        </strong>
+        <div style={{ marginTop: "var(--space-1)" }}>
+          <RolePills roles={person.roles} labels={labels} />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /** Wraps a user's name/avatar anywhere in the app; clicking opens their bio as a
  * modal (QA #42 — one pattern everywhere). Uses Base UI Dialog for focus trap,
@@ -82,15 +127,7 @@ export function PersonChip({
             </p>
           ) : person ? (
             <>
-              <div className="row" style={{ alignItems: "center" }}>
-                <Avatar name={person.name} image={person.image} />
-                <div>
-                  <strong>{person.name ?? "Member"}</strong>
-                  <div style={{ marginTop: "var(--space-1)" }}>
-                    <RolePills roles={person.roles} labels={roleLabels} />
-                  </div>
-                </div>
-              </div>
+              <PersonHeader slug={slug} person={person} labels={roleLabels} />
               {person.bioHtml ? (
                 <div
                   className="topic-body"

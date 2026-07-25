@@ -656,9 +656,30 @@ textarea {
   top: 50%;
   transform: translate(-50%, -50%);
   z-index: var(--z-modal);
-  width: min(440px, calc(100% - 40px));
+  /* 754px = the feed column: .container 980px − 200px sidebar − 26px gap. */
+  width: min(754px, calc(100% - 40px));
   max-height: 80vh;
   overflow-y: auto;
+}
+.person-modal-photo {
+  width: 128px;
+  height: 128px;
+  border-radius: var(--radius);
+  object-fit: cover;
+  flex: none;
+  background: var(--wash);
+}
+@media (max-width: 640px) {
+  .person-modal-photo {
+    width: 88px;
+    height: 88px;
+  }
+}
+.person-host-link {
+  color: inherit;
+}
+.person-host-link:hover {
+  text-decoration: underline;
 }
 
 .topic-title-link {

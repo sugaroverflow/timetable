@@ -84,6 +84,7 @@
      =========================================================================== */
 
   /* --- Surfaces --- */
+  color-scheme: light; /* native UI (scrollbars, form controls) follows mode */
   --bg: #eceef3; /* page background (themeable) */
   --card: #ffffff; /* raised surface: cards, inputs, menus */
   --wash: #f4f5f8; /* subtle fill / hover on cards */
@@ -224,6 +225,7 @@
    ============================================================================= */
 html[data-theme="dark"] {
   /* Surfaces */
+  color-scheme: dark; /* native UI (scrollbars, form controls) follows mode */
   --bg: #14171e;
   --card: #1d222c;
   --wash: #262b35;
