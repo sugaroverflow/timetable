@@ -4,9 +4,8 @@ import {
   buildFeed,
   type FeedSort,
   createTopic,
-  getOrCreateUserSlug,
+  getPerson,
   getTopicBySlug,
-  getUserById,
   getWeightedBreakdown,
   listCommentTree,
   listCommentTreesForTopics,
@@ -190,7 +189,8 @@ const ManagedTopicType = builder
       slug: t.exposeString("slug", { nullable: true }),
       hostSlug: t.string({
         nullable: true,
-        resolve: (tp) => getOrCreateUserSlug(tp.hostId),
+        resolve: async (tp) =>
+          (await getPerson(tp.timetableId, tp.hostId))?.slug ?? null,
       }),
       title: t.exposeString("title"),
       bodyMd: t.exposeString("bodyMd"),
@@ -199,11 +199,13 @@ const ManagedTopicType = builder
       updatedAt: t.string({ resolve: (tp) => tp.updatedAt.toISOString() }),
       hostName: t.string({
         nullable: true,
-        resolve: async (tp) => (await getUserById(tp.hostId))?.name ?? null,
+        resolve: async (tp) =>
+          (await getPerson(tp.timetableId, tp.hostId))?.name ?? null,
       }),
       hostImage: t.string({
         nullable: true,
-        resolve: async (tp) => (await getUserById(tp.hostId))?.image ?? null,
+        resolve: async (tp) =>
+          (await getPerson(tp.timetableId, tp.hostId))?.image ?? null,
       }),
       /** Public comment thread — lets My Topics render feed-identical cards
        * (QA #59). */
@@ -403,14 +405,14 @@ builder.queryFields((t) => ({
       // Not published: owner or admin only, with empty heart data.
       const isOwner = ctx.user?.id === topic.hostId;
       if (!isOwner && !moderate) return null;
-      const host = await getUserById(topic.hostId);
+      const host = await getPerson(topic.timetableId, topic.hostId);
       return {
         id: topic.id,
         timetableId: topic.timetableId,
         hostId: topic.hostId,
         hostName: host?.name ?? null,
         hostImage: host?.image ?? null,
-        hostSlug: await getOrCreateUserSlug(topic.hostId),
+        hostSlug: host?.slug ?? null,
         title: topic.title,
         slug: topic.slug,
         bodyMd: topic.bodyMd,

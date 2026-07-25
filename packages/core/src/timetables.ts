@@ -15,6 +15,8 @@ import {
   type Role,
 } from "@timetable/shared";
 
+import { createMembershipWithProfile } from "./members";
+
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -52,7 +54,7 @@ export async function createTimetable(
 
   if (!timetable) throw new Error("Failed to create timetable");
 
-  await db.insert(timetableMemberships).values({
+  await createMembershipWithProfile({
     userId: ownerId,
     timetableId: timetable.id,
     roles: ["owner", "admin"],

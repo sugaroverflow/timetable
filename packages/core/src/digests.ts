@@ -84,7 +84,8 @@ type DigestContext = {
   recipient: DigestRecipient;
   timetableName: Map<string, string>;
   timetableSlug: Map<string, string>;
-  recipientSlug: string | null;
+  /** The recipient's per-forum slug, by timetable (per-forum profiles). */
+  recipientSlugByTimetable: Map<string, string | null>;
   electorTimetableIds: string[];
   isHostSomewhere: boolean;
 };
@@ -92,32 +93,25 @@ type DigestContext = {
 async function loadDigestContext(
   recipient: DigestRecipient,
 ): Promise<DigestContext> {
-  const [memberships, recipientRows] = await Promise.all([
-    db
-      .select({
-        timetableId: timetableMemberships.timetableId,
-        roles: timetableMemberships.roles,
-        name: timetables.name,
-        slug: timetables.slug,
-      })
-      .from(timetableMemberships)
-      .innerJoin(
-        timetables,
-        eq(timetables.id, timetableMemberships.timetableId),
-      )
-      .where(eq(timetableMemberships.userId, recipient.id)),
-    db
-      .select({ slug: users.slug })
-      .from(users)
-      .where(eq(users.id, recipient.id))
-      .limit(1),
-  ]);
+  const memberships = await db
+    .select({
+      timetableId: timetableMemberships.timetableId,
+      roles: timetableMemberships.roles,
+      memberSlug: timetableMemberships.slug,
+      name: timetables.name,
+      slug: timetables.slug,
+    })
+    .from(timetableMemberships)
+    .innerJoin(timetables, eq(timetables.id, timetableMemberships.timetableId))
+    .where(eq(timetableMemberships.userId, recipient.id));
 
   return {
     recipient,
     timetableName: new Map(memberships.map((m) => [m.timetableId, m.name])),
     timetableSlug: new Map(memberships.map((m) => [m.timetableId, m.slug])),
-    recipientSlug: recipientRows[0]?.slug ?? null,
+    recipientSlugByTimetable: new Map(
+      memberships.map((m) => [m.timetableId, m.memberSlug]),
+    ),
     electorTimetableIds: memberships
       .filter((m) => m.roles.includes("elector"))
       .map((m) => m.timetableId),
@@ -138,10 +132,16 @@ async function newTopicsSection(
       title: topics.title,
       timetableId: topics.timetableId,
       slug: topics.slug,
-      hostSlug: users.slug,
+      hostSlug: timetableMemberships.slug,
     })
     .from(topics)
-    .innerJoin(users, eq(users.id, topics.hostId))
+    .leftJoin(
+      timetableMemberships,
+      and(
+        eq(timetableMemberships.userId, topics.hostId),
+        eq(timetableMemberships.timetableId, topics.timetableId),
+      ),
+    )
     .where(
       and(
         inArray(topics.timetableId, ctx.electorTimetableIds),
@@ -171,12 +171,18 @@ async function repliesSection(
   const rows = await db
     .select({
       topicTitle: topics.title,
-      by: users.name,
+      by: timetableMemberships.name,
       body: comments.body,
     })
     .from(comments)
     .innerJoin(topics, eq(topics.id, comments.topicId))
-    .innerJoin(users, eq(users.id, comments.authorId))
+    .leftJoin(
+      timetableMemberships,
+      and(
+        eq(timetableMemberships.userId, comments.authorId),
+        eq(timetableMemberships.timetableId, topics.timetableId),
+      ),
+    )
     .where(
       and(
         inArray(comments.parentId, myCommentIds),
@@ -215,7 +221,7 @@ async function hostActivitySection(
       t.id,
       topicPath(
         ctx.timetableSlug.get(t.timetableId),
-        ctx.recipientSlug,
+        ctx.recipientSlugByTimetable.get(t.timetableId),
         t.slug,
       ),
     ]),
@@ -299,7 +305,7 @@ async function assignedTopicsSection(
       timetableName: ctx.timetableName.get(r.timetableId) ?? "",
       path: topicPath(
         ctx.timetableSlug.get(r.timetableId),
-        ctx.recipientSlug,
+        ctx.recipientSlugByTimetable.get(r.timetableId),
         r.topicSlug,
       ),
     };

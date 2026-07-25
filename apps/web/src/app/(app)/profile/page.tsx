@@ -6,24 +6,19 @@ import { ProfilePanel } from "@/components/ProfilePanel";
 import { gqlFetch } from "@/lib/graphql";
 
 type Data = {
-  me: {
-    name: string | null;
-    bio: string | null;
-    email: string | null;
-    image: string | null;
-    notificationSettings: string;
-  } | null;
+  me: { email: string | null; notificationSettings: string } | null;
   myLastVisitedTimetableSlug: string | null;
 };
 
 const QUERY = `query {
-  me { name bio email image notificationSettings }
+  me { email notificationSettings }
   myLastVisitedTimetableSlug
 }`;
 
 /** Standalone profile route: users inside a timetable get the in-shell
  * version (QA #59 round 3), so redirect there when we know where they
- * live; users with no timetable get the plain page. */
+ * live. Profiles are per-forum (2026-07), so this fallback page is
+ * account-only: email, appearance, digests. */
 export default async function ProfilePage() {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
@@ -44,7 +39,12 @@ export default async function ProfilePage() {
 
   return (
     <main className="container">
-      <ProfilePanel me={data.me} digest={digest} />
+      <ProfilePanel
+        email={data.me.email}
+        digest={digest}
+        slug={null}
+        profile={null}
+      />
     </main>
   );
 }

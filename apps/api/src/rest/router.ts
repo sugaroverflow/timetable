@@ -11,6 +11,7 @@ import {
   createTimetable,
   getMembership,
   getMembershipById,
+  getPerson,
   getReadableTimetable,
   getSlotsForIcs,
   getTimetableById,
@@ -239,9 +240,10 @@ restRouter.post(
     if (!admin) return;
     const { membership } = admin;
 
-    const [member, timetable] = await Promise.all([
+    const [member, timetable, inviter] = await Promise.all([
       getUserById(membership.userId),
       getTimetableById(membership.timetableId),
+      getPerson(membership.timetableId, user.id),
     ]);
     if (!member?.email || !timetable) {
       res.status(400).json({ error: "Member has no email address" });
@@ -252,8 +254,9 @@ restRouter.post(
     const { subject, html } = renderInvite({
       timetableName: timetable.name,
       timetableSlug: timetable.slug,
-      inviteeName: member.name,
-      inviterName: user.name,
+      // Per-forum profiles: both names come from this forum's memberships.
+      inviteeName: membership.name,
+      inviterName: inviter?.name ?? user.name,
       topicsCount: topics.length,
     });
     await sendEmail({ to: member.email, subject, html });

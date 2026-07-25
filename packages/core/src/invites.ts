@@ -17,6 +17,7 @@ import {
 } from "@timetable/shared";
 
 import { logActivity } from "./activity";
+import { createMembershipWithProfile } from "./members";
 
 export type InviteOutcome = {
   email: string;
@@ -130,7 +131,7 @@ export async function inviteEmails(
         await logInvite(email);
         outcomes.push({ email, status: "membership_updated" });
       } else {
-        await db.insert(timetableMemberships).values({
+        await createMembershipWithProfile({
           userId: existingUser.id,
           timetableId,
           roles,
@@ -219,7 +220,7 @@ export async function claimInvitesForUser(
         })
         .where(eq(timetableMemberships.id, membership.id));
     } else {
-      await db.insert(timetableMemberships).values({
+      await createMembershipWithProfile({
         userId,
         timetableId: invite.timetableId,
         roles: invite.roles,

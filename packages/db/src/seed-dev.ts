@@ -847,6 +847,28 @@ export function parseFixture(markdown: string): Fixture {
   return fixture;
 }
 
+/** Membership rows with the per-forum profile mirrored from the account
+ * fields the fixture sets on the user row (userRows is built from the same
+ * people, in the same order). */
+function buildMembershipRows(
+  fixture: Fixture,
+  timetableId: string,
+  userRows: NewUser[],
+): NewTimetableMembership[] {
+  return fixture.people.map((person, index) => ({
+    id: stableUuid("membership", person.label),
+    userId: person.clerkId ?? userIdFor(person.label),
+    timetableId,
+    roles: person.roles,
+    name: person.displayName,
+    image: null,
+    bio: person.bio,
+    slug: userRows[index]?.slug ?? null,
+    createdAt: addMinutes(BASE_TIME, index),
+    updatedAt: addMinutes(BASE_TIME, index),
+  }));
+}
+
 export function findSampleFile(): string {
   for (const candidate of sampleFileCandidates) {
     const path = fileURLToPath(candidate);
@@ -944,16 +966,7 @@ function buildRows(fixture: Fixture): {
     updatedAt: BASE_TIME,
   };
 
-  const membershipRows: NewTimetableMembership[] = fixture.people.map(
-    (person, index) => ({
-      id: stableUuid("membership", person.label),
-      userId: localIdFor(person),
-      timetableId,
-      roles: person.roles,
-      createdAt: addMinutes(BASE_TIME, index),
-      updatedAt: addMinutes(BASE_TIME, index),
-    }),
-  );
+  const membershipRows = buildMembershipRows(fixture, timetableId, userRows);
 
   const topicRows: NewTopic[] = fixture.topics.map((topic, index) => {
     const createdAt = addMinutes(TOPIC_TIME, index * 15);

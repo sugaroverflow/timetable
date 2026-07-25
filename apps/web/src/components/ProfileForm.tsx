@@ -5,15 +5,18 @@ import { useState } from "react";
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { useGqlAction } from "@/lib/useGqlAction";
 
-const MUTATION = `mutation($name: String, $bio: String, $image: String) {
-  updateMyProfile(name: $name, bio: $bio, image: $image) { id }
+const MUTATION = `mutation($s: String!, $name: String, $bio: String, $image: String) {
+  updateMyProfile(idOrSlug: $s, name: $name, bio: $bio, image: $image) { userId }
 }`;
 
+/** Edits the viewer's profile in ONE forum (per-forum profiles). */
 export function ProfileForm({
+  slug,
   name: initialName,
   bio: initialBio,
   image: initialImage,
 }: {
+  slug: string;
   name: string | null;
   bio: string | null;
   image: string | null;
@@ -32,7 +35,7 @@ export function ProfileForm({
       MUTATION,
       // Empty string, not null: the API treats null as "leave unchanged",
       // so clearing the field must send "" for the image to be removed.
-      { name, bio, image: image.trim() },
+      { s: slug, name, bio, image: image.trim() },
       {
         success: "Profile saved",
         errorFallback: "Could not save profile",

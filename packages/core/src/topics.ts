@@ -4,9 +4,9 @@ import {
   comments,
   db,
   hearts,
+  timetableMemberships,
   timetables,
   topics,
-  users,
   type Topic,
   type TopicStatus,
 } from "@timetable/db";
@@ -462,15 +462,23 @@ async function loadDisplayedTopicRows(
   if (opts.hostId) displayConds.push(eq(topics.hostId, opts.hostId));
   if (opts.topicId) displayConds.push(eq(topics.id, opts.topicId));
 
+  // Left join: topics survive their host leaving the forum — profile
+  // fields just render null (per-forum profiles, 2026-07).
   return db
     .select({
       topic: topics,
-      hostName: users.name,
-      hostImage: users.image,
-      hostSlug: users.slug,
+      hostName: timetableMemberships.name,
+      hostImage: timetableMemberships.image,
+      hostSlug: timetableMemberships.slug,
     })
     .from(topics)
-    .innerJoin(users, eq(users.id, topics.hostId))
+    .leftJoin(
+      timetableMemberships,
+      and(
+        eq(timetableMemberships.userId, topics.hostId),
+        eq(timetableMemberships.timetableId, topics.timetableId),
+      ),
+    )
     .where(and(...displayConds));
 }
 
@@ -657,12 +665,19 @@ export async function getWeightedBreakdown(
   if (topicHearts.length === 0) return [];
 
   const electorRows = await db
-    .select({ id: users.id, name: users.name, image: users.image })
-    .from(users)
+    .select({
+      id: timetableMemberships.userId,
+      name: timetableMemberships.name,
+      image: timetableMemberships.image,
+    })
+    .from(timetableMemberships)
     .where(
-      inArray(
-        users.id,
-        topicHearts.map((h) => h.electorId),
+      and(
+        eq(timetableMemberships.timetableId, timetableId),
+        inArray(
+          timetableMemberships.userId,
+          topicHearts.map((h) => h.electorId),
+        ),
       ),
     );
   const electorById = new Map(electorRows.map((u) => [u.id, u]));

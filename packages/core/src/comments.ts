@@ -8,7 +8,6 @@ import {
   db,
   timetableMemberships,
   topics,
-  users,
   type Comment,
   type CommentVisibility,
 } from "@timetable/db";
@@ -33,13 +32,15 @@ async function recordMentions(comment: Comment): Promise<void> {
   if (!topic) return;
 
   const members = await db
-    .select({ userId: users.id, slug: users.slug })
-    .from(users)
-    .innerJoin(timetableMemberships, eq(timetableMemberships.userId, users.id))
+    .select({
+      userId: timetableMemberships.userId,
+      slug: timetableMemberships.slug,
+    })
+    .from(timetableMemberships)
     .where(
       and(
         eq(timetableMemberships.timetableId, topic.timetableId),
-        inArray(users.slug, handles),
+        inArray(timetableMemberships.slug, handles),
       ),
     );
 
@@ -191,21 +192,31 @@ async function fetchCommentRows(
   ];
   if (!opts.includeHidden) conds.push(isNull(comments.hiddenAt));
 
+  // Author profile comes from the author's membership in the topic's
+  // timetable (per-forum profiles); left join so comments survive their
+  // author leaving the forum.
   return db
     .select({
       topicId: comments.topicId,
       id: comments.id,
       parentId: comments.parentId,
       authorId: comments.authorId,
-      authorName: users.name,
-      authorImage: users.image,
+      authorName: timetableMemberships.name,
+      authorImage: timetableMemberships.image,
       body: comments.body,
       visibility: comments.visibility,
       hiddenAt: comments.hiddenAt,
       createdAt: comments.createdAt,
     })
     .from(comments)
-    .innerJoin(users, eq(users.id, comments.authorId))
+    .innerJoin(topics, eq(topics.id, comments.topicId))
+    .leftJoin(
+      timetableMemberships,
+      and(
+        eq(timetableMemberships.userId, comments.authorId),
+        eq(timetableMemberships.timetableId, topics.timetableId),
+      ),
+    )
     .where(and(...conds))
     .orderBy(asc(comments.createdAt));
 }

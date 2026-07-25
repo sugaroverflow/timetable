@@ -7,7 +7,6 @@ import {
   db,
   timetableMemberships,
   topics,
-  users,
 } from "@timetable/db";
 
 /** One entry in the notifications pane (QA #59): a comment on one of the
@@ -38,7 +37,10 @@ export async function listNotifications(
   limit = 50,
 ): Promise<NotificationItem[]> {
   const parents = alias(comments, "parent_comments");
-  const hostUsers = alias(users, "host_users");
+  // Per-forum profiles: author and host display fields come from their
+  // memberships in this timetable (left joins — ex-members render null).
+  const hostMembers = alias(timetableMemberships, "host_memberships");
+  const authorMembers = alias(timetableMemberships, "author_memberships");
   const mentions = alias(commentMentions, "viewer_mentions");
 
   const rows = await db
@@ -48,20 +50,32 @@ export async function listNotifications(
       topicHostId: topics.hostId,
       mentionUserId: mentions.userId,
       authorId: comments.authorId,
-      authorName: users.name,
-      authorImage: users.image,
+      authorName: authorMembers.name,
+      authorImage: authorMembers.image,
       body: comments.body,
       visibility: comments.visibility,
       createdAt: comments.createdAt,
       topicId: topics.id,
       topicTitle: topics.title,
       topicSlug: topics.slug,
-      topicHostSlug: hostUsers.slug,
+      topicHostSlug: hostMembers.slug,
     })
     .from(comments)
     .innerJoin(topics, eq(topics.id, comments.topicId))
-    .innerJoin(hostUsers, eq(hostUsers.id, topics.hostId))
-    .innerJoin(users, eq(users.id, comments.authorId))
+    .leftJoin(
+      hostMembers,
+      and(
+        eq(hostMembers.userId, topics.hostId),
+        eq(hostMembers.timetableId, topics.timetableId),
+      ),
+    )
+    .leftJoin(
+      authorMembers,
+      and(
+        eq(authorMembers.userId, comments.authorId),
+        eq(authorMembers.timetableId, topics.timetableId),
+      ),
+    )
     .leftJoin(parents, eq(parents.id, comments.parentId))
     .leftJoin(
       mentions,

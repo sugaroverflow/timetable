@@ -12,6 +12,31 @@ import {
 import type { Role } from "@timetable/shared";
 
 import { logActivity } from "./activity";
+import { ensureMemberSlug } from "./slugs";
+
+/** Create a membership with its per-forum profile seeded from the account's
+ * (Clerk-synced) defaults. Every membership-creation path goes through this
+ * so name/image/slug are always initialized. */
+export async function createMembershipWithProfile(args: {
+  userId: string;
+  timetableId: string;
+  roles: Role[];
+}): Promise<void> {
+  const [account] = await db
+    .select({ name: users.name, image: users.image })
+    .from(users)
+    .where(eq(users.id, args.userId))
+    .limit(1);
+  const slug = await ensureMemberSlug(args.timetableId, account?.name ?? null);
+  await db.insert(timetableMemberships).values({
+    userId: args.userId,
+    timetableId: args.timetableId,
+    roles: args.roles,
+    name: account?.name ?? null,
+    image: account?.image ?? null,
+    slug,
+  });
+}
 
 export async function getMembershipById(
   id: string,
@@ -95,9 +120,9 @@ export async function listMembers(
       roles: timetableMemberships.roles,
       inviteSentAt: timetableMemberships.inviteSentAt,
       userId: users.id,
-      name: users.name,
+      name: timetableMemberships.name,
       email: users.email,
-      image: users.image,
+      image: timetableMemberships.image,
     })
     .from(timetableMemberships)
     .innerJoin(users, eq(users.id, timetableMemberships.userId))
@@ -151,11 +176,6 @@ export async function removeMembership(
   membership: TimetableMembership,
   actorId: string,
 ): Promise<void> {
-  const [user] = await db
-    .select({ name: users.name })
-    .from(users)
-    .where(eq(users.id, membership.userId))
-    .limit(1);
   await db
     .delete(timetableMemberships)
     .where(eq(timetableMemberships.id, membership.id));
@@ -165,7 +185,7 @@ export async function removeMembership(
     action: "member.remove",
     payload: {
       removedUserId: membership.userId,
-      removedName: user?.name ?? null,
+      removedName: membership.name ?? null,
       roles: membership.roles,
     },
   });
@@ -195,10 +215,10 @@ export async function listPeople(timetableId: string): Promise<Person[]> {
   const rows = await db
     .select({
       userId: users.id,
-      name: users.name,
-      image: users.image,
-      slug: users.slug,
-      bio: users.bio,
+      name: timetableMemberships.name,
+      image: timetableMemberships.image,
+      slug: timetableMemberships.slug,
+      bio: timetableMemberships.bio,
       roles: timetableMemberships.roles,
     })
     .from(timetableMemberships)
@@ -244,7 +264,7 @@ export async function getPersonBySlug(
   timetableId: string,
   userSlug: string,
 ): Promise<Person | null> {
-  return getPersonWhere(timetableId, eq(users.slug, userSlug));
+  return getPersonWhere(timetableId, eq(timetableMemberships.slug, userSlug));
 }
 
 async function getPersonWhere(
@@ -254,10 +274,10 @@ async function getPersonWhere(
   const [row] = await db
     .select({
       userId: users.id,
-      name: users.name,
-      image: users.image,
-      slug: users.slug,
-      bio: users.bio,
+      name: timetableMemberships.name,
+      image: timetableMemberships.image,
+      slug: timetableMemberships.slug,
+      bio: timetableMemberships.bio,
       roles: timetableMemberships.roles,
     })
     .from(timetableMemberships)
