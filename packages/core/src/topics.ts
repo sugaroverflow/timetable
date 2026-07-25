@@ -578,6 +578,10 @@ export async function buildFeed(
     topicId?: string;
     /** Only topics the viewer currently hearts (QA #42 "My hearted topics"). */
     heartedByViewer?: boolean;
+    /** Only topics this user currently hearts (person pages). Caller gates
+     * visibility — this widens the host/admin-only breakdown to a per-person
+     * hearted list. */
+    heartedBy?: string;
     sort?: FeedSort;
     /** Shuffle seed for sort=random (QA #59). */
     seed?: string;
@@ -605,10 +609,18 @@ export async function buildFeed(
     }),
   );
 
-  const visibleFeed =
-    opts.heartedByViewer && viewerUserId
-      ? feed.filter((t) => t.viewerHasHearted)
-      : feed;
+  const visibleFeed = feed.filter((t) => {
+    if (opts.heartedByViewer && viewerUserId && !t.viewerHasHearted) {
+      return false;
+    }
+    if (
+      opts.heartedBy &&
+      !(heartsByTopic.get(t.id) ?? []).includes(opts.heartedBy)
+    ) {
+      return false;
+    }
+    return true;
+  });
 
   visibleFeed.sort(comparatorFor(opts.sort ?? "hearts", opts.seed ?? ""));
 

@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, type SQL } from "drizzle-orm";
 
 import {
   db,
@@ -234,6 +234,23 @@ export async function getPerson(
   timetableId: string,
   userId: string,
 ): Promise<Person | null> {
+  return getPersonWhere(timetableId, eq(timetableMemberships.userId, userId));
+}
+
+/** One member's public profile, resolved by their user slug (person pages —
+ * /t/[slug]/[userSlug]). Slugs are globally unique; the membership join
+ * scopes the hit to this timetable. */
+export async function getPersonBySlug(
+  timetableId: string,
+  userSlug: string,
+): Promise<Person | null> {
+  return getPersonWhere(timetableId, eq(users.slug, userSlug));
+}
+
+async function getPersonWhere(
+  timetableId: string,
+  cond: SQL,
+): Promise<Person | null> {
   const [row] = await db
     .select({
       userId: users.id,
@@ -245,12 +262,7 @@ export async function getPerson(
     })
     .from(timetableMemberships)
     .innerJoin(users, eq(users.id, timetableMemberships.userId))
-    .where(
-      and(
-        eq(timetableMemberships.timetableId, timetableId),
-        eq(timetableMemberships.userId, userId),
-      ),
-    )
+    .where(and(eq(timetableMemberships.timetableId, timetableId), cond))
     .limit(1);
   return row ?? null;
 }

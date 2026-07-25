@@ -661,6 +661,25 @@ textarea {
   max-height: 80vh;
   overflow-y: auto;
 }
+/* Person pages + host-filtered feed: the ~200px desktop profile photo. */
+.profile-photo-xl {
+  width: 200px;
+  height: 200px;
+  border-radius: var(--radius);
+  object-fit: cover;
+  flex: none;
+  background: var(--wash);
+}
+.profile-photo-link {
+  flex: none;
+  line-height: 0;
+}
+@media (max-width: 640px) {
+  .profile-photo-xl {
+    width: 120px;
+    height: 120px;
+  }
+}
 .person-modal-photo {
   width: 128px;
   height: 128px;
