@@ -29,6 +29,8 @@ export function FeedSortControl({ value }: { value: string }) {
       onChange={(e) => change(e.target.value)}
     >
       <option value="random">Random</option>
+      <option value="recent">Newest</option>
+      <option value="comments">Latest comments</option>
       <optgroup label="By hearts">
         {NORM_MODES.map((mode) => (
           <option key={mode.key} value={mode.key} title={mode.description}>
@@ -36,8 +38,6 @@ export function FeedSortControl({ value }: { value: string }) {
           </option>
         ))}
       </optgroup>
-      <option value="comments">Latest comments</option>
-      <option value="recent">Newest</option>
     </select>
   );
 }
