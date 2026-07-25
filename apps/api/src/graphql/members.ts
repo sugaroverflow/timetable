@@ -15,6 +15,7 @@ import {
   canSeePersonProfile,
   type Privacy,
   type Role as SharedRole,
+  type Viewer,
 } from "@timetable/shared";
 
 import type { SessionUser } from "../auth/clerk";
@@ -105,6 +106,18 @@ const PersonType = builder.objectRef<Person>("Person").implement({
   }),
 });
 
+/** Non-admins don't get to see who owns the forum (launch QA 2026-07-25):
+ * the owner role is stripped from profiles before they leave the API, so
+ * the Owner pill (People page, bio modal, person pages, host card) only
+ * renders for admin viewers. */
+function withPublicRoles(person: Person, viewer: Viewer): Person {
+  if (canModerate(viewer)) return person;
+  return {
+    ...person,
+    roles: person.roles.filter((r) => r !== "owner"),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Queries
 // ---------------------------------------------------------------------------
@@ -126,13 +139,15 @@ builder.queryFields((t) => ({
       if (!readable) return [];
       const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
       const people = await listPeople(readable.timetable.id);
-      return people.filter((p) =>
-        canSeePersonProfile(
-          readable.timetable.privacy as Privacy,
-          viewer,
-          p.roles as SharedRole[],
-        ),
-      );
+      return people
+        .filter((p) =>
+          canSeePersonProfile(
+            readable.timetable.privacy as Privacy,
+            viewer,
+            p.roles as SharedRole[],
+          ),
+        )
+        .map((p) => withPublicRoles(p, viewer));
     },
   }),
 
@@ -167,7 +182,7 @@ builder.queryFields((t) => ({
       ) {
         return null;
       }
-      return person;
+      return person ? withPublicRoles(person, viewer) : null;
     },
   }),
 
