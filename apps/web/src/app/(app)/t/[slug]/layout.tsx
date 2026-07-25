@@ -1,7 +1,9 @@
 import { auth } from "@clerk/nextjs/server";
 import { Flag, Heart } from "lucide-react";
+import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
+import { cache } from "react";
 
 import { isAdmin, isElector, isHost, type Role } from "@timetable/shared";
 
@@ -13,6 +15,7 @@ import {
   type SwitcherItem,
 } from "@/components/TimetableSwitcher";
 import { UserPreviewExit } from "@/components/UserPreview";
+import { emojiFavicon } from "@/lib/favicon";
 import { gqlFetch } from "@/lib/graphql";
 import { getMyTimetables } from "@/lib/myTimetables";
 import {
@@ -47,6 +50,36 @@ const TIMETABLE_QUERY = `
     }
   }
 `;
+
+/** One fetch per request even though both generateMetadata and the layout
+ * need the timetable — the GraphQL transport is a no-store POST, so Next
+ * won't dedupe it; React cache() does. */
+const loadTimetable = cache(async (slug: string) => {
+  const { timetable } = await gqlFetch<TimetableResult>(TIMETABLE_QUERY, {
+    idOrSlug: slug,
+  });
+  return timetable;
+});
+
+/** Forum-branded tab: "<name> Topics" plus the forum's icon as favicon,
+ * with the same emoji-over-upload precedence as the topbar/switcher. */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const timetable = await loadTimetable(slug);
+  if (!timetable) return {};
+  const settings = parseTimetableSettings(timetable.settings);
+  const icon = settings.iconEmoji
+    ? emojiFavicon(settings.iconEmoji)
+    : settings.iconUrl;
+  return {
+    title: `${timetable.name} Topics`,
+    ...(icon ? { icons: { icon } } : {}),
+  };
+}
 
 const UNREAD_QUERY = `
   query Unread($s: String!) {
@@ -152,9 +185,7 @@ export default async function TimetableLayout({
   const { userId } = await auth();
   const isAuthed = Boolean(userId);
 
-  const { timetable } = await gqlFetch<TimetableResult>(TIMETABLE_QUERY, {
-    idOrSlug: slug,
-  });
+  const timetable = await loadTimetable(slug);
 
   // Not readable: prompt anonymous visitors to sign in (it may be private);
   // signed-in users simply can't see it.

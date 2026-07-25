@@ -4,9 +4,15 @@ import type { Metadata } from "next";
 import "./tokens.css";
 import "./globals.css";
 
+import { emojiFavicon } from "@/lib/favicon";
+
 export const metadata: Metadata = {
   title: "Topic",
   description: "Collaborative forums — topic feeds, voting, and availability.",
+  // Config-based (not app/icon.tsx) so forum layouts can override the
+  // favicon with the forum's own icon — file-convention icons always win
+  // over nested metadata.
+  icons: { icon: emojiFavicon("📚") },
 };
 
 export default function RootLayout({
