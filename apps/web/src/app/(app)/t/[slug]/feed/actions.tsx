@@ -15,8 +15,17 @@ export async function loadMoreFeed(
   offset: number,
   hearted = false,
   seed = "",
+  heartedBy = "",
 ): Promise<{ cards: React.ReactNode; hasNext: boolean }> {
-  const page = await fetchFeedPage(slug, sort, host, offset, hearted, seed);
+  const page = await fetchFeedPage(
+    slug,
+    sort,
+    host,
+    offset,
+    hearted,
+    seed,
+    heartedBy,
+  );
   return {
     cards: page.topics.map((topic) => (
       <TopicCard key={topic.id} {...topicCardProps(page, topic)} />

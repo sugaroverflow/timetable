@@ -44,12 +44,12 @@ type Data = {
 };
 
 const QUERY = `
-  query Feed($s: String!, $sort: String, $seed: String, $host: String, $hearted: Boolean, $limit: Int, $offset: Int) {
+  query Feed($s: String!, $sort: String, $seed: String, $host: String, $hearted: Boolean, $heartedBy: String, $limit: Int, $offset: Int) {
     timetable(idOrSlug: $s) { viewerRoles settings viewerHeartedPublishedCount }
     me { id }
     myFeedLastSeenAt(idOrSlug: $s)
     timetableHosts(idOrSlug: $s) { id name }
-    topicFeed(idOrSlug: $s, sort: $sort, seed: $seed, hostId: $host, heartedByMe: $hearted, limit: $limit, offset: $offset) {
+    topicFeed(idOrSlug: $s, sort: $sort, seed: $seed, hostId: $host, heartedByMe: $hearted, heartedBy: $heartedBy, limit: $limit, offset: $offset) {
       ${TOPIC_FEED_FIELDS}
       contentUpdatedAt
     }
@@ -134,6 +134,7 @@ export async function fetchFeedPage(
   offset: number,
   hearted = false,
   seed = "",
+  heartedBy = "",
 ): Promise<FeedPage> {
   const data = await gqlFetch<Data>(QUERY, {
     s: slug,
@@ -141,13 +142,17 @@ export async function fetchFeedPage(
     seed: seed || null,
     host: host || null,
     hearted,
+    heartedBy: heartedBy || null,
     limit: FEED_PAGE_SIZE + 1,
     offset: Math.max(0, offset),
   });
   const roles = await displayRolesFromCookies(
     (data.timetable?.viewerRoles ?? []) as Role[],
   );
+  return toFeedPage(slug, data, roles);
+}
 
+function toFeedPage(slug: string, data: Data, roles: Role[]): FeedPage {
   return {
     slug,
     topics: data.topicFeed.slice(0, FEED_PAGE_SIZE),

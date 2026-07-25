@@ -1,5 +1,6 @@
 import {
   getPerson,
+  getPersonBySlug,
   getUserNotificationSettings,
   listMembers,
   listPeople,
@@ -135,19 +136,25 @@ builder.queryFields((t) => ({
     },
   }),
 
-  /** One member's public profile — powers the bio modal. */
+  /** One member's public profile — powers the bio modal and the person
+   * pages. Lookup is by userId or (exactly one required) by user slug. */
   person: t.field({
     type: PersonType,
     nullable: true,
     args: {
       idOrSlug: t.arg.string({ required: true }),
-      userId: t.arg.string({ required: true }),
+      userId: t.arg.string({ required: false }),
+      userSlug: t.arg.string({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
       const readable = await readTimetable(ctx, args.idOrSlug);
       if (!readable) return null;
       const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
-      const person = await getPerson(readable.timetable.id, args.userId);
+      const person = args.userId
+        ? await getPerson(readable.timetable.id, args.userId)
+        : args.userSlug
+          ? await getPersonBySlug(readable.timetable.id, args.userSlug)
+          : null;
       if (
         person &&
         !canSeePersonProfile(

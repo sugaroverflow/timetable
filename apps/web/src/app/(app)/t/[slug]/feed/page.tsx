@@ -1,12 +1,15 @@
 import { Heart } from "lucide-react";
 import Link from "next/link";
 
-import { Avatar } from "@/components/Avatar";
 import { EmptyState } from "@/components/EmptyState";
 import { FeedSortControl } from "@/components/FeedSortControl";
 import { HostFilter } from "@/components/HostFilter";
 import { InfiniteFeed } from "@/components/InfiniteFeed";
 import { MarkFeedSeen } from "@/components/MarkFeedSeen";
+import {
+  PersonProfileCard,
+  type ProfileCardPerson,
+} from "@/components/PersonProfileCard";
 import { TopicCard } from "@/components/TopicCard";
 import {
   FEED_PAGE_SIZE,
@@ -19,48 +22,13 @@ import { pluralLabel, roleLabel } from "@/lib/timetableSettings";
 
 import { loadMoreFeed } from "./actions";
 
-type HostCard = {
-  userId: string;
-  name: string | null;
-  image: string | null;
-  bioHtml: string | null;
-} | null;
+type HostCard = ProfileCardPerson | null;
 
 const HOST_CARD_QUERY = `
   query FeedHostCard($s: String!, $u: String!) {
-    person(idOrSlug: $s, userId: $u) { userId name image bioHtml }
+    person(idOrSlug: $s, userId: $u) { userId name image slug roles bioHtml }
   }
 `;
-
-/** Filtering to one host puts their profile card above the topics (QA #59). */
-function HostFilterCard({
-  hostCard,
-  hostLabel,
-}: {
-  hostCard: HostCard;
-  hostLabel: string;
-}) {
-  if (!hostCard) return null;
-  return (
-    <div className="card stack host-filter-card">
-      <div className="row" style={{ alignItems: "center" }}>
-        <Avatar name={hostCard.name} image={hostCard.image} large />
-        <div>
-          <strong>{hostCard.name ?? hostLabel}</strong>
-          <div className="faint" style={{ fontSize: 12 }}>
-            {hostLabel} · topics below
-          </div>
-        </div>
-      </div>
-      {hostCard.bioHtml ? (
-        <div
-          className="topic-body"
-          dangerouslySetInnerHTML={{ __html: hostCard.bioHtml }}
-        />
-      ) : null}
-    </div>
-  );
-}
 
 function FeedEmpty({
   hearted,
@@ -165,7 +133,13 @@ export default async function FeedPage({
         </div>
       ) : null}
 
-      <HostFilterCard hostCard={hostCard} hostLabel={hostLabel} />
+      {hostCard ? (
+        <PersonProfileCard
+          slug={slug}
+          person={hostCard}
+          labels={page.settings.roleLabels}
+        />
+      ) : null}
 
       {page.topics.length === 0 ? (
         <FeedEmpty

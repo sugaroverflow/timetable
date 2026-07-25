@@ -270,6 +270,7 @@ builder.queryFields((t) => ({
       idOrSlug: t.arg.string({ required: true }),
       hostId: t.arg.string({ required: false }),
       heartedByMe: t.arg.boolean({ required: false }),
+      heartedBy: t.arg.string({ required: false }),
       sort: t.arg.string({ required: false }),
       seed: t.arg.string({ required: false }),
       limit: t.arg.int({ required: false }),
@@ -307,6 +308,7 @@ builder.queryFields((t) => ({
         {
           hostId: args.hostId ?? undefined,
           heartedByViewer: Boolean(args.heartedByMe),
+          heartedBy: args.heartedBy ?? undefined,
           sort,
           seed: args.seed ?? undefined,
           limit: args.limit ?? 50,

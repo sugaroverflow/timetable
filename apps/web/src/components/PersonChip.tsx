@@ -18,7 +18,7 @@ import { RolePills } from "./RolePills";
 const QUERY = `query Person($s: String!, $u: String!) {
   timetable(idOrSlug: $s) { settings }
   person(idOrSlug: $s, userId: $u) {
-    userId name image roles bioHtml
+    userId name image slug roles bioHtml
   }
 }`;
 
@@ -28,14 +28,16 @@ type PersonData = {
     userId: string;
     name: string | null;
     image: string | null;
+    slug: string | null;
     roles: string[];
     bioHtml: string | null;
   } | null;
 };
 
-/** Modal header: large photo (avatar fallback), name, role pills. A host's
- * name links to their filtered feed; Dialog.Close makes the modal drop even
- * when only the search params change. */
+/** Modal header: large photo (avatar fallback), name, role pills. The photo
+ * links to the member's person page and a host's name to their filtered
+ * feed; Dialog.Close makes the modal drop even when only search params
+ * change. */
 function PersonHeader({
   slug,
   person,
@@ -46,13 +48,23 @@ function PersonHeader({
   labels: RoleLabels | undefined;
 }) {
   const name = person.name ?? "Member";
+  const photo = person.image ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img className="person-modal-photo" src={person.image} alt={name} />
+  ) : (
+    <Avatar name={person.name} image={null} large />
+  );
   return (
     <div className="row" style={{ alignItems: "center" }}>
-      {person.image ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img className="person-modal-photo" src={person.image} alt={name} />
+      {person.slug ? (
+        <Dialog.Close
+          render={<Link href={`/t/${slug}/${person.slug}`} />}
+          className="profile-photo-link"
+        >
+          {photo}
+        </Dialog.Close>
       ) : (
-        <Avatar name={person.name} image={null} large />
+        photo
       )}
       <div>
         <strong>
