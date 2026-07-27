@@ -1,5 +1,5 @@
 import { Heart } from "lucide-react";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { isElector, isHost, type Role } from "@timetable/shared";
 
@@ -36,6 +36,7 @@ function TopicSection({
   host,
   heartedBy,
   seed,
+  refreshToken,
   empty,
 }: {
   title: React.ReactNode;
@@ -43,6 +44,7 @@ function TopicSection({
   host: string;
   heartedBy: string;
   seed: string;
+  refreshToken: string;
   empty: React.ReactNode;
 }) {
   return (
@@ -58,6 +60,7 @@ function TopicSection({
           host={host}
           heartedBy={heartedBy}
           seed={seed}
+          refreshToken={refreshToken}
           pageSize={FEED_PAGE_SIZE}
           initialHasNext={page.hasNext}
           loadMore={loadMoreFeed}
@@ -76,10 +79,22 @@ function TopicSection({
  * both, topics first. Shows the same content as /feed?host=<id> for hosts. */
 export default async function PersonPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string; hostSlug: string }>;
+  searchParams: Promise<{ seed?: string }>;
 }) {
   const { slug, hostSlug } = await params;
+  const { seed: seedParam } = await searchParams;
+  // Same seed-in-URL pattern as the feed page: mint per visit, then
+  // redirect so router.refresh() after an action keeps this order.
+  if (!seedParam) {
+    // eslint-disable-next-line react-hooks/purity -- server-only, once per request
+    const minted = Math.random().toString(36).slice(2, 10);
+    redirect(`/t/${slug}/${hostSlug}?seed=${minted}`);
+  }
+  const seed = seedParam;
+
   const { person } = await gqlFetch<{ person: ProfileCardPerson | null }>(
     PERSON_QUERY,
     { s: slug, userSlug: hostSlug },
@@ -89,10 +104,8 @@ export default async function PersonPage({
   const roles = person.roles as Role[];
   const host = isHost(roles);
   const elector = isElector(roles);
-  // Fresh shuffle seed per visit, stable across this render's scroll pages
-  // (same pattern as the feed page).
-  // eslint-disable-next-line react-hooks/purity -- server-only, once per request
-  const seed = Math.random().toString(36).slice(2, 10);
+  // eslint-disable-next-line react-hooks/purity -- server-only render marker
+  const refreshToken = Math.random().toString(36).slice(2, 10);
 
   const [hostPage, heartedPage] = await Promise.all([
     host
@@ -119,6 +132,7 @@ export default async function PersonPage({
           host={person.userId}
           heartedBy=""
           seed={seed}
+          refreshToken={refreshToken}
           empty={<EmptyState icon="◇" title="No published topics yet" />}
         />
       ) : null}
@@ -133,6 +147,7 @@ export default async function PersonPage({
           host=""
           heartedBy={person.userId}
           seed={seed}
+          refreshToken={refreshToken}
           empty={<EmptyState icon="♥" title="No hearted topics yet" />}
         />
       ) : null}
