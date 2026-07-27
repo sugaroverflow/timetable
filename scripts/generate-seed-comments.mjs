@@ -294,10 +294,8 @@ for (const topic of topics) {
     }
   }
 
-  // Threaded admin feedback on submitted topics (and a few drafts, which
-  // represent the post-"request changes" state)
-  const wantsFeedback =
-    topic.status === "submitted" || (topic.status === "draft" && rand() < 0.2);
+  // Threaded admin feedback on submitted topics
+  const wantsFeedback = topic.status === "submitted";
   if (wantsFeedback) {
     const admin = pick(admins);
     const fbId = nextId();
