@@ -1,9 +1,9 @@
 "use client";
 
-import { Heart } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
+import { Avatar } from "@/components/Avatar";
 import {
   BreakdownCaret,
   BreakdownPanelBody,
@@ -16,13 +16,14 @@ export type LeaderboardEntry = {
   id: string;
   title: string;
   slug: string | null;
+  hostId: string;
   hostName: string | null;
+  hostImage: string | null;
   hostSlug: string | null;
   weightedScore: number;
   l2Score: number;
   devotionScore: number;
   heartCount: number;
-  lastHeartAt: string | null;
 };
 
 function scoreFor(entry: LeaderboardEntry, key: NormKey): number {
@@ -38,9 +39,9 @@ function scoreFor(entry: LeaderboardEntry, key: NormKey): number {
   }
 }
 
-/** One leaderboard entry with the ❤️-breakdown disclosure triangle inline
- * before the topic name (QA 2026-07-27 — replaced a per-row labelled
- * "Show ❤️ breakdown" line). */
+/** One topics-analysis row: "▸ [host avatar] host: topic … score". The
+ * host links to their person page, the disclosure triangle opens the
+ * ❤️ breakdown (QA 2026-07-27 — the "last ❤️" date came off the row). */
 function LeaderboardRow({
   entry,
   norm,
@@ -58,21 +59,19 @@ function LeaderboardRow({
   return (
     <li style={{ fontSize: 14 }}>
       <div className="row" style={{ justifyContent: "space-between" }}>
-        <span className="row" style={{ gap: 4, alignItems: "center" }}>
+        <span className="row" style={{ gap: 6, alignItems: "center" }}>
           <BreakdownCaret open={open} onToggle={() => setOpen(!open)} />
+          <Avatar small name={entry.hostName} image={entry.hostImage} />
           <span>
-            {href ? <Link href={href}>{entry.title}</Link> : entry.title}{" "}
-            <span className="faint">· {entry.hostName ?? hostLabel}</span>
+            <Link href={`/f/${slug}/${entry.hostSlug ?? entry.hostId}`}>
+              {entry.hostName ?? hostLabel}
+            </Link>
+            {": "}
+            {href ? <Link href={href}>{entry.title}</Link> : entry.title}
           </span>
         </span>
-        <span className="mono" style={{ textAlign: "right" }}>
+        <span className="mono">
           {norm === "raw" ? score : score.toFixed(2)}
-          {entry.lastHeartAt ? (
-            <span className="faint" style={{ display: "block", fontSize: 11 }}>
-              last <Heart size={14} fill="currentColor" aria-hidden />{" "}
-              {new Date(entry.lastHeartAt).toLocaleDateString()}
-            </span>
-          ) : null}
         </span>
       </div>
       {open ? (
@@ -85,9 +84,9 @@ function LeaderboardRow({
 }
 
 /**
- * "All topics by ❤️" leaderboard with a normalisation switcher (product
- * feedback round 1). The API sends every norm per topic; switching re-sorts
- * and re-labels client-side without a round-trip.
+ * The "topics analysis table": every published topic with a normalisation
+ * switcher (product feedback round 1). The API sends every norm per topic;
+ * switching re-sorts and re-labels client-side without a round-trip.
  */
 export function TopicLeaderboard({
   slug,
