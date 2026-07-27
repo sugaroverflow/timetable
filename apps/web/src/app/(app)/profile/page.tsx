@@ -27,7 +27,7 @@ export default async function ProfilePage() {
   if (!data.me) redirect("/sign-in");
 
   if (data.myLastVisitedTimetableSlug) {
-    redirect(`/t/${data.myLastVisitedTimetableSlug}/profile`);
+    redirect(`/f/${data.myLastVisitedTimetableSlug}/profile`);
   }
 
   let digest: DigestSettings = {};

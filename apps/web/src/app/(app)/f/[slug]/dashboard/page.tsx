@@ -185,7 +185,7 @@ function HostLeaderboardCard({
               style={{ justifyContent: "space-between", fontSize: 14 }}
             >
               <span>
-                <Link href={`/t/${slug}/feed?host=${h.hostId}`}>
+                <Link href={`/f/${slug}/topics?host=${h.hostId}`}>
                   {h.hostName ?? "Host"}
                 </Link>
               </span>
@@ -250,7 +250,7 @@ export default async function DashboardPage({
 
       <div className="stat-grid">
         <Stat label="Published topics" value={d.topicCounts.published} />
-        <Stat label="Total hearts" value={d.totalHearts} />
+        <Stat label="Total ❤️" value={d.totalHearts} />
         <Stat label="Electors" value={d.electorCount} />
         <Stat label="Timeslots" value={d.slotCount} />
       </div>

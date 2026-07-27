@@ -58,7 +58,7 @@ function PersonHeader({
     <div className="row" style={{ alignItems: "center" }}>
       {person.slug ? (
         <Dialog.Close
-          render={<Link href={`/t/${slug}/${person.slug}`} />}
+          render={<Link href={`/f/${slug}/${person.slug}`} />}
           className="profile-photo-link"
         >
           {photo}
@@ -70,7 +70,7 @@ function PersonHeader({
         <strong>
           {isHost(person.roles as Role[]) ? (
             <Dialog.Close
-              render={<Link href={`/t/${slug}/feed?host=${person.userId}`} />}
+              render={<Link href={`/f/${slug}/topics?host=${person.userId}`} />}
               className="person-host-link"
             >
               {name}

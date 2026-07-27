@@ -72,7 +72,7 @@ function IdentityFields({
         />
       </div>
       <p className="faint" style={{ margin: "0 0 12px", fontSize: 12 }}>
-        URL: /t/{slug} (set at creation)
+        URL: /f/{slug} (set at creation)
       </p>
       <div className="field">
         <label htmlFor="tt-desc">Description</label>

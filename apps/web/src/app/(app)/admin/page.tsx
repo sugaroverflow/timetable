@@ -57,7 +57,7 @@ export default async function SysadminPage() {
         <h2 className="section-title">Sysadmin</h2>
         <p>
           Every forum in this deployment. &ldquo;Active&rdquo; counts members
-          who opened the forum&rsquo;s feed in the last 30 days.
+          who viewed the forum&rsquo;s topics in the last 30 days.
         </p>
       </div>
 
@@ -84,7 +84,7 @@ export default async function SysadminPage() {
               {data.sysadminForums.map((f) => (
                 <tr key={f.id}>
                   <td>
-                    <Link href={`/t/${f.slug}/feed`}>{f.name}</Link>
+                    <Link href={`/f/${f.slug}/topics`}>{f.name}</Link>
                   </td>
                   <td>{f.privacy}</td>
                   <td>{f.createdAt.slice(0, 10)}</td>

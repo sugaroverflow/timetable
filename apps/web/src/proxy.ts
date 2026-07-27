@@ -54,7 +54,7 @@ function isCustomHost(host: string): boolean {
 }
 
 function shouldRewritePath(pathname: string): boolean {
-  if (pathname.startsWith("/t/")) return false;
+  if (pathname.startsWith("/f/")) return false;
   if (pathname.startsWith("/api/")) return false;
   if (pathname === "/graphql" || pathname.startsWith("/graphql/")) return false;
   if (pathname.startsWith("/sign-in") || pathname.startsWith("/sign-up")) {
@@ -124,7 +124,7 @@ async function customDomainRewrite(request: NextRequest) {
   if (!slug) return undefined;
 
   const url = request.nextUrl.clone();
-  url.pathname = `/t/${slug}${pathname === "/" ? "" : pathname}`;
+  url.pathname = `/f/${slug}${pathname === "/" ? "" : pathname}`;
   return NextResponse.rewrite(url);
 }
 

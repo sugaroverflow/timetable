@@ -76,7 +76,7 @@ export default async function SettingsPage({
             <h2 className="section-title">Members</h2>
             <p>
               Roles and bios are edited from the{" "}
-              <Link href={`/t/${slug}/people`}>People page</Link>.
+              <Link href={`/f/${slug}/people`}>People page</Link>.
             </p>
           </div>
         </div>

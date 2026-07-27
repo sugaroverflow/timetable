@@ -77,7 +77,7 @@ export function TimetableSwitcher({
                   className={`tt-menu-item${
                     item.slug === currentSlug ? " tt-menu-item-current" : ""
                   }`}
-                  render={<Link href={`/t/${item.slug}/feed`} />}
+                  render={<Link href={`/f/${item.slug}/topics`} />}
                 >
                   <ItemIcon item={item} />
                   <span>

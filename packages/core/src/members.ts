@@ -258,7 +258,7 @@ export async function getPerson(
 }
 
 /** One member's public profile, resolved by their user slug (person pages —
- * /t/[slug]/[userSlug]). Slugs are globally unique; the membership join
+ * /f/[slug]/[userSlug]). Slugs are globally unique; the membership join
  * scopes the hit to this timetable. */
 export async function getPersonBySlug(
   timetableId: string,

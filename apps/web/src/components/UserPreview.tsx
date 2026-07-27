@@ -14,11 +14,11 @@ const STOP = `mutation($s: String!, $u: String!){ stopUserPreview(idOrSlug: $s, 
 function setCookie(slug: string, userId: string) {
   document.cookie = `${VIEW_AS_COOKIE}=${encodeURIComponent(
     viewAsCookieValue(slug, userId),
-  )}; path=/t/${slug}`;
+  )}; path=/f/${slug}`;
 }
 
 function clearCookie(slug: string) {
-  document.cookie = `${VIEW_AS_COOKIE}=; path=/t/${slug}; max-age=0`;
+  document.cookie = `${VIEW_AS_COOKIE}=; path=/f/${slug}; max-age=0`;
 }
 
 /** "View timetable as [username]" on a People card (admins only, QA #59
@@ -43,7 +43,7 @@ export function UserPreviewStart({
       await clientGql(START, { s: slug, u: userId });
       setCookie(slug, userId);
       startTransition(() => {
-        router.push(`/t/${slug}/feed`);
+        router.push(`/f/${slug}/topics`);
         router.refresh();
       });
     } catch (err) {

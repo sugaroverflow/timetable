@@ -1,6 +1,6 @@
 /**
  * The four heart-ranking normalisations (product feedback round 1), shared by
- * the Topic Feed sort control and the Analysis leaderboard switcher so their
+ * the All Topics sort control and the Analysis leaderboard switcher so their
  * labels and descriptions never drift. The math lives in
  * `@timetable/shared` (`topicNormScores`).
  */

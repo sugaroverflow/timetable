@@ -15,6 +15,7 @@ const RESERVED_SEGMENTS = new Set([
   "settings",
   "people",
   "users",
+  "my-topics",
   "api",
   "sign-in",
   "sign-up",
@@ -44,7 +45,7 @@ export async function ensureTopicSlug(
 }
 
 /** Unique-per-timetable member slug from a display name, avoiding reserved
- * route segments. Person pages (/t/[slug]/[userSlug]) resolve by this;
+ * route segments. Person pages (/f/[slug]/[userSlug]) resolve by this;
  * in topic permalinks it stays cosmetic (stale segments 301). */
 export async function ensureMemberSlug(
   timetableId: string,

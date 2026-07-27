@@ -69,7 +69,7 @@ export default async function TopicPermalinkPage({
   return (
     <div className="stack">
       <div className="toolbar">
-        <Link href={`/t/${slug}/feed`} className="btn btn-ghost">
+        <Link href={`/f/${slug}/topics`} className="btn btn-ghost">
           ← Topic feed
         </Link>
         <StatusBadge status={topic.status} />

@@ -15,7 +15,7 @@ export type ProfileCardPerson = {
 };
 
 /** Profile header shared by the host-filtered feed and the person pages
- * (/t/[slug]/[userSlug]): large photo, name, role pills, bio. The photo
+ * (/f/[slug]/[userSlug]): large photo, name, role pills, bio. The photo
  * links to the person page unless this card IS that page. */
 export function PersonProfileCard({
   slug,
@@ -28,7 +28,7 @@ export function PersonProfileCard({
   labels: RoleLabels | undefined;
   linkPhoto?: boolean;
 }) {
-  const pagePath = person.slug ? `/t/${slug}/${person.slug}` : null;
+  const pagePath = person.slug ? `/f/${slug}/${person.slug}` : null;
   const photo = person.image ? (
     // eslint-disable-next-line @next/next/no-img-element
     <img

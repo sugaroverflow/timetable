@@ -8,9 +8,20 @@ Product context: `docs/PRODUCT.md`. Architecture: `docs/ARCHITECTURE.md`.
 
 **Rebrand (2026-07):** the product is now branded **"Topic"** (topic.forum),
 and the tenant entity is a **"forum"** in ALL user-facing copy. Code
-identifiers, `@timetable/*` packages, routes (`/t/`, `/timetables`) and the
+identifiers, `@timetable/*` packages, the `/timetables` route and the
 GraphQL schema deliberately keep `timetable` naming — new user-visible
 strings must say forum/Topic.
+
+**Naming pass (2026-07-27, de-social-media):** forum URLs are `/f/[slug]/…`
+(old `/t/` permanently redirects — never remove those redirects, sent
+emails link there). The browsing page is **"All Topics"** at `/topics`
+(never "feed" in user-facing copy); the host's own page is "My Topics" at
+`/my-topics`; the random sort's label is **"Shuffle"** (its value stays
+`random`); the admin settings nav is "Forum Settings". User-facing text
+uses the **"❤️" emoji instead of the word "heart"** where it reads
+naturally. Internal identifiers (`buildFeed`, `InfiniteFeed`,
+`lastSeenFeedAt`, CSS `feed-toolbar`, sort value `random`) keep their
+names.
 
 ## Monorepo map & boundary rules
 
