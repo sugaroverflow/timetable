@@ -173,7 +173,10 @@ function SideNav({
         </NavLink>
       )}
       {isMember && <NotificationsNavLink base={base} unread={unread} />}
-      {isMember && <NavLink href={`${base}/people`}>People</NavLink>}
+      {/* People shows for every viewer who can read the forum — the API
+          filters the list to the profiles their access allows (all members
+          on public forums; hosts + admins on hosts_only ones). */}
+      <NavLink href={`${base}/people`}>People</NavLink>
       {isAuthed && <NavLink href={`${base}/profile`}>Profile</NavLink>}
       {hostOrAdmin && <NavLink href={`${base}/analysis`}>Analysis</NavLink>}
       {admin && <NavLink href={`${base}/moderation`}>Pending Topics</NavLink>}
