@@ -1,8 +1,7 @@
-import Link from "next/link";
-
 import { isAdmin, isHost, type Role } from "@timetable/shared";
 
 import { ElectorActivityTable } from "@/components/ElectorActivityTable";
+import { HostActivityTable } from "@/components/HostActivityTable";
 import { HostFilter } from "@/components/HostFilter";
 import { TopicLeaderboard } from "@/components/TopicLeaderboard";
 import { gqlFetch } from "@/lib/graphql";
@@ -29,11 +28,20 @@ type Dashboard = {
     l2Score: number;
     devotionScore: number;
     heartCount: number;
+    commentTotal: number;
+    commenterCount: number;
+    commentL2: number;
+    commentL1: number;
+    commentDevotion: number;
   }[];
-  hostLeaderboard: {
+  hostActivity: {
     hostId: string;
     hostName: string | null;
-    weightedScore: number;
+    hostImage: string | null;
+    hostSlug: string | null;
+    topicCount: number;
+    commentCount: number;
+    latestActivityAt: string | null;
   }[];
   electorActivity: {
     electorId: string;
@@ -68,8 +76,8 @@ const QUERY = `
     timetableHosts(idOrSlug: $s) { id name }
     dashboard(idOrSlug: $s, hostId: $host) {
       totalHearts electorCount hostCount
-      topicLeaderboard { id title slug hostId hostName hostImage hostSlug weightedScore l2Score devotionScore heartCount }
-      hostLeaderboard { hostId hostName weightedScore }
+      topicLeaderboard { id title slug hostId hostName hostImage hostSlug weightedScore l2Score devotionScore heartCount commentTotal commenterCount commentL2 commentL1 commentDevotion }
+      hostActivity { hostId hostName hostImage hostSlug topicCount commentCount latestActivityAt }
       electorActivity {
         electorId electorName heartCount commentCount
         latestActivityAt
@@ -78,46 +86,6 @@ const QUERY = `
     }
   }
 `;
-
-function HostLeaderboardCard({
-  slug,
-  hostsPlural,
-  entries,
-}: {
-  slug: string;
-  hostsPlural: string;
-  entries: Dashboard["hostLeaderboard"];
-}) {
-  return (
-    <div className="card">
-      <h3 style={{ marginTop: 0, fontSize: 15 }}>
-        All {hostsPlural} by weighted votes
-      </h3>
-      {entries.length === 0 ? (
-        <p className="faint" style={{ fontSize: 13 }}>
-          No data yet.
-        </p>
-      ) : (
-        <ul className="list">
-          {entries.map((h) => (
-            <li
-              key={h.hostId}
-              className="row"
-              style={{ justifyContent: "space-between", fontSize: 14 }}
-            >
-              <span>
-                <Link href={`/f/${slug}/topics?host=${h.hostId}`}>
-                  {h.hostName ?? "Host"}
-                </Link>
-              </span>
-              <span className="mono">{h.weightedScore.toFixed(2)}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
 
 export default async function DashboardPage({
   params,
@@ -145,6 +113,7 @@ export default async function DashboardPage({
   const hostLabel = roleLabel(settings.roleLabels, "host");
   const hostsPlural = pluralLabel(hostLabel);
   const electorLabel = roleLabel(settings.roleLabels, "elector");
+  const adminsPlural = pluralLabel(roleLabel(settings.roleLabels, "admin"));
   const viewerIsAdmin = isAdmin(roles);
 
   return (
@@ -161,25 +130,15 @@ export default async function DashboardPage({
         />
       </div>
 
-      <div className="grid grid-2">
-        <TopicLeaderboard
-          slug={slug}
-          hostLabel={hostLabel}
-          entries={d.topicLeaderboard}
-          totalHearts={d.totalHearts}
-          hostCount={d.hostCount}
-          electorCount={d.electorCount}
-          electorLabel={electorLabel}
-        />
-
-        {viewerIsAdmin ? (
-          <HostLeaderboardCard
-            slug={slug}
-            hostsPlural={hostsPlural}
-            entries={d.hostLeaderboard}
-          />
-        ) : null}
-      </div>
+      <TopicLeaderboard
+        slug={slug}
+        hostLabel={hostLabel}
+        entries={d.topicLeaderboard}
+        totalHearts={d.totalHearts}
+        hostCount={d.hostCount}
+        electorCount={d.electorCount}
+        electorLabel={electorLabel}
+      />
 
       <div className="card">
         <div
@@ -203,6 +162,36 @@ export default async function DashboardPage({
           />
         )}
       </div>
+
+      {viewerIsAdmin ? (
+        <div className="card">
+          <div
+            className="row wrap"
+            style={{ justifyContent: "space-between", marginBottom: 12 }}
+          >
+            <div>
+              <h3 style={{ margin: 0, fontSize: 15 }}>{hostLabel} activity</h3>
+              <p className="faint" style={{ margin: "2px 0 0", fontSize: 12 }}>
+                Only visible to {adminsPlural.toLowerCase()}
+              </p>
+            </div>
+            <span className="faint" style={{ fontSize: 12 }}>
+              {d.hostActivity.length} shown
+            </span>
+          </div>
+          {d.hostActivity.length === 0 ? (
+            <p className="faint" style={{ fontSize: 13 }}>
+              No {hostsPlural.toLowerCase()} yet.
+            </p>
+          ) : (
+            <HostActivityTable
+              slug={slug}
+              hostLabel={hostLabel}
+              rows={d.hostActivity}
+            />
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }

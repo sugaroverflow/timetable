@@ -1,4 +1,4 @@
-import { and, eq, gte, isNull, sql, type SQL } from "drizzle-orm";
+import { and, eq, gte, isNull, ne, sql, type SQL } from "drizzle-orm";
 
 import {
   availability,
@@ -11,6 +11,12 @@ import {
   topics,
   type TopicStatus,
 } from "@timetable/db";
+
+import {
+  topicCommentScores,
+  type CommentTally,
+  type TopicCommentScores,
+} from "@timetable/shared";
 
 import { coerceDate } from "./dates";
 import { getHeartsCountFrom } from "./topics";
@@ -45,11 +51,27 @@ export type DashboardData = {
     l2Score: number;
     devotionScore: number;
     heartCount: number;
+    /** 💬 metrics (QA 2026-07-27): elector-authored public comments only,
+     * never the topic's own host, same activity window as the ❤️ counts.
+     * The math is `topicCommentScores` in @timetable/shared. */
+    commentTotal: number;
+    commenterCount: number;
+    commentL2: number;
+    commentL1: number;
+    commentDevotion: number;
   }[];
-  hostLeaderboard: {
+  /** Host activity (QA 2026-07-27, replaced the weighted-votes host
+   * leaderboard): every host-role member — topic-less ones included —
+   * with their published-topic count, public comments authored, and
+   * latest activity (topic publish/edit or comment) in the window. */
+  hostActivity: {
     hostId: string;
     hostName: string | null;
-    weightedScore: number;
+    hostImage: string | null;
+    hostSlug: string | null;
+    topicCount: number;
+    commentCount: number;
+    latestActivityAt: Date | null;
   }[];
   electorActivity: {
     electorId: string;
@@ -144,19 +166,26 @@ async function countTopicsByStatus(
 /** Members with their roles; electors keep their name for the activity list. */
 async function loadMembers(timetableId: string): Promise<{
   electorRows: { userId: string; name: string | null }[];
-  hostCount: number;
+  hostRows: {
+    userId: string;
+    name: string | null;
+    image: string | null;
+    slug: string | null;
+  }[];
 }> {
   const memberRows = await db
     .select({
       userId: timetableMemberships.userId,
       roles: timetableMemberships.roles,
       name: timetableMemberships.name,
+      image: timetableMemberships.image,
+      slug: timetableMemberships.slug,
     })
     .from(timetableMemberships)
     .where(eq(timetableMemberships.timetableId, timetableId));
   const electorRows = memberRows.filter((m) => m.roles.includes("elector"));
-  const hostCount = memberRows.filter((m) => m.roles.includes("host")).length;
-  return { electorRows, hostCount };
+  const hostRows = memberRows.filter((m) => m.roles.includes("host"));
+  return { electorRows, hostRows };
 }
 
 async function countSlots(timetableId: string): Promise<number> {
@@ -167,44 +196,85 @@ async function countSlots(timetableId: string): Promise<number> {
   return n;
 }
 
-function buildLeaderboards(feed: FeedTopic[]): {
-  topicLeaderboard: DashboardData["topicLeaderboard"];
-  hostLeaderboard: DashboardData["hostLeaderboard"];
-} {
+function buildLeaderboards(
+  feed: FeedTopic[],
+  commentScores: Map<string, TopicCommentScores>,
+): DashboardData["topicLeaderboard"] {
   // All published topics, not a top-10 — QA #42 wants the dashboard to show
   // every host and every topic, each linked to its permalink.
-  const topicLeaderboard = feed.map((t) => ({
-    id: t.id,
-    title: t.title,
-    slug: t.slug,
-    hostId: t.hostId,
-    hostName: t.hostName,
-    hostImage: t.hostImage,
-    hostSlug: t.hostSlug,
-    weightedScore: t.weightedScore,
-    l2Score: t.l2Score,
-    devotionScore: t.devotionScore,
-    heartCount: t.heartCount,
-  }));
-
-  const hostAgg = new Map<
-    string,
-    { hostId: string; hostName: string | null; weightedScore: number }
-  >();
-  for (const t of feed) {
-    const cur = hostAgg.get(t.hostId) ?? {
+  return feed.map((t) => {
+    const c = commentScores.get(t.id);
+    return {
+      id: t.id,
+      title: t.title,
+      slug: t.slug,
       hostId: t.hostId,
       hostName: t.hostName,
-      weightedScore: 0,
+      hostImage: t.hostImage,
+      hostSlug: t.hostSlug,
+      weightedScore: t.weightedScore,
+      l2Score: t.l2Score,
+      devotionScore: t.devotionScore,
+      heartCount: t.heartCount,
+      commentTotal: c?.total ?? 0,
+      commenterCount: c?.commenters ?? 0,
+      commentL2: c?.l2 ?? 0,
+      commentL1: c?.l1 ?? 0,
+      commentDevotion: c?.devotion ?? 0,
     };
-    cur.weightedScore += t.weightedScore;
-    hostAgg.set(t.hostId, cur);
-  }
-  const hostLeaderboard = Array.from(hostAgg.values()).sort(
-    (a, b) => b.weightedScore - a.weightedScore,
-  );
+  });
+}
 
-  return { topicLeaderboard, hostLeaderboard };
+/** Host activity rows: every host-role member (topic-less included, matching
+ * the hostCount decision), narrowed to one host under the host filter.
+ * Topic counts/dates come from the (already filtered) feed; comment stats
+ * from the same per-author map the elector table uses. */
+function buildHostActivity(args: {
+  hostRows: {
+    userId: string;
+    name: string | null;
+    image: string | null;
+    slug: string | null;
+  }[];
+  feed: FeedTopic[];
+  commentsByAuthor: Map<string, Stat>;
+  hostId?: string;
+}): DashboardData["hostActivity"] {
+  const topicCounts = new Map<string, number>();
+  const latestTopicAt = new Map<string, Date | null>();
+  for (const t of args.feed) {
+    topicCounts.set(t.hostId, (topicCounts.get(t.hostId) ?? 0) + 1);
+    latestTopicAt.set(
+      t.hostId,
+      latestDate(
+        latestTopicAt.get(t.hostId),
+        t.publishedAt ?? t.createdAt,
+        t.contentUpdatedAt,
+      ),
+    );
+  }
+  return args.hostRows
+    .filter((h) => !args.hostId || h.userId === args.hostId)
+    .map((h) => {
+      const commentStat = args.commentsByAuthor.get(h.userId);
+      return {
+        hostId: h.userId,
+        hostName: h.name,
+        hostImage: h.image,
+        hostSlug: h.slug,
+        topicCount: topicCounts.get(h.userId) ?? 0,
+        commentCount: commentStat?.count ?? 0,
+        latestActivityAt: latestDate(
+          latestTopicAt.get(h.userId),
+          commentStat?.latestAt,
+        ),
+      };
+    })
+    .sort(
+      (a, b) =>
+        (b.latestActivityAt?.getTime() ?? 0) -
+        (a.latestActivityAt?.getTime() ?? 0),
+    );
 }
 
 /** WHERE fragments for the elector-activity window: published topics
@@ -370,6 +440,43 @@ async function loadCommentActivity(
     byElectorTopic.set(`${r.electorId}:${r.topicId}`, r.count);
   }
   return { byElector, byElectorTopic };
+}
+
+/** Per-(elector, topic) public comment tallies feeding the 💬 metrics:
+ * elector-authored only (electors drive metrics — QA 2026-07-27), never the
+ * topic's own host, published topics, inside the activity window. Always
+ * forum-wide — the host filter never shrinks a commenter's denominator. */
+async function loadCommentTallies(
+  timetableId: string,
+  activitySince: Date | undefined,
+): Promise<CommentTally[]> {
+  return db
+    .select({
+      topicId: comments.topicId,
+      userId: comments.authorId,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(comments)
+    .innerJoin(topics, eq(topics.id, comments.topicId))
+    .innerJoin(
+      timetableMemberships,
+      and(
+        eq(timetableMemberships.userId, comments.authorId),
+        eq(timetableMemberships.timetableId, timetableId),
+      ),
+    )
+    .where(
+      and(
+        eq(topics.timetableId, timetableId),
+        eq(topics.status, "published" as const),
+        eq(comments.visibility, "public" as const),
+        isNull(comments.hiddenAt),
+        sql`'elector' = ANY(${timetableMemberships.roles})`,
+        ne(comments.authorId, topics.hostId),
+        ...(activitySince ? [gte(comments.createdAt, activitySince)] : []),
+      ),
+    )
+    .groupBy(comments.topicId, comments.authorId);
 }
 
 /** Availability updates per elector inside the activity window. */
@@ -541,8 +648,9 @@ export async function getDashboard(
   } = {},
 ): Promise<DashboardData> {
   const topicCounts = await countTopicsByStatus(timetableId, opts.hostId);
-  const { electorRows, hostCount } = await loadMembers(timetableId);
+  const { electorRows, hostRows } = await loadMembers(timetableId);
   const electorCount = electorRows.length;
+  const hostCount = hostRows.length;
   const slotCount = await countSlots(timetableId);
 
   // Weighted feed gives published topics with scores + host names.
@@ -551,10 +659,15 @@ export async function getDashboard(
     sort: "hearts",
   });
   const totalHearts = feed.reduce((sum, t) => sum + t.heartCount, 0);
-  const { topicLeaderboard, hostLeaderboard } = buildLeaderboards(feed);
 
   const { activityTopicConds, heartCountConds, activitySince } =
     await activityWindow(timetableId, opts);
+
+  const commentTallies = await loadCommentTallies(timetableId, activitySince);
+  const topicLeaderboard = buildLeaderboards(
+    feed,
+    topicCommentScores(commentTallies),
+  );
 
   const heartActivityRows = await loadHeartActivity(heartCountConds);
 
@@ -576,6 +689,13 @@ export async function getDashboard(
     filter: opts.electorActivity ?? "all",
   });
 
+  const hostActivity = buildHostActivity({
+    hostRows,
+    feed,
+    commentsByAuthor: commentActivity.byElector,
+    hostId: opts.hostId,
+  });
+
   const tagRows = await loadSlotTagRows(timetableId);
   const unallocatedTopics = findUnallocated(feed, tagRows);
   const conflicts = findConflicts(tagRows, opts.hostId);
@@ -587,7 +707,7 @@ export async function getDashboard(
     hostCount,
     slotCount,
     topicLeaderboard,
-    hostLeaderboard,
+    hostActivity,
     electorActivity,
     unallocatedTopics,
     conflicts,

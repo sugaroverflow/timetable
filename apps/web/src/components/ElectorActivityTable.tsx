@@ -29,7 +29,7 @@ export type ElectorRow = {
 type SortKey = "name" | "hearts" | "comments" | "activity";
 type TopicSortKey = "name" | "host" | "comments";
 
-function SortHeader({
+export function SortHeader({
   label,
   active,
   dir,

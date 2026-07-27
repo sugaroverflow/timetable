@@ -16,6 +16,57 @@ export type NormMode = {
   description: string;
 };
 
+/** The 💬 analogs (QA 2026-07-27), Analysis-only for now: elector comments
+ * on published topics (never the topic's own host), aggregated per person
+ * per topic since one person can 💬 a topic many times. Math:
+ * `topicCommentScores` in @timetable/shared. */
+export type CommentNormKey =
+  | "c_raw"
+  | "c_commenters"
+  | "c_l2"
+  | "c_l1"
+  | "c_devotion";
+
+export type CommentNormMode = Omit<NormMode, "key"> & { key: CommentNormKey };
+
+export const COMMENT_NORM_MODES: CommentNormMode[] = [
+  {
+    key: "c_raw",
+    symbol: "Σ💬",
+    label: "Total comments",
+    description:
+      "No normalisation — every elector 💬 counts equally (a topic's own host never counts).",
+  },
+  {
+    key: "c_commenters",
+    symbol: "#💬",
+    label: "Distinct commenters",
+    description:
+      "Each elector counts once per topic, however many 💬s they leave on it.",
+  },
+  {
+    key: "c_l2",
+    symbol: "Σ💬/√💬",
+    label: "Chattiness-discounted (L2)",
+    description:
+      "Comments discounted by the √ of each elector's total 💬s (L2).",
+  },
+  {
+    key: "c_l1",
+    symbol: "Σ💬/💬",
+    label: "Attention share (L1)",
+    description:
+      "Each elector has one unit of attention split across the topics they 💬 — one person can never contribute more than 1 (L1).",
+  },
+  {
+    key: "c_devotion",
+    symbol: "(Σ💬/💬)/#💬",
+    label: "Average devotion",
+    description:
+      "The mean share of their 💬s that this topic's commenters gave it.",
+  },
+];
+
 export const NORM_MODES: NormMode[] = [
   {
     key: "raw",
