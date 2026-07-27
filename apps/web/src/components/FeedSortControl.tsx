@@ -1,5 +1,7 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
+
 import { NORM_MODES } from "@/lib/normModes";
 import { useSetSearchParam } from "@/lib/useSearchParamNav";
 
@@ -22,22 +24,25 @@ export function FeedSortControl({ value }: { value: string }) {
   }
 
   return (
-    <select
-      id="sort"
-      aria-label="Sort topics"
-      value={value}
-      onChange={(e) => change(e.target.value)}
-    >
-      <option value="random">Shuffle</option>
-      <option value="recent">Newest</option>
-      <option value="comments">Latest comments</option>
-      <optgroup label="By ❤️">
-        {NORM_MODES.map((mode) => (
-          <option key={mode.key} value={mode.key} title={mode.description}>
-            {mode.symbol} — {mode.label}
-          </option>
-        ))}
-      </optgroup>
-    </select>
+    <span className="select-minimal">
+      <ChevronDown size={14} aria-hidden />
+      <select
+        id="sort"
+        aria-label="Sort topics"
+        value={value}
+        onChange={(e) => change(e.target.value)}
+      >
+        <option value="random">Shuffle</option>
+        <option value="recent">Newest</option>
+        <option value="comments">Latest comments</option>
+        <optgroup label="By ❤️">
+          {NORM_MODES.map((mode) => (
+            <option key={mode.key} value={mode.key} title={mode.description}>
+              {mode.symbol} — {mode.label}
+            </option>
+          ))}
+        </optgroup>
+      </select>
+    </span>
   );
 }

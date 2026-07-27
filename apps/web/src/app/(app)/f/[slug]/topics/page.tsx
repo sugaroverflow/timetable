@@ -134,8 +134,6 @@ export default async function FeedPage({
         </div>
       ) : null}
       <div className="toolbar feed-toolbar">
-        <label htmlFor="sort">Sort</label>
-        <FeedSortControl value={sort} />
         {page.hosts.length > 0 ? (
           <HostFilter
             value={host}
@@ -143,6 +141,7 @@ export default async function FeedPage({
             allLabel={`All ${pluralLabel(hostLabel)}`}
           />
         ) : null}
+        <FeedSortControl value={sort} />
       </div>
 
       {!page.isMember ? (

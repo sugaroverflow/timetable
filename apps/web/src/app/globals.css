@@ -949,6 +949,29 @@ textarea {
   padding: 5px 8px;
 }
 
+/* Minimalist select (All Topics toolbar): no box, no native arrow — a
+   chevron sits to the LEFT of the value instead. */
+.select-minimal {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--ink);
+}
+.select-minimal svg {
+  flex: none;
+  pointer-events: none;
+  color: var(--muted);
+}
+.select-minimal select {
+  appearance: none;
+  border: none;
+  background: transparent;
+  width: auto;
+  padding: 4px 2px;
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+
 .table-wrap {
   overflow-x: auto;
 }
