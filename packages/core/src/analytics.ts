@@ -1,4 +1,4 @@
-import { and, eq, gte, isNull, sql, type SQL } from "drizzle-orm";
+import { and, eq, gte, isNull, ne, sql, type SQL } from "drizzle-orm";
 
 import {
   availability,
@@ -11,6 +11,12 @@ import {
   topics,
   type TopicStatus,
 } from "@timetable/db";
+
+import {
+  topicCommentScores,
+  type CommentTally,
+  type TopicCommentScores,
+} from "@timetable/shared";
 
 import { coerceDate } from "./dates";
 import { getHeartsCountFrom } from "./topics";
@@ -45,6 +51,14 @@ export type DashboardData = {
     l2Score: number;
     devotionScore: number;
     heartCount: number;
+    /** 💬 metrics (QA 2026-07-27): elector-authored public comments only,
+     * never the topic's own host, same activity window as the ❤️ counts.
+     * The math is `topicCommentScores` in @timetable/shared. */
+    commentTotal: number;
+    commenterCount: number;
+    commentL2: number;
+    commentL1: number;
+    commentDevotion: number;
   }[];
   hostLeaderboard: {
     hostId: string;
@@ -167,25 +181,36 @@ async function countSlots(timetableId: string): Promise<number> {
   return n;
 }
 
-function buildLeaderboards(feed: FeedTopic[]): {
+function buildLeaderboards(
+  feed: FeedTopic[],
+  commentScores: Map<string, TopicCommentScores>,
+): {
   topicLeaderboard: DashboardData["topicLeaderboard"];
   hostLeaderboard: DashboardData["hostLeaderboard"];
 } {
   // All published topics, not a top-10 — QA #42 wants the dashboard to show
   // every host and every topic, each linked to its permalink.
-  const topicLeaderboard = feed.map((t) => ({
-    id: t.id,
-    title: t.title,
-    slug: t.slug,
-    hostId: t.hostId,
-    hostName: t.hostName,
-    hostImage: t.hostImage,
-    hostSlug: t.hostSlug,
-    weightedScore: t.weightedScore,
-    l2Score: t.l2Score,
-    devotionScore: t.devotionScore,
-    heartCount: t.heartCount,
-  }));
+  const topicLeaderboard = feed.map((t) => {
+    const c = commentScores.get(t.id);
+    return {
+      id: t.id,
+      title: t.title,
+      slug: t.slug,
+      hostId: t.hostId,
+      hostName: t.hostName,
+      hostImage: t.hostImage,
+      hostSlug: t.hostSlug,
+      weightedScore: t.weightedScore,
+      l2Score: t.l2Score,
+      devotionScore: t.devotionScore,
+      heartCount: t.heartCount,
+      commentTotal: c?.total ?? 0,
+      commenterCount: c?.commenters ?? 0,
+      commentL2: c?.l2 ?? 0,
+      commentL1: c?.l1 ?? 0,
+      commentDevotion: c?.devotion ?? 0,
+    };
+  });
 
   const hostAgg = new Map<
     string,
@@ -372,6 +397,43 @@ async function loadCommentActivity(
   return { byElector, byElectorTopic };
 }
 
+/** Per-(elector, topic) public comment tallies feeding the 💬 metrics:
+ * elector-authored only (electors drive metrics — QA 2026-07-27), never the
+ * topic's own host, published topics, inside the activity window. Always
+ * forum-wide — the host filter never shrinks a commenter's denominator. */
+async function loadCommentTallies(
+  timetableId: string,
+  activitySince: Date | undefined,
+): Promise<CommentTally[]> {
+  return db
+    .select({
+      topicId: comments.topicId,
+      userId: comments.authorId,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(comments)
+    .innerJoin(topics, eq(topics.id, comments.topicId))
+    .innerJoin(
+      timetableMemberships,
+      and(
+        eq(timetableMemberships.userId, comments.authorId),
+        eq(timetableMemberships.timetableId, timetableId),
+      ),
+    )
+    .where(
+      and(
+        eq(topics.timetableId, timetableId),
+        eq(topics.status, "published" as const),
+        eq(comments.visibility, "public" as const),
+        isNull(comments.hiddenAt),
+        sql`'elector' = ANY(${timetableMemberships.roles})`,
+        ne(comments.authorId, topics.hostId),
+        ...(activitySince ? [gte(comments.createdAt, activitySince)] : []),
+      ),
+    )
+    .groupBy(comments.topicId, comments.authorId);
+}
+
 /** Availability updates per elector inside the activity window. */
 async function loadAvailabilityActivity(
   timetableId: string,
@@ -551,10 +613,15 @@ export async function getDashboard(
     sort: "hearts",
   });
   const totalHearts = feed.reduce((sum, t) => sum + t.heartCount, 0);
-  const { topicLeaderboard, hostLeaderboard } = buildLeaderboards(feed);
 
   const { activityTopicConds, heartCountConds, activitySince } =
     await activityWindow(timetableId, opts);
+
+  const commentTallies = await loadCommentTallies(timetableId, activitySince);
+  const { topicLeaderboard, hostLeaderboard } = buildLeaderboards(
+    feed,
+    topicCommentScores(commentTallies),
+  );
 
   const heartActivityRows = await loadHeartActivity(heartCountConds);
 

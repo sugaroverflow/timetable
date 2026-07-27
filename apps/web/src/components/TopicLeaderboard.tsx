@@ -8,7 +8,12 @@ import {
   BreakdownCaret,
   BreakdownPanelBody,
 } from "@/components/BreakdownPanel";
-import { NORM_MODES, type NormKey } from "@/lib/normModes";
+import {
+  COMMENT_NORM_MODES,
+  NORM_MODES,
+  type CommentNormKey,
+  type NormKey,
+} from "@/lib/normModes";
 import { pluralLabel } from "@/lib/timetableSettings";
 import { topicPath } from "@/lib/topicPath";
 
@@ -24,9 +29,16 @@ export type LeaderboardEntry = {
   l2Score: number;
   devotionScore: number;
   heartCount: number;
+  commentTotal: number;
+  commenterCount: number;
+  commentL2: number;
+  commentL1: number;
+  commentDevotion: number;
 };
 
-function scoreFor(entry: LeaderboardEntry, key: NormKey): number {
+type AnyNormKey = NormKey | CommentNormKey;
+
+function scoreFor(entry: LeaderboardEntry, key: AnyNormKey): number {
   switch (key) {
     case "raw":
       return entry.heartCount;
@@ -34,10 +46,23 @@ function scoreFor(entry: LeaderboardEntry, key: NormKey): number {
       return entry.l2Score;
     case "devotion":
       return entry.devotionScore;
+    case "c_raw":
+      return entry.commentTotal;
+    case "c_commenters":
+      return entry.commenterCount;
+    case "c_l2":
+      return entry.commentL2;
+    case "c_l1":
+      return entry.commentL1;
+    case "c_devotion":
+      return entry.commentDevotion;
     default:
       return entry.weightedScore; // l1
   }
 }
+
+/** Norms that are whole counts — rendered without decimals. */
+const INTEGER_NORMS: readonly AnyNormKey[] = ["raw", "c_raw", "c_commenters"];
 
 /** One topics-analysis row: "▸ [host avatar] host: topic … score". The
  * host links to their person page, the disclosure triangle opens the
@@ -49,7 +74,7 @@ function LeaderboardRow({
   hostLabel,
 }: {
   entry: LeaderboardEntry;
-  norm: NormKey;
+  norm: AnyNormKey;
   slug: string;
   hostLabel: string;
 }) {
@@ -71,7 +96,7 @@ function LeaderboardRow({
           </span>
         </span>
         <span className="mono">
-          {norm === "raw" ? score : score.toFixed(2)}
+          {INTEGER_NORMS.includes(norm) ? score : score.toFixed(2)}
         </span>
       </div>
       {open ? (
@@ -105,17 +130,23 @@ export function TopicLeaderboard({
   electorCount: number;
   electorLabel: string;
 }) {
-  const [norm, setNorm] = useState<NormKey>("l1");
-  const mode = NORM_MODES.find((m) => m.key === norm) ?? NORM_MODES[0]!;
+  const [norm, setNorm] = useState<AnyNormKey>("l1");
+  const mode =
+    [...NORM_MODES, ...COMMENT_NORM_MODES].find((m) => m.key === norm) ??
+    NORM_MODES[0]!;
   const sorted = [...entries].sort(
     (a, b) => scoreFor(b, norm) - scoreFor(a, norm),
   );
   // The former stat cards, folded into the title (QA 2026-07-27):
   // "12 topics from 20 hosts sorted by 87 ❤️ from 9 electors". hostCount
-  // is ALL the forum's hosts, topic-less ones included (per Ed).
+  // is ALL the forum's hosts, topic-less ones included (per Ed). Under a
+  // 💬 norm the sorted-by clause switches to the comment total.
   const count = (n: number, label: string) =>
     `${n} ${(n === 1 ? label : pluralLabel(label)).toLowerCase()}`;
-  const title = `${entries.length} topic${entries.length === 1 ? "" : "s"} from ${count(hostCount, hostLabel)} sorted by ${totalHearts} ❤️ from ${count(electorCount, electorLabel)}`;
+  const sortedBy = norm.startsWith("c_")
+    ? `${entries.reduce((sum, e) => sum + e.commentTotal, 0)} 💬`
+    : `${totalHearts} ❤️`;
+  const title = `${entries.length} topic${entries.length === 1 ? "" : "s"} from ${count(hostCount, hostLabel)} sorted by ${sortedBy} from ${count(electorCount, electorLabel)}`;
 
   return (
     <div className="card">
@@ -129,15 +160,24 @@ export function TopicLeaderboard({
       >
         <h3 style={{ margin: 0, fontSize: 15 }}>{title}</h3>
         <select
-          aria-label="Vote normalisation"
+          aria-label="Score normalisation"
           value={norm}
-          onChange={(e) => setNorm(e.target.value as NormKey)}
+          onChange={(e) => setNorm(e.target.value as AnyNormKey)}
         >
-          {NORM_MODES.map((m) => (
-            <option key={m.key} value={m.key} title={m.description}>
-              {m.symbol} — {m.label}
-            </option>
-          ))}
+          <optgroup label="❤️ hearts">
+            {NORM_MODES.map((m) => (
+              <option key={m.key} value={m.key} title={m.description}>
+                {m.symbol} — {m.label}
+              </option>
+            ))}
+          </optgroup>
+          <optgroup label="💬 comments">
+            {COMMENT_NORM_MODES.map((m) => (
+              <option key={m.key} value={m.key} title={m.description}>
+                {m.symbol} — {m.label}
+              </option>
+            ))}
+          </optgroup>
         </select>
       </div>
       <p className="faint" style={{ marginTop: 0, fontSize: 12 }}>

@@ -29,6 +29,11 @@ type Dashboard = {
     l2Score: number;
     devotionScore: number;
     heartCount: number;
+    commentTotal: number;
+    commenterCount: number;
+    commentL2: number;
+    commentL1: number;
+    commentDevotion: number;
   }[];
   hostLeaderboard: {
     hostId: string;
@@ -68,7 +73,7 @@ const QUERY = `
     timetableHosts(idOrSlug: $s) { id name }
     dashboard(idOrSlug: $s, hostId: $host) {
       totalHearts electorCount hostCount
-      topicLeaderboard { id title slug hostId hostName hostImage hostSlug weightedScore l2Score devotionScore heartCount }
+      topicLeaderboard { id title slug hostId hostName hostImage hostSlug weightedScore l2Score devotionScore heartCount commentTotal commenterCount commentL2 commentL1 commentDevotion }
       hostLeaderboard { hostId hostName weightedScore }
       electorActivity {
         electorId electorName heartCount commentCount

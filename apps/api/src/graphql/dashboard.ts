@@ -45,6 +45,11 @@ const TopicLeaderboardEntryType = builder
       l2Score: t.exposeFloat("l2Score"),
       devotionScore: t.exposeFloat("devotionScore"),
       heartCount: t.exposeInt("heartCount"),
+      commentTotal: t.exposeInt("commentTotal"),
+      commenterCount: t.exposeInt("commenterCount"),
+      commentL2: t.exposeFloat("commentL2"),
+      commentL1: t.exposeFloat("commentL1"),
+      commentDevotion: t.exposeFloat("commentDevotion"),
     }),
   });
 
