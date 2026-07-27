@@ -2,8 +2,6 @@ import Link from "next/link";
 
 import { isAdmin, isHost, type Role } from "@timetable/shared";
 
-import { DashboardActivityFilter } from "@/components/DashboardActivityFilter";
-import { DashboardSinceFilter } from "@/components/DashboardSinceFilter";
 import { ElectorActivityTable } from "@/components/ElectorActivityTable";
 import { HostFilter } from "@/components/HostFilter";
 import { TopicLeaderboard } from "@/components/TopicLeaderboard";
@@ -14,14 +12,6 @@ import {
   pluralLabel,
   roleLabel,
 } from "@/lib/timetableSettings";
-
-const ACTIVITY_FILTERS = new Set([
-  "all",
-  "active",
-  "quiet",
-  "no_hearts",
-  "no_comments",
-]);
 
 type Dashboard = {
   totalHearts: number;
@@ -58,6 +48,7 @@ type Dashboard = {
       hostId: string;
       hostName: string | null;
       hostSlug: string | null;
+      commentCount: number;
     }[];
   }[];
 };
@@ -66,49 +57,27 @@ type Data = {
   timetable: {
     viewerRoles: string[];
     settings: string;
-    heartsCountFrom: string | null;
   } | null;
   timetableHosts: { id: string; name: string | null }[];
   dashboard: Dashboard | null;
 };
 
 const QUERY = `
-  query Dashboard($s: String!, $host: String, $activity: String, $since: String) {
-    timetable(idOrSlug: $s) { viewerRoles settings heartsCountFrom }
+  query Dashboard($s: String!, $host: String) {
+    timetable(idOrSlug: $s) { viewerRoles settings }
     timetableHosts(idOrSlug: $s) { id name }
-    dashboard(idOrSlug: $s, hostId: $host, electorActivity: $activity, activitySince: $since) {
+    dashboard(idOrSlug: $s, hostId: $host) {
       totalHearts electorCount hostCount
       topicLeaderboard { id title slug hostId hostName hostImage hostSlug weightedScore l2Score devotionScore heartCount }
       hostLeaderboard { hostId hostName weightedScore }
       electorActivity {
         electorId electorName heartCount commentCount
         latestActivityAt
-        heartedTopics { topicId title slug hostId hostName hostSlug }
+        heartedTopics { topicId title slug hostId hostName hostSlug commentCount }
       }
     }
   }
 `;
-
-/** Unknown filter values fall back to safe defaults rather than erroring. */
-function normalizeFilters(sp: {
-  host?: string;
-  activity?: string;
-  since?: string;
-}) {
-  const host = sp.host ?? "";
-  const activity =
-    sp.activity && ACTIVITY_FILTERS.has(sp.activity) ? sp.activity : "all";
-  const since = sp.since && !Number.isNaN(Date.parse(sp.since)) ? sp.since : "";
-  return { host, activity, since };
-}
-
-/** Picker shows the explicit choice, or the hearts-cutoff default. */
-function sincePickerValue(since: string, timetable: Data["timetable"]): string {
-  return (
-    since ||
-    (timetable?.heartsCountFrom ? timetable.heartsCountFrom.slice(0, 10) : "")
-  );
-}
 
 function HostLeaderboardCard({
   slug,
@@ -155,15 +124,13 @@ export default async function DashboardPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ host?: string; activity?: string; since?: string }>;
+  searchParams: Promise<{ host?: string }>;
 }) {
   const { slug } = await params;
-  const { host, activity, since } = normalizeFilters(await searchParams);
+  const host = (await searchParams).host ?? "";
   const data = await gqlFetch<Data>(QUERY, {
     s: slug,
     host: host || null,
-    activity,
-    since: since || null,
   });
   const roles = await displayRolesFromCookies(
     (data.timetable?.viewerRoles ?? []) as Role[],
@@ -179,7 +146,6 @@ export default async function DashboardPage({
   const hostsPlural = pluralLabel(hostLabel);
   const electorLabel = roleLabel(settings.roleLabels, "elector");
   const viewerIsAdmin = isAdmin(roles);
-  const sinceValue = sincePickerValue(since, data.timetable);
 
   return (
     <div className="stack">
@@ -221,22 +187,13 @@ export default async function DashboardPage({
           style={{ justifyContent: "space-between", marginBottom: 12 }}
         >
           <h3 style={{ margin: 0, fontSize: 15 }}>{electorLabel} activity</h3>
-          {/* These two only filter THIS table: which electors show, and the
-              date activity is counted from (default: the hearts cutoff). */}
-          <span className="row wrap" style={{ gap: 10, alignItems: "center" }}>
-            <DashboardActivityFilter
-              value={activity}
-              allLabel={`All ${pluralLabel(electorLabel).toLowerCase()}`}
-            />
-            <DashboardSinceFilter value={sinceValue} />
-            <span className="faint" style={{ fontSize: 12 }}>
-              {d.electorActivity.length} shown
-            </span>
+          <span className="faint" style={{ fontSize: 12 }}>
+            {d.electorActivity.length} shown
           </span>
         </div>
         {d.electorActivity.length === 0 ? (
           <p className="faint" style={{ fontSize: 13 }}>
-            No electors match this filter.
+            No electors yet.
           </p>
         ) : (
           <ElectorActivityTable
