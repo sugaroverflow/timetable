@@ -155,7 +155,10 @@ export function renderInvite(args: {
     `<p>${greeting}</p>`,
     `<p>You've been added to <strong>${esc(args.timetableName)}</strong>${by}.</p>`,
     topics,
-    `<p>${linked("Sign in with this email address to get started", `/f/${args.timetableSlug}`)} — no password needed, you'll receive a one-time code.</p>`,
+    // Straight to the sign-in page (invitees have no session yet — landing
+    // on the forum showed them a guest view; prod QA 2026-07-27), with the
+    // forum as the post-OTP destination.
+    `<p>${linked("Sign in with this email address to get started", `/sign-in?redirect_url=${encodeURIComponent(`/f/${args.timetableSlug}/topics`)}`)} — no password needed, you'll receive a one-time code.</p>`,
   ].join("\n");
   return { subject, html };
 }
