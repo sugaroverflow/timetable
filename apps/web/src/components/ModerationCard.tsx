@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AdminCommentsPanel } from "@/components/AdminCommentsPanel";
 import { AdminTopicActions } from "@/components/AdminTopicActions";
 import { Avatar } from "@/components/Avatar";
+import { CollapsibleTopicBody } from "@/components/CollapsibleTopicBody";
 import type { ManagedTopic } from "@/lib/feedTypes";
 import { topicPath } from "@/lib/topicPath";
 
@@ -59,10 +60,7 @@ export function ModerationCard({
           aria-label={`${topic.title} cover image`}
         />
       ) : null}
-      <div
-        className="topic-body"
-        dangerouslySetInnerHTML={{ __html: topic.bodyHtml }}
-      />
+      <CollapsibleTopicBody html={topic.bodyHtml} />
       <AdminCommentsPanel
         topicId={topic.id}
         comments={topic.adminComments ?? []}
