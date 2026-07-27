@@ -53,13 +53,20 @@ const TopicLeaderboardEntryType = builder
     }),
   });
 
-const HostLeaderboardEntryType = builder
-  .objectRef<DashboardData["hostLeaderboard"][number]>("HostLeaderboardEntry")
+const HostActivityType = builder
+  .objectRef<DashboardData["hostActivity"][number]>("HostActivity")
   .implement({
     fields: (t) => ({
       hostId: t.exposeID("hostId"),
       hostName: t.exposeString("hostName", { nullable: true }),
-      weightedScore: t.exposeFloat("weightedScore"),
+      hostImage: t.exposeString("hostImage", { nullable: true }),
+      hostSlug: t.exposeString("hostSlug", { nullable: true }),
+      topicCount: t.exposeInt("topicCount"),
+      commentCount: t.exposeInt("commentCount"),
+      latestActivityAt: t.string({
+        nullable: true,
+        resolve: (h) => h.latestActivityAt?.toISOString() ?? null,
+      }),
     }),
   });
 
@@ -135,9 +142,9 @@ const DashboardType = builder.objectRef<DashboardData>("Dashboard").implement({
       type: [TopicLeaderboardEntryType],
       resolve: (d) => d.topicLeaderboard,
     }),
-    hostLeaderboard: t.field({
-      type: [HostLeaderboardEntryType],
-      resolve: (d) => d.hostLeaderboard,
+    hostActivity: t.field({
+      type: [HostActivityType],
+      resolve: (d) => d.hostActivity,
     }),
     unallocatedTopics: t.field({
       type: [UnallocatedTopicType],
