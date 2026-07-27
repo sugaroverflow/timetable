@@ -11,6 +11,7 @@ import {
   createLocalUser,
   createTimetable,
   deleteForum,
+  buildFeed,
   getMembership,
   getUsersByEmails,
   getMembershipById,
@@ -42,10 +43,12 @@ import {
   type Role,
 } from "@timetable/shared";
 
+import { buildAtomFeed } from "../atom";
 import { getOrCreateClerkUser } from "../auth/clerk";
 import { isSysadmin } from "../auth/sysadmin";
 import { buildContext, type ApiContext } from "../context";
 import {
+  linkBase,
   renderDigest,
   renderInvite,
   renderNewForum,
@@ -59,6 +62,7 @@ import {
   structuredLogger,
 } from "../http/request-log";
 import { buildIcs } from "../ics";
+import { renderMarkdown } from "../markdown";
 import {
   createSignedUpload,
   isUploadPurpose,
@@ -613,6 +617,55 @@ restRouter.post(
     }
 
     res.json({ processed: recipients.length, sent });
+  }),
+);
+
+/**
+ * GET /api/timetables/:idOrSlug/feed.atom
+ * Atom feed of the forum's published topics, newest first (agent-access
+ * roadmap phase 1). Always evaluated as an anonymous reader — feed readers
+ * carry no session — so it exists only for forums the public can read;
+ * private/deactivated forums 404. Topic bodies ship as sanitized HTML from
+ * the shared markdown pipeline.
+ */
+restRouter.get(
+  "/timetables/:idOrSlug/feed.atom",
+  h(async (req, res) => {
+    const readable = await getReadableTimetable(
+      null,
+      req.params.idOrSlug as string,
+    );
+    if (!readable) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    const { timetable } = readable;
+
+    const topics = await buildFeed(timetable.id, null, { sort: "recent" });
+    const entries = topics.slice(0, 50).map((t) => ({
+      id: `urn:uuid:${t.id}`,
+      title: t.title,
+      url: t.slug
+        ? `${linkBase}/f/${timetable.slug}/${t.hostSlug ?? t.hostId}/${t.slug}`
+        : `${linkBase}/f/${timetable.slug}/topics`,
+      updated: t.contentUpdatedAt ?? t.publishedAt ?? t.createdAt,
+      published: t.publishedAt,
+      authorName: t.hostName,
+      contentHtml: renderMarkdown(t.bodyMd),
+    }));
+
+    const xml = buildAtomFeed({
+      title: timetable.name,
+      subtitle: "Published topics",
+      feedUrl: `${linkBase}/api/timetables/${timetable.slug}/feed.atom`,
+      siteUrl: `${linkBase}/f/${timetable.slug}/topics`,
+      entries,
+    });
+    res.setHeader("Content-Type", "application/atom+xml; charset=utf-8");
+    // Readers poll on their own schedule; five minutes keeps a popular feed
+    // from hammering the hearts math on every fetch.
+    res.setHeader("Cache-Control", "public, max-age=300");
+    res.send(xml);
   }),
 );
 

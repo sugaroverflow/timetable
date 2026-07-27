@@ -43,8 +43,8 @@ const esc = (s: string) =>
     (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] ?? c,
   );
 
-/** Digest links use the first configured web origin as their base. */
-const linkBase = (process.env.WEB_ORIGIN ?? "http://localhost:3000")
+/** Digest/feed links use the first configured web origin as their base. */
+export const linkBase = (process.env.WEB_ORIGIN ?? "http://localhost:3000")
   .split(",")[0]!
   .trim()
   .replace(/\/$/, "");

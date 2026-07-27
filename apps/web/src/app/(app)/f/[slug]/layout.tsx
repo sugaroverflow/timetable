@@ -14,6 +14,7 @@ import {
   type SwitcherItem,
 } from "@/components/TimetableSwitcher";
 import { UserPreviewExit } from "@/components/UserPreview";
+import { env } from "@/env";
 import { emojiFavicon } from "@/lib/favicon";
 import { gqlFetch } from "@/lib/graphql";
 import { getMyTimetables } from "@/lib/myTimetables";
@@ -74,9 +75,21 @@ export async function generateMetadata({
   const icon = settings.iconEmoji
     ? emojiFavicon(settings.iconEmoji)
     : settings.iconUrl;
+  // Feed readers autodiscover the Atom feed from any forum page; the feed
+  // itself only exists for publicly readable forums (it has no auth).
+  const hasFeed = !["private", "deactivated"].includes(timetable.privacy);
   return {
     title: `${timetable.name} Topics`,
     ...(icon ? { icons: { icon } } : {}),
+    ...(hasFeed
+      ? {
+          alternates: {
+            types: {
+              "application/atom+xml": `${env.apiUrl}/api/timetables/${slug}/feed.atom`,
+            },
+          },
+        }
+      : {}),
   };
 }
 
