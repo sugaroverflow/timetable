@@ -15,6 +15,7 @@ import {
   type CommentNormKey,
   type NormKey,
 } from "@/lib/normModes";
+import { personPath } from "@/lib/personPath";
 import { pluralLabel } from "@/lib/timetableSettings";
 import { topicPath } from "@/lib/topicPath";
 
@@ -89,7 +90,7 @@ function LeaderboardRow({
           <BreakdownCaret open={open} onToggle={() => setOpen(!open)} />
           <Avatar small name={entry.hostName} image={entry.hostImage} />
           <span>
-            <Link href={`/f/${slug}/${entry.hostSlug ?? entry.hostId}`}>
+            <Link href={personPath(slug, entry.hostSlug ?? entry.hostId)}>
               {entry.hostName ?? hostLabel}
             </Link>
             {": "}

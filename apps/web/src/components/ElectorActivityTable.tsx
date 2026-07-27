@@ -5,6 +5,7 @@ import { Fragment, useState } from "react";
 
 import { BreakdownCaret } from "@/components/BreakdownPanel";
 import { SortHeader } from "@/components/SortHeader";
+import { formatExactTime } from "@/lib/dates";
 import { relativeTime } from "@/lib/relativeTime";
 import { topicPath } from "@/lib/topicPath";
 
@@ -132,7 +133,7 @@ function ElectorRowItem({
             // suppressHydrationWarning: server and client may render this a
             // minute apart; the hover title carries the exact timestamp.
             <span
-              title={new Date(elector.latestActivityAt).toLocaleString()}
+              title={formatExactTime(elector.latestActivityAt)}
               suppressHydrationWarning
             >
               {relativeTime(elector.latestActivityAt)}

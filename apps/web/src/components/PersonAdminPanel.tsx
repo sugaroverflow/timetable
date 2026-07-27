@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
+import { isOwner as hasOwnerRole, type Role } from "@timetable/shared";
+
 import { MemberRolesEditor } from "@/components/MemberRolesEditor";
 import { useToast } from "@/components/Toast";
 import { clientApi } from "@/lib/clientApi";
@@ -32,7 +34,7 @@ export function PersonAdminPanel({
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [pending, startTransition] = useTransition();
-  const isOwner = roles.includes("owner");
+  const isOwner = hasOwnerRole(roles as Role[]);
 
   async function remove() {
     const res = await clientApi(`/api/memberships/${membershipId}`, {

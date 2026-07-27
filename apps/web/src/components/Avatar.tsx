@@ -1,13 +1,5 @@
-const COLORS = [
-  "#7048e8",
-  "#e8590c",
-  "#1098ad",
-  "#2f9e44",
-  "#c2255c",
-  "#3b5bdb",
-  "#0c8599",
-  "#5f3dc4",
-];
+// The palette lives in tokens.css (--avatar-1…8); the hash picks a slot.
+const COLOR_COUNT = 8;
 
 function colorFor(seed: string): string {
   let hash = 0;
@@ -15,7 +7,7 @@ function colorFor(seed: string): string {
     hash = (hash << 5) - hash + seed.charCodeAt(i);
     hash |= 0;
   }
-  return COLORS[Math.abs(hash) % COLORS.length] ?? COLORS[0]!;
+  return `var(--avatar-${(Math.abs(hash) % COLOR_COUNT) + 1})`;
 }
 
 function initials(name: string): string {

@@ -3,7 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { ASSIGNABLE_ROLES, type AssignableRole } from "@timetable/shared";
+import {
+  ASSIGNABLE_ROLES,
+  isOwner as hasOwnerRole,
+  type AssignableRole,
+  type Role,
+} from "@timetable/shared";
 
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { RichTextEditor } from "@/components/RichTextEditor";
@@ -137,7 +142,7 @@ export function MemberRolesEditor({
 }) {
   const router = useRouter();
   const { toast, toastError } = useToast();
-  const isOwner = initialRoles.includes("owner");
+  const isOwner = hasOwnerRole(initialRoles as Role[]);
   const [roles, setRoles] = useState<string[]>(initialRoles);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);

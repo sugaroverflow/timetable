@@ -5,6 +5,8 @@ import { useState } from "react";
 
 import { Avatar } from "@/components/Avatar";
 import { SortHeader } from "@/components/SortHeader";
+import { formatExactTime } from "@/lib/dates";
+import { personPath } from "@/lib/personPath";
 import { relativeTime } from "@/lib/relativeTime";
 
 export type HostActivityRow = {
@@ -104,7 +106,7 @@ export function HostActivityTable({
               <td>
                 <span className="row" style={{ gap: 8, alignItems: "center" }}>
                   <Avatar small name={host.hostName} image={host.hostImage} />
-                  <Link href={`/f/${slug}/${host.hostSlug ?? host.hostId}`}>
+                  <Link href={personPath(slug, host.hostSlug ?? host.hostId)}>
                     <strong>{host.hostName ?? "Host"}</strong>
                   </Link>
                 </span>
@@ -116,7 +118,7 @@ export function HostActivityTable({
                   // suppressHydrationWarning: server and client may render
                   // this a minute apart; hover carries the exact timestamp.
                   <span
-                    title={new Date(host.latestActivityAt).toLocaleString()}
+                    title={formatExactTime(host.latestActivityAt)}
                     suppressHydrationWarning
                   >
                     {relativeTime(host.latestActivityAt)}

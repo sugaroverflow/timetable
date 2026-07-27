@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { DeleteForumButton } from "@/components/DeleteForumButton";
 import { NewForumEmailToggle } from "@/components/NewForumEmailToggle";
 import { gqlFetch } from "@/lib/graphql";
+import { parseDigestSettings } from "@/lib/timetableSettings";
 
 export const metadata: Metadata = { title: "Sysadmin — Topic" };
 
@@ -41,15 +42,8 @@ export default async function SysadminPage() {
   const data = await gqlFetch<Data>(QUERY);
   if (!data.me?.isSysadmin) notFound();
 
-  let newForumEmails = false;
-  try {
-    const prefs = JSON.parse(data.me.notificationSettings) as {
-      newForumEmails?: boolean;
-    };
-    newForumEmails = prefs.newForumEmails ?? false;
-  } catch {
-    // Unparseable settings fall back to off.
-  }
+  const newForumEmails =
+    parseDigestSettings(data.me.notificationSettings).newForumEmails ?? false;
 
   return (
     <div className="stack">
