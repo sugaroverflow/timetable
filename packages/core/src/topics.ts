@@ -299,7 +299,7 @@ type PublishedHeart = {
  * getWeightedBreakdown and countViewerPublishedHearts share its query and
  * cutoff semantics.
  */
-async function loadPublishedHearts(
+export async function loadPublishedHearts(
   timetableId: string,
   opts: { userId?: string } = {},
 ): Promise<PublishedHeart[]> {
