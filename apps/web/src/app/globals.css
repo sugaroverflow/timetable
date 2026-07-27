@@ -591,8 +591,15 @@ textarea {
   cursor: pointer;
   text-align: left;
 }
+/* Unlike the menu entries, the trigger WRAPS long forum names (QA
+   2026-07-27) — `anywhere` also breaks single unbroken words. */
 .tt-switcher-trigger .tt-menu-name {
   flex: 1;
+  min-width: 0;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
 }
 .tt-switcher-hint {
   display: block;
