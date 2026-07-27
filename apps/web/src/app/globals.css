@@ -356,13 +356,17 @@ textarea {
 }
 .sidebar {
   position: sticky;
-  top: 20px;
+  /* Pin below the sticky topbar at the rail's natural resting offset (the
+     .container's 28px top padding) — scrolling never visibly moves it
+     relative to the viewport (it used to slide up to 20px-from-top, i.e.
+     underneath the topbar; QA 2026-07-27). */
+  top: calc(var(--topbar-h) + 28px);
   display: flex;
   flex-direction: column;
   gap: 16px;
   /* A sticky element taller than the viewport scrolls with the page — cap
      it so the rail actually pins (QA #59 round 3). */
-  max-height: calc(100vh - 40px);
+  max-height: calc(100vh - var(--topbar-h) - 40px);
   overflow-y: auto;
 }
 /* Guard against min-content blowout from wide topic/comment content. */
