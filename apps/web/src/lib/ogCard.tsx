@@ -36,12 +36,44 @@ export async function anonGql<T>(
   }
 }
 
+/** Image types satori (the OG renderer) can decode — uploads may also be
+ * AVIF, which it can't; those degrade to the text card. */
+const RENDERABLE_IMAGE_TYPES = /^image\/(png|jpe?g|gif|webp)/;
+
+/** Fetch an image and inline it as a data URI so the renderer never does
+ * its own (failable) fetch. Returns null on any failure — missing URL,
+ * non-image, oversized (> 4 MB), undecodable type, slow (> 3 s) — so the
+ * card degrades to its text-only form instead of erroring. */
+export async function fetchImageData(
+  url: string | null | undefined,
+): Promise<string | null> {
+  if (!url) return null;
+  try {
+    // Deliberately raw fetch: this hits the image CDN, not our API.
+    // eslint-disable-next-line no-restricted-globals
+    const res = await fetch(url, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(3000),
+    });
+    const type = res.headers.get("content-type") ?? "";
+    if (!res.ok || !RENDERABLE_IMAGE_TYPES.test(type)) return null;
+    const buf = await res.arrayBuffer();
+    if (buf.byteLength > 4_000_000) return null;
+    return `data:${type};base64,${Buffer.from(buf).toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
+
 /** The one card layout: optional small grey kicker line (forum name on
- * topic/person cards), a big title, an optional grey footer line, and an
- * accent bar along the bottom (the forum's theme primary when set). */
+ * topic/person cards), an optional round photo (person cards — cover-crop
+ * makes any aspect ratio a clean circle), a big title, an optional grey
+ * footer line, and an accent bar along the bottom (the forum's theme
+ * primary when set). */
 export function ogCard(args: {
   kicker?: string | null;
   emoji?: string | null;
+  photo?: string | null;
   title: string;
   footer?: string | null;
   accent?: string | null;
@@ -64,6 +96,20 @@ export function ogCard(args: {
         position: "relative",
       }}
     >
+      {args.photo ? (
+        // eslint-disable-next-line @next/next/no-img-element -- satori JSX
+        <img
+          src={args.photo}
+          alt=""
+          style={{
+            width: 200,
+            height: 200,
+            borderRadius: 9999,
+            objectFit: "cover",
+            marginBottom: 36,
+          }}
+        />
+      ) : null}
       {args.kicker ? (
         <div style={{ fontSize: 36, color: "#6a7383", marginBottom: 18 }}>
           {args.kicker}
@@ -87,6 +133,112 @@ export function ogCard(args: {
           {args.footer}
         </div>
       ) : null}
+      <div
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: 18,
+          background: accent,
+        }}
+      />
+    </div>
+  );
+}
+
+/** Full-bleed variant for topic cards with a cover photo: the image
+ * cover-crops to fill the whole card (any aspect ratio or size renders
+ * clean — tall/wide images just crop), with a bottom scrim so the white
+ * text stays readable on any picture. */
+export function ogCoverCard(args: {
+  image: string;
+  kicker?: string | null;
+  title: string;
+  footer?: string | null;
+  accent?: string | null;
+}) {
+  const accent =
+    args.accent && /^#[0-9a-fA-F]{6}$/.test(args.accent)
+      ? args.accent
+      : ACCENT_FALLBACK;
+  return (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        position: "relative",
+      }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element -- satori JSX */}
+      <img
+        src={args.image}
+        alt=""
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          background:
+            "linear-gradient(to top, rgba(10,12,18,0.85) 0%, rgba(10,12,18,0.35) 55%, rgba(10,12,18,0.05) 100%)",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 18,
+          display: "flex",
+          flexDirection: "column",
+          padding: "0 80px 72px",
+          color: "#ffffff",
+        }}
+      >
+        {args.kicker ? (
+          <div
+            style={{
+              fontSize: 36,
+              color: "rgba(255,255,255,0.82)",
+              marginBottom: 18,
+            }}
+          >
+            {args.kicker}
+          </div>
+        ) : null}
+        <div
+          style={{
+            fontSize: args.title.length > 60 ? 56 : 72,
+            fontWeight: 700,
+            lineHeight: 1.15,
+          }}
+        >
+          {args.title}
+        </div>
+        {args.footer ? (
+          <div
+            style={{
+              fontSize: 34,
+              color: "rgba(255,255,255,0.82)",
+              marginTop: 22,
+            }}
+          >
+            {args.footer}
+          </div>
+        ) : null}
+      </div>
       <div
         style={{
           position: "absolute",
