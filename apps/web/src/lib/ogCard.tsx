@@ -279,6 +279,6 @@ export function forumCardBits(forum: OgForum): {
 
 export const OG_FORUM_QUERY = `
   query OgForum($s: String!) {
-    timetable(idOrSlug: $s) { name settings }
+    timetable: forum(idOrSlug: $s) { name settings }
   }
 `;

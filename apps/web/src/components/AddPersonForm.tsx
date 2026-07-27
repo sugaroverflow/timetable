@@ -33,7 +33,7 @@ export function AddPersonForm({
     if (!email.trim() || roles.length === 0 || busy) return;
     setBusy(true);
     try {
-      const res = await clientApi(`/api/timetables/${timetableId}/people`, {
+      const res = await clientApi(`/api/forums/${timetableId}/people`, {
         method: "POST",
         body: JSON.stringify({
           email: email.trim(),

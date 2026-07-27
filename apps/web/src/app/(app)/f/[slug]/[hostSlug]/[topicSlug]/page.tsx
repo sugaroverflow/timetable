@@ -27,9 +27,9 @@ type Data = {
 
 const QUERY = `
   query TopicPermalink($s: String!, $topic: String!) {
-    timetable(idOrSlug: $s) { viewerRoles settings viewerHeartedPublishedCount }
+    timetable: forum(idOrSlug: $s) { viewerRoles settings viewerHeartedPublishedCount }
     me { id }
-    timetableHosts(idOrSlug: $s) { id name }
+    timetableHosts: forumHosts(idOrSlug: $s) { id name }
     topicPermalink(idOrSlug: $s, topicSlug: $topic) {
       ${TOPIC_FEED_FIELDS}
     }

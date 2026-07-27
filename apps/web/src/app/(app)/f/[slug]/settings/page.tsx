@@ -30,7 +30,7 @@ export default async function SettingsPage({
       settings: string;
     } | null;
   }>(
-    `query($idOrSlug: String!) { timetable(idOrSlug: $idOrSlug) { id name privacy customDomain heartsCountFrom viewerRoles settings } }`,
+    `query($idOrSlug: String!) { timetable: forum(idOrSlug: $idOrSlug) { id name privacy customDomain heartsCountFrom viewerRoles settings } }`,
     { idOrSlug: slug },
   );
   if (!first.timetable) notFound();

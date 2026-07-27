@@ -7,14 +7,14 @@ import type { DigestSettings, RoleLabels } from "@/lib/timetableSettings";
 import { useGqlAction } from "@/lib/useGqlAction";
 
 const MUTATION = `mutation($s: String!, $name: String, $privacy: String, $cd: String) {
-  updateTimetableProfile(idOrSlug: $s, name: $name, privacy: $privacy, customDomain: $cd) { id }
+  updateTimetableProfile: updateForumProfile(idOrSlug: $s, name: $name, privacy: $privacy, customDomain: $cd) { id }
 }`;
 
 const SETTINGS_MUTATION = `mutation Labels(
   $s: String!, $ra: String, $rh: String, $re: String,
   $dnt: Boolean, $dr: Boolean, $da: Boolean
 ) {
-  updateTimetableSettings(
+  updateTimetableSettings: updateForumSettings(
     idOrSlug: $s
     roleLabelAdmin: $ra
     roleLabelHost: $rh

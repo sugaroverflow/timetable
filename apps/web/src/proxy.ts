@@ -15,7 +15,7 @@ type RouteLookup = {
 
 const ROUTE_QUERY = `
   query DomainRoute($host: String!) {
-    timetableRouteByDomain(host: $host) { slug }
+    timetableRouteByDomain: forumRouteByDomain(host: $host) { slug }
   }
 `;
 

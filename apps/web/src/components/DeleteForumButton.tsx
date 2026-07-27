@@ -18,7 +18,7 @@ export function DeleteForumButton({ id, slug }: { id: string; slug: string }) {
     setBusy(true);
     setError(null);
     try {
-      const res = await clientApi(`/api/timetables/${id}`, {
+      const res = await clientApi(`/api/forums/${id}`, {
         method: "DELETE",
       });
       if (!res.ok) {

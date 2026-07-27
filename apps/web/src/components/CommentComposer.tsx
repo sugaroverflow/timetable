@@ -15,7 +15,7 @@ const MUTATION = `mutation AddComment($id: String!, $body: String!, $visibility:
 }`;
 
 const PEOPLE_QUERY = `query MentionPeople($s: String!) {
-  timetablePeople(idOrSlug: $s) { name slug }
+  timetablePeople: forumPeople(idOrSlug: $s) { name slug }
 }`;
 
 /** Comment box fixed to one visibility: the public, host-only, and

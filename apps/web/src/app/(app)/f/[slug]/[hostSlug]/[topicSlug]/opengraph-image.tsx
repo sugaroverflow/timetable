@@ -16,7 +16,7 @@ export const contentType = "image/png";
 
 const TOPIC_QUERY = `
   query OgTopic($s: String!, $topic: String!) {
-    timetable(idOrSlug: $s) { name settings }
+    timetable: forum(idOrSlug: $s) { name settings }
     topicPermalink(idOrSlug: $s, topicSlug: $topic) { title hostName coverImageUrl }
   }
 `;

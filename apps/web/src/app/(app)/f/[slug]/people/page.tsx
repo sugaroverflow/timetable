@@ -38,9 +38,9 @@ type Data = {
 
 const QUERY = `
   query People($s: String!) {
-    timetable(idOrSlug: $s) { id settings viewerRoles }
+    timetable: forum(idOrSlug: $s) { id settings viewerRoles }
     me { id }
-    timetablePeople(idOrSlug: $s) {
+    timetablePeople: forumPeople(idOrSlug: $s) {
       userId name image slug roles bioHtml
       publishedTopics { id title slug }
     }
@@ -58,7 +58,7 @@ type Member = {
 
 const MEMBERS_QUERY = `
   query Members($timetableId: String!) {
-    timetableMembers(timetableId: $timetableId) {
+    timetableMembers: forumMembers(forumId: $timetableId) {
       membershipId userId roles name email inviteSentAt
     }
   }

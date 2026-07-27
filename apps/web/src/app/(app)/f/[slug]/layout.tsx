@@ -39,7 +39,7 @@ type TimetableResult = {
 
 const TIMETABLE_QUERY = `
   query Timetable($idOrSlug: String!) {
-    timetable(idOrSlug: $idOrSlug) {
+    timetable: forum(idOrSlug: $idOrSlug) {
       id
       slug
       name
@@ -85,7 +85,7 @@ export async function generateMetadata({
       ? {
           alternates: {
             types: {
-              "application/atom+xml": `${env.apiUrl}/api/timetables/${slug}/feed.atom`,
+              "application/atom+xml": `${env.apiUrl}/api/forums/${slug}/feed.atom`,
             },
           },
         }

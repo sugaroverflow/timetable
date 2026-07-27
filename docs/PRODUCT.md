@@ -185,7 +185,7 @@ them.
 Calendar sync is one-way ICS export through:
 
 ```txt
-GET /api/timetables/:idOrSlug/calendar.ics
+GET /api/forums/:idOrSlug/calendar.ics
 ```
 
 Private timetables require a per-user ICS token.

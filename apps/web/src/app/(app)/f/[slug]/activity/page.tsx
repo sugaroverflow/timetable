@@ -28,7 +28,7 @@ type Data = {
 
 const QUERY = `
   query Activity($s: String!, $from: String, $to: String) {
-    timetable(idOrSlug: $s) { viewerRoles settings }
+    timetable: forum(idOrSlug: $s) { viewerRoles settings }
     activityTimeline(idOrSlug: $s, from: $from, to: $to) {
       id action note actorId actorName actorImage actorRoles createdAt
       topicTitle topicSlug topicHostSlug topicHostName snippet

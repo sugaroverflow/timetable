@@ -8,9 +8,18 @@ Product context: `docs/PRODUCT.md`. Architecture: `docs/ARCHITECTURE.md`.
 
 **Rebrand (2026-07):** the product is now branded **"Topic"** (topic.forum),
 and the tenant entity is a **"forum"** in ALL user-facing copy. Code
-identifiers, `@timetable/*` packages, the `/timetables` route and the
-GraphQL schema deliberately keep `timetable` naming — new user-visible
-strings must say forum/Topic.
+identifiers, `@timetable/*` packages, DB tables, and the `/timetables` web
+route deliberately keep `timetable` naming — new user-visible strings must
+say forum/Topic.
+
+**Public API naming (2026-07-27):** the PUBLIC API surface says **forum** —
+GraphQL exposed types/fields (`Forum`, `forum(idOrSlug:)`, `myForums`,
+`forumHosts`, `updateForumSettings`, `forumId`, …) and REST URLs
+(`/api/forums/…`). The web app's own queries alias back to the internal
+names (`timetable: forum(idOrSlug: $s)`) so TypeScript keeps `timetable`
+identifiers — follow that pattern in new queries. Legacy
+`/api/timetables/:idOrSlug/{calendar.ics,feed.atom}` 301-redirect (URLs
+live in calendar apps/feed readers — never remove).
 
 **Naming pass (2026-07-27, de-social-media):** forum URLs are `/f/[slug]/…`
 (old `/t/` permanently redirects — never remove those redirects, sent

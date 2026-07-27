@@ -133,7 +133,7 @@ builder.queryFields((t) => ({
 
   /** Members with public profile fields (People page). Anyone who can
    * read the timetable can see it — bios follow timetable visibility. */
-  timetablePeople: t.field({
+  forumPeople: t.field({
     type: [PersonType],
     args: { idOrSlug: t.arg.string({ required: true }) },
     resolve: async (_p, args, ctx) => {
@@ -188,13 +188,13 @@ builder.queryFields((t) => ({
     },
   }),
 
-  timetableMembers: t.field({
+  forumMembers: t.field({
     type: [MemberType],
-    args: { timetableId: t.arg.string({ required: true }) },
+    args: { forumId: t.arg.string({ required: true }) },
     resolve: async (_p, args, ctx) => {
-      const viewer = await ctx.getViewer(args.timetableId);
+      const viewer = await ctx.getViewer(args.forumId);
       if (!canManageMembers(viewer)) return [];
-      const members = await listMembers(args.timetableId);
+      const members = await listMembers(args.forumId);
       return members.map((m) => ({
         membershipId: m.membershipId,
         roles: m.roles as string[],

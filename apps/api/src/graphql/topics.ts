@@ -83,7 +83,7 @@ const HostOptionType = builder
 const TopicType = builder.objectRef<GqlTopic>("Topic").implement({
   fields: (t) => ({
     id: t.exposeID("id"),
-    timetableId: t.exposeID("timetableId"),
+    forumId: t.exposeID("timetableId"),
     hostId: t.exposeID("hostId"),
     hostName: t.exposeString("hostName", { nullable: true }),
     hostImage: t.exposeString("hostImage", { nullable: true }),
@@ -187,7 +187,7 @@ const ManagedTopicType = builder
   .implement({
     fields: (t) => ({
       id: t.exposeID("id"),
-      timetableId: t.exposeID("timetableId"),
+      forumId: t.exposeID("timetableId"),
       hostId: t.exposeID("hostId"),
       slug: t.exposeString("slug", { nullable: true }),
       hostSlug: t.string({
@@ -439,7 +439,7 @@ builder.queryFields((t) => ({
   }),
 
   /** Hosts in a timetable (for the feed's host filter). */
-  timetableHosts: t.field({
+  forumHosts: t.field({
     type: [HostOptionType],
     args: { idOrSlug: t.arg.string({ required: true }) },
     resolve: async (_p, args, ctx) => {

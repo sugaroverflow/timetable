@@ -141,11 +141,11 @@ function parseBody<T>(
 }
 
 /**
- * POST /api/timetables
+ * POST /api/forums
  * Create a timetable; the creator becomes owner + admin.
  */
 restRouter.post(
-  "/timetables",
+  "/forums",
   h(async (req, res) => {
     const ctx = await contextFromRequest(req);
     const user = requireUserCtx(ctx, res);
@@ -188,12 +188,12 @@ async function notifySysadminsOfNewForum(args: {
 }
 
 /**
- * DELETE /api/timetables/:id
+ * DELETE /api/forums/:id
  * Sysadmin-only (SYSADMIN_EMAILS): hard-deletes the forum; memberships,
  * invites, topics, comments, hearts, activity, and timeslots cascade.
  */
 restRouter.delete(
-  "/timetables/:id",
+  "/forums/:id",
   h(async (req, res) => {
     const ctx = await contextFromRequest(req);
     const user = requireUserCtx(ctx, res);
@@ -215,13 +215,13 @@ restRouter.delete(
 );
 
 /**
- * GET /api/timetables/:idOrSlug/export
+ * GET /api/forums/:idOrSlug/export
  * Read-only, role-filtered JSON dump of everything the viewer can read —
  * the download behind the forum's "API" page. Any reader (anonymous
  * included on public forums); the shape is documented in core/export.ts.
  */
 restRouter.get(
-  "/timetables/:idOrSlug/export",
+  "/forums/:idOrSlug/export",
   h(async (req, res) => {
     const ctx = await contextFromRequest(req);
     const readable = await getReadableTimetable(
@@ -246,11 +246,11 @@ restRouter.get(
 );
 
 /**
- * POST /api/timetables/:id/invites
+ * POST /api/forums/:id/invites
  * Admin-only. Adds existing users immediately, queues invites for unknown emails.
  */
 restRouter.post(
-  "/timetables/:id/invites",
+  "/forums/:id/invites",
   h(async (req, res) => {
     const ctx = await contextFromRequest(req);
     const user = requireUserCtx(ctx, res);
@@ -283,13 +283,13 @@ restRouter.post(
 );
 
 /**
- * POST /api/timetables/:id/people
+ * POST /api/forums/:id/people
  * Admin pre-creates an account (product feedback round 2): a Clerk user and
  * local row exist immediately so the admin can populate profile/topics, but
  * NO email is sent — that's the separate invite endpoint below.
  */
 restRouter.post(
-  "/timetables/:id/people",
+  "/forums/:id/people",
   h(async (req, res) => {
     const ctx = await contextFromRequest(req);
     const user = requireUserCtx(ctx, res);
@@ -482,7 +482,7 @@ async function authorizeUpload(
   }
   const readable = await getReadableTimetable(userId, timetableIdOrSlug.trim());
   if (!readable) {
-    return { ok: false, status: 404, error: "Timetable not found" };
+    return { ok: false, status: 404, error: "Forum not found" };
   }
 
   const viewer = { userId, roles: readable.roles };
@@ -621,7 +621,7 @@ restRouter.post(
 );
 
 /**
- * GET /api/timetables/:idOrSlug/feed.atom
+ * GET /api/forums/:idOrSlug/feed.atom
  * Atom feed of the forum's published topics, newest first (agent-access
  * roadmap phase 1). Always evaluated as an anonymous reader — feed readers
  * carry no session — so it exists only for forums the public can read;
@@ -629,7 +629,7 @@ restRouter.post(
  * the shared markdown pipeline.
  */
 restRouter.get(
-  "/timetables/:idOrSlug/feed.atom",
+  "/forums/:idOrSlug/feed.atom",
   h(async (req, res) => {
     const readable = await getReadableTimetable(
       null,
@@ -657,7 +657,7 @@ restRouter.get(
     const xml = buildAtomFeed({
       title: timetable.name,
       subtitle: "Published topics",
-      feedUrl: `${linkBase}/api/timetables/${timetable.slug}/feed.atom`,
+      feedUrl: `${linkBase}/api/forums/${timetable.slug}/feed.atom`,
       siteUrl: `${linkBase}/f/${timetable.slug}/topics`,
       entries,
     });
@@ -670,12 +670,12 @@ restRouter.get(
 );
 
 /**
- * GET /api/timetables/:idOrSlug/calendar.ics
+ * GET /api/forums/:idOrSlug/calendar.ics
  * ICS feed of the timetable's slots. Public timetables need no auth; private
  * ones require ?token=<user.icsToken> from a member.
  */
 restRouter.get(
-  "/timetables/:idOrSlug/calendar.ics",
+  "/forums/:idOrSlug/calendar.ics",
   h(async (req, res) => {
     const idOrSlug = req.params.idOrSlug as string;
     const token =
@@ -703,6 +703,22 @@ restRouter.get(
     res.send(ics);
   }),
 );
+
+/**
+ * Legacy /api/timetables/* URLs for the two GET feeds that were distributed
+ * before the public surface was renamed to "forums" (2026-07-27): ICS URLs
+ * live in members' calendar apps and the Atom URL in feed readers. 301s
+ * preserve the query string (the ICS ?token= must survive). Never remove.
+ */
+for (const suffix of ["feed.atom", "calendar.ics"]) {
+  restRouter.get(`/timetables/:idOrSlug/${suffix}`, (req, res) => {
+    const qs = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
+    res.redirect(
+      301,
+      `/api/forums/${encodeURIComponent(req.params.idOrSlug as string)}/${suffix}${qs}`,
+    );
+  });
+}
 
 restRouter.use(
   (err: unknown, req: Request, res: Response, _next: NextFunction) => {

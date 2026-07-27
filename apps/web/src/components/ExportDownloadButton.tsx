@@ -15,7 +15,7 @@ export function ExportDownloadButton({ slug }: { slug: string }) {
     setBusy(true);
     setError(null);
     try {
-      const res = await clientApi(`/api/timetables/${slug}/export`);
+      const res = await clientApi(`/api/forums/${slug}/export`);
       if (!res.ok) throw new Error(`Export failed (${res.status})`);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);

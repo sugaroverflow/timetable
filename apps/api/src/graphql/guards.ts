@@ -69,7 +69,7 @@ export async function loadTimetableAndViewer(
 ) {
   const user = await requireUser(ctx);
   const readable = await readTimetable(ctx, idOrSlug);
-  if (!readable) notFound("Timetable not found");
+  if (!readable) notFound("Forum not found");
   const viewer = { userId: user.id, roles: readable.roles };
   return { user, readable, viewer };
 }
@@ -87,7 +87,7 @@ export async function loadTopicAndViewer(ctx: ApiContext, topicId: string) {
   const viewer = await ctx.getViewer(topic.timetableId);
   const timetable = await getTimetableById(topic.timetableId);
   if (timetable?.privacy === "deactivated" && !canModerate(viewer)) {
-    forbidden("Timetable is deactivated");
+    forbidden("Forum is deactivated");
   }
   return { topic, viewer };
 }
@@ -109,7 +109,7 @@ export async function loadSlotAndViewer(ctx: ApiContext, slotId: string) {
   const viewer = await ctx.getViewer(slot.timetableId);
   const timetable = await getTimetableById(slot.timetableId);
   if (timetable?.privacy === "deactivated" && !canModerate(viewer)) {
-    forbidden("Timetable is deactivated");
+    forbidden("Forum is deactivated");
   }
   return { slot, viewer };
 }

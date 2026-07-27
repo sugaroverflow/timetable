@@ -241,7 +241,7 @@ describe("createApiApp", () => {
 
   it("rejects unauthenticated timetable creation before validation or database work", async () => {
     await withTestServer(async (baseUrl) => {
-      const res = await fetch(`${baseUrl}/api/timetables`, {
+      const res = await fetch(`${baseUrl}/api/forums`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
@@ -256,7 +256,7 @@ describe("createApiApp", () => {
 
   it("rejects unauthenticated invite management", async () => {
     await withTestServer(async (baseUrl) => {
-      const res = await fetch(`${baseUrl}/api/timetables/timetable-1/invites`, {
+      const res = await fetch(`${baseUrl}/api/forums/timetable-1/invites`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ emails: ["host@example.com"] }),
@@ -288,7 +288,7 @@ describe("createApiApp", () => {
     mockSession("host-1", ["host"]);
 
     await withTestServer(async (baseUrl) => {
-      const res = await fetch(`${baseUrl}/api/timetables/timetable-1/invites`, {
+      const res = await fetch(`${baseUrl}/api/forums/timetable-1/invites`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -311,7 +311,7 @@ describe("createApiApp", () => {
     vi.mocked(core.inviteEmails).mockResolvedValue(results);
 
     await withTestServer(async (baseUrl) => {
-      const res = await fetch(`${baseUrl}/api/timetables/timetable-1/invites`, {
+      const res = await fetch(`${baseUrl}/api/forums/timetable-1/invites`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -335,7 +335,7 @@ describe("createApiApp", () => {
     mockSession("host-1", ["host"]);
 
     await withTestServer(async (baseUrl) => {
-      const res = await fetch(`${baseUrl}/api/timetables/timetable-1/people`, {
+      const res = await fetch(`${baseUrl}/api/forums/timetable-1/people`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: "ada@example.com", roles: ["host"] }),
@@ -362,7 +362,7 @@ describe("createApiApp", () => {
     });
 
     await withTestServer(async (baseUrl) => {
-      const res = await fetch(`${baseUrl}/api/timetables/timetable-1/people`, {
+      const res = await fetch(`${baseUrl}/api/forums/timetable-1/people`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -693,7 +693,7 @@ describe("createApiApp", () => {
 
     await withTestServer(async (baseUrl) => {
       const res = await fetch(
-        `${baseUrl}/api/timetables/private-calendar/calendar.ics`,
+        `${baseUrl}/api/forums/private-calendar/calendar.ics`,
       );
 
       expect(res.status).toBe(404);
@@ -724,7 +724,7 @@ describe("createApiApp", () => {
 
     await withTestServer(async (baseUrl) => {
       const res = await fetch(
-        `${baseUrl}/api/timetables/public-calendar/calendar.ics`,
+        `${baseUrl}/api/forums/public-calendar/calendar.ics`,
       );
       const body = await res.text();
 
@@ -738,6 +738,19 @@ describe("createApiApp", () => {
       expect(body).toContain("SUMMARY:Opening Session");
       expect(body).toContain("LOCATION:Main Hall");
       expect(core.getSlotsForIcs).toHaveBeenCalledWith(timetable.id);
+    });
+  });
+
+  it("301-redirects legacy /api/timetables feed URLs, keeping the query", async () => {
+    await withTestServer(async (baseUrl) => {
+      const res = await fetch(
+        `${baseUrl}/api/timetables/public-calendar/calendar.ics?token=abc`,
+        { redirect: "manual" },
+      );
+      expect(res.status).toBe(301);
+      expect(res.headers.get("location")).toBe(
+        "/api/forums/public-calendar/calendar.ics?token=abc",
+      );
     });
   });
 
@@ -756,7 +769,7 @@ describe("createApiApp", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           query: `query($s: String!) {
-            timetable(idOrSlug: $s) { viewerHeartedPublishedCount }
+            timetable: forum(idOrSlug: $s) { viewerHeartedPublishedCount }
           }`,
           variables: { s: timetable.slug },
         }),
@@ -789,7 +802,7 @@ describe("createApiApp", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           query: `mutation($s: String!) {
-            updateTimetableSettings(
+            updateTimetableSettings: updateForumSettings(
               idOrSlug: $s
               digestNewTopics: true
               digestReplies: false
@@ -820,7 +833,7 @@ describe("createApiApp", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           query: `query($s: String!) {
-            timetable(idOrSlug: $s) { viewerHeartedPublishedCount }
+            timetable: forum(idOrSlug: $s) { viewerHeartedPublishedCount }
           }`,
           variables: { s: timetable.slug },
         }),

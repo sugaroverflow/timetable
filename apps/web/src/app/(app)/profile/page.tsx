@@ -12,7 +12,7 @@ type Data = {
 
 const QUERY = `query {
   me { email notificationSettings }
-  myLastVisitedTimetableSlug
+  myLastVisitedTimetableSlug: myLastVisitedForumSlug
 }`;
 
 /** Standalone profile route: users inside a timetable get the in-shell

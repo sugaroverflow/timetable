@@ -30,7 +30,7 @@ type Data = {
 
 const QUERY = `
   query Notifications($s: String!) {
-    timetable(idOrSlug: $s) { viewerRoles }
+    timetable: forum(idOrSlug: $s) { viewerRoles }
     notifications(idOrSlug: $s) {
       commentId kind authorId authorName authorImage body visibility createdAt
       topicTitle topicSlug topicHostSlug

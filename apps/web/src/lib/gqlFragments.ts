@@ -16,7 +16,7 @@ export function commentTree(field = "comments"): string {
  * weightedBreakdown is deliberately NOT selected here: BreakdownToggle
  * fetches it lazily on first expand (it costs ~4 queries per topic). */
 export const TOPIC_FEED_FIELDS = `
-  id timetableId hostId hostName hostImage hostSlug title slug bodyMd bodyHtml coverImageUrl status
+  id timetableId: forumId hostId hostName hostImage hostSlug title slug bodyMd bodyHtml coverImageUrl status
   heartCount weightedScore viewerHasHearted commentCount
   publishedAt createdAt
   ${commentTree()}
