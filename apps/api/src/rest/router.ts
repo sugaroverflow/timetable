@@ -368,7 +368,20 @@ restRouter.post(
       inviterName: inviter?.name ?? user.name,
       topicsCount: topics.length,
     });
-    await sendEmail({ to: member.email, subject, html });
+    try {
+      await sendEmail({ to: member.email, subject, html });
+    } catch (err) {
+      // Surface the provider's reason instead of a bare 500 (prod QA
+      // 2026-07-27) — Resend rejections name the actual problem
+      // (unverified from-domain, invalid address, bad key).
+      console.error("[invite] email send failed:", err);
+      const detail =
+        err instanceof Error ? err.message.slice(0, 300) : "unknown error";
+      res.status(502).json({
+        error: `The invite email could not be sent — check the member's address and the email configuration. (${detail})`,
+      });
+      return;
+    }
 
     const sentAt = new Date();
     await markInviteSent(membership.id, sentAt);
