@@ -9,6 +9,7 @@ import {
   BreakdownPanelBody,
 } from "@/components/BreakdownPanel";
 import { NORM_MODES, type NormKey } from "@/lib/normModes";
+import { pluralLabel } from "@/lib/timetableSettings";
 import { topicPath } from "@/lib/topicPath";
 
 export type LeaderboardEntry = {
@@ -92,16 +93,30 @@ export function TopicLeaderboard({
   slug,
   hostLabel,
   entries,
+  totalHearts,
+  hostCount,
+  electorCount,
+  electorLabel,
 }: {
   slug: string;
   hostLabel: string;
   entries: LeaderboardEntry[];
+  totalHearts: number;
+  hostCount: number;
+  electorCount: number;
+  electorLabel: string;
 }) {
   const [norm, setNorm] = useState<NormKey>("l1");
   const mode = NORM_MODES.find((m) => m.key === norm) ?? NORM_MODES[0]!;
   const sorted = [...entries].sort(
     (a, b) => scoreFor(b, norm) - scoreFor(a, norm),
   );
+  // The former stat cards, folded into the title (QA 2026-07-27):
+  // "12 topics from 20 hosts sorted by 87 ❤️ from 9 electors". hostCount
+  // is ALL the forum's hosts, topic-less ones included (per Ed).
+  const count = (n: number, label: string) =>
+    `${n} ${(n === 1 ? label : pluralLabel(label)).toLowerCase()}`;
+  const title = `${entries.length} topic${entries.length === 1 ? "" : "s"} from ${count(hostCount, hostLabel)} sorted by ${totalHearts} ❤️ from ${count(electorCount, electorLabel)}`;
 
   return (
     <div className="card">
@@ -113,7 +128,7 @@ export function TopicLeaderboard({
           marginBottom: 4,
         }}
       >
-        <h3 style={{ margin: 0, fontSize: 15 }}>All topics by ❤️</h3>
+        <h3 style={{ margin: 0, fontSize: 15 }}>{title}</h3>
         <select
           aria-label="Vote normalisation"
           value={norm}
