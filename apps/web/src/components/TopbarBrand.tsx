@@ -22,12 +22,13 @@ const PUBLIC_BRAND_QUERY = `
 
 /**
  * Topbar identity (QA #59): inside a timetable the topbar shows that
- * timetable's icon + name CENTERED (QA 2026-07-27 — the name left the
- * sidebar head), linking home to its topics — the app logotype and switcher
- * are gone (switching lives in the sidebar footer). Signed-in viewers get
- * the identity from their membership list; anonymous visitors on a public
- * timetable resolve it client-side (QA #59 round 3). Outside a timetable
- * it falls back to the left-aligned app brand.
+ * timetable's icon + name on the left (linking home to its topics) — the
+ * app logotype and switcher are gone (switching lives in the sidebar
+ * footer). Long names wrap to two lines rather than truncate (QA
+ * 2026-07-27 — truncating the forum's own name reads as an insult).
+ * Signed-in viewers get the identity from their membership list; anonymous
+ * visitors on a public timetable resolve it client-side (QA #59 round 3).
+ * Outside a timetable it falls back to the app brand.
  */
 export function TopbarBrand({
   items,
@@ -70,7 +71,7 @@ export function TopbarBrand({
 
   if (current) {
     return (
-      <Link className="brand topbar-center" href={`/f/${current.slug}/topics`}>
+      <Link className="brand" href={`/f/${current.slug}/topics`}>
         {current.iconEmoji ? (
           <span className="tt-menu-icon tt-menu-icon-emoji" aria-hidden>
             {current.iconEmoji}

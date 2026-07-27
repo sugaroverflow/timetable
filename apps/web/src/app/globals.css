@@ -68,21 +68,18 @@ h3 {
   color: var(--topbar-ink);
 }
 
-/* Forum identity sits dead-center in the topbar (QA 2026-07-27 — moved out
-   of the sidebar head). Absolute so the flanking flex items (hamburger,
-   roles, email) can't nudge it off-center; capped + ellipsized so long
-   names never collide with them. */
-.topbar-center {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  max-width: min(42vw, 480px);
+/* Long forum names WRAP (two lines max) instead of truncating — clipping
+   the forum's own name is worse than an uneven topbar (QA 2026-07-27). */
+.topbar .brand {
+  max-width: min(45vw, 480px);
 }
-.topbar-center > span:last-child {
+.topbar .brand > span:last-child {
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.1;
 }
 .topbar-roles {
   display: inline-flex;
