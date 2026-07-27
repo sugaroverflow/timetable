@@ -27,6 +27,14 @@ const PERSON_QUERY = `
   }
 `;
 
+const PERSON_BY_ID_QUERY = `
+  query PersonPageById($s: String!, $userId: String!) {
+    person(idOrSlug: $s, userId: $userId) {
+      userId name image slug roles bioHtml
+    }
+  }
+`;
+
 /** A topic section (their topics / their hearted topics) with its own
  * infinite scroller; the two sections page independently. */
 function TopicSection({
@@ -73,6 +81,27 @@ function TopicSection({
   );
 }
 
+/** Resolve by member slug, falling back to userId — PersonChips link by
+ * id (they don't know slugs) and land here; those get redirected to the
+ * canonical slug URL. Slug lookup runs first, so a slug can never be
+ * shadowed by an id. */
+async function resolvePerson(
+  slug: string,
+  hostSlug: string,
+): Promise<ProfileCardPerson | null> {
+  const { person } = await gqlFetch<{ person: ProfileCardPerson | null }>(
+    PERSON_QUERY,
+    { s: slug, userSlug: hostSlug },
+  );
+  if (person) return person;
+  const byId = await gqlFetch<{ person: ProfileCardPerson | null }>(
+    PERSON_BY_ID_QUERY,
+    { s: slug, userId: hostSlug },
+  );
+  if (byId.person?.slug) redirect(`/f/${slug}/${byId.person.slug}`);
+  return byId.person;
+}
+
 /** Person page: /f/[slug]/[userSlug] — profile header, then their topics
  * (hosts) and the topics they heart (electors); host+elector members get
  * both, topics first. Shows the same content as /topics?host=<id> for hosts. */
@@ -85,6 +114,10 @@ export default async function PersonPage({
 }) {
   const { slug, hostSlug } = await params;
   const { seed: seedParam } = await searchParams;
+
+  const person = await resolvePerson(slug, hostSlug);
+  if (!person) notFound();
+
   // Same seed-in-URL pattern as the feed page: mint per visit, then
   // redirect so router.refresh() after an action keeps this order.
   if (!seedParam) {
@@ -93,12 +126,6 @@ export default async function PersonPage({
     redirect(`/f/${slug}/${hostSlug}?seed=${minted}`);
   }
   const seed = seedParam;
-
-  const { person } = await gqlFetch<{ person: ProfileCardPerson | null }>(
-    PERSON_QUERY,
-    { s: slug, userSlug: hostSlug },
-  );
-  if (!person) notFound();
 
   const roles = person.roles as Role[];
   const host = isHost(roles);

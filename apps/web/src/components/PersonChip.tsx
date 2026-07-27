@@ -1,95 +1,9 @@
-"use client";
-
-import { Dialog } from "@base-ui/react/dialog";
 import Link from "next/link";
-import { useState } from "react";
 
-import { isHost, type Role } from "@timetable/shared";
-
-import { clientGql } from "@/lib/clientGraphql";
-import {
-  parseTimetableSettings,
-  type RoleLabels,
-} from "@/lib/timetableSettings";
-
-import { Avatar } from "./Avatar";
-import { RolePills } from "./RolePills";
-
-const QUERY = `query Person($s: String!, $u: String!) {
-  timetable(idOrSlug: $s) { settings }
-  person(idOrSlug: $s, userId: $u) {
-    userId name image slug roles bioHtml
-  }
-}`;
-
-type PersonData = {
-  timetable: { settings: string } | null;
-  person: {
-    userId: string;
-    name: string | null;
-    image: string | null;
-    slug: string | null;
-    roles: string[];
-    bioHtml: string | null;
-  } | null;
-};
-
-/** Modal header: large photo (avatar fallback), name, role pills. The photo
- * links to the member's person page and a host's name to their filtered
- * feed; Dialog.Close makes the modal drop even when only search params
- * change. */
-function PersonHeader({
-  slug,
-  person,
-  labels,
-}: {
-  slug: string;
-  person: NonNullable<PersonData["person"]>;
-  labels: RoleLabels | undefined;
-}) {
-  const name = person.name ?? "Member";
-  const photo = person.image ? (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img className="person-modal-photo" src={person.image} alt={name} />
-  ) : (
-    <Avatar name={person.name} image={null} large />
-  );
-  return (
-    <div className="row" style={{ alignItems: "center" }}>
-      {person.slug ? (
-        <Dialog.Close
-          render={<Link href={`/f/${slug}/${person.slug}`} />}
-          className="profile-photo-link"
-        >
-          {photo}
-        </Dialog.Close>
-      ) : (
-        photo
-      )}
-      <div>
-        <strong>
-          {isHost(person.roles as Role[]) ? (
-            <Dialog.Close
-              render={<Link href={`/f/${slug}/topics?host=${person.userId}`} />}
-              className="person-host-link"
-            >
-              {name}
-            </Dialog.Close>
-          ) : (
-            name
-          )}
-        </strong>
-        <div style={{ marginTop: "var(--space-1)" }}>
-          <RolePills roles={person.roles} labels={labels} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** Wraps a user's name/avatar anywhere in the app; clicking opens their bio as a
- * modal (QA #42 — one pattern everywhere). Uses Base UI Dialog for focus trap,
- * scroll lock, Escape-to-close, and focus return (was a hand-rolled div). */
+/** Wraps a user's name/avatar anywhere in the app; clicking goes straight
+ * to their person page (QA 2026-07-27 — the bio modal step is gone). Links
+ * by userId: the person page canonically redirects to the member's slug
+ * URL, so callers don't need to know it. */
 export function PersonChip({
   slug,
   userId,
@@ -99,71 +13,9 @@ export function PersonChip({
   userId: string;
   children: React.ReactNode;
 }) {
-  const [data, setData] = useState<PersonData | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  async function load() {
-    if (data || loading) return;
-    setLoading(true);
-    try {
-      setData(await clientGql<PersonData>(QUERY, { s: slug, u: userId }));
-    } catch {
-      // Keep the dialog open with a fallback message.
-      setData({ timetable: null, person: null });
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const person = data?.person ?? null;
-  const roleLabels: RoleLabels | undefined = data?.timetable
-    ? parseTimetableSettings(data.timetable.settings).roleLabels
-    : undefined;
-
   return (
-    <Dialog.Root
-      onOpenChange={(open) => {
-        if (open) load();
-      }}
-    >
-      <Dialog.Trigger className="person-trigger">{children}</Dialog.Trigger>
-      <Dialog.Portal>
-        <Dialog.Backdrop className="modal-backdrop" />
-        <Dialog.Popup
-          className="card stack person-modal"
-          aria-label="Member bio"
-        >
-          {loading || !data ? (
-            <p className="faint" style={{ margin: 0 }}>
-              Loading…
-            </p>
-          ) : person ? (
-            <>
-              <PersonHeader slug={slug} person={person} labels={roleLabels} />
-              {person.bioHtml ? (
-                <div
-                  className="topic-body"
-                  dangerouslySetInnerHTML={{ __html: person.bioHtml }}
-                />
-              ) : (
-                <p className="faint" style={{ margin: 0 }}>
-                  No bio yet.
-                </p>
-              )}
-            </>
-          ) : (
-            <p className="faint" style={{ margin: 0 }}>
-              Profile unavailable.
-            </p>
-          )}
-          <Dialog.Close
-            className="btn btn-ghost"
-            style={{ alignSelf: "flex-end" }}
-          >
-            Close
-          </Dialog.Close>
-        </Dialog.Popup>
-      </Dialog.Portal>
-    </Dialog.Root>
+    <Link href={`/f/${slug}/${userId}`} className="person-trigger">
+      {children}
+    </Link>
   );
 }

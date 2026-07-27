@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 
 import { type Role } from "@timetable/shared";
@@ -69,9 +68,6 @@ export default async function TopicPermalinkPage({
   return (
     <div className="stack">
       <div className="toolbar">
-        <Link href={`/f/${slug}/topics`} className="btn btn-ghost">
-          ← Topic feed
-        </Link>
         <StatusBadge status={topic.status} />
       </div>
       <TopicCard
