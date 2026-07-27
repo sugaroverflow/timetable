@@ -4,6 +4,7 @@ import { isAdmin, primaryRole, type Role } from "@timetable/shared";
 
 import { AddPersonForm } from "@/components/AddPersonForm";
 import { Avatar } from "@/components/Avatar";
+import { CollapsibleTopicBody } from "@/components/CollapsibleTopicBody";
 import { EmptyState } from "@/components/EmptyState";
 import { InviteSendButton } from "@/components/InviteSendButton";
 import { PersonAdminPanel } from "@/components/PersonAdminPanel";
@@ -171,12 +172,7 @@ function PersonCard({
           </div>
         </div>
       </div>
-      {person.bioHtml ? (
-        <div
-          className="topic-body"
-          dangerouslySetInnerHTML={{ __html: person.bioHtml }}
-        />
-      ) : null}
+      {person.bioHtml ? <CollapsibleTopicBody html={person.bioHtml} /> : null}
       <PersonTopics slug={slug} person={person} />
       <PersonCardActions
         slug={slug}

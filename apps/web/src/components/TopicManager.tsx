@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { AdminCommentsPanel } from "@/components/AdminCommentsPanel";
 import { AdminTopicActions } from "@/components/AdminTopicActions";
+import { CollapsibleTopicBody } from "@/components/CollapsibleTopicBody";
 import { CommentComposer } from "@/components/CommentComposer";
 import { CommentList } from "@/components/CommentList";
 import { HostOnlyPanel } from "@/components/HostOnlyPanel";
@@ -166,10 +167,7 @@ export function TopicManager({
         />
       ) : null}
 
-      <div
-        className="topic-body"
-        dangerouslySetInnerHTML={{ __html: topic.bodyHtml }}
-      />
+      <CollapsibleTopicBody html={topic.bodyHtml} />
 
       {publicComments.length > 0 ? (
         <CommentList

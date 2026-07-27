@@ -5,6 +5,7 @@ import { topicPath } from "@/lib/topicPath";
 
 import { AdminTopicActions } from "./AdminTopicActions";
 import { Avatar } from "./Avatar";
+import { CollapsibleTopicBody } from "./CollapsibleTopicBody";
 import { CommentComposer } from "./CommentComposer";
 import { CommentList } from "./CommentList";
 import { HostOnlyPanel } from "./HostOnlyPanel";
@@ -173,10 +174,7 @@ export function TopicCard({
         />
       ) : null}
 
-      <div
-        className="topic-body"
-        dangerouslySetInnerHTML={{ __html: topic.bodyHtml }}
-      />
+      <CollapsibleTopicBody html={topic.bodyHtml} />
 
       <TopicActionsRow
         topicId={topic.id}
