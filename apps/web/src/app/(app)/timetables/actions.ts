@@ -13,7 +13,6 @@ export async function createTimetableAction(
 ): Promise<CreateTimetableState> {
   const name = String(formData.get("name") ?? "").trim();
   const privacy = String(formData.get("privacy") ?? "private");
-  const description = String(formData.get("description") ?? "").trim();
   const slug = String(formData.get("slug") ?? "").trim();
 
   if (!name) return { error: "Name is required" };
@@ -23,7 +22,6 @@ export async function createTimetableAction(
     body: JSON.stringify({
       name,
       privacy,
-      description: description || undefined,
       slug: slug || undefined,
     }),
   });

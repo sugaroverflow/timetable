@@ -6,8 +6,8 @@ import { clientGql } from "@/lib/clientGraphql";
 import type { DigestSettings, RoleLabels } from "@/lib/timetableSettings";
 import { useGqlAction } from "@/lib/useGqlAction";
 
-const MUTATION = `mutation($s: String!, $name: String, $desc: String, $privacy: String, $cd: String) {
-  updateTimetableProfile(idOrSlug: $s, name: $name, description: $desc, privacy: $privacy, customDomain: $cd) { id }
+const MUTATION = `mutation($s: String!, $name: String, $privacy: String, $cd: String) {
+  updateTimetableProfile(idOrSlug: $s, name: $name, privacy: $privacy, customDomain: $cd) { id }
 }`;
 
 const SETTINGS_MUTATION = `mutation Labels(
@@ -27,7 +27,6 @@ const SETTINGS_MUTATION = `mutation Labels(
 
 type IdentityState = {
   name: string;
-  description: string;
   privacy: string;
   customDomain: string;
 };
@@ -74,14 +73,6 @@ function IdentityFields({
       <p className="faint" style={{ margin: "0 0 12px", fontSize: 12 }}>
         URL: /f/{slug} (set at creation)
       </p>
-      <div className="field">
-        <label htmlFor="tt-desc">Description</label>
-        <textarea
-          id="tt-desc"
-          value={value.description}
-          onChange={(e) => onChange({ description: e.target.value })}
-        />
-      </div>
       <div className="field">
         <label htmlFor="tt-privacy">Visibility</label>
         <select
@@ -212,7 +203,6 @@ function DigestFields({
 export function TimetableProfileForm({
   slug,
   name: initialName,
-  description: initialDescription,
   privacy: initialPrivacy,
   customDomain: initialCustomDomain,
   roleLabels,
@@ -220,7 +210,6 @@ export function TimetableProfileForm({
 }: {
   slug: string;
   name: string;
-  description: string | null;
   privacy: string;
   customDomain: string | null;
   roleLabels?: RoleLabels;
@@ -229,7 +218,6 @@ export function TimetableProfileForm({
   const { run, busy } = useGqlAction();
   const [identity, setIdentity] = useState<IdentityState>({
     name: initialName,
-    description: initialDescription ?? "",
     privacy: initialPrivacy,
     customDomain: initialCustomDomain ?? "",
   });
@@ -249,7 +237,6 @@ export function TimetableProfileForm({
       {
         s: slug,
         name: identity.name,
-        desc: identity.description,
         privacy: identity.privacy,
         cd: identity.customDomain,
       },

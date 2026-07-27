@@ -23,7 +23,6 @@ export default async function SettingsPage({
     timetable: {
       id: string;
       name: string;
-      description: string | null;
       privacy: string;
       customDomain: string | null;
       heartsCountFrom: string | null;
@@ -31,7 +30,7 @@ export default async function SettingsPage({
       settings: string;
     } | null;
   }>(
-    `query($idOrSlug: String!) { timetable(idOrSlug: $idOrSlug) { id name description privacy customDomain heartsCountFrom viewerRoles settings } }`,
+    `query($idOrSlug: String!) { timetable(idOrSlug: $idOrSlug) { id name privacy customDomain heartsCountFrom viewerRoles settings } }`,
     { idOrSlug: slug },
   );
   if (!first.timetable) notFound();
@@ -57,7 +56,6 @@ export default async function SettingsPage({
         <TimetableProfileForm
           slug={slug}
           name={first.timetable.name}
-          description={first.timetable.description}
           privacy={first.timetable.privacy}
           customDomain={first.timetable.customDomain}
           roleLabels={settings.roleLabels}

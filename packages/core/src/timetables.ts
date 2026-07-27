@@ -46,7 +46,6 @@ export async function createTimetable(
     .values({
       name: input.name,
       slug,
-      description: input.description ?? null,
       privacy: input.privacy ?? "private",
       ownerId,
     })
@@ -68,7 +67,6 @@ export async function updateTimetableProfile(
   timetableId: string,
   patch: {
     name?: string;
-    description?: string | null;
     privacy?: Privacy;
     customDomain?: string | null;
   },
@@ -77,9 +75,6 @@ export async function updateTimetableProfile(
     .update(timetables)
     .set({
       ...(patch.name !== undefined ? { name: patch.name } : {}),
-      ...(patch.description !== undefined
-        ? { description: patch.description }
-        : {}),
       ...(patch.privacy !== undefined ? { privacy: patch.privacy } : {}),
       ...(patch.customDomain !== undefined
         ? { customDomain: patch.customDomain || null }

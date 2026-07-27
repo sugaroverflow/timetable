@@ -115,7 +115,6 @@ type RoleLabels = NonNullable<NewTimetable["settings"]>["roleLabels"];
 type TimetableFixture = {
   name: string;
   slug: string;
-  description: string | null;
   privacy: TimetablePrivacy;
   roleLabels: RoleLabels;
 };
@@ -261,7 +260,6 @@ function parseTimetable(markdown: string): TimetableFixture {
   const block = section(markdown, "Timetable");
   const name = fieldFromBlock(block, "Name", { required: true });
   const slug = fieldFromBlock(block, "Slug", { required: true });
-  const description = fieldFromBlock(block, "Description") || null;
   const privacyRaw = fieldFromBlock(block, "Privacy", { required: true });
   const privacy =
     /\*\*(deactivated|private|public|hosts_only|no_comments)\*\*/.exec(
@@ -283,7 +281,7 @@ function parseTimetable(markdown: string): TimetableFixture {
     if (role && label) roleLabels[role] = label;
   }
 
-  return { name, slug, description, privacy, roleLabels };
+  return { name, slug, privacy, roleLabels };
 }
 
 function parseRoles(rolesRaw: string, label: string): Role[] {
@@ -957,7 +955,6 @@ function buildRows(fixture: Fixture): {
     id: timetableId,
     slug: fixture.timetable.slug,
     name: fixture.timetable.name,
-    description: fixture.timetable.description,
     privacy: fixture.timetable.privacy,
     customDomain: null,
     settings: { roleLabels: fixture.timetable.roleLabels },

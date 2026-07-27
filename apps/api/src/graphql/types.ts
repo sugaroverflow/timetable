@@ -20,7 +20,6 @@ export const TimetableType = builder
       id: t.exposeID("id"),
       slug: t.exposeString("slug"),
       name: t.exposeString("name"),
-      description: t.exposeString("description", { nullable: true }),
       privacy: t.exposeString("privacy"),
       customDomain: t.exposeString("customDomain", { nullable: true }),
       heartsCountFrom: t.string({

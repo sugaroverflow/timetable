@@ -27,7 +27,6 @@ export const createTimetableSchema = z.object({
     )
     .max(60)
     .optional(),
-  description: z.string().max(2000).optional(),
   privacy: privacyEnum.optional(),
 });
 export type CreateTimetableInput = z.infer<typeof createTimetableSchema>;

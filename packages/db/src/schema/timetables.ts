@@ -22,7 +22,6 @@ export const timetables = pgTable("timetables", {
   id: uuid().primaryKey().defaultRandom(),
   slug: text().notNull().unique(),
   name: text().notNull(),
-  description: text(),
   privacy: privacyEnum().notNull().default("private"),
   customDomain: text().unique(),
   settings: jsonb().$type<TimetableSettings>().notNull().default({}),

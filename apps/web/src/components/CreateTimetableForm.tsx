@@ -61,15 +61,6 @@ export function CreateTimetableForm() {
       </div>
 
       <div className="field">
-        <label htmlFor="description">Description (optional)</label>
-        <textarea
-          id="description"
-          name="description"
-          placeholder="What is this forum for?"
-        />
-      </div>
-
-      <div className="field">
         <label htmlFor="privacy">Visibility</label>
         <select id="privacy" name="privacy" defaultValue="private">
           <option value="private">Private — members only</option>

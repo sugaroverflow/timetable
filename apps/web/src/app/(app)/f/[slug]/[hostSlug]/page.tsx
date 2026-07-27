@@ -1,6 +1,9 @@
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
 import { isElector, isHost, type Role } from "@timetable/shared";
+
+import { anonGql } from "@/lib/ogCard";
 
 import { EmptyState } from "@/components/EmptyState";
 import { InfiniteFeed } from "@/components/InfiniteFeed";
@@ -34,6 +37,26 @@ const PERSON_BY_ID_QUERY = `
     }
   }
 `;
+
+/** Social/tab metadata (QA 2026-07-27): the person's name — resolved
+ * anonymously, so profiles the public can't see inherit the forum layout's
+ * generic metadata instead. */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string; hostSlug: string }>;
+}): Promise<Metadata> {
+  const { slug, hostSlug } = await params;
+  const data = await anonGql<{ person: { name: string | null } | null }>(
+    `query OgPersonMeta($s: String!, $userSlug: String!) {
+      person(idOrSlug: $s, userSlug: $userSlug) { name }
+    }`,
+    { s: slug, userSlug: hostSlug },
+  );
+  const name = data?.person?.name;
+  if (!name) return {};
+  return { title: name, openGraph: { title: name } };
+}
 
 /** A topic section (their topics / their hearted topics) with its own
  * infinite scroller; the two sections page independently. */
