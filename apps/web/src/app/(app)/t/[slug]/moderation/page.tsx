@@ -1,10 +1,16 @@
 import { isAdmin, type Role } from "@timetable/shared";
 
 import { EmptyState } from "@/components/EmptyState";
+import { ListSortControl } from "@/components/ListSortControl";
 import { ModerationCard } from "@/components/ModerationCard";
 import type { ManagedTopic } from "@/lib/feedTypes";
 import { commentTree } from "@/lib/gqlFragments";
 import { gqlFetch } from "@/lib/graphql";
+import {
+  normalizeManagedSort,
+  PENDING_SORTS,
+  sortManagedTopics,
+} from "@/lib/managedTopicSort";
 import { displayRolesFromCookies } from "@/lib/previewRoles.server";
 import { parseTimetableSettings, roleLabel } from "@/lib/timetableSettings";
 
@@ -27,10 +33,14 @@ const QUERY = `
 
 export default async function ModerationPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ sort?: string }>;
 }) {
   const { slug } = await params;
+  const { sort: sortParam } = await searchParams;
+  const sort = normalizeManagedSort(sortParam, PENDING_SORTS);
   const data = await gqlFetch<Data>(QUERY, { s: slug });
   const roles = await displayRolesFromCookies(
     (data.timetable?.viewerRoles ?? []) as Role[],
@@ -53,6 +63,12 @@ export default async function ModerationPage({
         </p>
       </div>
       <h3 className="people-heading">Unpublished Topics</h3>
+      {data.moderationQueue.length > 1 ? (
+        <div className="toolbar">
+          <label htmlFor="sort">Sort</label>
+          <ListSortControl value={sort} options={PENDING_SORTS} />
+        </div>
+      ) : null}
       {data.moderationQueue.length === 0 ? (
         <EmptyState
           icon="✓"
@@ -61,7 +77,7 @@ export default async function ModerationPage({
         />
       ) : (
         <ul className="list">
-          {data.moderationQueue.map((topic) => (
+          {sortManagedTopics(data.moderationQueue, sort).map((topic) => (
             <ModerationCard
               key={topic.id}
               topic={topic}
