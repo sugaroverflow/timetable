@@ -19,12 +19,11 @@ export type ElectorRow = {
   electorName: string | null;
   heartCount: number;
   commentCount: number;
-  availabilityCount: number;
   latestActivityAt: string | null;
   heartedTopics: HeartedTopic[];
 };
 
-type SortKey = "name" | "hearts" | "comments" | "availability" | "activity";
+type SortKey = "name" | "hearts" | "comments" | "activity";
 
 function groupByHost(topics: HeartedTopic[]) {
   const map = new Map<
@@ -48,7 +47,7 @@ function groupByHost(topics: HeartedTopic[]) {
 function HeartsRow({ slug, topics }: { slug: string; topics: HeartedTopic[] }) {
   return (
     <tr className="elector-hearts-row">
-      <td colSpan={5}>
+      <td colSpan={4}>
         {topics.length === 0 ? (
           <span className="faint" style={{ fontSize: 12 }}>
             No hearts in range.
@@ -65,7 +64,7 @@ function HeartsRow({ slug, topics }: { slug: string; topics: HeartedTopic[] }) {
                 </div>
                 <ul>
                   {group.topics.map((t) => {
-                    const href = topicPath(slug, t.hostSlug, t.slug);
+                    const href = topicPath(slug, t.hostSlug, t.slug, t.hostId);
                     return (
                       <li key={t.topicId}>
                         {href ? <Link href={href}>{t.title}</Link> : t.title}
@@ -123,9 +122,6 @@ export function ElectorActivityTable({
       case "comments":
         cmp = a.commentCount - b.commentCount;
         break;
-      case "availability":
-        cmp = a.availabilityCount - b.availabilityCount;
-        break;
       case "activity":
         cmp =
           (a.latestActivityAt ? Date.parse(a.latestActivityAt) : 0) -
@@ -181,7 +177,6 @@ export function ElectorActivityTable({
             {header("name", electorLabel)}
             {header("hearts", "❤️")}
             {header("comments", "Comments")}
-            {header("availability", "Availability")}
             {header("activity", "Last activity")}
           </tr>
         </thead>
@@ -194,7 +189,6 @@ export function ElectorActivityTable({
                 </td>
                 <td className="mono">{elector.heartCount}</td>
                 <td className="mono">{elector.commentCount}</td>
-                <td className="mono">{elector.availabilityCount}</td>
                 <td>
                   {elector.latestActivityAt ? (
                     new Date(elector.latestActivityAt).toLocaleString()

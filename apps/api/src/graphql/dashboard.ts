@@ -37,16 +37,14 @@ const TopicLeaderboardEntryType = builder
       id: t.exposeID("id"),
       title: t.exposeString("title"),
       slug: t.exposeString("slug", { nullable: true }),
+      hostId: t.exposeID("hostId"),
       hostName: t.exposeString("hostName", { nullable: true }),
+      hostImage: t.exposeString("hostImage", { nullable: true }),
       hostSlug: t.exposeString("hostSlug", { nullable: true }),
       weightedScore: t.exposeFloat("weightedScore"),
       l2Score: t.exposeFloat("l2Score"),
       devotionScore: t.exposeFloat("devotionScore"),
       heartCount: t.exposeInt("heartCount"),
-      lastHeartAt: t.string({
-        nullable: true,
-        resolve: (e) => e.lastHeartAt?.toISOString() ?? null,
-      }),
     }),
   });
 

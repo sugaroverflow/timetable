@@ -1,5 +1,7 @@
 "use client";
 
+import { CalendarDays } from "lucide-react";
+
 import { useSetSearchParam } from "@/lib/useSearchParamNav";
 
 /** Start date for the elector-activity table (QA #59 round 3). Defaults to
@@ -8,14 +10,14 @@ export function DashboardSinceFilter({ value }: { value: string }) {
   const setParam = useSetSearchParam();
 
   return (
-    <>
-      <label htmlFor="dash-since">Since</label>
+    <span className="select-minimal">
+      <CalendarDays size={14} aria-hidden />
       <input
-        id="dash-since"
+        aria-label="Count activity since"
         type="date"
         value={value}
         onChange={(e) => setParam("since", e.target.value)}
       />
-    </>
+    </span>
   );
 }

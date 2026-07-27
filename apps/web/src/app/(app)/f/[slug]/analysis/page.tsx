@@ -1,4 +1,3 @@
-import { TriangleAlert } from "lucide-react";
 import Link from "next/link";
 
 import { isAdmin, isHost, type Role } from "@timetable/shared";
@@ -22,7 +21,6 @@ const ACTIVITY_FILTERS = new Set([
   "quiet",
   "no_hearts",
   "no_comments",
-  "no_availability",
 ]);
 
 type Dashboard = {
@@ -33,13 +31,14 @@ type Dashboard = {
     id: string;
     title: string;
     slug: string | null;
+    hostId: string;
     hostName: string | null;
+    hostImage: string | null;
     hostSlug: string | null;
     weightedScore: number;
     l2Score: number;
     devotionScore: number;
     heartCount: number;
-    lastHeartAt: string | null;
   }[];
   hostLeaderboard: {
     hostId: string;
@@ -51,7 +50,6 @@ type Dashboard = {
     electorName: string | null;
     heartCount: number;
     commentCount: number;
-    availabilityCount: number;
     latestActivityAt: string | null;
     heartedTopics: {
       topicId: string;
@@ -61,12 +59,6 @@ type Dashboard = {
       hostName: string | null;
       hostSlug: string | null;
     }[];
-  }[];
-  conflicts: {
-    slotId: string;
-    location: string;
-    startsAt: string;
-    topics: { id: string; title: string }[];
   }[];
 };
 
@@ -86,14 +78,13 @@ const QUERY = `
     timetableHosts(idOrSlug: $s) { id name }
     dashboard(idOrSlug: $s, hostId: $host, electorActivity: $activity, activitySince: $since) {
       totalHearts electorCount hostCount
-      topicLeaderboard { id title slug hostName hostSlug weightedScore l2Score devotionScore heartCount lastHeartAt }
+      topicLeaderboard { id title slug hostId hostName hostImage hostSlug weightedScore l2Score devotionScore heartCount }
       hostLeaderboard { hostId hostName weightedScore }
       electorActivity {
-        electorId electorName heartCount commentCount availabilityCount
+        electorId electorName heartCount commentCount
         latestActivityAt
         heartedTopics { topicId title slug hostId hostName hostSlug }
       }
-      conflicts { slotId location startsAt topics { id title } }
     }
   }
 `;
@@ -116,26 +107,6 @@ function sincePickerValue(since: string, timetable: Data["timetable"]): string {
   return (
     since ||
     (timetable?.heartsCountFrom ? timetable.heartsCountFrom.slice(0, 10) : "")
-  );
-}
-
-function ConflictsCard({ conflicts }: { conflicts: Dashboard["conflicts"] }) {
-  if (conflicts.length === 0) return null;
-  return (
-    <div className="card" style={{ borderColor: "var(--yellow)" }}>
-      <h3 style={{ marginTop: 0, fontSize: 15 }}>
-        <TriangleAlert size={14} aria-hidden /> Slot conflicts (
-        {conflicts.length})
-      </h3>
-      <ul className="list">
-        {conflicts.map((c) => (
-          <li key={c.slotId} className="faint" style={{ fontSize: 13 }}>
-            {new Date(c.startsAt).toLocaleString()} · {c.location || "—"} —{" "}
-            {c.topics.map((t) => t.title).join(", ")}
-          </li>
-        ))}
-      </ul>
-    </div>
   );
 }
 
@@ -214,22 +185,15 @@ export default async function DashboardPage({
     <div className="stack">
       <div className="page-head">
         <h2 className="section-title">Analysis</h2>
-        <p>Activity and standings across this forum.</p>
       </div>
 
-      <div className="toolbar">
-        <label>{hostLabel}</label>
+      <div className="toolbar feed-toolbar">
         <HostFilter
           value={host}
           hosts={data.timetableHosts}
           allLabel={`All ${hostsPlural}`}
         />
-        <label>{electorLabel} activity</label>
-        <DashboardActivityFilter value={activity} />
-        <DashboardSinceFilter value={sinceValue} />
       </div>
-
-      <ConflictsCard conflicts={d.conflicts} />
 
       <div className="grid grid-2">
         <TopicLeaderboard
@@ -257,8 +221,17 @@ export default async function DashboardPage({
           style={{ justifyContent: "space-between", marginBottom: 12 }}
         >
           <h3 style={{ margin: 0, fontSize: 15 }}>{electorLabel} activity</h3>
-          <span className="faint" style={{ fontSize: 12 }}>
-            {d.electorActivity.length} shown
+          {/* These two only filter THIS table: which electors show, and the
+              date activity is counted from (default: the hearts cutoff). */}
+          <span className="row wrap" style={{ gap: 10, alignItems: "center" }}>
+            <DashboardActivityFilter
+              value={activity}
+              allLabel={`All ${pluralLabel(electorLabel).toLowerCase()}`}
+            />
+            <DashboardSinceFilter value={sinceValue} />
+            <span className="faint" style={{ fontSize: 12 }}>
+              {d.electorActivity.length} shown
+            </span>
           </span>
         </div>
         {d.electorActivity.length === 0 ? (

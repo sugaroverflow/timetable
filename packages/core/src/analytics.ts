@@ -37,13 +37,14 @@ export type DashboardData = {
     id: string;
     title: string;
     slug: string | null;
+    hostId: string;
     hostName: string | null;
+    hostImage: string | null;
     hostSlug: string | null;
     weightedScore: number;
     l2Score: number;
     devotionScore: number;
     heartCount: number;
-    lastHeartAt: Date | null;
   }[];
   hostLeaderboard: {
     hostId: string;
@@ -174,13 +175,14 @@ function buildLeaderboards(feed: FeedTopic[]): {
     id: t.id,
     title: t.title,
     slug: t.slug,
+    hostId: t.hostId,
     hostName: t.hostName,
+    hostImage: t.hostImage,
     hostSlug: t.hostSlug,
     weightedScore: t.weightedScore,
     l2Score: t.l2Score,
     devotionScore: t.devotionScore,
     heartCount: t.heartCount,
-    lastHeartAt: null as Date | null,
   }));
 
   const hostAgg = new Map<
@@ -273,18 +275,6 @@ async function loadHeartActivity(
       ),
     )
     .where(and(...heartCountConds));
-}
-
-/** Latest counted heart per topic (QA #42: heart timestamps on the
- * dashboard). */
-function lastHeartByTopic(
-  heartActivityRows: HeartActivityRow[],
-): Map<string, Date | null> {
-  const last = new Map<string, Date | null>();
-  for (const r of heartActivityRows) {
-    last.set(r.topicId, latestDate(last.get(r.topicId), r.createdAt));
-  }
-  return last;
 }
 
 function heartStatsByElector(
@@ -542,10 +532,6 @@ export async function getDashboard(
     await activityWindow(timetableId, opts);
 
   const heartActivityRows = await loadHeartActivity(heartCountConds);
-  const lastHearts = lastHeartByTopic(heartActivityRows);
-  for (const t of topicLeaderboard) {
-    t.lastHeartAt = lastHearts.get(t.id) ?? null;
-  }
 
   const commentsByElector = await loadCommentActivity(
     activityTopicConds,
