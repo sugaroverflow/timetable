@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { Avatar } from "@/components/Avatar";
-import { SortHeader } from "@/components/ElectorActivityTable";
+import { SortHeader } from "@/components/SortHeader";
 import { relativeTime } from "@/lib/relativeTime";
 
 export type HostActivityRow = {
