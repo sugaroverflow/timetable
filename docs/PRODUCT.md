@@ -235,8 +235,6 @@ Before opening to real users:
 - The availability calendar is unlinked from navigation pending re-add (#55).
 - Calendar sync is one-way ICS export only.
 - Feed pagination is offset-based behind infinite scroll; cursor pagination is a future scalability item.
-- The product's emails have not been designed yet — the digest and invite templates are provisional; email design is an open todo.
-- The timeslots/availability calendar is unreleased and unfinished (#55); finishing it, and then adding its data to the API/export surface, is an open todo — the data export and API page deliberately exclude timeslot data until then.
 
 **Testing gaps**
 

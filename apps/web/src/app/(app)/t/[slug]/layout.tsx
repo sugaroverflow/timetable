@@ -130,23 +130,6 @@ async function loadSwitcherAndUnread(
   return { switcherItems, unread: unreadData.notificationsUnread };
 }
 
-function NotificationsNavLink({
-  base,
-  unread,
-}: {
-  base: string;
-  unread: number;
-}) {
-  return (
-    <NavLink href={`${base}/notifications`}>
-      Notifications
-      {unread > 0 ? (
-        <span className="nav-badge">{unread > 99 ? "99+" : unread}</span>
-      ) : null}
-    </NavLink>
-  );
-}
-
 function SideNav({
   base,
   isAuthed,
@@ -173,14 +156,20 @@ function SideNav({
           <Heart size={14} fill="currentColor" aria-hidden /> Topics
         </NavLink>
       )}
-      {isMember && <NotificationsNavLink base={base} unread={unread} />}
+      {isMember && (
+        <NavLink href={`${base}/notifications`}>
+          Notifications
+          {unread > 0 ? (
+            <span className="nav-badge">{unread > 99 ? "99+" : unread}</span>
+          ) : null}
+        </NavLink>
+      )}
       {isMember && <NavLink href={`${base}/people`}>People</NavLink>}
       {isAuthed && <NavLink href={`${base}/profile`}>Profile</NavLink>}
       {hostOrAdmin && <NavLink href={`${base}/dashboard`}>Analysis</NavLink>}
       {admin && <NavLink href={`${base}/moderation`}>Pending Topics</NavLink>}
       {admin && <NavLink href={`${base}/activity`}>Activity Log</NavLink>}
       {admin && <NavLink href={`${base}/settings`}>Settings</NavLink>}
-      {isMember && <NavLink href={`${base}/api`}>API</NavLink>}
     </nav>
   );
 }
