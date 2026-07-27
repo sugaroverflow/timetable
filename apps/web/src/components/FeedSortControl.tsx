@@ -15,9 +15,9 @@ export function FeedSortControl({ value }: { value: string }) {
       // in the URL so infinite-scroll pages stay consistent (QA #59).
       mutate: (params) => {
         if (next === "random") {
-          params.set("seed", Math.random().toString(36).slice(2, 10));
+          params.set("shuffle", Math.random().toString(36).slice(2, 10));
         } else {
-          params.delete("seed");
+          params.delete("shuffle");
         }
       },
     });
