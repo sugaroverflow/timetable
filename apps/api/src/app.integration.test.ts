@@ -135,7 +135,6 @@ function timetableFixture(patch: Partial<Timetable> = {}): Timetable {
     id: "11111111-1111-1111-1111-111111111111",
     slug: "public-calendar",
     name: "Public Calendar",
-    description: null,
     privacy: "public",
     customDomain: null,
     settings: {},

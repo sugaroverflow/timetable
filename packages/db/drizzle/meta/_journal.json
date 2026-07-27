@@ -141,6 +141,13 @@
       "when": 1785160763816,
       "tag": "0019_backfill_member_slugs",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1785184420720,
+      "tag": "0020_noisy_katie_power",
+      "breakpoints": true
     }
   ]
 }

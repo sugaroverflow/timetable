@@ -159,13 +159,12 @@ builder.mutationFields((t) => ({
     },
   }),
 
-  /** Admin: update timetable name, description, visibility, custom domain. */
+  /** Admin: update timetable name, visibility, custom domain. */
   updateTimetableProfile: t.field({
     type: TimetableType,
     args: {
       idOrSlug: t.arg.string({ required: true }),
       name: t.arg.string({ required: false }),
-      description: t.arg.string({ required: false }),
       privacy: t.arg.string({ required: false }),
       customDomain: t.arg.string({ required: false }),
     },
@@ -186,7 +185,6 @@ builder.mutationFields((t) => ({
 
       const updated = await updateTimetableProfile(readable.timetable.id, {
         name: args.name ?? undefined,
-        description: args.description ?? undefined,
         privacy,
         customDomain:
           args.customDomain != null ? args.customDomain.trim() : undefined,
