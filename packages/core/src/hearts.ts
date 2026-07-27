@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { db, hearts, topics } from "@timetable/db";
 
 import { logActivity } from "./activity";
+import { markTopicSeen } from "./queue";
 
 /** Toggle an elector's heart on a published topic. Returns the new state.
  * Hearts are logged to the activity feed (QA #42). Whether a heart *counts*
@@ -46,6 +47,9 @@ export async function toggleHeart(
         target: [hearts.topicId, hearts.userId],
         set: { createdAt: new Date() },
       });
+    // Hearting implies having seen it — from any surface, not just the
+    // queue. (Un-hearting keeps the seen row: they did see it.)
+    await markTopicSeen(topicId, userId);
   }
 
   await logActivity({

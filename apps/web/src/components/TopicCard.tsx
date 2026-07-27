@@ -123,6 +123,16 @@ function TopicTail({
   );
 }
 
+/** Collapsed by default; the Topic Queue shows the whole body. */
+function TopicBody({ html, expand }: { html: string; expand: boolean }) {
+  if (expand) {
+    return (
+      <div className="topic-body" dangerouslySetInnerHTML={{ __html: html }} />
+    );
+  }
+  return <CollapsibleTopicBody html={html} />;
+}
+
 /* Element order per QA #42: title, author, cover, description,
  * hearts + comments, comment bar, then the two collapsed panels
  * (vote breakdown, host-only comments), host actions, admin actions. */
@@ -136,6 +146,7 @@ export function TopicCard({
   adminLabel = "Admin",
   viewerHeartCount = null,
   hosts = [],
+  expandBody = false,
 }: {
   topic: FeedTopic;
   perms: FeedPerms;
@@ -146,6 +157,9 @@ export function TopicCard({
   adminLabel?: string;
   viewerHeartCount?: number | null;
   hosts?: { id: string; name: string | null }[];
+  /** Full body, no collapse — the Topic Queue shows one topic at a time,
+   * and deciding needs the whole thing. */
+  expandBody?: boolean;
 }) {
   const publicComments = topic.comments.filter(
     (c) => c.visibility !== "host_only",
@@ -174,7 +188,7 @@ export function TopicCard({
         />
       ) : null}
 
-      <CollapsibleTopicBody html={topic.bodyHtml} />
+      <TopicBody html={topic.bodyHtml} expand={expandBody} />
 
       <TopicActionsRow
         topicId={topic.id}

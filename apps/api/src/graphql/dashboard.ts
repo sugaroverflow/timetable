@@ -117,6 +117,8 @@ const ElectorActivityType = builder
       heartCount: t.exposeInt("heartCount"),
       commentCount: t.exposeInt("commentCount"),
       availabilityCount: t.exposeInt("availabilityCount"),
+      /** Published topics never seen nor ❤️'d — the queue coverage gap. */
+      queueCount: t.exposeInt("queueCount"),
       latestActivityAt: t.string({
         nullable: true,
         resolve: (activity) => activity.latestActivityAt?.toISOString() ?? null,

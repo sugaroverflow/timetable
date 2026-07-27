@@ -6,6 +6,7 @@ import {
   createTopic,
   getPerson,
   getTopicBySlug,
+  getTopicQueue,
   getWeightedBreakdown,
   listCommentTree,
   listCommentTreesForTopics,
@@ -13,14 +14,17 @@ import {
   listSubmittedTopics,
   listTimetableHosts,
   logActivity,
+  markTopicSeen,
   moderateTopic,
   reassignTopic,
+  restartQueueRound,
   submitTopic,
   toggleHeart,
   unpublishTopic,
   updateTopic,
   type CommentNode,
   type FeedTopic,
+  type TopicQueueState,
 } from "@timetable/core";
 import type { Topic } from "@timetable/db";
 import {
@@ -624,6 +628,100 @@ builder.mutationFields((t) => ({
       if (!canHeart(viewer)) forbidden("Electors only");
       const { hearted } = await toggleHeart(topic.id, user.id);
       return { topicId: topic.id, hearted };
+    },
+  }),
+}));
+
+// ---------------------------------------------------------------------------
+// Topic Queue (2026-07-28): elector-only, one topic at a time — see
+// packages/core/src/queue.ts for the mechanics.
+// ---------------------------------------------------------------------------
+
+type GqlTopicQueue = TopicQueueState & { current: GqlTopic | null };
+
+const TopicQueueType = builder
+  .objectRef<GqlTopicQueue>("TopicQueue")
+  .implement({
+    fields: (t) => ({
+      /** Unseen this round (includes the new ones). */
+      remaining: t.exposeInt("remaining"),
+      /** Subset of remaining published after the round started. */
+      remainingNew: t.exposeInt("remainingNew"),
+      /** All unhearted published topics in the current round. */
+      roundSize: t.exposeInt("roundSize"),
+      current: t.field({
+        type: TopicType,
+        nullable: true,
+        resolve: (q) => q.current,
+      }),
+    }),
+  });
+
+builder.queryFields((t) => ({
+  /** The viewer's Topic Queue. Null for guests and non-electors — the
+   * queue is a voting surface. */
+  topicQueue: t.field({
+    type: TopicQueueType,
+    nullable: true,
+    args: { idOrSlug: t.arg.string({ required: true }) },
+    resolve: async (_p, args, ctx) => {
+      if (!ctx.user) return null;
+      const readable = await readTimetable(ctx, args.idOrSlug);
+      if (!readable) return null;
+      const viewer = await ctx.getViewer(readable.timetable.id);
+      if (!canHeart(viewer)) return null;
+
+      const state = await getTopicQueue(readable.timetable.id, ctx.user.id);
+      let current: GqlTopic | null = null;
+      if (state.currentTopicId) {
+        const [topic] = await buildFeed(readable.timetable.id, ctx.user.id, {
+          topicId: state.currentTopicId,
+        });
+        if (topic) {
+          current = {
+            ...topic,
+            canSeeHostOnly: canSeeHostOnly(viewer),
+            canModerate: canModerate(viewer),
+            canSeeComments: canSeeComments(
+              readable.timetable.privacy as Privacy,
+              viewer,
+            ),
+          };
+        }
+      }
+      return { ...state, current };
+    },
+  }),
+}));
+
+builder.mutationFields((t) => ({
+  /** The queue's "Later" button: record the topic as seen this round and
+   * move on. */
+  queueMarkSeen: t.boolean({
+    args: { topicId: t.arg.string({ required: true }) },
+    resolve: async (_p, args, ctx) => {
+      const user = await requireUser(ctx);
+      const { topic, viewer } = await loadTopicAndViewer(ctx, args.topicId);
+      if (!canHeart(viewer)) forbidden("Electors only");
+      if (topic.status !== "published") {
+        throw new GraphQLError("Only published topics can be queued");
+      }
+      await markTopicSeen(topic.id, user.id);
+      return true;
+    },
+  }),
+
+  /** End-of-round "Start another round": everything still unhearted comes
+   * around again. */
+  queueRestartRound: t.boolean({
+    args: { idOrSlug: t.arg.string({ required: true }) },
+    resolve: async (_p, args, ctx) => {
+      const { user, readable, viewer } = await loadTimetableAndViewer(
+        ctx,
+        args.idOrSlug,
+      );
+      if (!canHeart(viewer)) forbidden("Electors only");
+      return restartQueueRound(readable.timetable.id, user.id);
     },
   }),
 }));

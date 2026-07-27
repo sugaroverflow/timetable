@@ -19,6 +19,7 @@ import {
 } from "@timetable/shared";
 
 import { coerceDate } from "./dates";
+import { loadQueueCoverage } from "./queue";
 import { getHeartsCountFrom } from "./topics";
 import { buildFeed, type FeedTopic } from "./topics";
 
@@ -79,6 +80,9 @@ export type DashboardData = {
     heartCount: number;
     commentCount: number;
     availabilityCount: number;
+    /** Published topics this elector has never seen nor hearted (the
+     * Topic Queue coverage gap, 2026-07-28). */
+    queueCount: number;
     latestActivityAt: Date | null;
     /** Topics this elector hearted (a sortable sub-table in the UI). */
     heartedTopics: {
@@ -541,6 +545,7 @@ function buildElectorActivity(args: {
   commentsByElector: Map<string, Stat>;
   commentsByElectorTopic: Map<string, number>;
   availabilityByElector: Map<string, Stat>;
+  queueCoverage: { publishedCount: number; coveredByUser: Map<string, number> };
   filter: ElectorActivityFilter;
 }): DashboardData["electorActivity"] {
   const heartsByElector = heartStatsByElector(args.heartActivityRows);
@@ -560,6 +565,9 @@ function buildElectorActivity(args: {
         heartCount: heartStat?.count ?? 0,
         commentCount: commentStat?.count ?? 0,
         availabilityCount: availabilityStat?.count ?? 0,
+        queueCount:
+          args.queueCoverage.publishedCount -
+          (args.queueCoverage.coveredByUser.get(elector.userId) ?? 0),
         latestActivityAt: latestDate(
           heartStat?.latestAt,
           commentStat?.latestAt,
@@ -714,6 +722,7 @@ export async function getDashboard(
     commentsByElector: commentActivity.byElector,
     commentsByElectorTopic: commentActivity.byElectorTopic,
     availabilityByElector,
+    queueCoverage: await loadQueueCoverage(timetableId),
     filter: opts.electorActivity ?? "all",
   });
 
