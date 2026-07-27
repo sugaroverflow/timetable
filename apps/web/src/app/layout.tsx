@@ -8,7 +8,7 @@ import { emojiFavicon } from "@/lib/favicon";
 
 export const metadata: Metadata = {
   title: "Topic",
-  description: "Collaborative forums — topic feeds, voting, and availability.",
+  description: "Collaborative forums — topics, voting, and availability.",
   // Config-based (not app/icon.tsx) so forum layouts can override the
   // favicon with the forum's own icon — file-convention icons always win
   // over nested metadata.
