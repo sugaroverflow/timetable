@@ -36,6 +36,27 @@ export function privacyBadge(privacy: string): { dot: string; label: string } {
   return config[privacy] ?? { dot: "var(--faint)", label: privacy };
 }
 
+/** One-line plain-English gloss of a privacy level for the sidebar footer
+ * (QA 2026-07-27 — replaced the terse pill). Mirrors the actual rules in
+ * shared/permissions: comments are public only on `public`; bios follow
+ * canSeePersonProfile (everyone on public/no_comments, hosts + admins on
+ * hosts_only). Role labels are the forum's own, pluralized. */
+export function privacyDescription(
+  privacy: string,
+  labels: RoleLabels | undefined,
+): string {
+  const hosts = pluralLabel(roleLabel(labels, "host")).toLowerCase();
+  const admins = pluralLabel(roleLabel(labels, "admin")).toLowerCase();
+  const config: Record<string, string> = {
+    public: "Topics, bios, and comments are public",
+    no_comments: "Topics and user bios are public",
+    hosts_only: `Topics and ${hosts} bios are public`,
+    private: "Forum is only visible to members",
+    deactivated: `Forum is only visible to ${admins}`,
+  };
+  return config[privacy] ?? privacy;
+}
+
 /** Naive plural for role labels: collective nouns like "Faculty" (and
  * labels already ending in s) stay as-is, everything else gets an "s". */
 export function pluralLabel(label: string): string {

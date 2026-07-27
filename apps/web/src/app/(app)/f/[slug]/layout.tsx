@@ -20,7 +20,7 @@ import { getMyTimetables } from "@/lib/myTimetables";
 import {
   buildThemeCss,
   parseTimetableSettings,
-  privacyBadge,
+  privacyDescription,
 } from "@/lib/timetableSettings";
 import { parseViewAs, VIEW_AS_COOKIE } from "@/lib/userPreview";
 
@@ -212,7 +212,6 @@ export default async function TimetableLayout({
   const { previewUserId, previewName } = await loadPreview(slug);
   const settings = parseTimetableSettings(timetable.settings);
   const base = `/f/${slug}`;
-  const privacy = privacyBadge(timetable.privacy);
   const { switcherItems, unread } = await loadSwitcherAndUnread(
     isAuthed,
     isMember,
@@ -259,22 +258,19 @@ export default async function TimetableLayout({
             <Flag size={14} aria-hidden /> Report a bug
           </a>
 
-          {/* Forum identity footer: the switcher with the forum's visibility
-              pill beneath it (QA 2026-07-27 — the name itself moved to the
-              topbar center, roles to the topbar right). */}
+          {/* Forum identity footer: the switcher with a plain-English line
+              about the forum's visibility beneath it (QA 2026-07-27 — the
+              pill was too terse; the name lives in the topbar). */}
           <div className="sidebar-foot">
             {switcherItems.length > 0 ? (
               <TimetableSwitcher items={switcherItems} currentSlug={slug} />
             ) : null}
-            <div className="row wrap" style={{ marginTop: 8 }}>
-              <span className="privacy-pill">
-                <span
-                  className="privacy-dot"
-                  style={{ background: privacy.dot }}
-                />
-                {privacy.label}
-              </span>
-            </div>
+            <p
+              className="faint"
+              style={{ margin: "8px 0 0", fontSize: "var(--text-2xs)" }}
+            >
+              {privacyDescription(timetable.privacy, settings.roleLabels)}
+            </p>
           </div>
         </Sidebar>
 
