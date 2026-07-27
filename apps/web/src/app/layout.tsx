@@ -4,9 +4,13 @@ import type { Metadata } from "next";
 import "./tokens.css";
 import "./globals.css";
 
+import { env } from "@/env";
 import { emojiFavicon } from "@/lib/favicon";
 
 export const metadata: Metadata = {
+  // Absolute base for og:image and other metadata URLs — without it Next
+  // falls back to localhost and scrapers can't fetch the social cards.
+  metadataBase: new URL(env.webOrigin),
   title: "Topic",
   description: "Collaborative forums — topics, voting, and availability.",
   // Config-based (not app/icon.tsx) so forum layouts can override the
