@@ -21,7 +21,7 @@ export function TopbarHamburger() {
     () => false,
   );
 
-  if (!/^\/t\//.test(pathname ?? "")) return null;
+  if (!/^\/f\//.test(pathname ?? "")) return null;
 
   return (
     <button
