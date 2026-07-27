@@ -60,6 +60,7 @@ services:
       - { key: CRON_SECRET, value: "${CRON_SECRET}", scope: RUN_TIME, type: SECRET }
       - { key: RESEND_API_KEY, value: "${RESEND_API_KEY}", scope: RUN_TIME, type: SECRET }
       - { key: EMAIL_FROM, value: "${EMAIL_FROM}", scope: RUN_TIME }
+      - { key: SYSADMIN_EMAILS, value: "${SYSADMIN_EMAILS}", scope: RUN_TIME }
       # Image uploads to Spaces (S3). Credentials come from the GitHub
       # Environment "production" via deploy-production.yml (the API refuses
       # to start when SPACES_BUCKET is set without KEY/SECRET).
