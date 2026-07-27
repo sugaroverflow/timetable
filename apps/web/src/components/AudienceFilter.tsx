@@ -1,5 +1,6 @@
 "use client";
 
+import { SelectMinimal } from "@/components/SelectMinimal";
 import type { TopicOption } from "@/lib/calendarTypes";
 import { useSetSearchParam } from "@/lib/useSearchParamNav";
 
@@ -15,7 +16,7 @@ export function AudienceFilter({
   const setParam = useSetSearchParam();
 
   return (
-    <select
+    <SelectMinimal
       aria-label="Audience"
       value={value}
       onChange={(e) => {
@@ -31,6 +32,6 @@ export function AudienceFilter({
           Hearted: {tp.title}
         </option>
       ))}
-    </select>
+    </SelectMinimal>
   );
 }
