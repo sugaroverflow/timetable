@@ -1,4 +1,3 @@
-import { Heart } from "lucide-react";
 import Link from "next/link";
 
 import type { FeedTopic } from "@/lib/feedTypes";
@@ -6,14 +5,12 @@ import { topicPath } from "@/lib/topicPath";
 
 import { AdminTopicActions } from "./AdminTopicActions";
 import { Avatar } from "./Avatar";
-import { BreakdownToggle } from "./BreakdownToggle";
 import { CommentComposer } from "./CommentComposer";
 import { CommentList } from "./CommentList";
-import { FocusCommentButton } from "./FocusCommentButton";
-import { HeartButton } from "./HeartButton";
 import { HostOnlyPanel } from "./HostOnlyPanel";
 import { HostTopicActions } from "./HostTopicActions";
 import { PersonChip } from "./PersonChip";
+import { TopicActionsRow } from "./TopicActionsRow";
 
 export type FeedPerms = {
   canHeart: boolean;
@@ -67,47 +64,9 @@ function TopicHead({
   );
 }
 
-function HeartCommentRow({
-  topic,
-  canHeart,
-  viewerHeartCount,
-}: {
-  topic: FeedTopic;
-  canHeart: boolean;
-  viewerHeartCount: number | null;
-}) {
-  return (
-    <div className="card-actions">
-      {canHeart ? (
-        <HeartButton
-          topicId={topic.id}
-          hearted={topic.viewerHasHearted}
-          count={topic.heartCount}
-        />
-      ) : (
-        <span className="heart-btn" aria-hidden>
-          <span className="ic">
-            <Heart size={16} fill="currentColor" />
-          </span>
-          {topic.heartCount}
-        </span>
-      )}
-      <FocusCommentButton
-        topicId={topic.id}
-        commentCount={topic.commentCount}
-      />
-      <span style={{ flex: 1 }} />
-      {topic.viewerHasHearted && viewerHeartCount ? (
-        <span className="weight-chip" title="Your current vote weight">
-          your vote: 1/{viewerHeartCount}
-        </span>
-      ) : null}
-    </div>
-  );
-}
-
 /* The collapsed panels and role-gated action rows that close out the card:
- * vote breakdown, host-only comments, host actions, admin actions. */
+ * host-only comments, host actions, admin actions. (The ❤️ breakdown moved
+ * to the actions-row disclosure — any signed-in viewer, QA 2026-07-27.) */
 function TopicTail({
   topic,
   perms,
@@ -136,15 +95,6 @@ function TopicTail({
   };
   return (
     <>
-      {perms.canHostOnly && topic.weightedScore != null ? (
-        <BreakdownToggle
-          slug={slug}
-          topicId={topic.id}
-          className="host-panel"
-          triggerClassName="host-panel-toggle"
-        />
-      ) : null}
-
       {perms.canHostOnly ? (
         <HostOnlyPanel
           topicId={topic.id}
@@ -228,9 +178,14 @@ export function TopicCard({
         dangerouslySetInnerHTML={{ __html: topic.bodyHtml }}
       />
 
-      <HeartCommentRow
-        topic={topic}
+      <TopicActionsRow
+        topicId={topic.id}
+        slug={slug}
+        heartCount={topic.heartCount}
+        viewerHasHearted={topic.viewerHasHearted}
+        commentCount={topic.commentCount}
         canHeart={perms.canHeart}
+        signedIn={viewerId != null}
         viewerHeartCount={viewerHeartCount}
       />
 

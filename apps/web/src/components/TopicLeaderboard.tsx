@@ -4,7 +4,10 @@ import { Heart } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
-import { BreakdownToggle } from "@/components/BreakdownToggle";
+import {
+  BreakdownCaret,
+  BreakdownPanelBody,
+} from "@/components/BreakdownPanel";
 import { NORM_MODES, type NormKey } from "@/lib/normModes";
 import { topicPath } from "@/lib/topicPath";
 
@@ -32,6 +35,52 @@ function scoreFor(entry: LeaderboardEntry, key: NormKey): number {
     default:
       return entry.weightedScore; // l1
   }
+}
+
+/** One leaderboard entry with the ❤️-breakdown disclosure triangle inline
+ * before the topic name (QA 2026-07-27 — replaced a per-row labelled
+ * "Show ❤️ breakdown" line). */
+function LeaderboardRow({
+  entry,
+  norm,
+  slug,
+  hostLabel,
+}: {
+  entry: LeaderboardEntry;
+  norm: NormKey;
+  slug: string;
+  hostLabel: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const href = topicPath(slug, entry.hostSlug, entry.slug);
+  const score = scoreFor(entry, norm);
+  return (
+    <li style={{ fontSize: 14 }}>
+      <div className="row" style={{ justifyContent: "space-between" }}>
+        <span className="row" style={{ gap: 4, alignItems: "center" }}>
+          <BreakdownCaret open={open} onToggle={() => setOpen(!open)} />
+          <span>
+            {href ? <Link href={href}>{entry.title}</Link> : entry.title}{" "}
+            <span className="faint">· {entry.hostName ?? hostLabel}</span>
+          </span>
+        </span>
+        <span className="mono" style={{ textAlign: "right" }}>
+          {norm === "raw" ? score : score.toFixed(2)}
+          {entry.lastHeartAt ? (
+            <span className="faint" style={{ display: "block", fontSize: 11 }}>
+              last <Heart size={14} fill="currentColor" aria-hidden />{" "}
+              {new Date(entry.lastHeartAt).toLocaleDateString()}
+            </span>
+          ) : null}
+        </span>
+      </div>
+      {open ? (
+        <div className="dash-breakdown">
+          <BreakdownPanelBody slug={slug} topicId={entry.id} />
+        </div>
+      ) : null}
+    </li>
+  );
 }
 
 /**
@@ -86,41 +135,15 @@ export function TopicLeaderboard({
         </p>
       ) : (
         <ul className="list">
-          {sorted.map((t) => {
-            const href = topicPath(slug, t.hostSlug, t.slug);
-            const score = scoreFor(t, norm);
-            return (
-              <li key={t.id} style={{ fontSize: 14 }}>
-                <div
-                  className="row"
-                  style={{ justifyContent: "space-between" }}
-                >
-                  <span>
-                    {href ? <Link href={href}>{t.title}</Link> : t.title}{" "}
-                    <span className="faint">· {t.hostName ?? hostLabel}</span>
-                  </span>
-                  <span className="mono" style={{ textAlign: "right" }}>
-                    {norm === "raw" ? score : score.toFixed(2)}
-                    {t.lastHeartAt ? (
-                      <span
-                        className="faint"
-                        style={{ display: "block", fontSize: 11 }}
-                      >
-                        last <Heart size={14} fill="currentColor" aria-hidden />{" "}
-                        {new Date(t.lastHeartAt).toLocaleDateString()}
-                      </span>
-                    ) : null}
-                  </span>
-                </div>
-                <BreakdownToggle
-                  slug={slug}
-                  topicId={t.id}
-                  className="dash-breakdown"
-                  triggerClassName="thread-toggle"
-                />
-              </li>
-            );
-          })}
+          {sorted.map((t) => (
+            <LeaderboardRow
+              key={t.id}
+              entry={t}
+              norm={norm}
+              slug={slug}
+              hostLabel={hostLabel}
+            />
+          ))}
         </ul>
       )}
     </div>

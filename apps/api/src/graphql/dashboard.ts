@@ -181,8 +181,11 @@ builder.queryFields((t) => ({
     },
   }),
 
-  /** Per-elector weights for one topic — fetched lazily by the dashboard's
-   * "Show ❤️ breakdown" toggle (QA #59 round 3). Host/admin only. */
+  /** Per-elector weights for one topic — fetched lazily by the ❤️-breakdown
+   * disclosures on topic cards and Analysis rows. Any signed-in reader
+   * (QA 2026-07-27; was host/admin only — who-hearts-what is already
+   * reader-visible via person pages, and the weights derive from it. The
+   * one genuinely new datum for electors is each ❤️'s date). */
   topicWeightedBreakdown: t.field({
     type: [WeightedHeartType],
     nullable: true,
@@ -193,8 +196,7 @@ builder.queryFields((t) => ({
     resolve: async (_p, args, ctx) => {
       const readable = await readTimetable(ctx, args.idOrSlug);
       if (!readable) return null;
-      const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
-      if (!canSeeHostOnly(viewer)) return null;
+      if (!ctx.user) return null;
       return getWeightedBreakdown(readable.timetable.id, args.topicId);
     },
   }),

@@ -29,6 +29,13 @@ const config: NextConfig = {
         destination: "/f/:slug/topics",
         permanent: true,
       },
+      // Analysis moved off /dashboard (2026-07-27). Old /t/ links reach
+      // this via the blanket /t → /f hop first.
+      {
+        source: "/f/:slug/dashboard",
+        destination: "/f/:slug/analysis",
+        permanent: true,
+      },
     ];
   },
 };
