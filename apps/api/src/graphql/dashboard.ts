@@ -173,6 +173,9 @@ builder.queryFields((t) => ({
     args: {
       idOrSlug: t.arg.string({ required: true }),
       hostId: t.arg.string({ required: false }),
+      /** Separate host filter for the elector-activity table (per-table
+       * filters, QA 2026-07-27). */
+      activityHostId: t.arg.string({ required: false }),
       electorActivity: t.arg.string({ required: false }),
       activitySince: t.arg.string({ required: false }),
     },
@@ -186,6 +189,7 @@ builder.queryFields((t) => ({
         : Number.NaN;
       return getDashboard(readable.timetable.id, {
         hostId: args.hostId ?? undefined,
+        activityHostId: args.activityHostId ?? undefined,
         electorActivity: parseElectorActivityFilter(args.electorActivity),
         activitySince: Number.isNaN(sinceMs) ? undefined : new Date(sinceMs),
       });
