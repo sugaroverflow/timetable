@@ -166,10 +166,10 @@ function SideNav({
 }) {
   return (
     <nav className="nav side-nav">
-      <NavLink href={`${base}/feed`}>Topic Feed</NavLink>
-      {hostOrAdmin && <NavLink href={`${base}/topics`}>My Topics</NavLink>}
+      <NavLink href={`${base}/topics`}>All Topics</NavLink>
+      {hostOrAdmin && <NavLink href={`${base}/my-topics`}>My Topics</NavLink>}
       {elector && (
-        <NavLink href={`${base}/feed?hearted=me`}>
+        <NavLink href={`${base}/topics?hearted=me`}>
           <Heart size={14} fill="currentColor" aria-hidden /> Topics
         </NavLink>
       )}
@@ -179,7 +179,7 @@ function SideNav({
       {hostOrAdmin && <NavLink href={`${base}/dashboard`}>Analysis</NavLink>}
       {admin && <NavLink href={`${base}/moderation`}>Pending Topics</NavLink>}
       {admin && <NavLink href={`${base}/activity`}>Activity Log</NavLink>}
-      {admin && <NavLink href={`${base}/settings`}>Settings</NavLink>}
+      {admin && <NavLink href={`${base}/settings`}>Forum Settings</NavLink>}
       {isMember && <NavLink href={`${base}/api`}>API</NavLink>}
     </nav>
   );
@@ -209,7 +209,7 @@ export default async function TimetableLayout({
   const isMember = roles.length > 0;
   const { previewUserId, previewName } = await loadPreview(slug);
   const settings = parseTimetableSettings(timetable.settings);
-  const base = `/t/${slug}`;
+  const base = `/f/${slug}`;
   const privacy = privacyBadge(timetable.privacy);
   const { switcherItems, unread } = await loadSwitcherAndUnread(
     isAuthed,

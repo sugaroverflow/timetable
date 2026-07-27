@@ -1,6 +1,6 @@
 /**
  * "View timetable as [username]" (QA #59 round 3). The cookie carries
- * `<slug>:<userId>` and is path-scoped to /t/<slug>, so previewing one
+ * `<slug>:<userId>` and is path-scoped to /f/<slug>, so previewing one
  * timetable never affects another. It grants nothing by itself: the API
  * re-verifies on every request that the real user is an admin of that
  * timetable, resolves reads as the target member, and blocks all mutations

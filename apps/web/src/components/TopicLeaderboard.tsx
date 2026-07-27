@@ -35,7 +35,7 @@ function scoreFor(entry: LeaderboardEntry, key: NormKey): number {
 }
 
 /**
- * "All topics by hearts" leaderboard with a normalisation switcher (product
+ * "All topics by ❤️" leaderboard with a normalisation switcher (product
  * feedback round 1). The API sends every norm per topic; switching re-sorts
  * and re-labels client-side without a round-trip.
  */
@@ -64,7 +64,7 @@ export function TopicLeaderboard({
           marginBottom: 4,
         }}
       >
-        <h3 style={{ margin: 0, fontSize: 15 }}>All topics by hearts</h3>
+        <h3 style={{ margin: 0, fontSize: 15 }}>All topics by ❤️</h3>
         <select
           aria-label="Vote normalisation"
           value={norm}

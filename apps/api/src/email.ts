@@ -124,7 +124,7 @@ export function renderNewForum(args: {
     subject: `New forum created: ${args.forumName}`,
     html: [
       `<h2>New forum on Topic</h2>`,
-      `<p>${linked(args.forumName, `/t/${args.forumSlug}/feed`)}</p>`,
+      `<p>${linked(args.forumName, `/f/${args.forumSlug}/topics`)}</p>`,
       `<p>Owner: ${owner ? esc(owner) : "unknown"}</p>`,
     ].join("\n"),
   };
@@ -155,7 +155,7 @@ export function renderInvite(args: {
     `<p>${greeting}</p>`,
     `<p>You've been added to <strong>${esc(args.timetableName)}</strong>${by}.</p>`,
     topics,
-    `<p>${linked("Sign in with this email address to get started", `/t/${args.timetableSlug}`)} — no password needed, you'll receive a one-time code.</p>`,
+    `<p>${linked("Sign in with this email address to get started", `/f/${args.timetableSlug}`)} — no password needed, you'll receive a one-time code.</p>`,
   ].join("\n");
   return { subject, html };
 }

@@ -17,7 +17,7 @@ export default async function TimetablesLandingPage() {
     `query { myLastVisitedTimetableSlug }`,
   );
   if (data.myLastVisitedTimetableSlug) {
-    redirect(`/t/${data.myLastVisitedTimetableSlug}/feed`);
+    redirect(`/f/${data.myLastVisitedTimetableSlug}/topics`);
   }
   redirect("/timetables/new");
 }

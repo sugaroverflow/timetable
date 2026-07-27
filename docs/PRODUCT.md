@@ -237,6 +237,7 @@ Before opening to real users:
 - Feed pagination is offset-based behind infinite scroll; cursor pagination is a future scalability item.
 - The product's emails have not been designed yet — the digest and invite templates are provisional; email design is an open todo.
 - The timeslots/availability calendar is unreleased and unfinished (#55); finishing it, and then adding its data to the API/export surface, is an open todo — the data export and API page deliberately exclude timeslot data until then.
+- A full copy review is an open todo: read every user-facing string in one pass and check the tone matches across the product (per-surface copy has accreted PR by PR). Includes applying the "❤️ instead of 'heart'" and no-social-media-language conventions everywhere.
 
 **Testing gaps**
 

@@ -69,7 +69,7 @@ export function TopbarBrand({
 
   if (current) {
     return (
-      <Link className="brand" href={`/t/${current.slug}/feed`}>
+      <Link className="brand" href={`/f/${current.slug}/topics`}>
         {current.iconEmoji ? (
           <span className="tt-menu-icon tt-menu-icon-emoji" aria-hidden>
             {current.iconEmoji}

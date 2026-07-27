@@ -6,7 +6,7 @@ import { ProfileForm } from "@/components/ProfileForm";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 /** The profile editor stack. Profiles are per-forum (2026-07): inside a
- * forum (/t/[slug]/profile) the name/photo/bio form edits that forum's
+ * forum (/f/[slug]/profile) the name/photo/bio form edits that forum's
  * membership; the standalone /profile page is account-only (email,
  * appearance, digests). */
 export function ProfilePanel({

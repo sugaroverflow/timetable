@@ -179,7 +179,7 @@ export function ElectorActivityTable({
         <thead>
           <tr>
             {header("name", electorLabel)}
-            {header("hearts", "Hearts")}
+            {header("hearts", "❤️")}
             {header("comments", "Comments")}
             {header("availability", "Availability")}
             {header("activity", "Last activity")}

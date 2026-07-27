@@ -1,4 +1,3 @@
-import { Heart } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 
 import { isElector, isHost, type Role } from "@timetable/shared";
@@ -18,7 +17,7 @@ import {
 } from "@/lib/feedPage";
 import { gqlFetch } from "@/lib/graphql";
 
-import { loadMoreFeed } from "../feed/actions";
+import { loadMoreFeed } from "../topics/actions";
 
 const PERSON_QUERY = `
   query PersonPage($s: String!, $userSlug: String!) {
@@ -74,9 +73,9 @@ function TopicSection({
   );
 }
 
-/** Person page: /t/[slug]/[userSlug] — profile header, then their topics
+/** Person page: /f/[slug]/[userSlug] — profile header, then their topics
  * (hosts) and the topics they heart (electors); host+elector members get
- * both, topics first. Shows the same content as /feed?host=<id> for hosts. */
+ * both, topics first. Shows the same content as /topics?host=<id> for hosts. */
 export default async function PersonPage({
   params,
   searchParams,
@@ -91,7 +90,7 @@ export default async function PersonPage({
   if (!seedParam) {
     // eslint-disable-next-line react-hooks/purity -- server-only, once per request
     const minted = Math.random().toString(36).slice(2, 10);
-    redirect(`/t/${slug}/${hostSlug}?seed=${minted}`);
+    redirect(`/f/${slug}/${hostSlug}?seed=${minted}`);
   }
   const seed = seedParam;
 
@@ -138,17 +137,13 @@ export default async function PersonPage({
       ) : null}
       {heartedPage ? (
         <TopicSection
-          title={
-            <>
-              <Heart size={14} fill="currentColor" aria-hidden /> Hearted topics
-            </>
-          }
+          title="Topics they ❤️"
           page={heartedPage}
           host=""
           heartedBy={person.userId}
           seed={seed}
           refreshToken={refreshToken}
-          empty={<EmptyState icon="♥" title="No hearted topics yet" />}
+          empty={<EmptyState icon="♥" title="No ❤️ topics yet" />}
         />
       ) : null}
     </div>

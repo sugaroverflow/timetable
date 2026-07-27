@@ -28,10 +28,10 @@ export function FeedSortControl({ value }: { value: string }) {
       value={value}
       onChange={(e) => change(e.target.value)}
     >
-      <option value="random">Random</option>
+      <option value="random">Shuffle</option>
       <option value="recent">Newest</option>
       <option value="comments">Latest comments</option>
-      <optgroup label="By hearts">
+      <optgroup label="By ❤️">
         {NORM_MODES.map((mode) => (
           <option key={mode.key} value={mode.key} title={mode.description}>
             {mode.symbol} — {mode.label}

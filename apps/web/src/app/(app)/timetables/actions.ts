@@ -35,5 +35,5 @@ export async function createTimetableAction(
 
   const timetable = (await res.json()) as { slug: string };
   revalidatePath("/timetables");
-  redirect(`/t/${timetable.slug}`);
+  redirect(`/f/${timetable.slug}`);
 }

@@ -24,7 +24,7 @@ export type UserDigest = {
   userId: string;
   email: string;
   name: string | null;
-  /** `path` is a site-relative permalink (/t/{tt}/{host}/{topic}); the
+  /** `path` is a site-relative permalink (/f/{tt}/{host}/{topic}); the
    * mailer prefixes the web origin. Null when slugs are missing. */
   newTopics: { title: string; timetableName: string; path: string | null }[];
   replies: { topicTitle: string; by: string | null; snippet: string }[];
@@ -47,7 +47,7 @@ function topicPath(
   topicSlug: string | null | undefined,
 ): string | null {
   if (!timetableSlug || !hostSlug || !topicSlug) return null;
-  return `/t/${timetableSlug}/${hostSlug}/${topicSlug}`;
+  return `/f/${timetableSlug}/${hostSlug}/${topicSlug}`;
 }
 
 /** Users who have opted into at least one digest channel and have an email. */

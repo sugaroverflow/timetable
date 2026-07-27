@@ -159,7 +159,7 @@ function PersonCard({
           {hasTopics ? (
             <Link
               className="person-name-link"
-              href={`/t/${slug}/feed?host=${person.userId}`}
+              href={`/f/${slug}/topics?host=${person.userId}`}
             >
               <strong>{person.name ?? "Member"}</strong>
             </Link>

@@ -42,7 +42,7 @@ function redirectWithFreshSeed(
   if (current.host) params.set("host", current.host);
   if (current.hearted) params.set("hearted", current.hearted);
   params.set("seed", Math.random().toString(36).slice(2, 10));
-  redirect(`/t/${slug}/feed?${params.toString()}`);
+  redirect(`/f/${slug}/topics?${params.toString()}`);
 }
 
 function FeedEmpty({
@@ -58,8 +58,8 @@ function FeedEmpty({
     return (
       <EmptyState
         icon="♥"
-        title="No hearted topics yet"
-        hint="Heart topics in the feed and they'll collect here."
+        title="No ❤️ topics yet"
+        hint="❤️ topics and they'll collect here."
       />
     );
   }
@@ -130,7 +130,7 @@ export default async function FeedPage({
           <h2 className="section-title">
             <Heart size={14} fill="currentColor" aria-hidden /> Topics
           </h2>
-          <p>Published topics you currently heart.</p>
+          <p>Published topics you currently ❤️.</p>
         </div>
       ) : null}
       <div className="toolbar feed-toolbar">
@@ -147,8 +147,8 @@ export default async function FeedPage({
 
       {!page.isMember ? (
         <div className="notice">
-          You&rsquo;re viewing a public feed.{" "}
-          <Link href="/sign-in">Sign in</Link> to heart and comment.
+          You&rsquo;re viewing this forum as a guest.{" "}
+          <Link href="/sign-in">Sign in</Link> to ❤️ and comment.
         </div>
       ) : null}
 

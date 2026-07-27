@@ -55,7 +55,7 @@ export function CreateTimetableForm() {
         />
         <p className="faint" style={{ fontSize: 12, margin: "4px 0 0" }}>
           {effectiveSlug
-            ? `Your forum will live at /t/${effectiveSlug}`
+            ? `Your forum will live at /f/${effectiveSlug}`
             : "Lowercase letters, numbers, and hyphens. Set once — it can't be changed later."}
         </p>
       </div>

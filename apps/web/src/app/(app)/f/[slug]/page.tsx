@@ -7,5 +7,5 @@ export default async function TimetableIndexPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  redirect(`/t/${slug}/feed`);
+  redirect(`/f/${slug}/topics`);
 }
