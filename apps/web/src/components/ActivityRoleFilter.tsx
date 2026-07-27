@@ -1,5 +1,7 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
+
 import { useSetSearchParam } from "@/lib/useSearchParamNav";
 
 /** Filter activity entries by the actor's role (QA #59). */
@@ -13,8 +15,8 @@ export function ActivityRoleFilter({
   const setParam = useSetSearchParam();
 
   return (
-    <>
-      <label htmlFor="activity-role">Role</label>
+    <span className="select-minimal">
+      <ChevronDown size={14} aria-hidden />
       <select
         id="activity-role"
         aria-label="Filter by actor role"
@@ -28,6 +30,6 @@ export function ActivityRoleFilter({
           </option>
         ))}
       </select>
-    </>
+    </span>
   );
 }

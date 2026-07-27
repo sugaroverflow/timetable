@@ -1,5 +1,7 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
+
 import { ACTION_LABELS } from "@/lib/activityLabels";
 import { useSetSearchParam } from "@/lib/useSearchParamNav";
 
@@ -13,8 +15,8 @@ export function ActivityFilter({
   const setParam = useSetSearchParam();
 
   return (
-    <>
-      <label htmlFor="activity-filter">Action</label>
+    <span className="select-minimal">
+      <ChevronDown size={14} aria-hidden />
       <select
         id="activity-filter"
         aria-label="Filter by action type"
@@ -28,6 +30,6 @@ export function ActivityFilter({
           </option>
         ))}
       </select>
-    </>
+    </span>
   );
 }

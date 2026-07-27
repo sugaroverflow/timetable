@@ -1,5 +1,7 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
+
 import type { ManagedSortOption } from "@/lib/managedTopicSort";
 import { useSetSearchParam } from "@/lib/useSearchParamNav";
 
@@ -15,17 +17,20 @@ export function ListSortControl({
   const setParam = useSetSearchParam();
 
   return (
-    <select
-      id="sort"
-      aria-label="Sort topics"
-      value={value}
-      onChange={(e) => setParam("sort", e.target.value)}
-    >
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </select>
+    <span className="select-minimal">
+      <ChevronDown size={14} aria-hidden />
+      <select
+        id="sort"
+        aria-label="Sort topics"
+        value={value}
+        onChange={(e) => setParam("sort", e.target.value)}
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </span>
   );
 }

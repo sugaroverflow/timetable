@@ -64,8 +64,7 @@ export default async function ModerationPage({
       </div>
       <h3 className="people-heading">Unpublished Topics</h3>
       {data.moderationQueue.length > 1 ? (
-        <div className="toolbar">
-          <label htmlFor="sort">Sort</label>
+        <div className="toolbar feed-toolbar">
           <ListSortControl value={sort} options={PENDING_SORTS} />
         </div>
       ) : null}

@@ -108,7 +108,8 @@ export async function listTimetableHosts(
   const members = await listMembers(timetableId);
   return members
     .filter((m) => m.roles.includes("host"))
-    .map((m) => ({ id: m.user.id, name: m.user.name }));
+    .map((m) => ({ id: m.user.id, name: m.user.name }))
+    .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
 }
 
 export async function listMembers(
