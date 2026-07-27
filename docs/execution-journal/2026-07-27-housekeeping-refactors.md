@@ -45,10 +45,11 @@ fetch the social cards).
   pages, Analysis rework, `/admin`, Atom feed + export + forum-delete REST
   rows, OG cards, membership slugs powering permalinks, favicon shipped,
   description field removed, residual "drafts" wording.
-- `actions/checkout` and `actions/setup-node` bumped v4 → v5 everywhere
-  (kills the Node 20 runner deprecation warnings; deploy-production.yml got
-  the version bump only). Dead `AUTH_SECRET` CI env var deleted (read
-  nowhere; there is no Auth.js).
+- Flagged for Ed (agent credentials can't push workflow files): bump
+  `actions/checkout` and `actions/setup-node` v4 → v5 in all four workflows
+  (kills the Node 20 runner deprecation warnings; deploy-production.yml
+  version bump only) and delete the dead `AUTH_SECRET` env var from ci.yml
+  (read nowhere; there is no Auth.js).
 
 ## Deliberately not done
 
