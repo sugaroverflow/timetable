@@ -58,7 +58,7 @@ export type DashboardData = {
     commentCount: number;
     availabilityCount: number;
     latestActivityAt: Date | null;
-    /** Topics this elector hearted (grouped by host in the UI). */
+    /** Topics this elector hearted (a sortable sub-table in the UI). */
     heartedTopics: {
       topicId: string;
       title: string;
@@ -66,6 +66,8 @@ export type DashboardData = {
       hostId: string;
       hostName: string | null;
       hostSlug: string | null;
+      /** This elector's public comments on this topic. */
+      commentCount: number;
     }[];
   }[];
   unallocatedTopics: {
@@ -290,10 +292,12 @@ function heartStatsByElector(
   return stats;
 }
 
-/** Per-elector hearted topics for the "Show ❤️s" toggle — same cutoff/filter
- * as the heart counts, with the host attached so the UI can group by host. */
+/** Per-elector hearted topics for the per-row disclosure — same cutoff/
+ * filter as the heart counts, with the host and the elector's own comment
+ * count on each topic attached for the sortable sub-table. */
 function heartedTopicsByElector(
   heartActivityRows: HeartActivityRow[],
+  commentsByElectorTopic: Map<string, number>,
 ): Map<string, DashboardData["electorActivity"][number]["heartedTopics"]> {
   const byElector = new Map<
     string,
@@ -308,6 +312,8 @@ function heartedTopicsByElector(
       hostId: r.hostId,
       hostName: r.hostName,
       hostSlug: r.hostSlug,
+      commentCount:
+        commentsByElectorTopic.get(`${r.electorId}:${r.topicId}`) ?? 0,
     });
     byElector.set(r.electorId, list);
   }
@@ -326,14 +332,20 @@ function statsBy(
   );
 }
 
-/** Public, non-hidden comments per elector inside the activity window. */
+/** Public, non-hidden comments per elector inside the activity window,
+ * counted per topic — the per-elector totals and the per-topic counts for
+ * the hearted-topics sub-table both derive from one grouped query. */
 async function loadCommentActivity(
   activityTopicConds: SQL[],
   activitySince: Date | undefined,
-): Promise<Map<string, Stat>> {
+): Promise<{
+  byElector: Map<string, Stat>;
+  byElectorTopic: Map<string, number>;
+}> {
   const commentRows = await db
     .select({
       electorId: comments.authorId,
+      topicId: comments.topicId,
       count: sql<number>`count(*)::int`,
       latestAt: sql<Date | null>`max(${comments.createdAt})`,
     })
@@ -347,8 +359,17 @@ async function loadCommentActivity(
         ...(activitySince ? [gte(comments.createdAt, activitySince)] : []),
       ),
     )
-    .groupBy(comments.authorId);
-  return statsBy(commentRows);
+    .groupBy(comments.authorId, comments.topicId);
+  const byElector = new Map<string, Stat>();
+  const byElectorTopic = new Map<string, number>();
+  for (const r of commentRows) {
+    const cur = byElector.get(r.electorId) ?? { count: 0, latestAt: null };
+    cur.count += r.count;
+    cur.latestAt = latestDate(cur.latestAt, r.latestAt);
+    byElector.set(r.electorId, cur);
+    byElectorTopic.set(`${r.electorId}:${r.topicId}`, r.count);
+  }
+  return { byElector, byElectorTopic };
 }
 
 /** Availability updates per elector inside the activity window. */
@@ -393,11 +414,15 @@ function buildElectorActivity(args: {
   electorRows: { userId: string; name: string | null }[];
   heartActivityRows: HeartActivityRow[];
   commentsByElector: Map<string, Stat>;
+  commentsByElectorTopic: Map<string, number>;
   availabilityByElector: Map<string, Stat>;
   filter: ElectorActivityFilter;
 }): DashboardData["electorActivity"] {
   const heartsByElector = heartStatsByElector(args.heartActivityRows);
-  const heartedByElector = heartedTopicsByElector(args.heartActivityRows);
+  const heartedByElector = heartedTopicsByElector(
+    args.heartActivityRows,
+    args.commentsByElectorTopic,
+  );
 
   return args.electorRows
     .map((elector) => {
@@ -533,7 +558,7 @@ export async function getDashboard(
 
   const heartActivityRows = await loadHeartActivity(heartCountConds);
 
-  const commentsByElector = await loadCommentActivity(
+  const commentActivity = await loadCommentActivity(
     activityTopicConds,
     activitySince,
   );
@@ -545,7 +570,8 @@ export async function getDashboard(
   const electorActivity = buildElectorActivity({
     electorRows,
     heartActivityRows,
-    commentsByElector,
+    commentsByElector: commentActivity.byElector,
+    commentsByElectorTopic: commentActivity.byElectorTopic,
     availabilityByElector,
     filter: opts.electorActivity ?? "all",
   });

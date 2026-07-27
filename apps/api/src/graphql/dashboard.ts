@@ -92,6 +92,7 @@ const ElectorHeartedTopicType = builder
       hostId: t.exposeID("hostId"),
       hostName: t.exposeString("hostName", { nullable: true }),
       hostSlug: t.exposeString("hostSlug", { nullable: true }),
+      commentCount: t.exposeInt("commentCount"),
     }),
   });
 

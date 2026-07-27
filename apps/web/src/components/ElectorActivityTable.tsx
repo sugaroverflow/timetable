@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { Fragment, useState } from "react";
 
+import { BreakdownCaret } from "@/components/BreakdownPanel";
+import { relativeTime } from "@/lib/relativeTime";
 import { topicPath } from "@/lib/topicPath";
 
 type HeartedTopic = {
@@ -12,6 +14,7 @@ type HeartedTopic = {
   hostId: string;
   hostName: string | null;
   hostSlug: string | null;
+  commentCount: number;
 };
 
 export type ElectorRow = {
@@ -24,68 +27,171 @@ export type ElectorRow = {
 };
 
 type SortKey = "name" | "hearts" | "comments" | "activity";
+type TopicSortKey = "name" | "host" | "comments";
 
-function groupByHost(topics: HeartedTopic[]) {
-  const map = new Map<
-    string,
-    { hostName: string | null; hostSlug: string | null; topics: HeartedTopic[] }
-  >();
-  for (const t of topics) {
-    const group = map.get(t.hostId) ?? {
-      hostName: t.hostName,
-      hostSlug: t.hostSlug,
-      topics: [],
-    };
-    group.topics.push(t);
-    map.set(t.hostId, group);
-  }
-  return Array.from(map.values());
+function SortHeader({
+  label,
+  active,
+  dir,
+  onToggle,
+}: {
+  label: string;
+  active: boolean;
+  dir: "asc" | "desc";
+  onToggle: () => void;
+}) {
+  return (
+    <th
+      aria-sort={active ? (dir === "asc" ? "ascending" : "descending") : "none"}
+    >
+      <button
+        type="button"
+        className={active ? "th-sort th-sort-active" : "th-sort"}
+        onClick={onToggle}
+      >
+        {label}
+        <span aria-hidden className="th-sort-arrow">
+          {active ? (dir === "asc" ? " ▲" : " ▼") : ""}
+        </span>
+      </button>
+    </th>
+  );
 }
 
-/** The expanded row under an elector when "Show ❤️s" is on: the topics they
- * hearted, grouped by host. */
-function HeartsRow({ slug, topics }: { slug: string; topics: HeartedTopic[] }) {
+/** The fold under an elector row: the topics they ❤️'d as a sortable table
+ * (QA 2026-07-27 — replaced the page-wide "Show ❤️s" toggle and its
+ * host-grouped lists). "Comments" is THIS elector's comments per topic. */
+function HeartedTopicsTable({
+  slug,
+  topics,
+}: {
+  slug: string;
+  topics: HeartedTopic[];
+}) {
+  const [key, setKey] = useState<TopicSortKey>("name");
+  const [dir, setDir] = useState<"asc" | "desc">("asc");
+
+  function toggle(next: TopicSortKey) {
+    if (next === key) {
+      setDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setKey(next);
+      setDir(next === "comments" ? "desc" : "asc");
+    }
+  }
+
+  const sorted = [...topics].sort((a, b) => {
+    let cmp = 0;
+    switch (key) {
+      case "name":
+        cmp = a.title.localeCompare(b.title);
+        break;
+      case "host":
+        cmp = (a.hostName ?? "").localeCompare(b.hostName ?? "");
+        break;
+      case "comments":
+        cmp = a.commentCount - b.commentCount;
+        break;
+    }
+    return dir === "asc" ? cmp : -cmp;
+  });
+
   return (
-    <tr className="elector-hearts-row">
-      <td colSpan={4}>
-        {topics.length === 0 ? (
-          <span className="faint" style={{ fontSize: 12 }}>
-            No hearts in range.
+    <table className="data-table sortable-table">
+      <thead>
+        <tr>
+          <SortHeader
+            label="Topic"
+            active={key === "name"}
+            dir={dir}
+            onToggle={() => toggle("name")}
+          />
+          <SortHeader
+            label="Host"
+            active={key === "host"}
+            dir={dir}
+            onToggle={() => toggle("host")}
+          />
+          <SortHeader
+            label="Comments"
+            active={key === "comments"}
+            dir={dir}
+            onToggle={() => toggle("comments")}
+          />
+        </tr>
+      </thead>
+      <tbody>
+        {sorted.map((t) => {
+          const href = topicPath(slug, t.hostSlug, t.slug, t.hostId);
+          return (
+            <tr key={t.topicId}>
+              <td>{href ? <Link href={href}>{t.title}</Link> : t.title}</td>
+              <td>{t.hostName ?? "Host"}</td>
+              <td className="mono">{t.commentCount}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+function ElectorRowItem({
+  slug,
+  elector,
+}: {
+  slug: string;
+  elector: ElectorRow;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Fragment>
+      <tr>
+        <td>
+          <span className="row" style={{ gap: 6, alignItems: "center" }}>
+            <BreakdownCaret open={open} onToggle={() => setOpen(!open)} />
+            <strong>{elector.electorName ?? "Elector"}</strong>
           </span>
-        ) : (
-          <div className="elector-hearts">
-            {groupByHost(topics).map((group) => (
-              <div
-                key={group.hostSlug ?? group.hostName ?? "host"}
-                className="elector-hearts-group"
-              >
-                <div className="faint" style={{ fontSize: 12 }}>
-                  {group.hostName ?? "Host"}
-                </div>
-                <ul>
-                  {group.topics.map((t) => {
-                    const href = topicPath(slug, t.hostSlug, t.slug, t.hostId);
-                    return (
-                      <li key={t.topicId}>
-                        {href ? <Link href={href}>{t.title}</Link> : t.title}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            ))}
-          </div>
-        )}
-      </td>
-    </tr>
+        </td>
+        <td className="mono">{elector.heartCount}</td>
+        <td className="mono">{elector.commentCount}</td>
+        <td>
+          {elector.latestActivityAt ? (
+            // suppressHydrationWarning: server and client may render this a
+            // minute apart; the hover title carries the exact timestamp.
+            <span
+              title={new Date(elector.latestActivityAt).toLocaleString()}
+              suppressHydrationWarning
+            >
+              {relativeTime(elector.latestActivityAt)}
+            </span>
+          ) : (
+            <span className="faint">None</span>
+          )}
+        </td>
+      </tr>
+      {open ? (
+        <tr className="elector-hearts-row">
+          <td colSpan={4}>
+            {elector.heartedTopics.length === 0 ? (
+              <span className="faint" style={{ fontSize: 12 }}>
+                No ❤️s yet.
+              </span>
+            ) : (
+              <HeartedTopicsTable slug={slug} topics={elector.heartedTopics} />
+            )}
+          </td>
+        </tr>
+      ) : null}
+    </Fragment>
   );
 }
 
 /**
- * Elector-activity table with click-to-sort headers and a "Show ❤️s" toggle
- * that expands each row into the topics they hearted, grouped by host
- * (product feedback round 1). Sorting/toggling are client-side over the rows
- * the server already returned (respecting the page's host/since filters).
+ * Elector-activity table with click-to-sort headers. Each row folds open
+ * (disclosure triangle, same as the ❤️-breakdown carets) into a sortable
+ * table of the topics that elector ❤️'d. Sorting is client-side over the
+ * rows the server already returned (respecting the page's host filter).
  */
 export function ElectorActivityTable({
   slug,
@@ -98,7 +204,6 @@ export function ElectorActivityTable({
 }) {
   const [sortKey, setSortKey] = useState<SortKey>("activity");
   const [dir, setDir] = useState<"asc" | "desc">("desc");
-  const [showHearts, setShowHearts] = useState(false);
 
   function toggleSort(key: SortKey) {
     if (key === sortKey) {
@@ -131,76 +236,44 @@ export function ElectorActivityTable({
     return dir === "asc" ? cmp : -cmp;
   });
 
-  function header(key: SortKey, label: string) {
-    const active = sortKey === key;
-    return (
-      <th
-        aria-sort={
-          active ? (dir === "asc" ? "ascending" : "descending") : "none"
-        }
-      >
-        <button
-          type="button"
-          className={active ? "th-sort th-sort-active" : "th-sort"}
-          onClick={() => toggleSort(key)}
-        >
-          {label}
-          <span aria-hidden className="th-sort-arrow">
-            {active ? (dir === "asc" ? " ▲" : " ▼") : ""}
-          </span>
-        </button>
-      </th>
-    );
-  }
-
   return (
     <div className="table-wrap">
-      <div
-        className="row"
-        style={{ justifyContent: "flex-end", marginBottom: 8 }}
-      >
-        <label
-          className="row"
-          style={{ gap: 6, alignItems: "center", fontSize: 13 }}
-        >
-          <input
-            type="checkbox"
-            checked={showHearts}
-            onChange={(e) => setShowHearts(e.target.checked)}
-          />
-          Show ❤️s
-        </label>
-      </div>
       <table className="data-table sortable-table">
         <thead>
           <tr>
-            {header("name", electorLabel)}
-            {header("hearts", "❤️")}
-            {header("comments", "Comments")}
-            {header("activity", "Last activity")}
+            <SortHeader
+              label={electorLabel}
+              active={sortKey === "name"}
+              dir={dir}
+              onToggle={() => toggleSort("name")}
+            />
+            <SortHeader
+              label="❤️"
+              active={sortKey === "hearts"}
+              dir={dir}
+              onToggle={() => toggleSort("hearts")}
+            />
+            <SortHeader
+              label="Comments"
+              active={sortKey === "comments"}
+              dir={dir}
+              onToggle={() => toggleSort("comments")}
+            />
+            <SortHeader
+              label="Last activity"
+              active={sortKey === "activity"}
+              dir={dir}
+              onToggle={() => toggleSort("activity")}
+            />
           </tr>
         </thead>
         <tbody>
           {sorted.map((elector) => (
-            <Fragment key={elector.electorId}>
-              <tr>
-                <td>
-                  <strong>{elector.electorName ?? "Elector"}</strong>
-                </td>
-                <td className="mono">{elector.heartCount}</td>
-                <td className="mono">{elector.commentCount}</td>
-                <td>
-                  {elector.latestActivityAt ? (
-                    new Date(elector.latestActivityAt).toLocaleString()
-                  ) : (
-                    <span className="faint">None</span>
-                  )}
-                </td>
-              </tr>
-              {showHearts ? (
-                <HeartsRow slug={slug} topics={elector.heartedTopics} />
-              ) : null}
-            </Fragment>
+            <ElectorRowItem
+              key={elector.electorId}
+              slug={slug}
+              elector={elector}
+            />
           ))}
         </tbody>
       </table>
