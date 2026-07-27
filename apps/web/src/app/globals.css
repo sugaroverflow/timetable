@@ -1770,15 +1770,3 @@ textarea {
 .divider-top {
   border-top: 1px solid var(--line);
 }
-
-/* Responsive stat grid (was inline gridTemplateColumns:repeat(4,1fr)). */
-.stat-grid {
-  display: grid;
-  gap: var(--space-3);
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-@media (max-width: 640px) {
-  .stat-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}

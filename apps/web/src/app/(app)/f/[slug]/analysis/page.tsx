@@ -28,14 +28,6 @@ const ACTIVITY_FILTERS = new Set([
 type Dashboard = {
   totalHearts: number;
   electorCount: number;
-  hostCount: number;
-  slotCount: number;
-  topicCounts: {
-    submitted: number;
-    published: number;
-    unpublished: number;
-    archived: number;
-  };
   topicLeaderboard: {
     id: string;
     title: string;
@@ -92,8 +84,7 @@ const QUERY = `
     timetable(idOrSlug: $s) { viewerRoles settings heartsCountFrom }
     timetableHosts(idOrSlug: $s) { id name }
     dashboard(idOrSlug: $s, hostId: $host, electorActivity: $activity, activitySince: $since) {
-      totalHearts electorCount hostCount slotCount
-      topicCounts { submitted published unpublished archived }
+      totalHearts electorCount
       topicLeaderboard { id title slug hostName hostSlug weightedScore l2Score devotionScore heartCount lastHeartAt }
       hostLeaderboard { hostId hostName weightedScore }
       electorActivity {
@@ -105,17 +96,6 @@ const QUERY = `
     }
   }
 `;
-
-function Stat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="card" style={{ textAlign: "center" }}>
-      <div style={{ fontFamily: "var(--serif)", fontSize: 28 }}>{value}</div>
-      <div className="faint" style={{ fontSize: 12 }}>
-        {label}
-      </div>
-    </div>
-  );
-}
 
 /** Unknown filter values fall back to safe defaults rather than erroring. */
 function normalizeFilters(sp: {
@@ -248,13 +228,6 @@ export default async function DashboardPage({
         <DashboardSinceFilter value={sinceValue} />
       </div>
 
-      <div className="stat-grid">
-        <Stat label="Published topics" value={d.topicCounts.published} />
-        <Stat label="Total ❤️" value={d.totalHearts} />
-        <Stat label="Electors" value={d.electorCount} />
-        <Stat label="Timeslots" value={d.slotCount} />
-      </div>
-
       <ConflictsCard conflicts={d.conflicts} />
 
       <div className="grid grid-2">
@@ -262,6 +235,9 @@ export default async function DashboardPage({
           slug={slug}
           hostLabel={hostLabel}
           entries={d.topicLeaderboard}
+          totalHearts={d.totalHearts}
+          electorCount={d.electorCount}
+          electorLabel={electorLabel}
         />
 
         {viewerIsAdmin ? (
