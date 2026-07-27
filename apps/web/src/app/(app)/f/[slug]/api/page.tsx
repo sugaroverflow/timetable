@@ -44,10 +44,20 @@ export default async function ApiPage({
       </section>
 
       <section className="stack">
+        <h3 className="people-heading">Atom feed</h3>
+        <p>
+          The published topics are available as an Atom feed at{" "}
+          <code>{`${env.apiUrl}/api/timetables/${slug}/feed.atom`}</code> — the
+          newest 50, with full topic bodies, no authentication. The feed exists
+          only while the forum is readable without signing in; feed readers also
+          discover it automatically from any forum page.
+        </p>
+      </section>
+
+      <section className="stack">
         <h3 className="people-heading">Planned</h3>
         <ul className="list">
           <li>Personal API tokens (read-only).</li>
-          <li>An RSS/Atom feed of published topics.</li>
           <li>An MCP server.</li>
         </ul>
       </section>
