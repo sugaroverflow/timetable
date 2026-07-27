@@ -21,12 +21,13 @@ const PUBLIC_BRAND_QUERY = `
 `;
 
 /**
- * Topbar identity (QA #59): inside a timetable the topbar shows only that
- * timetable's icon + name (linking home to its feed) — the app logotype and
- * switcher are gone (switching lives in the sidebar footer). Signed-in
- * viewers get the identity from their membership list; anonymous visitors
- * on a public timetable resolve it client-side (QA #59 round 3). Outside a
- * timetable it falls back to the app brand.
+ * Topbar identity (QA #59): inside a timetable the topbar shows that
+ * timetable's icon + name CENTERED (QA 2026-07-27 — the name left the
+ * sidebar head), linking home to its topics — the app logotype and switcher
+ * are gone (switching lives in the sidebar footer). Signed-in viewers get
+ * the identity from their membership list; anonymous visitors on a public
+ * timetable resolve it client-side (QA #59 round 3). Outside a timetable
+ * it falls back to the left-aligned app brand.
  */
 export function TopbarBrand({
   items,
@@ -36,7 +37,7 @@ export function TopbarBrand({
   fallbackHref?: string;
 }) {
   const pathname = usePathname();
-  const currentSlug = /^\/t\/([^/]+)/.exec(pathname ?? "")?.[1] ?? null;
+  const currentSlug = /^\/f\/([^/]+)/.exec(pathname ?? "")?.[1] ?? null;
   const [fetched, setFetched] = useState<BrandItem | null>(null);
   const listed = items.find((i) => i.slug === currentSlug) ?? null;
   const current =
@@ -69,7 +70,7 @@ export function TopbarBrand({
 
   if (current) {
     return (
-      <Link className="brand" href={`/f/${current.slug}/topics`}>
+      <Link className="brand topbar-center" href={`/f/${current.slug}/topics`}>
         {current.iconEmoji ? (
           <span className="tt-menu-icon tt-menu-icon-emoji" aria-hidden>
             {current.iconEmoji}

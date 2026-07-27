@@ -68,8 +68,29 @@ h3 {
   color: var(--topbar-ink);
 }
 
+/* Forum identity sits dead-center in the topbar (QA 2026-07-27 — moved out
+   of the sidebar head). Absolute so the flanking flex items (hamburger,
+   roles, email) can't nudge it off-center; capped + ellipsized so long
+   names never collide with them. */
+.topbar-center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  max-width: min(42vw, 480px);
+}
+.topbar-center > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.topbar-roles {
+  display: inline-flex;
+}
+
 @media (max-width: 640px) {
-  .topbar-email {
+  .topbar-email,
+  .topbar-roles {
     display: none;
   }
 }
@@ -344,23 +365,12 @@ textarea {
   max-height: calc(100vh - 40px);
   overflow-y: auto;
 }
-.sidebar-head {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
 /* Guard against min-content blowout from wide topic/comment content. */
 .shell-content {
   min-width: 0;
 }
 .topic-body {
   overflow-wrap: anywhere;
-}
-.sidebar-title {
-  font-family: var(--serif);
-  font-weight: var(--fw-bold);
-  font-size: 17px;
-  line-height: var(--lh-tight);
 }
 .side-nav {
   flex-direction: column;
