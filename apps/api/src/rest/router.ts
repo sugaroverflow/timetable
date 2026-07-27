@@ -52,6 +52,7 @@ import {
   sendEmail,
 } from "../email";
 import { env } from "../env";
+import { enforceActionLimit } from "../http/action-limits";
 import {
   getRequestId,
   logRequestError,
@@ -260,6 +261,12 @@ restRouter.post(
 
     const input = parseBody(inviteSchema, req, res);
     if (!input) return;
+    // Each address can become an invite email, so spend one unit per
+    // recipient — a pasted cohort is fine, a runaway loop is not.
+    if (
+      !(await enforceActionLimit(res, user.id, "invite", input.emails.length))
+    )
+      return;
 
     const results = await inviteEmails(
       timetableId,
@@ -293,6 +300,7 @@ restRouter.post(
 
     const input = parseBody(addPersonSchema, req, res);
     if (!input) return;
+    if (!(await enforceActionLimit(res, user.id, "invite"))) return;
 
     const email = normalizeEmail(input.email);
     const clerkUser = await getOrCreateClerkUser(email, input.name ?? null);
@@ -349,6 +357,7 @@ restRouter.post(
       res.status(400).json({ error: "Member has no email address" });
       return;
     }
+    if (!(await enforceActionLimit(res, user.id, "invite"))) return;
 
     const topics = await listHostTopics(membership.timetableId, member.id);
     const { subject, html } = renderInvite({

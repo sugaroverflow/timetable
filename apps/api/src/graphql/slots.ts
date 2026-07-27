@@ -18,6 +18,7 @@ import {
 import type { AvailabilityState } from "@timetable/db";
 import { canSeeHostOnly, isAdmin, isElector } from "@timetable/shared";
 
+import { assertActionLimit } from "../http/action-limits";
 import { builder } from "./builder";
 import {
   forbidden,
@@ -298,6 +299,7 @@ builder.mutationFields((t) => ({
       if (!canSeeHostOnly(viewer)) forbidden("Hosts/admins only");
       const body = args.body.trim();
       if (!body) throw new GraphQLError("Comment cannot be empty");
+      await assertActionLimit(user.id, "comment");
       const comment = await addSlotComment(slot.id, user.id, body);
       const author = await getUserById(user.id);
       return {
