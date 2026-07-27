@@ -22,8 +22,8 @@ type Data = {
 
 const QUERY = `
   query Moderation($s: String!) {
-    timetable(idOrSlug: $s) { viewerRoles settings }
-    timetableHosts(idOrSlug: $s) { id name }
+    timetable: forum(idOrSlug: $s) { viewerRoles settings }
+    timetableHosts: forumHosts(idOrSlug: $s) { id name }
     moderationQueue(idOrSlug: $s) {
       id title slug hostId hostSlug hostName hostImage status bodyMd bodyHtml coverImageUrl updatedAt
       ${commentTree("adminComments")}

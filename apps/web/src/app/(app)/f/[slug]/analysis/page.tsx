@@ -72,8 +72,8 @@ type Data = {
 
 const QUERY = `
   query Dashboard($s: String!, $host: String, $activityHost: String) {
-    timetable(idOrSlug: $s) { viewerRoles settings }
-    timetableHosts(idOrSlug: $s) { id name }
+    timetable: forum(idOrSlug: $s) { viewerRoles settings }
+    timetableHosts: forumHosts(idOrSlug: $s) { id name }
     dashboard(idOrSlug: $s, hostId: $host, activityHostId: $activityHost) {
       totalHearts electorCount hostCount
       topicLeaderboard { id title slug hostId hostName hostImage hostSlug weightedScore l2Score devotionScore heartCount commentTotal commenterCount commentL2 commentL1 commentDevotion }

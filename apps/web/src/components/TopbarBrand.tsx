@@ -16,7 +16,7 @@ export type BrandItem = {
 
 const PUBLIC_BRAND_QUERY = `
   query TopbarBrand($s: String!) {
-    timetable(idOrSlug: $s) { name settings }
+    timetable: forum(idOrSlug: $s) { name settings }
   }
 `;
 

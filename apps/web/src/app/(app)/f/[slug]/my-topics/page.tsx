@@ -23,9 +23,9 @@ type Data = {
 
 const QUERY = `
   query HostDashboard($s: String!) {
-    timetable(idOrSlug: $s) { viewerRoles settings }
+    timetable: forum(idOrSlug: $s) { viewerRoles settings }
     me { id }
-    timetableHosts(idOrSlug: $s) { id name }
+    timetableHosts: forumHosts(idOrSlug: $s) { id name }
     hostDashboard(idOrSlug: $s) {
       id title slug hostId hostSlug status bodyMd bodyHtml coverImageUrl updatedAt
       ${commentTree()}

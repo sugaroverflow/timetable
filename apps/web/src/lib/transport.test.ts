@@ -98,14 +98,12 @@ describe("gql", () => {
 describe("rest", () => {
   it("joins the path onto the API URL and returns the raw Response", async () => {
     const mock = stubFetch(jsonResponse({ ok: true }, 201));
-    const res = await createTransport(fakeAuth("tok")).rest("/api/timetables", {
+    const res = await createTransport(fakeAuth("tok")).rest("/api/forums", {
       method: "POST",
     });
 
     expect(res.status).toBe(201);
-    expect(mock.mock.calls[0]?.[0]).toBe(
-      "http://localhost:4000/api/timetables",
-    );
+    expect(mock.mock.calls[0]?.[0]).toBe("http://localhost:4000/api/forums");
   });
 
   it("sends Bearer but never x-view-as (REST is the write surface)", async () => {

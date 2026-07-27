@@ -14,7 +14,7 @@ import {
 import { useGqlAction } from "@/lib/useGqlAction";
 
 const MUTATION = `mutation Theme($s: String!, $theme: String, $cover: String, $icon: String, $emoji: String) {
-  updateTimetableSettings(
+  updateTimetableSettings: updateForumSettings(
     idOrSlug: $s
     themeJson: $theme
     coverImageUrl: $cover

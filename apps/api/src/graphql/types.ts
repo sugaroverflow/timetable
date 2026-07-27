@@ -14,7 +14,7 @@ import { builder } from "./builder";
 export type GqlTimetable = Timetable & { viewerRoles: string[] };
 
 export const TimetableType = builder
-  .objectRef<GqlTimetable>("Timetable")
+  .objectRef<GqlTimetable>("Forum")
   .implement({
     fields: (t) => ({
       id: t.exposeID("id"),

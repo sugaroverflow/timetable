@@ -40,7 +40,7 @@ type GqlTimetableRoute = Pick<Timetable, "id" | "slug" | "privacy">;
 type GqlMembership = { id: string; roles: string[]; timetable: GqlTimetable };
 
 const TimetableRouteType = builder
-  .objectRef<GqlTimetableRoute>("TimetableRoute")
+  .objectRef<GqlTimetableRoute>("ForumRoute")
   .implement({
     fields: (t) => ({
       id: t.exposeID("id"),
@@ -55,7 +55,7 @@ const MembershipType = builder
     fields: (t) => ({
       id: t.exposeID("id"),
       roles: t.exposeStringList("roles"),
-      timetable: t.field({ type: TimetableType, resolve: (m) => m.timetable }),
+      forum: t.field({ type: TimetableType, resolve: (m) => m.timetable }),
     }),
   });
 
@@ -64,7 +64,7 @@ const MembershipType = builder
 // ---------------------------------------------------------------------------
 
 builder.queryFields((t) => ({
-  myTimetables: t.field({
+  myForums: t.field({
     type: [MembershipType],
     resolve: async (_p, _a, ctx) => {
       if (!ctx.user) return [];
@@ -81,7 +81,7 @@ builder.queryFields((t) => ({
     },
   }),
 
-  timetable: t.field({
+  forum: t.field({
     type: TimetableType,
     nullable: true,
     args: { idOrSlug: t.arg.string({ required: true }) },
@@ -94,17 +94,14 @@ builder.queryFields((t) => ({
 
   myMembership: t.field({
     type: ["String"],
-    args: { timetableId: t.arg.string({ required: true }) },
+    args: { forumId: t.arg.string({ required: true }) },
     resolve: async (_p, args, ctx) =>
-      (await getViewerRoles(
-        ctx.user?.id ?? null,
-        args.timetableId,
-      )) as string[],
+      (await getViewerRoles(ctx.user?.id ?? null, args.forumId)) as string[],
   }),
 
   /** Slug of the timetable the viewer last engaged with (for the
    * signed-in landing redirect and brand link). */
-  myLastVisitedTimetableSlug: t.string({
+  myLastVisitedForumSlug: t.string({
     nullable: true,
     resolve: async (_p, _args, ctx) =>
       ctx.user ? getLastVisitedTimetableSlug(ctx.user.id) : null,
@@ -125,7 +122,7 @@ builder.queryFields((t) => ({
   }),
 
   /** Public hostname routing lookup. Returns only route-safe fields. */
-  timetableRouteByDomain: t.field({
+  forumRouteByDomain: t.field({
     type: TimetableRouteType,
     nullable: true,
     args: { host: t.arg.string({ required: true }) },
@@ -160,7 +157,7 @@ builder.mutationFields((t) => ({
   }),
 
   /** Admin: update timetable name, visibility, custom domain. */
-  updateTimetableProfile: t.field({
+  updateForumProfile: t.field({
     type: TimetableType,
     args: {
       idOrSlug: t.arg.string({ required: true }),
@@ -189,7 +186,7 @@ builder.mutationFields((t) => ({
         customDomain:
           args.customDomain != null ? args.customDomain.trim() : undefined,
       });
-      if (!updated) notFound("Timetable not found");
+      if (!updated) notFound("Forum not found");
       return { ...updated, viewerRoles: readable.roles as string[] };
     },
   }),
@@ -220,7 +217,7 @@ builder.mutationFields((t) => ({
       // Deliberately NOT the request memo: this re-read must observe the
       // heartsCountFrom just written (the memo holds the pre-write row).
       const updated = await getReadableTimetable(user.id, args.idOrSlug);
-      if (!updated) notFound("Timetable not found");
+      if (!updated) notFound("Forum not found");
       return {
         ...updated.timetable,
         viewerRoles: updated.roles as string[],
@@ -231,7 +228,7 @@ builder.mutationFields((t) => ({
 
 builder.mutationFields((t) => ({
   /** Admin: update role labels and theme colors (persisted to settings). */
-  updateTimetableSettings: t.field({
+  updateForumSettings: t.field({
     type: TimetableType,
     args: {
       idOrSlug: t.arg.string({ required: true }),
@@ -334,7 +331,7 @@ builder.mutationFields((t) => ({
         readable.timetable.id,
         patch,
       );
-      if (!updated) notFound("Timetable not found");
+      if (!updated) notFound("Forum not found");
       return { ...updated, viewerRoles: readable.roles as string[] };
     },
   }),

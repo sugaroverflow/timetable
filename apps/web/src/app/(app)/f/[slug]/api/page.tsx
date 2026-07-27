@@ -47,7 +47,7 @@ export default async function ApiPage({
         <h3 className="people-heading">Atom feed</h3>
         <p>
           The published topics are available as an Atom feed at{" "}
-          <code>{`${env.apiUrl}/api/timetables/${slug}/feed.atom`}</code> — the
+          <code>{`${env.apiUrl}/api/forums/${slug}/feed.atom`}</code> — the
           newest 50, with full topic bodies, no authentication. The feed exists
           only while the forum is readable without signing in; feed readers also
           discover it automatically from any forum page.

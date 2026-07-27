@@ -30,7 +30,7 @@ export function InviteForm({ timetableId }: { timetableId: string }) {
     }
 
     setBusy(true);
-    const res = await clientApi(`/api/timetables/${timetableId}/invites`, {
+    const res = await clientApi(`/api/forums/${timetableId}/invites`, {
       method: "POST",
       body: JSON.stringify({ emails: list, roles }),
     });

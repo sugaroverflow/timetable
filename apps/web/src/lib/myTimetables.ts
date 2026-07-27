@@ -11,8 +11,8 @@ export type MyTimetable = {
 
 const QUERY = `
   query MyTimetables {
-    myTimetables {
-      timetable { slug name privacy settings }
+    myTimetables: myForums {
+      timetable: forum { slug name privacy settings }
     }
   }
 `;

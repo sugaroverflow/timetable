@@ -14,7 +14,7 @@ export default async function TimetablesLandingPage() {
   if (!userId) redirect("/sign-in");
 
   const data = await gqlFetch<{ myLastVisitedTimetableSlug: string | null }>(
-    `query { myLastVisitedTimetableSlug }`,
+    `query { myLastVisitedTimetableSlug: myLastVisitedForumSlug }`,
   );
   if (data.myLastVisitedTimetableSlug) {
     redirect(`/f/${data.myLastVisitedTimetableSlug}/topics`);

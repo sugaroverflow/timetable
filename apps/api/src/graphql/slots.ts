@@ -220,7 +220,7 @@ builder.mutationFields((t) => ({
         location: args.location ?? undefined,
       });
       const readable = await readTimetable(ctx, slot.timetableId);
-      if (!readable) notFound("Timetable not found");
+      if (!readable) notFound("Forum not found");
       return { ...readable.timetable, viewerRoles: readable.roles as string[] };
     },
   }),

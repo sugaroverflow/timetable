@@ -17,7 +17,7 @@ export async function createTimetableAction(
 
   if (!name) return { error: "Name is required" };
 
-  const res = await apiFetch("/api/timetables", {
+  const res = await apiFetch("/api/forums", {
     method: "POST",
     body: JSON.stringify({
       name,

@@ -45,10 +45,10 @@ type Data = {
 
 const QUERY = `
   query Feed($s: String!, $sort: String, $seed: String, $host: String, $hearted: Boolean, $heartedBy: String, $limit: Int, $offset: Int) {
-    timetable(idOrSlug: $s) { viewerRoles settings viewerHeartedPublishedCount }
+    timetable: forum(idOrSlug: $s) { viewerRoles settings viewerHeartedPublishedCount }
     me { id }
     myFeedLastSeenAt(idOrSlug: $s)
-    timetableHosts(idOrSlug: $s) { id name }
+    timetableHosts: forumHosts(idOrSlug: $s) { id name }
     topicFeed(idOrSlug: $s, sort: $sort, seed: $seed, hostId: $host, heartedByMe: $hearted, heartedBy: $heartedBy, limit: $limit, offset: $offset) {
       ${TOPIC_FEED_FIELDS}
       contentUpdatedAt

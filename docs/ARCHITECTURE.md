@@ -7,9 +7,11 @@ through Drizzle.
 Since the 2026-07 rebrand the product is branded **Topic** (future domain
 topic.forum) and the tenant entity is a "forum" in all user-facing copy. Code
 identifiers, the `@timetable/*` package names, the `/timetables` resolver,
-CSS classes, and the GraphQL schema deliberately keep `timetable` naming — new
-user-visible strings must say forum/Topic, and this document uses the code
-names. The domain cutover (still timetable.love) happens separately.
+CSS classes, and the DB schema deliberately keep `timetable` naming — but the
+PUBLIC API surface (GraphQL exposed names, `/api/forums/*` REST URLs) says
+forum (2026-07-27; see the GraphQL Surface section), and new user-visible
+strings must say forum/Topic. This document otherwise uses the code names.
+The domain cutover (still timetable.love) happens separately.
 
 ## Repository Shape
 
@@ -90,7 +92,7 @@ Codex/agent workflows are separate from the app runtime.
   host filter with profile card, and "new since last visit" highlights;
   hosts/admins get a sortable per-elector breakdown table (the shared
   `BreakdownTable` component: L1/L2/devotion weights + hearted-at, footer
-  sums matching the topic's scores, names opening profile cards)
+  sums matching the topic's scores, names linking to person pages)
 - topic permalinks at `/f/[slug]/[hostSlug]/[topicSlug]` (stale host segments
   redirect; old `/t/` URLs permanently redirect and must keep doing so)
 - person pages at `/f/[slug]/[userSlug]` (per-forum member profiles; a
@@ -157,19 +159,23 @@ REST routes currently include:
 
 | Route | Purpose |
 | --- | --- |
-| `POST /api/timetables` | Create a timetable; creator becomes owner and admin |
-| `POST /api/timetables/:id/invites` | Invite emails and assign timetable roles |
-| `POST /api/timetables/:id/people` | Admin add-person: silently create the Clerk user + local row + membership in one call, no email |
+| `POST /api/forums` | Create a timetable; creator becomes owner and admin |
+| `POST /api/forums/:id/invites` | Invite emails and assign timetable roles |
+| `POST /api/forums/:id/people` | Admin add-person: silently create the Clerk user + local row + membership in one call, no email |
 | `POST /api/memberships/:id/invite` | Admin send (or resend) the invite email via Resend; records `inviteSentAt` |
 | `PATCH /api/memberships/:id/roles` | Change member roles |
 | `DELETE /api/memberships/:id` | Remove a member (the owner can never be removed) |
 | `POST /api/jobs/digests` | Cron-protected digest job |
-| `GET /api/timetables/:idOrSlug/calendar.ics` | Calendar feed |
-| `GET /api/timetables/:idOrSlug/feed.atom` | Atom feed of the newest published topics (anonymous-only — private forums 404) |
-| `GET /api/timetables/:idOrSlug/export` | Read-only JSON export of a forum's public data |
-| `DELETE /api/timetables/:id` | Delete a forum (sysadmin dashboard) |
+| `GET /api/forums/:idOrSlug/calendar.ics` | Calendar feed |
+| `GET /api/forums/:idOrSlug/feed.atom` | Atom feed of the newest published topics (anonymous-only — private forums 404) |
+| `GET /api/forums/:idOrSlug/export` | Read-only JSON export of a forum's public data |
+| `DELETE /api/forums/:id` | Delete a forum (sysadmin dashboard) |
 | `POST /api/uploads` | Signed direct browser uploads to S3-compatible storage |
 | `GET /health` | Health check |
+
+Legacy `/api/timetables/:idOrSlug/{calendar.ics,feed.atom}` URLs 301-redirect
+to the `/api/forums` equivalents (query string preserved — ICS tokens live in
+members' calendar apps). Never remove.
 
 The add-person flow deliberately splits account creation from the invite
 email: `getOrCreateClerkUser` (`auth/clerk.ts`) finds or silently creates the
@@ -179,14 +185,18 @@ and the invite email is an explicit second step. `inviteSentAt` on
 
 ## GraphQL Surface
 
+The public surface uses **forum** naming (2026-07-27); the web app's own
+queries alias the fields back to internal `timetable` names
+(`timetable: forum(idOrSlug: $s)`), so TypeScript identifiers stay unchanged.
+
 Main queries include:
 
 - `me`
-- `myTimetables`
-- `timetable`
+- `myForums`
+- `forum`
 - `myMembership`
-- `timetableMembers`
-- `timetablePeople` / `person` (People page and bio modal, with published
+- `forumMembers`
+- `forumPeople` / `person` (People page and person pages, with published
   topics per person)
 - `topicFeed` (sort + seed + host + hearted-by-me filters, offset paging)
 - `topicPermalink`
@@ -195,13 +205,13 @@ Main queries include:
 - `activityTimeline` (actor, date-range args)
 - `notifications` / `notificationsUnread`
 - `myFeedLastSeenAt`
-- `timetableHosts`
+- `forumHosts`
 - `calendar`
 - `slotComments`
 - `dashboard`
 - `myIcsToken`
 - `timetableRouteByDomain`
-- `timetableByDomain`
+- `forumByDomain`
 
 The `dashboard` query accepts optional host and elector-activity filters for
 host/admin planning views.

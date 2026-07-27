@@ -29,7 +29,7 @@ const SLOT_FIELDS = `
 
 const QUERY = `
   query Calendar($s: String!, $audience: String) {
-    timetable(idOrSlug: $s) { viewerRoles settings }
+    timetable: forum(idOrSlug: $s) { viewerRoles settings }
     calendar(idOrSlug: $s, audience: $audience) { ${SLOT_FIELDS} }
     topicFeed(idOrSlug: $s) { id title }
   }
@@ -37,7 +37,7 @@ const QUERY = `
 
 const QUERY_AUTHED = `
   query CalendarAuthed($s: String!, $audience: String) {
-    timetable(idOrSlug: $s) { viewerRoles settings }
+    timetable: forum(idOrSlug: $s) { viewerRoles settings }
     calendar(idOrSlug: $s, audience: $audience) { ${SLOT_FIELDS} }
     topicFeed(idOrSlug: $s) { id title }
     myIcsToken
@@ -46,7 +46,7 @@ const QUERY_AUTHED = `
 
 function buildIcsUrl(slug: string, token: string | null | undefined): string {
   return (
-    `${env.apiUrl}/api/timetables/${slug}/calendar.ics` +
+    `${env.apiUrl}/api/forums/${slug}/calendar.ics` +
     (token ? `?token=${token}` : "")
   );
 }

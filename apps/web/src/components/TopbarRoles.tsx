@@ -12,7 +12,7 @@ import {
 
 const ROLES_QUERY = `
   query TopbarRoles($s: String!) {
-    timetable(idOrSlug: $s) { viewerRoles settings }
+    timetable: forum(idOrSlug: $s) { viewerRoles settings }
   }
 `;
 

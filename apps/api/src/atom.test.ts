@@ -16,7 +16,7 @@ function feed(entries: AtomEntry[] = [ENTRY]) {
   return buildAtomFeed({
     title: "Demo Forum",
     subtitle: "Published topics",
-    feedUrl: "https://topic.forum/api/timetables/demo/feed.atom",
+    feedUrl: "https://topic.forum/api/forums/demo/feed.atom",
     siteUrl: "https://topic.forum/f/demo/topics",
     entries,
   });
@@ -28,7 +28,7 @@ describe("buildAtomFeed", () => {
     expect(xml).toContain(`<?xml version="1.0" encoding="utf-8"?>`);
     expect(xml).toContain(`<feed xmlns="http://www.w3.org/2005/Atom">`);
     expect(xml).toContain(
-      `<link rel="self" type="application/atom+xml" href="https://topic.forum/api/timetables/demo/feed.atom"/>`,
+      `<link rel="self" type="application/atom+xml" href="https://topic.forum/api/forums/demo/feed.atom"/>`,
     );
     expect(xml).toContain(`</feed>`);
   });

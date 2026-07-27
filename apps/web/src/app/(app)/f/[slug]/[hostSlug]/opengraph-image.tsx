@@ -16,7 +16,7 @@ export const contentType = "image/png";
 
 const PERSON_QUERY = `
   query OgPerson($s: String!, $userSlug: String!) {
-    timetable(idOrSlug: $s) { name settings }
+    timetable: forum(idOrSlug: $s) { name settings }
     person(idOrSlug: $s, userSlug: $userSlug) { name image }
   }
 `;

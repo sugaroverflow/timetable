@@ -227,7 +227,7 @@ builder.queryFields((t) => ({
   }),
 
   /** Resolve a timetable by custom domain (for hostname routing). */
-  timetableByDomain: t.field({
+  forumByDomain: t.field({
     type: TimetableType,
     nullable: true,
     args: { host: t.arg.string({ required: true }) },
