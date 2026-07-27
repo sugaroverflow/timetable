@@ -113,6 +113,7 @@ export default async function DashboardPage({
   const hostLabel = roleLabel(settings.roleLabels, "host");
   const hostsPlural = pluralLabel(hostLabel);
   const electorLabel = roleLabel(settings.roleLabels, "elector");
+  const adminsPlural = pluralLabel(roleLabel(settings.roleLabels, "admin"));
   const viewerIsAdmin = isAdmin(roles);
 
   return (
@@ -168,7 +169,12 @@ export default async function DashboardPage({
             className="row wrap"
             style={{ justifyContent: "space-between", marginBottom: 12 }}
           >
-            <h3 style={{ margin: 0, fontSize: 15 }}>{hostLabel} activity</h3>
+            <div>
+              <h3 style={{ margin: 0, fontSize: 15 }}>{hostLabel} activity</h3>
+              <p className="faint" style={{ margin: "2px 0 0", fontSize: 12 }}>
+                Only visible to {adminsPlural.toLowerCase()}
+              </p>
+            </div>
             <span className="faint" style={{ fontSize: 12 }}>
               {d.hostActivity.length} shown
             </span>
