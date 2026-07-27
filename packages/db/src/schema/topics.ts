@@ -65,6 +65,28 @@ export const hearts = pgTable(
   ],
 );
 
+/** Topic Queue exposure record (2026-07-28): one row per (topic, user)
+ * the user has been shown in the queue — or hearted anywhere (a heart
+ * implies having seen it). `seenAt` is bumped on each showing; "seen this
+ * round" compares it to the membership's `queueRoundStartedAt`. A row's
+ * existence at all is the exposure signal for analytics. */
+export const topicSeen = pgTable(
+  "topic_seen",
+  {
+    topicId: uuid()
+      .notNull()
+      .references(() => topics.id, { onDelete: "cascade" }),
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    seenAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("topic_seen_topic_user_uq").on(t.topicId, t.userId),
+    index("topic_seen_user_idx").on(t.userId),
+  ],
+);
+
 export const comments = pgTable(
   "comments",
   {

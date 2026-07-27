@@ -71,6 +71,10 @@ export const timetableMemberships = pgTable(
     // round 2: admins pre-create accounts, populate them, then send the
     // invite explicitly). Null = added but never invited.
     inviteSentAt: timestamp({ withTimezone: true }),
+    // Topic Queue round watermark (2026-07-28): topics seen before this
+    // instant come around again; topics published after it are 🆕 and jump
+    // the queue. Null = first round (nothing is "new", all seen rows count).
+    queueRoundStartedAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
