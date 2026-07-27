@@ -71,10 +71,12 @@ export default async function NotificationsPage({
         <ul className="list">
           {data.notifications.map((n) => {
             // Admin-thread comments never render on the feed permalink —
-            // their home is My Topics (owner) or Pending Topics (admins).
+            // their home is My Topics (the topic's host) or Pending Topics
+            // (admins). Hosts used to be sent to All Topics, where their
+            // unpublished topic doesn't exist at all (QA 2026-07-28).
             const base =
               n.visibility === "admin_only"
-                ? `/f/${slug}/${viewerIsAdmin ? "moderation" : "topics"}`
+                ? `/f/${slug}/${viewerIsAdmin ? "moderation" : "my-topics"}`
                 : topicPath(slug, n.topicHostSlug, n.topicSlug);
             const href = base ? `${base}#comment-${n.commentId}` : null;
             const replyHref = base
