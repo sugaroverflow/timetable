@@ -6,6 +6,7 @@ import {
 } from "express";
 
 import {
+  buildDataExport,
   computeUserDigest,
   createLocalUser,
   createTimetable,
@@ -205,6 +206,37 @@ restRouter.delete(
       `${user.email} deleted forum "${deleted.name}" (${deleted.slug}, ${deleted.id})`,
     );
     res.json({ deleted: true, name: deleted.name, slug: deleted.slug });
+  }),
+);
+
+/**
+ * GET /api/timetables/:idOrSlug/export
+ * Read-only, role-filtered JSON dump of everything the viewer can read —
+ * the download behind the forum's "API" page. Any reader (anonymous
+ * included on public forums); the shape is documented in core/export.ts.
+ */
+restRouter.get(
+  "/timetables/:idOrSlug/export",
+  h(async (req, res) => {
+    const ctx = await contextFromRequest(req);
+    const readable = await getReadableTimetable(
+      ctx.user?.id ?? null,
+      req.params.idOrSlug as string,
+    );
+    if (!readable) {
+      res.status(404).json({ error: "Forum not found" });
+      return;
+    }
+    const data = await buildDataExport(readable.timetable, {
+      userId: ctx.user?.id ?? null,
+      roles: readable.roles,
+    });
+    const stamp = data.forum.exportedAt.slice(0, 10);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${readable.timetable.slug}-export-${stamp}.json"`,
+    );
+    res.json(data);
   }),
 );
 
