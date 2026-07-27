@@ -31,7 +31,6 @@ import {
   canSeeComments,
   canSeeHostOnly,
   isAdmin,
-  isHost,
   ownsTopicAsHost,
   type Privacy,
 } from "@timetable/shared";

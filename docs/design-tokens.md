@@ -68,7 +68,7 @@ dark block wins over light when `data-theme="dark"`.
 **Status — warning:** `--yellow`, `--yellow-soft`, `--warning-ink`,
 `--warning-soft`, `--warning-line`.
 **Status — danger:** `--red`, `--red-soft`, `--red-ink`.
-**Status — neutral chips:** `--status-draft-bg/-ink`, `--status-neutral-bg/-ink`.
+**Status — neutral chips:** `--status-neutral-bg/-ink`.
 
 **Components:** `--pill-strong-bg/-ink/-line` (owner/admin pill), `--bubble-bg`
 (comment bubble), `--toast-bg/-ink/-ok/-error-bg/-error-ink`.
