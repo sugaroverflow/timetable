@@ -9,6 +9,7 @@ import {
 } from "@timetable/core";
 import { canComment, canModerate, canSeeHostOnly } from "@timetable/shared";
 
+import { assertActionLimit } from "../http/action-limits";
 import { builder } from "./builder";
 import { forbidden, loadTopicAndViewer, notFound, requireUser } from "./guards";
 import { CommentType } from "./types";
@@ -48,6 +49,7 @@ builder.mutationFields((t) => ({
       }
       const body = args.body.trim();
       if (!body) throw new GraphQLError("Comment cannot be empty");
+      await assertActionLimit(user.id, "comment");
       const comment = await addComment(topic.id, user.id, body, visibility);
       const author = await getUserById(user.id);
       return {
@@ -90,6 +92,7 @@ builder.mutationFields((t) => ({
       }
       const body = args.body.trim();
       if (!body) throw new GraphQLError("Reply cannot be empty");
+      await assertActionLimit(user.id, "comment");
       const reply = await addReply(parent, user.id, body);
       const author = await getUserById(user.id);
       return {

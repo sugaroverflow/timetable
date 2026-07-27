@@ -34,6 +34,7 @@ import {
   type Privacy,
 } from "@timetable/shared";
 
+import { assertActionLimit } from "../http/action-limits";
 import { renderMarkdown } from "../markdown";
 import { builder } from "./builder";
 import {
@@ -477,6 +478,7 @@ builder.mutationFields((t) => ({
         hostId = args.hostId;
       }
 
+      await assertActionLimit(user.id, "topic");
       const created = await createTopic(readable.timetable.id, hostId, {
         title: args.title,
         bodyMd: args.bodyMd ?? "",
