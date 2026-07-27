@@ -110,20 +110,20 @@ export default async function PersonPage({
   searchParams,
 }: {
   params: Promise<{ slug: string; hostSlug: string }>;
-  searchParams: Promise<{ seed?: string }>;
+  searchParams: Promise<{ shuffle?: string }>;
 }) {
   const { slug, hostSlug } = await params;
-  const { seed: seedParam } = await searchParams;
+  const { shuffle: seedParam } = await searchParams;
 
   const person = await resolvePerson(slug, hostSlug);
   if (!person) notFound();
 
-  // Same seed-in-URL pattern as the feed page: mint per visit, then
+  // Same shuffle-in-URL pattern as the feed page: mint per visit, then
   // redirect so router.refresh() after an action keeps this order.
   if (!seedParam) {
     // eslint-disable-next-line react-hooks/purity -- server-only, once per request
     const minted = Math.random().toString(36).slice(2, 10);
-    redirect(`/f/${slug}/${hostSlug}?seed=${minted}`);
+    redirect(`/f/${slug}/${hostSlug}?shuffle=${minted}`);
   }
   const seed = seedParam;
 

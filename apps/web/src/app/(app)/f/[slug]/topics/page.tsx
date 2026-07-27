@@ -31,8 +31,9 @@ const HOST_CARD_QUERY = `
   }
 `;
 
-/** Mint a fresh shuffle seed and put it in the URL, preserving the other
- * feed params. Never returns (redirect throws). */
+/** Mint a fresh shuffle seed and put it in the URL (the user-facing param
+ * is named "shuffle" — QA 2026-07-27), preserving the other feed params.
+ * Never returns (redirect throws). */
 function redirectWithFreshSeed(
   slug: string,
   current: { sort?: string; host?: string; hearted?: string },
@@ -41,7 +42,7 @@ function redirectWithFreshSeed(
   if (current.sort) params.set("sort", current.sort);
   if (current.host) params.set("host", current.host);
   if (current.hearted) params.set("hearted", current.hearted);
-  params.set("seed", Math.random().toString(36).slice(2, 10));
+  params.set("shuffle", Math.random().toString(36).slice(2, 10));
   redirect(`/f/${slug}/topics?${params.toString()}`);
 }
 
@@ -81,7 +82,7 @@ export default async function FeedPage({
     sort?: string;
     host?: string;
     hearted?: string;
-    seed?: string;
+    shuffle?: string;
   }>;
 }) {
   const { slug } = await params;
@@ -89,7 +90,7 @@ export default async function FeedPage({
     sort: sortParam,
     host: hostParam,
     hearted: heartedParam,
-    seed: seedParam,
+    shuffle: seedParam,
   } = await searchParams;
   const sort = normalizeFeedSort(sortParam);
   const host = hostParam ?? "";
