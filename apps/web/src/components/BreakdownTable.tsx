@@ -18,7 +18,7 @@ function fmt(n: number): string {
  * Sortable per-elector ❤️ breakdown (product feedback round 2). One row per
  * elector with their L1 (1/n), L2 (1/√n) and devotion contributions plus
  * when they hearted; each numeric column sums (in the footer) to the topic's
- * corresponding score. Elector names open their profile card.
+ * corresponding score. Elector names link to their person page.
  */
 export function BreakdownTable({
   slug,

@@ -209,7 +209,7 @@ export type Person = {
 };
 
 /** Members with their public profile fields (no emails) — powers the
- * People page and the bio modal. Caller gates on timetable readability.
+ * People page and person pages. Caller gates on timetable readability.
  * Each person carries their published topics (QA #59 — host cards list
  * topic titles). */
 export async function listPeople(timetableId: string): Promise<Person[]> {
@@ -250,7 +250,7 @@ export async function listPeople(timetableId: string): Promise<Person[]> {
     .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
 }
 
-/** One member's public profile (for the bio modal). */
+/** One member's public profile (person pages / profile editor). */
 export async function getPerson(
   timetableId: string,
   userId: string,

@@ -58,7 +58,7 @@ export const timetableMemberships = pgTable(
     name: text(),
     image: text(),
     bio: text(),
-    /** URL slug, unique per timetable (person pages /t/[slug]/[userSlug]
+    /** URL slug, unique per timetable (person pages /f/[slug]/[userSlug]
      * and the cosmetic host segment in topic permalinks). */
     slug: text(),
     // Watermark for the feed's "new since your last visit" highlight;

@@ -3,7 +3,7 @@ import { and, eq, ne } from "drizzle-orm";
 import { db, timetableMemberships, topics } from "@timetable/db";
 import { slugify } from "@timetable/shared";
 
-/** Route segments under /t/[slug]/ that a user slug must never shadow —
+/** Route segments under /f/[slug]/ that a user slug must never shadow —
  * the permalink route's [hostSlug] segment lives at the same level. */
 const RESERVED_SEGMENTS = new Set([
   "feed",
