@@ -58,7 +58,11 @@ export function canSeePersonProfile(
 ): boolean {
   if (isMember(viewer.roles)) return true;
   if (privacy === "public" || privacy === "no_comments") return true;
-  if (privacy === "hosts_only") return isHost(personRoles);
+  if (privacy === "hosts_only") {
+    // The public sees who runs the forum — hosts AND admins — but never
+    // the elector membership (QA 2026-07-27).
+    return isHost(personRoles) || isAdmin(personRoles);
+  }
   // private/deactivated timetables aren't readable by non-members anyway.
   return true;
 }
