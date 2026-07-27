@@ -76,7 +76,7 @@ try {
     }
   });
 
-  await page.goto(`${BASE}/t/${SLUG}/people`, { waitUntil: "networkidle" });
+  await page.goto(`${BASE}/f/${SLUG}/people`, { waitUntil: "networkidle" });
   await page.fill("#add-person-name", INVITEE_NAME);
   await page.fill("#add-person-email", INVITEE_EMAIL);
   // host role is the default — leave checkboxes as-is
@@ -106,7 +106,7 @@ try {
   await shot(page, "person-added");
 
   // Create a topic owned by the invitee
-  await page.goto(`${BASE}/t/${SLUG}/topics`, { waitUntil: "networkidle" });
+  await page.goto(`${BASE}/f/${SLUG}/topics`, { waitUntil: "networkidle" });
   await page.fill("#topic-title", TOPIC_TITLE);
   await page.waitForSelector("#topic-host", { timeout: 10000 });
   await page.selectOption("#topic-host", { label: INVITEE_NAME });
@@ -118,7 +118,7 @@ try {
   await shot(page, "topic-created-for-invitee");
 
   // Send the invite
-  await page.goto(`${BASE}/t/${SLUG}/people`, { waitUntil: "networkidle" });
+  await page.goto(`${BASE}/f/${SLUG}/people`, { waitUntil: "networkidle" });
   const card2 = page.locator("li.card", { hasText: INVITEE_NAME });
   await card2.getByRole("button", { name: "Send invite" }).click();
   await page
@@ -141,7 +141,7 @@ try {
   const page2 = await inviteeCtx.newPage();
   await signIn(page2, INVITEE_EMAIL);
 
-  await page2.goto(`${BASE}/t/${SLUG}/topics`, { waitUntil: "networkidle" });
+  await page2.goto(`${BASE}/f/${SLUG}/topics`, { waitUntil: "networkidle" });
   await page2.getByText(TOPIC_TITLE).first().waitFor({ timeout: 15000 });
   console.log(
     `✓ invitee's first sign-in: "${TOPIC_TITLE}" is waiting in My Topics`,

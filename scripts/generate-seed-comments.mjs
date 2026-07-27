@@ -10,8 +10,8 @@
  *   matching how deep the feed query fetches replies)
  * - five "mega" topics get 100+ comments with multiple threads
  * - ~40% of published topics get a hosts-only thread
- * - submitted topics (plus a few drafts) get a threaded hosts-only
- *   feedback exchange between an admin and the topic's host
+ * - submitted topics get a threaded hosts-only feedback exchange between
+ *   an admin and the topic's host
  *
  * Output replaces everything between the GENERATED marker and "## Hearts",
  * so hand-authored comments above the marker are preserved.

@@ -36,8 +36,8 @@ function ItemIcon({ item }: { item: SwitcherItem }) {
 /**
  * Timetable switcher in the sidebar footer (QA #59 — moved out of the
  * topbar, cf. the account switcher in Twitter's sidebar). Each entry shows
- * the timetable's icon, name, and visibility; the menu opens upward and
- * ends with "New timetable". Selecting one always lands on its feed.
+ * the forum's icon, name, and visibility; the menu opens upward and ends
+ * with "New forum". Selecting one lands on its All Topics page.
  *
  * Base UI Menu handles open/close, outside-click, Escape, focus, and
  * roving-keyboard nav; navigation via Menu.Item(render=Link) auto-closes it.

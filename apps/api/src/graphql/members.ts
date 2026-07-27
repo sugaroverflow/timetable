@@ -110,8 +110,8 @@ const PersonType = builder.objectRef<Person>("Person").implement({
 
 /** Non-admins don't get to see who owns the forum (launch QA 2026-07-25):
  * the owner role is stripped from profiles before they leave the API, so
- * the Owner pill (People page, bio modal, person pages, host card) only
- * renders for admin viewers. */
+ * the Owner pill (People page, person pages, host card) only renders for
+ * admin viewers. */
 function withPublicRoles(person: Person, viewer: Viewer): Person {
   if (canModerate(viewer)) return person;
   return {
@@ -153,8 +153,8 @@ builder.queryFields((t) => ({
     },
   }),
 
-  /** One member's public profile — powers the bio modal, the person pages,
-   * and (with no user args) the viewer's own per-forum profile editor.
+  /** One member's public profile — powers the person pages and (with no
+   * user args) the viewer's own per-forum profile editor.
    * Lookup: userId, or user slug, or the signed-in viewer. */
   person: t.field({
     type: PersonType,
