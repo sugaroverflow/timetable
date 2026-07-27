@@ -8,7 +8,6 @@ import { cache } from "react";
 import { isAdmin, isElector, isHost, type Role } from "@timetable/shared";
 
 import { NavLink } from "@/components/NavLink";
-import { RolePills } from "@/components/RolePills";
 import { Sidebar } from "@/components/Sidebar";
 import {
   TimetableSwitcher,
@@ -228,22 +227,6 @@ export default async function TimetableLayout({
       ) : null}
       <div className="shell">
         <Sidebar>
-          <div className="sidebar-head">
-            <div className="sidebar-title">{timetable.name}</div>
-            <div className="row wrap" style={{ gap: 6 }}>
-              <span className="privacy-pill">
-                <span
-                  className="privacy-dot"
-                  style={{ background: privacy.dot }}
-                />
-                {privacy.label}
-              </span>
-            </div>
-            {isAuthed ? (
-              <RolePills roles={roles} labels={settings.roleLabels} />
-            ) : null}
-          </div>
-
           <SideNav
             base={base}
             isAuthed={isAuthed}
@@ -273,11 +256,23 @@ export default async function TimetableLayout({
             <Flag size={14} aria-hidden /> Report a bug
           </a>
 
-          {switcherItems.length > 0 ? (
-            <div className="sidebar-foot">
+          {/* Forum identity footer: the switcher with the forum's visibility
+              pill beneath it (QA 2026-07-27 — the name itself moved to the
+              topbar center, roles to the topbar right). */}
+          <div className="sidebar-foot">
+            {switcherItems.length > 0 ? (
               <TimetableSwitcher items={switcherItems} currentSlug={slug} />
+            ) : null}
+            <div className="row wrap" style={{ marginTop: 8 }}>
+              <span className="privacy-pill">
+                <span
+                  className="privacy-dot"
+                  style={{ background: privacy.dot }}
+                />
+                {privacy.label}
+              </span>
             </div>
-          ) : null}
+          </div>
         </Sidebar>
 
         <div className="shell-content">

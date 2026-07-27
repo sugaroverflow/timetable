@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { TopbarBrand, type BrandItem } from "@/components/TopbarBrand";
 import { TopbarHamburger } from "@/components/TopbarHamburger";
+import { TopbarRoles } from "@/components/TopbarRoles";
 import { ToastProvider } from "@/components/Toast";
 import { getMyTimetables } from "@/lib/myTimetables";
 import { parseTimetableSettings } from "@/lib/timetableSettings";
@@ -44,6 +45,7 @@ export default async function AppLayout({
         <div className="spacer" />
         {userId ? (
           <>
+            <TopbarRoles />
             <Link
               className="muted topbar-email"
               href="/profile"
