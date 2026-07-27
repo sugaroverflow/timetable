@@ -71,10 +71,10 @@ type Data = {
 };
 
 const QUERY = `
-  query Dashboard($s: String!, $host: String) {
+  query Dashboard($s: String!, $host: String, $activityHost: String) {
     timetable(idOrSlug: $s) { viewerRoles settings }
     timetableHosts(idOrSlug: $s) { id name }
-    dashboard(idOrSlug: $s, hostId: $host) {
+    dashboard(idOrSlug: $s, hostId: $host, activityHostId: $activityHost) {
       totalHearts electorCount hostCount
       topicLeaderboard { id title slug hostId hostName hostImage hostSlug weightedScore l2Score devotionScore heartCount commentTotal commenterCount commentL2 commentL1 commentDevotion }
       hostActivity { hostId hostName hostImage hostSlug topicCount commentCount latestActivityAt }
@@ -87,18 +87,103 @@ const QUERY = `
   }
 `;
 
+function ElectorActivityCard({
+  slug,
+  electorLabel,
+  hostFilter,
+  rows,
+}: {
+  slug: string;
+  electorLabel: string;
+  hostFilter: React.ReactNode;
+  rows: Dashboard["electorActivity"];
+}) {
+  return (
+    <div className="card">
+      <div
+        className="row wrap"
+        style={{ justifyContent: "space-between", marginBottom: 12 }}
+      >
+        <h3 style={{ margin: 0, fontSize: 15 }}>{electorLabel} activity</h3>
+        {/* This table's own host filter: counts only activity on the
+            chosen host's topics (independent of the topics table's). */}
+        <span className="row wrap" style={{ gap: 10, alignItems: "center" }}>
+          {hostFilter}
+          <span className="faint" style={{ fontSize: 12 }}>
+            {rows.length} shown
+          </span>
+        </span>
+      </div>
+      {rows.length === 0 ? (
+        <p className="faint" style={{ fontSize: 13 }}>
+          No electors yet.
+        </p>
+      ) : (
+        <ElectorActivityTable
+          slug={slug}
+          electorLabel={electorLabel}
+          rows={rows}
+        />
+      )}
+    </div>
+  );
+}
+
+function HostActivityCard({
+  slug,
+  hostLabel,
+  hostsPlural,
+  adminsPlural,
+  rows,
+}: {
+  slug: string;
+  hostLabel: string;
+  hostsPlural: string;
+  adminsPlural: string;
+  rows: Dashboard["hostActivity"];
+}) {
+  return (
+    <div className="card">
+      <div
+        className="row wrap"
+        style={{ justifyContent: "space-between", marginBottom: 12 }}
+      >
+        <div>
+          <h3 style={{ margin: 0, fontSize: 15 }}>{hostLabel} activity</h3>
+          <p className="faint" style={{ margin: "2px 0 0", fontSize: 12 }}>
+            Only visible to {adminsPlural.toLowerCase()}
+          </p>
+        </div>
+        <span className="faint" style={{ fontSize: 12 }}>
+          {rows.length} shown
+        </span>
+      </div>
+      {rows.length === 0 ? (
+        <p className="faint" style={{ fontSize: 13 }}>
+          No {hostsPlural.toLowerCase()} yet.
+        </p>
+      ) : (
+        <HostActivityTable slug={slug} hostLabel={hostLabel} rows={rows} />
+      )}
+    </div>
+  );
+}
+
 export default async function DashboardPage({
   params,
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ host?: string }>;
+  searchParams: Promise<{ host?: string; activityHost?: string }>;
 }) {
   const { slug } = await params;
-  const host = (await searchParams).host ?? "";
+  const sp = await searchParams;
+  const host = sp.host ?? "";
+  const activityHost = sp.activityHost ?? "";
   const data = await gqlFetch<Data>(QUERY, {
     s: slug,
     host: host || null,
+    activityHost: activityHost || null,
   });
   const roles = await displayRolesFromCookies(
     (data.timetable?.viewerRoles ?? []) as Role[],
@@ -122,14 +207,6 @@ export default async function DashboardPage({
         <h2 className="section-title">Analysis</h2>
       </div>
 
-      <div className="toolbar feed-toolbar">
-        <HostFilter
-          value={host}
-          hosts={data.timetableHosts}
-          allLabel={`All ${hostsPlural}`}
-        />
-      </div>
-
       <TopicLeaderboard
         slug={slug}
         hostLabel={hostLabel}
@@ -138,59 +215,37 @@ export default async function DashboardPage({
         hostCount={d.hostCount}
         electorCount={d.electorCount}
         electorLabel={electorLabel}
+        hostFilter={
+          <HostFilter
+            value={host}
+            hosts={data.timetableHosts}
+            allLabel={`All ${hostsPlural}`}
+          />
+        }
       />
 
-      <div className="card">
-        <div
-          className="row wrap"
-          style={{ justifyContent: "space-between", marginBottom: 12 }}
-        >
-          <h3 style={{ margin: 0, fontSize: 15 }}>{electorLabel} activity</h3>
-          <span className="faint" style={{ fontSize: 12 }}>
-            {d.electorActivity.length} shown
-          </span>
-        </div>
-        {d.electorActivity.length === 0 ? (
-          <p className="faint" style={{ fontSize: 13 }}>
-            No electors yet.
-          </p>
-        ) : (
-          <ElectorActivityTable
-            slug={slug}
-            electorLabel={electorLabel}
-            rows={d.electorActivity}
+      <ElectorActivityCard
+        slug={slug}
+        electorLabel={electorLabel}
+        rows={d.electorActivity}
+        hostFilter={
+          <HostFilter
+            value={activityHost}
+            hosts={data.timetableHosts}
+            allLabel={`All ${hostsPlural}`}
+            param="activityHost"
           />
-        )}
-      </div>
+        }
+      />
 
       {viewerIsAdmin ? (
-        <div className="card">
-          <div
-            className="row wrap"
-            style={{ justifyContent: "space-between", marginBottom: 12 }}
-          >
-            <div>
-              <h3 style={{ margin: 0, fontSize: 15 }}>{hostLabel} activity</h3>
-              <p className="faint" style={{ margin: "2px 0 0", fontSize: 12 }}>
-                Only visible to {adminsPlural.toLowerCase()}
-              </p>
-            </div>
-            <span className="faint" style={{ fontSize: 12 }}>
-              {d.hostActivity.length} shown
-            </span>
-          </div>
-          {d.hostActivity.length === 0 ? (
-            <p className="faint" style={{ fontSize: 13 }}>
-              No {hostsPlural.toLowerCase()} yet.
-            </p>
-          ) : (
-            <HostActivityTable
-              slug={slug}
-              hostLabel={hostLabel}
-              rows={d.hostActivity}
-            />
-          )}
-        </div>
+        <HostActivityCard
+          slug={slug}
+          hostLabel={hostLabel}
+          hostsPlural={hostsPlural}
+          adminsPlural={adminsPlural}
+          rows={d.hostActivity}
+        />
       ) : null}
     </div>
   );

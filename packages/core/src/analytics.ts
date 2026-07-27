@@ -225,10 +225,36 @@ function buildLeaderboards(
   });
 }
 
+/** Published-topic count + latest publish/edit per host, forum-wide — the
+ * host-activity table ignores the per-table host filters (QA 2026-07-27),
+ * so it can't reuse the possibly-filtered feed. */
+async function loadHostTopicStats(
+  timetableId: string,
+): Promise<Map<string, Stat>> {
+  const rows = await db
+    .select({
+      hostId: topics.hostId,
+      count: sql<number>`count(*)::int`,
+      latestAt: sql<Date | null>`max(greatest(coalesce(${topics.publishedAt}, ${topics.createdAt}), coalesce(${topics.contentUpdatedAt}, ${topics.createdAt})))`,
+    })
+    .from(topics)
+    .where(
+      and(
+        eq(topics.timetableId, timetableId),
+        eq(topics.status, "published" as const),
+      ),
+    )
+    .groupBy(topics.hostId);
+  return new Map(
+    rows.map((r) => [
+      r.hostId,
+      { count: r.count, latestAt: coerceDate(r.latestAt) },
+    ]),
+  );
+}
+
 /** Host activity rows: every host-role member (topic-less included, matching
- * the hostCount decision), narrowed to one host under the host filter.
- * Topic counts/dates come from the (already filtered) feed; comment stats
- * from the same per-author map the elector table uses. */
+ * the hostCount decision), never narrowed by either host filter. */
 function buildHostActivity(args: {
   hostRows: {
     userId: string;
@@ -236,36 +262,22 @@ function buildHostActivity(args: {
     image: string | null;
     slug: string | null;
   }[];
-  feed: FeedTopic[];
+  topicStats: Map<string, Stat>;
   commentsByAuthor: Map<string, Stat>;
-  hostId?: string;
 }): DashboardData["hostActivity"] {
-  const topicCounts = new Map<string, number>();
-  const latestTopicAt = new Map<string, Date | null>();
-  for (const t of args.feed) {
-    topicCounts.set(t.hostId, (topicCounts.get(t.hostId) ?? 0) + 1);
-    latestTopicAt.set(
-      t.hostId,
-      latestDate(
-        latestTopicAt.get(t.hostId),
-        t.publishedAt ?? t.createdAt,
-        t.contentUpdatedAt,
-      ),
-    );
-  }
   return args.hostRows
-    .filter((h) => !args.hostId || h.userId === args.hostId)
     .map((h) => {
+      const topicStat = args.topicStats.get(h.userId);
       const commentStat = args.commentsByAuthor.get(h.userId);
       return {
         hostId: h.userId,
         hostName: h.name,
         hostImage: h.image,
         hostSlug: h.slug,
-        topicCount: topicCounts.get(h.userId) ?? 0,
+        topicCount: topicStat?.count ?? 0,
         commentCount: commentStat?.count ?? 0,
         latestActivityAt: latestDate(
-          latestTopicAt.get(h.userId),
+          topicStat?.latestAt,
           commentStat?.latestAt,
         ),
       };
@@ -278,22 +290,28 @@ function buildHostActivity(args: {
 }
 
 /** WHERE fragments for the elector-activity window: published topics
- * (optionally one host's); hearts additionally post-cutoff and post-
- * activitySince. Elector activity starts at the explicit date, or the
- * hearts cutoff by default (QA #59 round 3). */
+ * (optionally one host's — the elector table's OWN filter, independent of
+ * the topics filter since QA 2026-07-27); hearts additionally post-cutoff
+ * and post-activitySince. Elector activity starts at the explicit date, or
+ * the hearts cutoff by default (QA #59 round 3). `baseTopicConds` is the
+ * same window without the host narrowing, for the host-activity table. */
 async function activityWindow(
   timetableId: string,
-  opts: { hostId?: string; activitySince?: Date },
+  opts: { activityHostId?: string; activitySince?: Date },
 ): Promise<{
+  baseTopicConds: SQL[];
   activityTopicConds: SQL[];
   heartCountConds: SQL[];
   activitySince: Date | undefined;
 }> {
-  const activityTopicConds = [
+  const baseTopicConds = [
     eq(topics.timetableId, timetableId),
     eq(topics.status, "published" as const),
   ];
-  if (opts.hostId) activityTopicConds.push(eq(topics.hostId, opts.hostId));
+  const activityTopicConds = [...baseTopicConds];
+  if (opts.activityHostId) {
+    activityTopicConds.push(eq(topics.hostId, opts.activityHostId));
+  }
 
   const cutoff = await getHeartsCountFrom(timetableId);
   const activitySince = opts.activitySince ?? cutoff ?? undefined;
@@ -303,7 +321,7 @@ async function activityWindow(
     heartCountConds.push(gte(hearts.createdAt, activitySince));
   }
 
-  return { activityTopicConds, heartCountConds, activitySince };
+  return { baseTopicConds, activityTopicConds, heartCountConds, activitySince };
 }
 
 type HeartActivityRow = {
@@ -640,7 +658,12 @@ function findConflicts(
 export async function getDashboard(
   timetableId: string,
   opts: {
+    /** Narrows the topic leaderboard (and slot data) to one host. */
     hostId?: string;
+    /** Narrows the elector-activity table to activity on one host's topics —
+     * independent of `hostId` since QA 2026-07-27 (per-table filters). The
+     * host-activity table is never narrowed. */
+    activityHostId?: string;
     electorActivity?: ElectorActivityFilter;
     /** Only count elector activity on/after this date (QA #59 round 3);
      * the UI defaults it to the hearts cutoff. */
@@ -660,7 +683,7 @@ export async function getDashboard(
   });
   const totalHearts = feed.reduce((sum, t) => sum + t.heartCount, 0);
 
-  const { activityTopicConds, heartCountConds, activitySince } =
+  const { baseTopicConds, activityTopicConds, heartCountConds, activitySince } =
     await activityWindow(timetableId, opts);
 
   const commentTallies = await loadCommentTallies(timetableId, activitySince);
@@ -675,6 +698,11 @@ export async function getDashboard(
     activityTopicConds,
     activitySince,
   );
+  // The host table ignores both host filters — recount unfiltered when the
+  // elector table's filter would otherwise shrink hosts' comment stats.
+  const hostCommentStats = opts.activityHostId
+    ? (await loadCommentActivity(baseTopicConds, activitySince)).byElector
+    : commentActivity.byElector;
   const availabilityByElector = await loadAvailabilityActivity(
     timetableId,
     activitySince,
@@ -691,9 +719,8 @@ export async function getDashboard(
 
   const hostActivity = buildHostActivity({
     hostRows,
-    feed,
-    commentsByAuthor: commentActivity.byElector,
-    hostId: opts.hostId,
+    topicStats: await loadHostTopicStats(timetableId),
+    commentsByAuthor: hostCommentStats,
   });
 
   const tagRows = await loadSlotTagRows(timetableId);

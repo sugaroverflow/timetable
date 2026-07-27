@@ -92,7 +92,9 @@ function LeaderboardRow({
               {entry.hostName ?? hostLabel}
             </Link>
             {": "}
-            {href ? <Link href={href}>{entry.title}</Link> : entry.title}
+            <strong>
+              {href ? <Link href={href}>{entry.title}</Link> : entry.title}
+            </strong>
           </span>
         </span>
         <span className="mono">
@@ -121,6 +123,7 @@ export function TopicLeaderboard({
   hostCount,
   electorCount,
   electorLabel,
+  hostFilter,
 }: {
   slug: string;
   hostLabel: string;
@@ -129,6 +132,9 @@ export function TopicLeaderboard({
   hostCount: number;
   electorCount: number;
   electorLabel: string;
+  /** This table's own host filter (per-table filters, QA 2026-07-27),
+   * rendered with the other header controls. */
+  hostFilter?: React.ReactNode;
 }) {
   const [norm, setNorm] = useState<AnyNormKey>("l1");
   const mode =
@@ -159,26 +165,29 @@ export function TopicLeaderboard({
         }}
       >
         <h3 style={{ margin: 0, fontSize: 15 }}>{title}</h3>
-        <select
-          aria-label="Score normalisation"
-          value={norm}
-          onChange={(e) => setNorm(e.target.value as AnyNormKey)}
-        >
-          <optgroup label="❤️ hearts">
-            {NORM_MODES.map((m) => (
-              <option key={m.key} value={m.key} title={m.description}>
-                {m.symbol} — {m.label}
-              </option>
-            ))}
-          </optgroup>
-          <optgroup label="💬 comments">
-            {COMMENT_NORM_MODES.map((m) => (
-              <option key={m.key} value={m.key} title={m.description}>
-                {m.symbol} — {m.label}
-              </option>
-            ))}
-          </optgroup>
-        </select>
+        <span className="row wrap" style={{ gap: 10, alignItems: "center" }}>
+          {hostFilter}
+          <select
+            aria-label="Score normalisation"
+            value={norm}
+            onChange={(e) => setNorm(e.target.value as AnyNormKey)}
+          >
+            <optgroup label="❤️ hearts">
+              {NORM_MODES.map((m) => (
+                <option key={m.key} value={m.key} title={m.description}>
+                  {m.symbol} — {m.label}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="💬 comments">
+              {COMMENT_NORM_MODES.map((m) => (
+                <option key={m.key} value={m.key} title={m.description}>
+                  {m.symbol} — {m.label}
+                </option>
+              ))}
+            </optgroup>
+          </select>
+        </span>
       </div>
       <p className="faint" style={{ marginTop: 0, fontSize: 12 }}>
         {mode.description}
