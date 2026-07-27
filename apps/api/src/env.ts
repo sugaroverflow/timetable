@@ -96,4 +96,17 @@ export const env = {
   graphqlMaxDepth: intEnv("GRAPHQL_MAX_DEPTH", 12),
   graphqlMaxCost: intEnv("GRAPHQL_MAX_COST", 500),
   uploadMaxImageBytes: intEnv("UPLOAD_MAX_IMAGE_BYTES", 5 * 1024 * 1024),
+  /**
+   * Emails (lowercased) whose accounts get the global sysadmin dashboard
+   * (/admin): every forum, activity counts, owner contact, forum deletion.
+   * Unset in production = nobody. Outside production it defaults to the
+   * seeded dev admin so the dashboard is QA-able with zero config.
+   */
+  sysadminEmails: (
+    process.env.SYSADMIN_EMAILS ??
+    (isProd ? "" : "admin-edwin+clerk_test@example.com")
+  )
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean),
 };

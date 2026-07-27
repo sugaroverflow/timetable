@@ -17,6 +17,8 @@ export type NotificationSettings = {
   digestNewTopics?: boolean;
   digestReplies?: boolean;
   digestActivity?: boolean;
+  /** Sysadmins only: email when any new forum is created. */
+  newForumEmails?: boolean;
 };
 
 /** Per-timetable theme (QA #59 full theming). All colours are #rrggbb.

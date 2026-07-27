@@ -24,6 +24,7 @@ export function InfiniteFeed({
   hearted = false,
   seed = "",
   heartedBy = "",
+  refreshToken = "",
   pageSize,
   initialHasNext,
   loadMore,
@@ -35,6 +36,9 @@ export function InfiniteFeed({
   hearted?: boolean;
   seed?: string;
   heartedBy?: string;
+  /** Server-render marker: pass a fresh value on every server render so
+   * appended pages can re-sync after a router.refresh() (see below). */
+  refreshToken?: string;
   pageSize: number;
   initialHasNext: boolean;
   loadMore: LoadMore;
@@ -46,6 +50,7 @@ export function InfiniteFeed({
   const loadingRef = useRef(false);
   const offsetRef = useRef(pageSize);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const tokenRef = useRef(refreshToken);
 
   const loadNext = useCallback(async () => {
     if (loadingRef.current) return;
@@ -70,6 +75,59 @@ export function InfiniteFeed({
       loadingRef.current = false;
     }
   }, [loadMore, slug, sort, host, hearted, seed, heartedBy, pageSize]);
+
+  // After a router.refresh() (an action succeeded → new server render →
+  // new refreshToken), the server-rendered first page (children) is fresh
+  // but our appended pages are stale client-state snapshots. Re-fetch the
+  // pages the user has already loaded so an edit/heart made on a
+  // deep-scrolled card is visible in place. Same seed → same order, so
+  // nothing jumps.
+  useEffect(() => {
+    if (tokenRef.current === refreshToken) return;
+    tokenRef.current = refreshToken;
+    if (offsetRef.current <= pageSize || loadingRef.current) return;
+    let cancelled = false;
+    void (async () => {
+      loadingRef.current = true;
+      try {
+        const fresh: React.ReactNode[] = [];
+        let next = true;
+        for (let off = pageSize; off < offsetRef.current; off += pageSize) {
+          const res = await loadMore(
+            slug,
+            sort,
+            host,
+            off,
+            hearted,
+            seed,
+            heartedBy,
+          );
+          if (cancelled) return;
+          fresh.push(res.cards);
+          next = res.hasNext;
+        }
+        setPages(fresh);
+        setHasNext(next);
+      } catch {
+        // Keep the stale pages — the next scroll or refresh retries.
+      } finally {
+        loadingRef.current = false;
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    refreshToken,
+    loadMore,
+    slug,
+    sort,
+    host,
+    hearted,
+    seed,
+    heartedBy,
+    pageSize,
+  ]);
 
   useEffect(() => {
     const el = sentinelRef.current;

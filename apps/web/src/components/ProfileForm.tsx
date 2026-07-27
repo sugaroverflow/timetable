@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { ImageUploadField } from "@/components/ImageUploadField";
+import { RichTextEditor } from "@/components/RichTextEditor";
 import { useGqlAction } from "@/lib/useGqlAction";
 
 const MUTATION = `mutation($s: String!, $name: String, $bio: String, $image: String) {
@@ -56,11 +57,13 @@ export function ProfileForm({
         />
       </div>
       <div className="field">
-        <label htmlFor="bio">About (markdown supported)</label>
-        <textarea
-          id="bio"
+        <label htmlFor="bio">About</label>
+        {/* Same editor and size as the topic composers — one consistent
+         * writing surface everywhere (launch QA 2026-07-27). Markdown
+         * stays the stored format underneath. */}
+        <RichTextEditor
           value={bio}
-          onChange={(e) => setBio(e.target.value)}
+          onChange={setBio}
           placeholder="A sentence or two about you."
         />
       </div>

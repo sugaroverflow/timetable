@@ -109,6 +109,27 @@ export function renderDigest(digest: UserDigest): {
   };
 }
 
+/** Sysadmin notification when any new forum is created (opt-in via the
+ * /admin dashboard). */
+export function renderNewForum(args: {
+  forumName: string;
+  forumSlug: string;
+  ownerName: string | null;
+  ownerEmail: string | null;
+}): { subject: string; html: string } {
+  const owner = [args.ownerName, args.ownerEmail && `<${args.ownerEmail}>`]
+    .filter(Boolean)
+    .join(" ");
+  return {
+    subject: `New forum created: ${args.forumName}`,
+    html: [
+      `<h2>New forum on Topic</h2>`,
+      `<p>${linked(args.forumName, `/t/${args.forumSlug}/feed`)}</p>`,
+      `<p>Owner: ${owner ? esc(owner) : "unknown"}</p>`,
+    ].join("\n"),
+  };
+}
+
 /**
  * Invite email for a pre-created account (product feedback round 2). Sent
  * explicitly by an admin after the person's profile/topics are populated —

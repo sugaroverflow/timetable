@@ -21,5 +21,6 @@ import "./timetables";
 import "./activity";
 import "./slots";
 import "./dashboard";
+import "./sysadmin";
 
 export const schema = builder.toSchema();

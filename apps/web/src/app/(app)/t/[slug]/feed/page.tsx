@@ -1,5 +1,6 @@
 import { Heart } from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { EmptyState } from "@/components/EmptyState";
 import { FeedSortControl } from "@/components/FeedSortControl";
@@ -29,6 +30,20 @@ const HOST_CARD_QUERY = `
     person(idOrSlug: $s, userId: $u) { userId name image slug roles bioHtml }
   }
 `;
+
+/** Mint a fresh shuffle seed and put it in the URL, preserving the other
+ * feed params. Never returns (redirect throws). */
+function redirectWithFreshSeed(
+  slug: string,
+  current: { sort?: string; host?: string; hearted?: string },
+): never {
+  const params = new URLSearchParams();
+  if (current.sort) params.set("sort", current.sort);
+  if (current.host) params.set("host", current.host);
+  if (current.hearted) params.set("hearted", current.hearted);
+  params.set("seed", Math.random().toString(36).slice(2, 10));
+  redirect(`/t/${slug}/feed?${params.toString()}`);
+}
 
 function FeedEmpty({
   hearted,
@@ -79,16 +94,20 @@ export default async function FeedPage({
   const sort = normalizeFeedSort(sortParam);
   const host = hostParam ?? "";
   const hearted = heartedParam === "me";
-  // Random is the default sort, so a first visit has no seed in the URL —
-  // mint a fresh one so the shuffle is genuinely random per visit yet stable
-  // across this render's infinite-scroll pages. Safe in a Server Component:
-  // it renders once per request and never re-renders on the client.
-  const seed =
-    seedParam ??
-    (sort === "random"
-      ? // eslint-disable-next-line react-hooks/purity -- server-only, once per request
-        Math.random().toString(36).slice(2, 10)
-      : "");
+  // Random is the default sort, so a first visit has no seed in the URL.
+  // Mint one and redirect so the seed is IN the URL: router.refresh()
+  // after an action (edit save, heart, comment) then re-renders the same
+  // order instead of reshuffling under the user (admin QA 2026-07-27).
+  // Each fresh /feed navigation still gets a new shuffle — this mints a
+  // new seed per visit.
+  if (sort === "random" && !seedParam) {
+    redirectWithFreshSeed(slug, {
+      sort: sortParam,
+      host: hostParam,
+      hearted: heartedParam,
+    });
+  }
+  const seed = seedParam ?? "";
 
   const page = await fetchFeedPage(slug, sort, host, 0, hearted, seed);
   const hostLabel = roleLabel(page.settings.roleLabels, "host");
@@ -155,6 +174,8 @@ export default async function FeedPage({
           host={host}
           hearted={hearted}
           seed={seed}
+          // eslint-disable-next-line react-hooks/purity -- server-only render marker
+          refreshToken={Math.random().toString(36).slice(2, 10)}
           pageSize={FEED_PAGE_SIZE}
           initialHasNext={page.hasNext}
           loadMore={loadMoreFeed}
