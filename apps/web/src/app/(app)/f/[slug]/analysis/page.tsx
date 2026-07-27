@@ -28,11 +28,11 @@ const ACTIVITY_FILTERS = new Set([
 type Dashboard = {
   totalHearts: number;
   electorCount: number;
+  hostCount: number;
   topicLeaderboard: {
     id: string;
     title: string;
     slug: string | null;
-    hostId: string;
     hostName: string | null;
     hostSlug: string | null;
     weightedScore: number;
@@ -85,8 +85,8 @@ const QUERY = `
     timetable(idOrSlug: $s) { viewerRoles settings heartsCountFrom }
     timetableHosts(idOrSlug: $s) { id name }
     dashboard(idOrSlug: $s, hostId: $host, electorActivity: $activity, activitySince: $since) {
-      totalHearts electorCount
-      topicLeaderboard { id title slug hostId hostName hostSlug weightedScore l2Score devotionScore heartCount lastHeartAt }
+      totalHearts electorCount hostCount
+      topicLeaderboard { id title slug hostName hostSlug weightedScore l2Score devotionScore heartCount lastHeartAt }
       hostLeaderboard { hostId hostName weightedScore }
       electorActivity {
         electorId electorName heartCount commentCount availabilityCount
@@ -237,6 +237,7 @@ export default async function DashboardPage({
           hostLabel={hostLabel}
           entries={d.topicLeaderboard}
           totalHearts={d.totalHearts}
+          hostCount={d.hostCount}
           electorCount={d.electorCount}
           electorLabel={electorLabel}
         />
