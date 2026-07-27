@@ -20,6 +20,7 @@ import {
 
 import type { SessionUser } from "../auth/clerk";
 import { renderMarkdown } from "../markdown";
+import { isSysadmin } from "../auth/sysadmin";
 import { builder } from "./builder";
 import {
   forbidden,
@@ -57,6 +58,8 @@ const UserType = builder.objectRef<SessionUser>("User").implement({
       resolve: async (u) =>
         JSON.stringify(await getUserNotificationSettings(u.id)),
     }),
+    /** Global sysadmin (SYSADMIN_EMAILS env) — gates the /admin page. */
+    isSysadmin: t.boolean({ resolve: (u) => isSysadmin(u) }),
   }),
 });
 
@@ -294,6 +297,7 @@ builder.mutationFields((t) => ({
       digestNewTopics: t.arg.boolean({ required: false }),
       digestReplies: t.arg.boolean({ required: false }),
       digestActivity: t.arg.boolean({ required: false }),
+      newForumEmails: t.arg.boolean({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
       const user = await requireUser(ctx);
@@ -306,6 +310,11 @@ builder.mutationFields((t) => ({
           : {}),
         ...(args.digestActivity != null
           ? { digestActivity: args.digestActivity }
+          : {}),
+        // Harmless for non-sysadmins to set — the sender only ever mails
+        // addresses on the SYSADMIN_EMAILS list.
+        ...(args.newForumEmails != null
+          ? { newForumEmails: args.newForumEmails }
           : {}),
       });
       if (!updated) notFound("User not found");

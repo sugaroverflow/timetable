@@ -49,6 +49,7 @@ services:
       - { key: CRON_SECRET, value: "${CRON_SECRET}", scope: RUN_TIME, type: SECRET }
       - { key: RESEND_API_KEY, value: "${RESEND_API_KEY}", scope: RUN_TIME, type: SECRET }
       - { key: EMAIL_FROM, value: "${EMAIL_FROM}", scope: RUN_TIME }
+      - { key: SYSADMIN_EMAILS, value: "${SYSADMIN_EMAILS}", scope: RUN_TIME }
       - { key: SPACES_ENDPOINT, value: "https://lon1.digitaloceanspaces.com", scope: RUN_TIME }
       - { key: SPACES_REGION, value: "lon1", scope: RUN_TIME }
       # Dev uses its own bucket (matching local dev) — the shared "timetable"

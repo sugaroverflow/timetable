@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ASSIGNABLE_ROLES, type AssignableRole } from "@timetable/shared";
 
 import { ImageUploadField } from "@/components/ImageUploadField";
+import { RichTextEditor } from "@/components/RichTextEditor";
 import { useToast } from "@/components/Toast";
 import { clientApi } from "@/lib/clientApi";
 import { clientGql } from "@/lib/clientGraphql";
@@ -65,15 +66,17 @@ function BioEditor({ slug, userId }: { slug: string; userId: string }) {
     <div className="stack" style={{ marginTop: 12, gap: 8 }}>
       {bioOpen ? (
         <>
-          <textarea
-            value={bio ?? ""}
-            onChange={(e) => setBio(e.target.value)}
-            placeholder={
-              bio === null ? "Loading…" : "Member bio (markdown supported)"
-            }
-            aria-label="Member bio"
-            disabled={bio === null}
-          />
+          {bio === null ? (
+            <div className="rte" style={{ minHeight: 420 }} aria-busy="true" />
+          ) : (
+            // Same editor as the topic composers and the profile About
+            // field (launch QA 2026-07-27); markdown stays underneath.
+            <RichTextEditor
+              value={bio}
+              onChange={setBio}
+              placeholder="Member bio"
+            />
+          )}
           <ImageUploadField
             id={`member-image-${userId}`}
             label="Profile image"

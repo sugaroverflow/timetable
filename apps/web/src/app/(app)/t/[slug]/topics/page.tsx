@@ -1,10 +1,16 @@
 import { isAdmin, isHost, type Role } from "@timetable/shared";
 
 import { CreateTopicForm } from "@/components/CreateTopicForm";
+import { ListSortControl } from "@/components/ListSortControl";
 import { TopicManager } from "@/components/TopicManager";
 import type { ManagedTopic } from "@/lib/feedTypes";
 import { commentTree } from "@/lib/gqlFragments";
 import { gqlFetch } from "@/lib/graphql";
+import {
+  MY_TOPICS_SORTS,
+  normalizeManagedSort,
+  sortManagedTopics,
+} from "@/lib/managedTopicSort";
 import { displayRolesFromCookies } from "@/lib/previewRoles.server";
 import { parseTimetableSettings, roleLabel } from "@/lib/timetableSettings";
 
@@ -31,10 +37,14 @@ const QUERY = `
 
 export default async function MyTopicsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ sort?: string }>;
 }) {
   const { slug } = await params;
+  const { sort: sortParam } = await searchParams;
+  const sort = normalizeManagedSort(sortParam, MY_TOPICS_SORTS);
   const data = await gqlFetch<Data>(QUERY, { s: slug });
   const roles = await displayRolesFromCookies(
     (data.timetable?.viewerRoles ?? []) as Role[],
@@ -67,11 +77,17 @@ export default async function MyTopicsPage({
           <h2 className="section-title">My Topics</h2>
           <p>Create topics for an admin to publish, and unpublish your own.</p>
         </div>
+        {data.hostDashboard.length > 1 ? (
+          <div className="toolbar">
+            <label htmlFor="sort">Sort</label>
+            <ListSortControl value={sort} options={MY_TOPICS_SORTS} />
+          </div>
+        ) : null}
         {data.hostDashboard.length === 0 ? (
           <div className="notice">No topics yet — create your first one.</div>
         ) : (
           <ul className="list">
-            {data.hostDashboard.map((topic) => (
+            {sortManagedTopics(data.hostDashboard, sort).map((topic) => (
               <TopicManager
                 key={topic.id}
                 topic={topic}
