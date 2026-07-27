@@ -84,7 +84,6 @@ function testContext(userId: string | null, roles: Role[] = []): ApiContext {
           email: `${userId}@example.com`,
           name: "Test User",
           image: null,
-          bio: null,
         }
       : null,
     impersonation: null,

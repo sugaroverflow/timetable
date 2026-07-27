@@ -13,7 +13,6 @@ export type SessionUser = {
   email: string | null;
   name: string | null;
   image: string | null;
-  bio: string | null;
 };
 
 const secretKey = process.env.CLERK_SECRET_KEY ?? "";
@@ -39,7 +38,6 @@ async function loadLocalUser(id: string): Promise<SessionUser | null> {
       email: users.email,
       name: users.name,
       image: users.image,
-      bio: users.bio,
     })
     .from(users)
     .where(eq(users.id, id))
