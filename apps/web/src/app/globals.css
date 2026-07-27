@@ -932,6 +932,14 @@ textarea {
   font-weight: var(--fw-semibold);
   cursor: pointer;
 }
+/* Chromium derives the option-popup colors from the select's own background;
+   with ours transparent it falls back to a LIGHT popup even in dark mode,
+   while the option text inherits the (light) ink — explicit surface colors
+   keep the list readable in both modes. */
+.select-minimal select option {
+  background: var(--card);
+  color: var(--ink);
+}
 
 .table-wrap {
   overflow-x: auto;
