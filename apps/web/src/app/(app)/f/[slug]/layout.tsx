@@ -176,7 +176,7 @@ function SideNav({
       {isMember && <NotificationsNavLink base={base} unread={unread} />}
       {isMember && <NavLink href={`${base}/people`}>People</NavLink>}
       {isAuthed && <NavLink href={`${base}/profile`}>Profile</NavLink>}
-      {hostOrAdmin && <NavLink href={`${base}/dashboard`}>Analysis</NavLink>}
+      {hostOrAdmin && <NavLink href={`${base}/analysis`}>Analysis</NavLink>}
       {admin && <NavLink href={`${base}/moderation`}>Pending Topics</NavLink>}
       {admin && <NavLink href={`${base}/activity`}>Activity Log</NavLink>}
       {admin && <NavLink href={`${base}/settings`}>Forum Settings</NavLink>}

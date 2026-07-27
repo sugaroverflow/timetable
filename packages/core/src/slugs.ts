@@ -10,6 +10,7 @@ const RESERVED_SEGMENTS = new Set([
   "topics",
   "calendar",
   "dashboard",
+  "analysis",
   "moderation",
   "activity",
   "settings",

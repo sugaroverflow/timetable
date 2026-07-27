@@ -1303,6 +1303,22 @@ textarea {
 }
 
 /* Host insights panel — collapsible vote breakdown */
+/* The ❤️-breakdown disclosure triangle (topic cards + Analysis rows). */
+.breakdown-caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.breakdown-caret:hover,
+.breakdown-caret[aria-expanded="true"] {
+  color: var(--ink);
+}
+
 .host-panel-toggle {
   display: flex;
   align-items: center;

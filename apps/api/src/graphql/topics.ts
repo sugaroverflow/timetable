@@ -121,12 +121,13 @@ const TopicType = builder.objectRef<GqlTopic>("Topic").implement({
       nullable: true,
       resolve: (tp) => (tp.canSeeHostOnly ? tp.devotionScore : null),
     }),
-    // Per-elector breakdown, host/admin-only.
+    // Per-elector breakdown — any signed-in viewer, matching the
+    // topicWeightedBreakdown query (QA 2026-07-27).
     weightedBreakdown: t.field({
       type: [WeightedHeartType],
       nullable: true,
-      resolve: async (tp) => {
-        if (!tp.canSeeHostOnly) return null;
+      resolve: async (tp, _args, ctx) => {
+        if (!ctx.user) return null;
         return getWeightedBreakdown(tp.timetableId, tp.id);
       },
     }),
