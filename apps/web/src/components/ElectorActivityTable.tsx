@@ -24,11 +24,13 @@ export type ElectorRow = {
   electorName: string | null;
   heartCount: number;
   commentCount: number;
+  /** Published topics this elector has never seen nor ❤️'d. */
+  queueCount: number;
   latestActivityAt: string | null;
   heartedTopics: HeartedTopic[];
 };
 
-type SortKey = "name" | "hearts" | "comments" | "activity";
+type SortKey = "name" | "hearts" | "comments" | "queue" | "activity";
 type TopicSortKey = "name" | "host" | "comments";
 
 /** The fold under an elector row: the topics they ❤️'d as a sortable table
@@ -128,6 +130,7 @@ function ElectorRowItem({
         </td>
         <td className="mono">{elector.heartCount}</td>
         <td className="mono">{elector.commentCount}</td>
+        <td className="mono">{elector.queueCount}</td>
         <td>
           {elector.latestActivityAt ? (
             // suppressHydrationWarning: server and client may render this a
@@ -145,7 +148,7 @@ function ElectorRowItem({
       </tr>
       {open ? (
         <tr className="elector-hearts-row">
-          <td colSpan={4}>
+          <td colSpan={5}>
             {elector.heartedTopics.length === 0 ? (
               <span className="faint" style={{ fontSize: 12 }}>
                 No ❤️s yet.
@@ -200,6 +203,9 @@ export function ElectorActivityTable({
       case "comments":
         cmp = a.commentCount - b.commentCount;
         break;
+      case "queue":
+        cmp = a.queueCount - b.queueCount;
+        break;
       case "activity":
         cmp =
           (a.latestActivityAt ? Date.parse(a.latestActivityAt) : 0) -
@@ -231,6 +237,12 @@ export function ElectorActivityTable({
               active={sortKey === "comments"}
               dir={dir}
               onToggle={() => toggleSort("comments")}
+            />
+            <SortHeader
+              label="Queue"
+              active={sortKey === "queue"}
+              dir={dir}
+              onToggle={() => toggleSort("queue")}
             />
             <SortHeader
               label="Last activity"

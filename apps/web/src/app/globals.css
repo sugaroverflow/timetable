@@ -1472,6 +1472,27 @@ textarea {
   margin: 2px 0 10px;
 }
 
+/* Topic Queue decision bar (?sort=queue) */
+.queue-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+  padding: 6px 0 2px;
+}
+.queue-bar .queue-heart {
+  border-color: transparent;
+  background: var(--heart-soft);
+  color: var(--heart);
+}
+.queue-bar .queue-progress {
+  font-size: var(--text-sm);
+  margin-left: 6px;
+}
+.queue-done {
+  align-items: center;
+}
+
 /* Topic card action bar */
 .card-actions {
   display: flex;

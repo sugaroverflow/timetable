@@ -25,6 +25,7 @@ vi.mock("@timetable/core", async (importOriginal) => {
     getPerson: vi.fn(),
     getReadableTimetable: vi.fn(),
     getSlotsForIcs: vi.fn(),
+    getTopicQueue: vi.fn(),
     getTimetableById: vi.fn(),
     getUserById: vi.fn(),
     getUserByIcsToken: vi.fn(),
@@ -160,6 +161,7 @@ function membershipFixture(
     lastSeenFeedAt: null,
     lastSeenNotificationsAt: null,
     inviteSentAt: null,
+    queueRoundStartedAt: null,
     createdAt: new Date("2026-01-01T00:00:00.000Z"),
     updatedAt: new Date("2026-01-01T00:00:00.000Z"),
     ...patch,
@@ -216,6 +218,7 @@ afterEach(() => {
   vi.mocked(core.getMembershipById).mockReset();
   vi.mocked(core.getReadableTimetable).mockReset();
   vi.mocked(core.getSlotsForIcs).mockReset();
+  vi.mocked(core.getTopicQueue).mockReset();
   vi.mocked(core.getTimetableById).mockReset();
   vi.mocked(core.getUserById).mockReset();
   vi.mocked(core.getUserByIcsToken).mockReset();
@@ -784,6 +787,61 @@ describe("createApiApp", () => {
         timetable.id,
         "elector-1",
       );
+    });
+  });
+
+  it("returns the Topic Queue to electors and null to non-electors", async () => {
+    const timetable = timetableFixture();
+    vi.mocked(core.getReadableTimetable).mockResolvedValue({
+      timetable,
+      roles: ["elector"],
+    });
+    vi.mocked(core.getTopicQueue).mockResolvedValue({
+      currentTopicId: null,
+      remaining: 0,
+      remainingNew: 0,
+      roundSize: 4,
+    });
+
+    const query = `query($s: String!) {
+      topicQueue(idOrSlug: $s) { remaining remainingNew roundSize }
+    }`;
+
+    await withTestServer(async (baseUrl) => {
+      mockSession("elector-1", ["elector"]);
+      const asElector = await fetch(`${baseUrl}/graphql`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, variables: { s: timetable.slug } }),
+      });
+      const electorBody = (await asElector.json()) as {
+        data: { topicQueue: { roundSize: number } | null };
+      };
+      expect(electorBody.data.topicQueue).toEqual({
+        remaining: 0,
+        remainingNew: 0,
+        roundSize: 4,
+      });
+      expect(core.getTopicQueue).toHaveBeenCalledWith(
+        timetable.id,
+        "elector-1",
+      );
+
+      // Hosts don't vote — no queue.
+      mockSession("host-1", ["host"]);
+      vi.mocked(core.getReadableTimetable).mockResolvedValue({
+        timetable,
+        roles: ["host"],
+      });
+      const asHost = await fetch(`${baseUrl}/graphql`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, variables: { s: timetable.slug } }),
+      });
+      const hostBody = (await asHost.json()) as {
+        data: { topicQueue: unknown };
+      };
+      expect(hostBody.data.topicQueue).toBeNull();
     });
   });
 

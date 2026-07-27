@@ -31,6 +31,8 @@ export function normalizeFeedSort(sort: string | undefined): string {
   return SORTS.has(sort) ? sort : "random";
 }
 
+export type QueueCounts = { remaining: number; remainingNew: number };
+
 type Data = {
   timetable: {
     viewerRoles: string[];
@@ -41,6 +43,7 @@ type Data = {
   myFeedLastSeenAt: string | null;
   topicFeed: FeedTopic[];
   timetableHosts: { id: string; name: string | null }[];
+  topicQueue: QueueCounts | null;
 };
 
 const QUERY = `
@@ -49,6 +52,7 @@ const QUERY = `
     me { id }
     myFeedLastSeenAt(idOrSlug: $s)
     timetableHosts: forumHosts(idOrSlug: $s) { id name }
+    topicQueue(idOrSlug: $s) { remaining remainingNew }
     topicFeed(idOrSlug: $s, sort: $sort, seed: $seed, hostId: $host, heartedByMe: $hearted, heartedBy: $heartedBy, limit: $limit, offset: $offset) {
       ${TOPIC_FEED_FIELDS}
       contentUpdatedAt
@@ -103,6 +107,8 @@ export type FeedPage = {
   lastSeenAt: string | null;
   isMember: boolean;
   hosts: { id: string; name: string | null }[];
+  /** Topic Queue counts for the sort menu; null for guests/non-electors. */
+  queue: QueueCounts | null;
 };
 
 /** Everything one TopicCard needs, derived once per topic: perms gated on
@@ -120,6 +126,50 @@ export function topicCardProps(page: FeedPage, topic: FeedTopic) {
     viewerHeartCount: page.viewerHeartCount,
     hosts: page.hosts,
   };
+}
+
+export type QueueState = QueueCounts & {
+  roundSize: number;
+  current: FeedTopic | null;
+};
+
+const QUEUE_QUERY = `
+  query QueuePage($s: String!) {
+    timetable: forum(idOrSlug: $s) { viewerRoles settings viewerHeartedPublishedCount }
+    me { id }
+    myFeedLastSeenAt(idOrSlug: $s)
+    timetableHosts: forumHosts(idOrSlug: $s) { id name }
+    topicQueue(idOrSlug: $s) {
+      remaining remainingNew roundSize
+      current {
+        ${TOPIC_FEED_FIELDS}
+        contentUpdatedAt
+      }
+    }
+  }
+`;
+
+/** The Topic Queue view (?sort=queue): the current topic plus counts.
+ * `queue` is null for guests and non-electors — the caller falls back to
+ * the regular feed. */
+export async function fetchQueuePage(
+  slug: string,
+): Promise<{ page: FeedPage; queue: QueueState | null }> {
+  const data = await gqlFetch<
+    Omit<Data, "topicFeed" | "topicQueue"> & {
+      topicQueue: QueueState | null;
+    }
+  >(QUEUE_QUERY, { s: slug });
+  const roles = await displayRolesFromCookies(
+    (data.timetable?.viewerRoles ?? []) as Role[],
+  );
+  const queue = data.topicQueue;
+  const page = toFeedPage(
+    slug,
+    { ...data, topicFeed: [], topicQueue: queue },
+    roles,
+  );
+  return { page, queue };
 }
 
 /**
@@ -164,5 +214,6 @@ function toFeedPage(slug: string, data: Data, roles: Role[]): FeedPage {
     lastSeenAt: data.myFeedLastSeenAt,
     isMember: roles.length > 0,
     hosts: data.timetableHosts,
+    queue: data.topicQueue,
   };
 }

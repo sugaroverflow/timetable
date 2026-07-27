@@ -11,10 +11,12 @@ import {
   PersonProfileCard,
   type ProfileCardPerson,
 } from "@/components/PersonProfileCard";
+import { QueueControls, QueueRestartButton } from "@/components/QueueControls";
 import { TopicCard } from "@/components/TopicCard";
 import {
   FEED_PAGE_SIZE,
   fetchFeedPage,
+  fetchQueuePage,
   normalizeFeedSort,
   topicCardProps,
 } from "@/lib/feedPage";
@@ -46,6 +48,15 @@ function redirectWithFreshSeed(
   redirect(`/f/${slug}/topics?${params.toString()}`);
 }
 
+async function loadHostCard(slug: string, host: string): Promise<HostCard> {
+  if (!host) return null;
+  const data = await gqlFetch<{ person: HostCard }>(HOST_CARD_QUERY, {
+    s: slug,
+    u: host,
+  });
+  return data.person;
+}
+
 function FeedEmpty({
   hearted,
   hostLabel,
@@ -73,6 +84,60 @@ function FeedEmpty({
   );
 }
 
+/** ?sort=queue — the Topic Queue: one unhearted topic at a time in a
+ * per-user stable shuffle, ❤️ or Later under it, and an explicit
+ * end-of-round state (product feedback 2026-07-28). */
+async function QueueView({ slug }: { slug: string }) {
+  const { page, queue } = await fetchQueuePage(slug);
+  // Guests and non-electors have no queue — show the regular list.
+  if (!queue) redirect(`/f/${slug}/topics`);
+
+  const heartedCount = page.viewerHeartCount ?? 0;
+  const publishedCount = queue.roundSize + heartedCount;
+  const hostLabel = roleLabel(page.settings.roleLabels, "host");
+  const adminLabel = roleLabel(page.settings.roleLabels, "admin");
+
+  return (
+    <div className="stack">
+      {page.isMember ? <MarkFeedSeen slug={slug} /> : null}
+      <div className="toolbar feed-toolbar">
+        <FeedSortControl value="queue" queue={queue} />
+      </div>
+      {publishedCount === 0 ? (
+        <FeedEmpty
+          hearted={false}
+          hostLabel={hostLabel}
+          adminLabel={adminLabel}
+        />
+      ) : queue.current ? (
+        <>
+          <TopicCard {...topicCardProps(page, queue.current)} expandBody />
+          <QueueControls
+            topicId={queue.current.id}
+            position={queue.roundSize - queue.remaining + 1}
+            roundSize={queue.roundSize}
+          />
+        </>
+      ) : queue.roundSize === 0 ? (
+        <EmptyState
+          icon="♥"
+          title="You've ❤️'d every topic"
+          hint="Nothing left to queue — newly published topics will appear here."
+        />
+      ) : (
+        <div className="stack queue-done">
+          <EmptyState
+            icon="✓"
+            title="That's every topic"
+            hint={`You've seen all ${publishedCount} and currently ❤️ ${heartedCount}.`}
+          />
+          <QueueRestartButton slug={slug} roundSize={queue.roundSize} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default async function FeedPage({
   params,
   searchParams,
@@ -92,6 +157,11 @@ export default async function FeedPage({
     hearted: heartedParam,
     shuffle: seedParam,
   } = await searchParams;
+  // Queue mode is a different view, not a feed sort — branch before the
+  // sort normalisation (which would fold "queue" into random).
+  if (sortParam === "queue") {
+    return <QueueView slug={slug} />;
+  }
   const sort = normalizeFeedSort(sortParam);
   const host = hostParam ?? "";
   const hearted = heartedParam === "me";
@@ -114,14 +184,7 @@ export default async function FeedPage({
   const hostLabel = roleLabel(page.settings.roleLabels, "host");
   const adminLabel = roleLabel(page.settings.roleLabels, "admin");
 
-  let hostCard: HostCard = null;
-  if (host) {
-    const data = await gqlFetch<{ person: HostCard }>(HOST_CARD_QUERY, {
-      s: slug,
-      u: host,
-    });
-    hostCard = data.person;
-  }
+  const hostCard = await loadHostCard(slug, host);
 
   return (
     <div className="stack">
@@ -142,7 +205,7 @@ export default async function FeedPage({
             allLabel={`All ${pluralLabel(hostLabel)}`}
           />
         ) : null}
-        <FeedSortControl value={sort} />
+        <FeedSortControl value={sort} queue={page.queue} />
       </div>
 
       {!page.isMember ? (
