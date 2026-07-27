@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -167,26 +168,29 @@ export function TopicLeaderboard({
         <h3 style={{ margin: 0, fontSize: 15 }}>{title}</h3>
         <span className="row wrap" style={{ gap: 10, alignItems: "center" }}>
           {hostFilter}
-          <select
-            aria-label="Score normalisation"
-            value={norm}
-            onChange={(e) => setNorm(e.target.value as AnyNormKey)}
-          >
-            <optgroup label="❤️ hearts">
-              {NORM_MODES.map((m) => (
-                <option key={m.key} value={m.key} title={m.description}>
-                  {m.symbol} — {m.label}
-                </option>
-              ))}
-            </optgroup>
-            <optgroup label="💬 comments">
-              {COMMENT_NORM_MODES.map((m) => (
-                <option key={m.key} value={m.key} title={m.description}>
-                  {m.symbol} — {m.label}
-                </option>
-              ))}
-            </optgroup>
-          </select>
+          <span className="select-minimal">
+            <ChevronDown size={14} aria-hidden />
+            <select
+              aria-label="Score normalisation"
+              value={norm}
+              onChange={(e) => setNorm(e.target.value as AnyNormKey)}
+            >
+              <optgroup label="❤️ hearts">
+                {NORM_MODES.map((m) => (
+                  <option key={m.key} value={m.key} title={m.description}>
+                    {m.symbol} — {m.label}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="💬 comments">
+                {COMMENT_NORM_MODES.map((m) => (
+                  <option key={m.key} value={m.key} title={m.description}>
+                    {m.symbol} — {m.label}
+                  </option>
+                ))}
+              </optgroup>
+            </select>
+          </span>
         </span>
       </div>
       <p className="faint" style={{ marginTop: 0, fontSize: 12 }}>

@@ -78,8 +78,7 @@ export default async function MyTopicsPage({
           <p>Create topics for an admin to publish, and unpublish your own.</p>
         </div>
         {data.hostDashboard.length > 1 ? (
-          <div className="toolbar">
-            <label htmlFor="sort">Sort</label>
+          <div className="toolbar feed-toolbar">
             <ListSortControl value={sort} options={MY_TOPICS_SORTS} />
           </div>
         ) : null}

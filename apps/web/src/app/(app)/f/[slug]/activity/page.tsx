@@ -245,7 +245,7 @@ function ActivityToolbar({
     roleLabels,
   );
   return (
-    <div className="toolbar wrap">
+    <div className="toolbar feed-toolbar wrap">
       <ActivityFilter value={filters.action ?? ""} actions={uniqueActions} />
       <ActorFilter value={filters.actor ?? ""} actors={uniqueActors} />
       <ActivityRoleFilter value={filters.role ?? ""} options={roleOptions} />

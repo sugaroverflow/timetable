@@ -1,5 +1,7 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
+
 import { useSetSearchParam } from "@/lib/useSearchParamNav";
 
 export function ActorFilter({
@@ -12,8 +14,8 @@ export function ActorFilter({
   const setParam = useSetSearchParam();
 
   return (
-    <>
-      <label htmlFor="actor-filter">User</label>
+    <span className="select-minimal">
+      <ChevronDown size={14} aria-hidden />
       <select
         id="actor-filter"
         aria-label="Filter by user"
@@ -27,6 +29,6 @@ export function ActorFilter({
           </option>
         ))}
       </select>
-    </>
+    </span>
   );
 }
