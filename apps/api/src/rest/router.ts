@@ -9,7 +9,9 @@ import {
   computeUserDigest,
   createLocalUser,
   createTimetable,
+  deleteForum,
   getMembership,
+  getUsersByEmails,
   getMembershipById,
   getPerson,
   getReadableTimetable,
@@ -40,9 +42,20 @@ import {
 } from "@timetable/shared";
 
 import { getOrCreateClerkUser } from "../auth/clerk";
+import { isSysadmin } from "../auth/sysadmin";
 import { buildContext, type ApiContext } from "../context";
-import { renderDigest, renderInvite, sendEmail } from "../email";
-import { getRequestId, logRequestError } from "../http/request-log";
+import {
+  renderDigest,
+  renderInvite,
+  renderNewForum,
+  sendEmail,
+} from "../email";
+import { env } from "../env";
+import {
+  getRequestId,
+  logRequestError,
+  structuredLogger,
+} from "../http/request-log";
 import { buildIcs } from "../ics";
 import {
   createSignedUpload,
@@ -136,7 +149,62 @@ restRouter.post(
     if (!input) return;
 
     const timetable = await createTimetable(user.id, input);
+    // Notify opted-in sysadmins — fire-and-forget so an email hiccup can
+    // never fail forum creation.
+    void notifySysadminsOfNewForum({
+      forumName: timetable.name,
+      forumSlug: timetable.slug,
+      ownerName: user.name,
+      ownerEmail: user.email,
+    }).catch((err) => {
+      logRequestError(req, err, { component: "new-forum-email" });
+    });
     res.status(201).json(timetable);
+  }),
+);
+
+/** Email each SYSADMIN_EMAILS account that opted in (newForumEmails). */
+async function notifySysadminsOfNewForum(args: {
+  forumName: string;
+  forumSlug: string;
+  ownerName: string | null;
+  ownerEmail: string | null;
+}): Promise<void> {
+  const sysadmins = await getUsersByEmails(env.sysadminEmails);
+  const recipients = sysadmins.filter(
+    (u) => u.email && u.notificationSettings.newForumEmails === true,
+  );
+  if (recipients.length === 0) return;
+  const { subject, html } = renderNewForum(args);
+  await Promise.all(
+    recipients.map((u) => sendEmail({ to: u.email!, subject, html })),
+  );
+}
+
+/**
+ * DELETE /api/timetables/:id
+ * Sysadmin-only (SYSADMIN_EMAILS): hard-deletes the forum; memberships,
+ * invites, topics, comments, hearts, activity, and timeslots cascade.
+ */
+restRouter.delete(
+  "/timetables/:id",
+  h(async (req, res) => {
+    const ctx = await contextFromRequest(req);
+    const user = requireUserCtx(ctx, res);
+    if (!user) return;
+    if (!isSysadmin(user)) {
+      res.status(403).json({ error: "Sysadmins only" });
+      return;
+    }
+    const deleted = await deleteForum(req.params.id as string);
+    if (!deleted) {
+      res.status(404).json({ error: "Forum not found" });
+      return;
+    }
+    structuredLogger("sysadmin").info(
+      `${user.email} deleted forum "${deleted.name}" (${deleted.slug}, ${deleted.id})`,
+    );
+    res.json({ deleted: true, name: deleted.name, slug: deleted.slug });
   }),
 );
 
