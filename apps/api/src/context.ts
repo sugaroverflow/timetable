@@ -61,7 +61,6 @@ async function resolveImpersonation(
       email: null, // never expose the target's email through preview
       name: target.name,
       image: target.image,
-      bio: target.bio,
     },
     impersonation: {
       actorId: actual.id,

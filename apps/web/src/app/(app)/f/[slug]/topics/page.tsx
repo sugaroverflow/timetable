@@ -99,8 +99,8 @@ export default async function FeedPage({
   // Mint one and redirect so the seed is IN the URL: router.refresh()
   // after an action (edit save, heart, comment) then re-renders the same
   // order instead of reshuffling under the user (admin QA 2026-07-27).
-  // Each fresh /feed navigation still gets a new shuffle — this mints a
-  // new seed per visit.
+  // Each fresh All Topics navigation still gets a new shuffle — this mints
+  // a new seed per visit.
   if (sort === "random" && !seedParam) {
     redirectWithFreshSeed(slug, {
       sort: sortParam,

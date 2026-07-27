@@ -23,6 +23,18 @@ export function parseTimetableSettings(raw: string | null | undefined) {
   }
 }
 
+/** Parse a user's serialized notification prefs; {} on missing/bad JSON. */
+export function parseDigestSettings(
+  raw: string | null | undefined,
+): DigestSettings {
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw) as DigestSettings;
+  } catch {
+    return {};
+  }
+}
+
 /** Privacy → sidebar pill colour/label, shared by the timetable shell and
  * the sidebar switcher. */
 export function privacyBadge(privacy: string): { dot: string; label: string } {

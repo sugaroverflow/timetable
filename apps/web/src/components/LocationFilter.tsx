@@ -1,5 +1,6 @@
 "use client";
 
+import { SelectMinimal } from "@/components/SelectMinimal";
 import { useSetSearchParam } from "@/lib/useSearchParamNav";
 
 export function LocationFilter({
@@ -12,7 +13,7 @@ export function LocationFilter({
   const setParam = useSetSearchParam();
 
   return (
-    <select
+    <SelectMinimal
       value={value}
       onChange={(e) => setParam("location", e.target.value)}
       aria-label="Filter by location"
@@ -23,6 +24,6 @@ export function LocationFilter({
           {loc}
         </option>
       ))}
-    </select>
+    </SelectMinimal>
   );
 }

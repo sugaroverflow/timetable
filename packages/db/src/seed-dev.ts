@@ -845,14 +845,23 @@ export function parseFixture(markdown: string): Fixture {
   return fixture;
 }
 
-/** Membership rows with the per-forum profile mirrored from the account
- * fields the fixture sets on the user row (userRows is built from the same
- * people, in the same order). */
+/** Membership rows carry the per-forum profile (name/photo/bio/slug).
+ * Slugs are deterministic from display names, "-2" on collision. */
 function buildMembershipRows(
   fixture: Fixture,
   timetableId: string,
-  userRows: NewUser[],
 ): NewTimetableMembership[] {
+  const seenSlugs = new Map<string, number>();
+  const slugFor = (name: string): string => {
+    const base =
+      name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "") || "user";
+    const n = (seenSlugs.get(base) ?? 0) + 1;
+    seenSlugs.set(base, n);
+    return n === 1 ? base : `${base}-${n}`;
+  };
   return fixture.people.map((person, index) => ({
     id: stableUuid("membership", person.label),
     userId: person.clerkId ?? userIdFor(person.label),
@@ -861,7 +870,7 @@ function buildMembershipRows(
     name: person.displayName,
     image: null,
     bio: person.bio,
-    slug: userRows[index]?.slug ?? null,
+    slug: slugFor(person.displayName),
     createdAt: addMinutes(BASE_TIME, index),
     updatedAt: addMinutes(BASE_TIME, index),
   }));
@@ -918,29 +927,14 @@ function buildRows(fixture: Fixture): {
     ]),
   );
 
-  // Deterministic, unique user slugs from display names ("-2" on collision).
-  const seenUserSlugs = new Map<string, number>();
-  const userSlugFor = (name: string): string => {
-    const base =
-      name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "") || "user";
-    const n = (seenUserSlugs.get(base) ?? 0) + 1;
-    seenUserSlugs.set(base, n);
-    return n === 1 ? base : `${base}-${n}`;
-  };
-
   const userRows: NewUser[] = fixture.people.map((person, index) => ({
     id: localIdFor(person),
     name: person.displayName,
-    slug: userSlugFor(person.displayName),
     email: person.clerkId
       ? `${person.label.toLowerCase()}@real.clerk`
       : fakeEmailFor(person.label),
     emailVerified: BASE_TIME,
     image: null,
-    bio: person.bio,
     notificationSettings: {
       digestNewTopics: true,
       digestReplies: true,
@@ -963,7 +957,7 @@ function buildRows(fixture: Fixture): {
     updatedAt: BASE_TIME,
   };
 
-  const membershipRows = buildMembershipRows(fixture, timetableId, userRows);
+  const membershipRows = buildMembershipRows(fixture, timetableId);
 
   const topicRows: NewTopic[] = fixture.topics.map((topic, index) => {
     const createdAt = addMinutes(TOPIC_TIME, index * 15);
@@ -1317,7 +1311,6 @@ async function upsertUsers(tx: SeedTx, seedUsers: NewUser[]): Promise<void> {
           email: user.email,
           emailVerified: user.emailVerified,
           image: user.image,
-          bio: user.bio,
           notificationSettings: user.notificationSettings,
           lastDigestAt: user.lastDigestAt,
           icsToken: user.icsToken,

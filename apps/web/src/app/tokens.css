@@ -79,6 +79,17 @@
   --toast-error-bg-hue: #5c1f24;
   --toast-error-ink-hue: #ff9aa5;
 
+  /* Initials-avatar backgrounds (mode-agnostic; picked by name hash — see
+     components/Avatar.tsx, the numbering is load-bearing) */
+  --avatar-1: #7048e8;
+  --avatar-2: #e8590c;
+  --avatar-3: #1098ad;
+  --avatar-4: #2f9e44;
+  --avatar-5: #c2255c;
+  --avatar-6: #3b5bdb;
+  --avatar-7: #0c8599;
+  --avatar-8: #5f3dc4;
+
   /* ===========================================================================
      SEMANTIC TOKENS — LIGHT (the default). Dark overrides in the block below.
      =========================================================================== */

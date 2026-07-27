@@ -93,6 +93,18 @@ export function canProposeTopics(viewer: Viewer): boolean {
   );
 }
 
+/** The topic's owning host acting on their own topic. Distinct from
+ * canEditTopic so callers can tell an owner edit from an admin override
+ * (admin edits of someone else's topic are activity-logged). */
+export function ownsTopicAsHost(viewer: Viewer, topicHostId: string): boolean {
+  return viewer.userId === topicHostId && isHost(viewer.roles);
+}
+
+/** Edit, submit, or unpublish a topic: its owning host, or any admin. */
+export function canEditTopic(viewer: Viewer, topicHostId: string): boolean {
+  return ownsTopicAsHost(viewer, topicHostId) || isAdmin(viewer.roles);
+}
+
 export function canModerate(viewer: Viewer): boolean {
   return isAdmin(viewer.roles);
 }

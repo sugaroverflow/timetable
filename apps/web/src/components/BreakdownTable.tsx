@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { Avatar } from "@/components/Avatar";
 import { PersonChip } from "@/components/PersonChip";
+import { SortHeader } from "@/components/SortHeader";
 import { formatShortDate } from "@/lib/dates";
 import type { WeightedHeart } from "@/lib/feedTypes";
 
@@ -62,24 +63,13 @@ export function BreakdownTable({
   });
 
   function header(key: SortKey, label: string) {
-    const active = sortKey === key;
     return (
-      <th
-        aria-sort={
-          active ? (dir === "asc" ? "ascending" : "descending") : "none"
-        }
-      >
-        <button
-          type="button"
-          className={active ? "th-sort th-sort-active" : "th-sort"}
-          onClick={() => toggleSort(key)}
-        >
-          {label}
-          <span aria-hidden className="th-sort-arrow">
-            {active ? (dir === "asc" ? " ▲" : " ▼") : ""}
-          </span>
-        </button>
-      </th>
+      <SortHeader
+        label={label}
+        active={sortKey === key}
+        dir={dir}
+        onToggle={() => toggleSort(key)}
+      />
     );
   }
 

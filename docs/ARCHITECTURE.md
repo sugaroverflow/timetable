@@ -6,7 +6,7 @@ through Drizzle.
 
 Since the 2026-07 rebrand the product is branded **Topic** (future domain
 topic.forum) and the tenant entity is a "forum" in all user-facing copy. Code
-identifiers, the `@timetable/*` package names, routes (`/t/`, `/timetables`),
+identifiers, the `@timetable/*` package names, the `/timetables` resolver,
 CSS classes, and the GraphQL schema deliberately keep `timetable` naming — new
 user-visible strings must say forum/Topic, and this document uses the code
 names. The domain cutover (still timetable.love) happens separately.
@@ -91,8 +91,10 @@ Codex/agent workflows are separate from the app runtime.
   hosts/admins get a sortable per-elector breakdown table (the shared
   `BreakdownTable` component: L1/L2/devotion weights + hearted-at, footer
   sums matching the topic's scores, names opening profile cards)
-- topic permalinks at `/t/[slug]/[hostSlug]/[topicSlug]` (stale host segments
-  redirect)
+- topic permalinks at `/f/[slug]/[hostSlug]/[topicSlug]` (stale host segments
+  redirect; old `/t/` URLs permanently redirect and must keep doing so)
+- person pages at `/f/[slug]/[userSlug]` (per-forum member profiles; a
+  userId segment canonically redirects to the member's slug)
 - My Topics (feed-identical cards + manage controls, TipTap editor; admins
   can create a topic on behalf of another host)
 - Pending Topics (the submitted moderation queue; the draft topic status was
@@ -105,8 +107,14 @@ Codex/agent workflows are separate from the app runtime.
 - settings (timetable profile + theme sections, hearts cutoff, invites)
 - user profile (name, avatar, markdown bio, digest preferences)
 - availability calendar (route live; nav link removed pending #55)
-- analytics dashboard
+- Analysis page (`/f/[slug]/analysis`): topics analysis table with ❤️ and 💬
+  normalisations, per-table host filters, elector activity table with
+  per-row topic folds, admin-only host activity table
+- `/admin` sysadmin dashboard (SYSADMIN_EMAILS-gated forum overview/delete)
 - `/timetables` resolver → last-engaged timetable's feed, or the create screen
+- social preview (Open Graph) cards for the app, forums, topics, and people
+  (`opengraph-image.tsx` per segment + `lib/ogCard.tsx`; resolved via a
+  session-less GraphQL fetch so private content degrades to generic cards)
 
 Per-timetable theme (colours, fonts, dark palette) is validated server-side,
 stored in the settings JSON, and applied through a server-rendered style tag;
@@ -157,6 +165,9 @@ REST routes currently include:
 | `DELETE /api/memberships/:id` | Remove a member (the owner can never be removed) |
 | `POST /api/jobs/digests` | Cron-protected digest job |
 | `GET /api/timetables/:idOrSlug/calendar.ics` | Calendar feed |
+| `GET /api/timetables/:idOrSlug/feed.atom` | Atom feed of the newest published topics (anonymous-only — private forums 404) |
+| `GET /api/timetables/:idOrSlug/export` | Read-only JSON export of a forum's public data |
+| `DELETE /api/timetables/:id` | Delete a forum (sysadmin dashboard) |
 | `POST /api/uploads` | Signed direct browser uploads to S3-compatible storage |
 | `GET /health` | Health check |
 
@@ -220,7 +231,7 @@ Hearts, comments, invites, and first sign-ins are logged as activity events
 alongside moderation and lifecycle actions.
 
 The web proxy uses `timetableRouteByDomain` to rewrite custom-domain requests
-onto the existing `/t/[slug]` route tree.
+onto the existing `/f/[slug]` route tree.
 
 ## Auth Flow
 
@@ -259,7 +270,8 @@ Core tables:
 Notable columns: `timetables.settings` is a JSON blob holding role labels,
 theme (colours, fonts, dark palette), icon/cover URLs, and digest defaults;
 `timetables.heartsCountFrom` is the heart-count cutoff; `topics.slug` +
-`users.slug` power permalinks; `topics.contentUpdatedAt` tracks content edits
+`timetable_memberships.slug` power permalinks (member profiles are
+per-forum); `topics.contentUpdatedAt` tracks content edits
 for "newest" sorting; memberships carry `lastSeenFeedAt` and
 `lastSeenNotificationsAt` watermarks plus `inviteSentAt` (null = added by an
 admin but never invited).
@@ -287,10 +299,11 @@ Production deploys are manual-only. Per-PR review apps were removed
 Static README images live in `docs/assets/readme`.
 
 Web assets live in `apps/web/public/assets`. Next.js serves them from the site
-root. Since the rebrand the logo is the 📚 emoji rendered inline (topbar brand
-and landing page); the old `timetable.love-logo-transparent.png` asset is
-unreferenced and slated for deletion at the domain cutover, along with adding
-a proper favicon.
+root. Since the rebrand the logo is the 📚 emoji rendered inline (topbar
+brand and landing page) and the favicon is an emoji data URI (`lib/favicon.ts`
+— forums can override it with their own icon emoji); the old
+`timetable.love-logo-transparent.png` asset is unreferenced and slated for
+deletion at the domain cutover.
 
 ## Architecture Risks
 

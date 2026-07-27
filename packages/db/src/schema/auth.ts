@@ -10,8 +10,7 @@ export type { NotificationSettings };
  * Local user record. Authentication is handled by Clerk; `id` is the Clerk
  * user id, and this row mirrors profile fields so domain tables can hold
  * foreign keys without calling Clerk. Created/updated on sign-in by the API.
- *
- * `bio` is the "about" text; `image` is the profile picture URL.
+ * Public profile (name/photo/bio/slug) lives per-forum on the membership.
  */
 export const users = pgTable("user", {
   id: text().primaryKey(),
@@ -19,10 +18,6 @@ export const users = pgTable("user", {
   email: text().unique(),
   emailVerified: timestamp({ withTimezone: true }),
   image: text(),
-  /** URL slug (globally unique, from the display name). Cosmetic segment in
-   * topic permalinks — resolution is by topic slug, so renames are safe. */
-  slug: text().unique(),
-  bio: text(),
   notificationSettings: jsonb()
     .$type<NotificationSettings>()
     .notNull()

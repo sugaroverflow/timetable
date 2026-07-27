@@ -20,8 +20,8 @@ Roles are scoped to timetable membership:
 | Role | Can |
 | --- | --- |
 | Owner | Everything an admin can do, plus protected ownership of the timetable |
-| Admin | Moderate topics, create topics and reassign their owner, see every host's drafts, hide comments, manage members and their bios from the People page, edit settings and theme, set the hearts cutoff, create slots, tag topics to slots, view the dashboard |
-| Host | Propose topics (rich-text editor), submit drafts, edit their own topics from the feed, see weighted-heart breakdowns, use host-only threads, join slot discussions, view the dashboard |
+| Admin | Moderate topics, create topics and reassign their owner, see every host's submitted topics, hide comments, manage members and their bios from the People page, edit settings and theme, set the hearts cutoff, create slots, tag topics to slots, view the dashboard |
+| Host | Propose and submit topics (rich-text editor), edit their own topics from the feed, see weighted-heart breakdowns, use host-only threads, join slot discussions, view the dashboard |
 | Elector | Read published topics, heart and comment on them, collect "My hearted topics", set availability |
 
 Each timetable can rename its roles (e.g. Admin → Dean, Host → Faculty,
@@ -45,7 +45,7 @@ behalf of another host), and hide comments; pre-publish feedback happens in
 the topic's drafting thread (admin-only comments the owner can reply to).
 Pending Topics shows the submitted queue.
 
-Published topics get stable permalinks (`/t/{timetable}/{host}/{topic}`;
+Published topics get stable permalinks (`/f/{forum}/{host}/{topic}`;
 slugs freeze at first publish). The feed is single-column with infinite
 scroll and sorts by hearts (any of the four normalisations below), latest
 comments, newest (content edits count as new, without triggering email), or
@@ -110,13 +110,13 @@ with multiple topics appears as a conflict in dashboard analytics.
 
 Admin surfaces include:
 
-- Pending Topics (submitted queue + all hosts' drafts)
+- Pending Topics (every host's submitted queue)
 - activity timeline: grouped by week and day with a date-range filter,
   actor avatars/roles, filters by action type, actor, and role, and enriched
   entries (comment text with a link to the comment, invites, first sign-ins)
 - member and role management from the People page (roles + markdown bios),
   including adding people and sending their invite emails
-- timetable profile: name, description, visibility, custom role labels with a
+- timetable profile: name, visibility, custom role labels with a
   live preview sentence, digest defaults, and the custom domain field
   (marked "coming soon" — routing is not wired up yet)
 - theme: primary/secondary/background/topbar/text colours with live preview,
@@ -207,6 +207,7 @@ configuration remain environment setup tasks.
 | QA round 2 (issue #59, PR #60) | Done | Status-aware moderation actions, role-label copy, Profile nav, sidebar-footer switcher, People grouping + member editing, random sort + edits-as-new, admin drafts, activity grouping/filters, full theming + dark mode + fonts, TipTap editor, My Topics feed parity, notifications pane |
 | Product feedback round 1 (PRs #64/#66/#67) | Done | Design-token theming + Base UI, draft-status removal, the four vote normalisations + Random default sort, @mention notifications, nav/People/Analysis polish |
 | Product feedback round 2 (PRs #75/#76/#78/#81/#85) | Done | Sortable per-elector breakdown table, mobile slide-in drawer, "Topic"/forum rebrand (code phase), add-person + deferred invite email flow |
+| Launch QA (PRs #103–#142, 2026-07) | Done | `/f/` forum URLs + All Topics naming, per-forum member profiles + person pages, Analysis rework (❤️/💬 normalisations, per-table filters, elector/host activity tables), guest People page + plain-English visibility, collapsible topic bodies, sysadmin dashboard, data export, rate limits, Atom feed, OG social cards, forum-description field removed |
 
 ## Go-Live Checklist
 
@@ -246,7 +247,7 @@ Committed tests cover: weighted-heart behavior, GraphQL depth/cost validation, r
 Priority next tests:
 
 - authenticated browser workflows (needs a Clerk test-user harness)
-- topic lifecycle across draft → submitted → published → unpublished → archived
+- topic lifecycle across submitted → published → unpublished → archived
 - broader GraphQL role/permission fixtures
 - performance regression fixtures for feed/dashboard once pagination or dataloaders land
 

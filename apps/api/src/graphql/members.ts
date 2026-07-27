@@ -53,7 +53,6 @@ const UserType = builder.objectRef<SessionUser>("User").implement({
     email: t.exposeString("email", { nullable: true }),
     name: t.exposeString("name", { nullable: true }),
     image: t.exposeString("image", { nullable: true }),
-    bio: t.exposeString("bio", { nullable: true }),
     notificationSettings: t.string({
       resolve: async (u) =>
         JSON.stringify(await getUserNotificationSettings(u.id)),
@@ -323,7 +322,6 @@ builder.mutationFields((t) => ({
         email: updated.email,
         name: updated.name,
         image: updated.image,
-        bio: updated.bio,
       };
     },
   }),

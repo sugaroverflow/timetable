@@ -4,6 +4,8 @@ import Link from "next/link";
 import { Fragment, useState } from "react";
 
 import { BreakdownCaret } from "@/components/BreakdownPanel";
+import { SortHeader } from "@/components/SortHeader";
+import { formatExactTime } from "@/lib/dates";
 import { relativeTime } from "@/lib/relativeTime";
 import { topicPath } from "@/lib/topicPath";
 
@@ -28,35 +30,6 @@ export type ElectorRow = {
 
 type SortKey = "name" | "hearts" | "comments" | "activity";
 type TopicSortKey = "name" | "host" | "comments";
-
-export function SortHeader({
-  label,
-  active,
-  dir,
-  onToggle,
-}: {
-  label: string;
-  active: boolean;
-  dir: "asc" | "desc";
-  onToggle: () => void;
-}) {
-  return (
-    <th
-      aria-sort={active ? (dir === "asc" ? "ascending" : "descending") : "none"}
-    >
-      <button
-        type="button"
-        className={active ? "th-sort th-sort-active" : "th-sort"}
-        onClick={onToggle}
-      >
-        {label}
-        <span aria-hidden className="th-sort-arrow">
-          {active ? (dir === "asc" ? " ▲" : " ▼") : ""}
-        </span>
-      </button>
-    </th>
-  );
-}
 
 /** The fold under an elector row: the topics they ❤️'d as a sortable table
  * (QA 2026-07-27 — replaced the page-wide "Show ❤️s" toggle and its
@@ -160,7 +133,7 @@ function ElectorRowItem({
             // suppressHydrationWarning: server and client may render this a
             // minute apart; the hover title carries the exact timestamp.
             <span
-              title={new Date(elector.latestActivityAt).toLocaleString()}
+              title={formatExactTime(elector.latestActivityAt)}
               suppressHydrationWarning
             >
               {relativeTime(elector.latestActivityAt)}

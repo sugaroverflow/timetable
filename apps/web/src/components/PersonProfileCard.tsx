@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { personPath } from "@/lib/personPath";
 import type { RoleLabels } from "@/lib/timetableSettings";
 
 import { Avatar } from "./Avatar";
@@ -28,7 +29,7 @@ export function PersonProfileCard({
   labels: RoleLabels | undefined;
   linkPhoto?: boolean;
 }) {
-  const pagePath = person.slug ? `/f/${slug}/${person.slug}` : null;
+  const pagePath = person.slug ? personPath(slug, person.slug) : null;
   const photo = person.image ? (
     // eslint-disable-next-line @next/next/no-img-element
     <img

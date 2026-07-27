@@ -1,7 +1,6 @@
 "use client";
 
-import { ChevronDown } from "lucide-react";
-
+import { SelectMinimal } from "@/components/SelectMinimal";
 import { useSetSearchParam } from "@/lib/useSearchParamNav";
 
 export function ActorFilter({
@@ -14,21 +13,18 @@ export function ActorFilter({
   const setParam = useSetSearchParam();
 
   return (
-    <span className="select-minimal">
-      <ChevronDown size={14} aria-hidden />
-      <select
-        id="actor-filter"
-        aria-label="Filter by user"
-        value={value}
-        onChange={(e) => setParam("actor", e.target.value)}
-      >
-        <option value="">All users</option>
-        {actors.map((actor) => (
-          <option key={actor.id} value={actor.id}>
-            {actor.name ?? actor.id}
-          </option>
-        ))}
-      </select>
-    </span>
+    <SelectMinimal
+      id="actor-filter"
+      aria-label="Filter by user"
+      value={value}
+      onChange={(e) => setParam("actor", e.target.value)}
+    >
+      <option value="">All users</option>
+      {actors.map((actor) => (
+        <option key={actor.id} value={actor.id}>
+          {actor.name ?? actor.id}
+        </option>
+      ))}
+    </SelectMinimal>
   );
 }

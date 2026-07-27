@@ -1,7 +1,6 @@
 "use client";
 
-import { ChevronDown } from "lucide-react";
-
+import { SelectMinimal } from "@/components/SelectMinimal";
 import { useSetSearchParam } from "@/lib/useSearchParamNav";
 
 export function HostFilter({
@@ -20,20 +19,17 @@ export function HostFilter({
   const setParam = useSetSearchParam();
 
   return (
-    <span className="select-minimal">
-      <ChevronDown size={14} aria-hidden />
-      <select
-        aria-label="Filter by host"
-        value={value}
-        onChange={(e) => setParam(param, e.target.value, { resetPage: true })}
-      >
-        <option value="">{allLabel}</option>
-        {hosts.map((h) => (
-          <option key={h.id} value={h.id}>
-            {h.name ?? "Host"}
-          </option>
-        ))}
-      </select>
-    </span>
+    <SelectMinimal
+      aria-label="Filter by host"
+      value={value}
+      onChange={(e) => setParam(param, e.target.value, { resetPage: true })}
+    >
+      <option value="">{allLabel}</option>
+      {hosts.map((h) => (
+        <option key={h.id} value={h.id}>
+          {h.name ?? "Host"}
+        </option>
+      ))}
+    </SelectMinimal>
   );
 }

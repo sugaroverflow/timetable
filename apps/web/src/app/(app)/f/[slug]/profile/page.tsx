@@ -1,9 +1,9 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
-import type { DigestSettings } from "@/components/DigestSettingsForm";
 import { ProfilePanel } from "@/components/ProfilePanel";
 import { gqlFetch } from "@/lib/graphql";
+import { parseDigestSettings } from "@/lib/timetableSettings";
 
 type Data = {
   me: { email: string | null; notificationSettings: string } | null;
@@ -34,12 +34,7 @@ export default async function TimetableProfilePage({
   const data = await gqlFetch<Data>(QUERY, { s: slug });
   if (!data.me) redirect("/sign-in");
 
-  let digest: DigestSettings = {};
-  try {
-    digest = JSON.parse(data.me.notificationSettings) as DigestSettings;
-  } catch {
-    digest = {};
-  }
+  const digest = parseDigestSettings(data.me.notificationSettings);
 
   return (
     <ProfilePanel

@@ -30,8 +30,8 @@ Core workflows:
 - Hosts and admins use weighted-heart scores, a hearts cutoff, elector
   activity filters, availability breakdowns, and conflict alerts to plan the
   final schedule.
-- Every member has a markdown bio shown in a popup and on the People page;
-  topics get stable permalinks (`/t/{timetable}/{host}/{topic}`).
+- Every member has a markdown bio shown on their person page and the People
+  page; topics get stable permalinks (`/f/{forum}/{host}/{topic}`).
 - A notifications pane collects comments on your topics and replies to you.
 - Each timetable is themeable: colours, fonts, dark-mode palette, custom role
   labels, icon, and cover image — with per-user light/dark mode.

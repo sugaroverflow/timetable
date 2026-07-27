@@ -24,13 +24,14 @@ import {
 } from "@timetable/core";
 import type { Topic } from "@timetable/db";
 import {
+  canEditTopic,
   canHeart,
   canModerate,
   canProposeTopics,
   canSeeComments,
   canSeeHostOnly,
   isAdmin,
-  isHost,
+  ownsTopicAsHost,
   type Privacy,
 } from "@timetable/shared";
 
@@ -516,8 +517,8 @@ builder.mutationFields((t) => ({
     resolve: async (_p, args, ctx) => {
       const user = await requireUser(ctx);
       const { topic, viewer } = await loadTopicAndViewer(ctx, args.topicId);
-      const ownerHost = topic.hostId === user.id && isHost(viewer.roles);
-      if (!(ownerHost || isAdmin(viewer.roles))) forbidden();
+      if (!canEditTopic(viewer, topic.hostId)) forbidden();
+      const ownerHost = ownsTopicAsHost(viewer, topic.hostId);
       const updated = await updateTopic(topic.id, {
         title: args.title ?? undefined,
         bodyMd: args.bodyMd ?? undefined,
@@ -565,8 +566,7 @@ builder.mutationFields((t) => ({
     resolve: async (_p, args, ctx) => {
       const user = await requireUser(ctx);
       const { topic, viewer } = await loadTopicAndViewer(ctx, args.topicId);
-      const ownerHost = topic.hostId === user.id && isHost(viewer.roles);
-      if (!(ownerHost || isAdmin(viewer.roles))) forbidden();
+      if (!canEditTopic(viewer, topic.hostId)) forbidden();
       if (topic.status !== "unpublished") {
         throw new GraphQLError("Only unpublished topics can be re-submitted");
       }
@@ -582,8 +582,7 @@ builder.mutationFields((t) => ({
     resolve: async (_p, args, ctx) => {
       const user = await requireUser(ctx);
       const { topic, viewer } = await loadTopicAndViewer(ctx, args.topicId);
-      const ownerHost = topic.hostId === user.id && isHost(viewer.roles);
-      if (!(ownerHost || isAdmin(viewer.roles))) forbidden();
+      if (!canEditTopic(viewer, topic.hostId)) forbidden();
       const updated = await unpublishTopic(topic, user.id);
       if (!updated) notFound("Topic not found");
       return updated;
