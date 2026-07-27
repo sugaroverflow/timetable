@@ -25,7 +25,12 @@ export function ModerationCard({
   adminLabel?: string;
   hosts?: { id: string; name: string | null }[];
 }) {
-  const permalink = topicPath(slug, topic.hostSlug ?? null, topic.slug ?? null);
+  const permalink = topicPath(
+    slug,
+    topic.hostSlug ?? null,
+    topic.slug ?? null,
+    topic.hostId,
+  );
 
   return (
     <li className="card stack">

@@ -64,7 +64,7 @@ function HeartsRow({ slug, topics }: { slug: string; topics: HeartedTopic[] }) {
                 </div>
                 <ul>
                   {group.topics.map((t) => {
-                    const href = topicPath(slug, t.hostSlug, t.slug);
+                    const href = topicPath(slug, t.hostSlug, t.slug, t.hostId);
                     return (
                       <li key={t.topicId}>
                         {href ? <Link href={href}>{t.title}</Link> : t.title}

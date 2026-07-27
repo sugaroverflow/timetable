@@ -153,7 +153,7 @@ export function TopicCard({
     (c) => c.visibility === "host_only",
   );
   const isOwner = viewerId != null && viewerId === topic.hostId;
-  const permalink = topicPath(slug, topic.hostSlug, topic.slug);
+  const permalink = topicPath(slug, topic.hostSlug, topic.slug, topic.hostId);
 
   return (
     <article className={`card stack${isNew ? " topic-new" : ""}`}>

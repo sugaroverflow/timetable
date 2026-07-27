@@ -131,7 +131,12 @@ export function TopicManager({
 }) {
   const permalink =
     topic.status === "published"
-      ? topicPath(slug, topic.hostSlug ?? null, topic.slug ?? null)
+      ? topicPath(
+          slug,
+          topic.hostSlug ?? null,
+          topic.slug ?? null,
+          topic.hostId,
+        )
       : null;
   const publicComments = topic.comments ?? [];
   const hostComments = topic.hostOnlyComments ?? [];

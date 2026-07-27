@@ -54,7 +54,7 @@ function LeaderboardRow({
   hostLabel: string;
 }) {
   const [open, setOpen] = useState(false);
-  const href = topicPath(slug, entry.hostSlug, entry.slug);
+  const href = topicPath(slug, entry.hostSlug, entry.slug, entry.hostId);
   const score = scoreFor(entry, norm);
   return (
     <li style={{ fontSize: 14 }}>
