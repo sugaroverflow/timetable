@@ -16,6 +16,7 @@ export type LeaderboardEntry = {
   id: string;
   title: string;
   slug: string | null;
+  hostId: string;
   hostName: string | null;
   hostSlug: string | null;
   weightedScore: number;
@@ -110,12 +111,11 @@ export function TopicLeaderboard({
     (a, b) => scoreFor(b, norm) - scoreFor(a, norm),
   );
   // The former stat cards, folded into the title (QA 2026-07-27):
-  // "12 topics by 87 ❤️ from 9 electors".
-  const electors =
-    electorCount === 1
-      ? electorLabel.toLowerCase()
-      : pluralLabel(electorLabel).toLowerCase();
-  const title = `${entries.length} topic${entries.length === 1 ? "" : "s"} by ${totalHearts} ❤️ from ${electorCount} ${electors}`;
+  // "12 topics from 8 hosts sorted by 87 ❤️ from 9 electors".
+  const hostCount = new Set(entries.map((e) => e.hostId)).size;
+  const count = (n: number, label: string) =>
+    `${n} ${(n === 1 ? label : pluralLabel(label)).toLowerCase()}`;
+  const title = `${entries.length} topic${entries.length === 1 ? "" : "s"} from ${count(hostCount, hostLabel)} sorted by ${totalHearts} ❤️ from ${count(electorCount, electorLabel)}`;
 
   return (
     <div className="card">

@@ -32,6 +32,7 @@ type Dashboard = {
     id: string;
     title: string;
     slug: string | null;
+    hostId: string;
     hostName: string | null;
     hostSlug: string | null;
     weightedScore: number;
@@ -85,7 +86,7 @@ const QUERY = `
     timetableHosts(idOrSlug: $s) { id name }
     dashboard(idOrSlug: $s, hostId: $host, electorActivity: $activity, activitySince: $since) {
       totalHearts electorCount
-      topicLeaderboard { id title slug hostName hostSlug weightedScore l2Score devotionScore heartCount lastHeartAt }
+      topicLeaderboard { id title slug hostId hostName hostSlug weightedScore l2Score devotionScore heartCount lastHeartAt }
       hostLeaderboard { hostId hostName weightedScore }
       electorActivity {
         electorId electorName heartCount commentCount availabilityCount
