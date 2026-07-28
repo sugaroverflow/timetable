@@ -879,6 +879,11 @@ textarea {
   max-width: 100%;
   border-radius: 8px;
 }
+/* Markdown "loose" lists wrap each item in a <p> whose default 1em margins
+   became the gap between items — halve it (QA 2026-07-28). */
+.topic-body li > p {
+  margin-block: 0.5em;
+}
 
 .toolbar {
   display: flex;
