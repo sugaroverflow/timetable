@@ -141,6 +141,10 @@ export function renderInvite(args: {
   inviteeName: string | null;
   inviterName: string | null;
   topicsCount: number;
+  /** Clerk sign-in ticket: the link signs the member in with one click —
+   * the invite email itself proves address ownership, so no OTP round-trip
+   * (QA 2026-07-28). Null falls back to the plain sign-in link. */
+  signInTicket: string | null;
 }): { subject: string; html: string } {
   const subject = `You've been added to ${args.timetableName}`;
   const greeting = args.inviteeName ? `Hi ${esc(args.inviteeName)},` : "Hi,";
@@ -151,14 +155,19 @@ export function renderInvite(args: {
           args.topicsCount === 1 ? "" : "s"
         } waiting under your name.</p>`
       : "";
+  const destination = encodeURIComponent(`/f/${args.timetableSlug}/topics`);
+  // Straight to the sign-in page either way (invitees have no session yet —
+  // landing on the forum showed them a guest view; prod QA 2026-07-27),
+  // with the forum as the post-sign-in destination. Clerk's <SignIn/>
+  // consumes the __clerk_ticket param and signs in without the OTP.
+  const cta = args.signInTicket
+    ? `<p>${linked("Open your forum", `/sign-in?__clerk_ticket=${encodeURIComponent(args.signInTicket)}&redirect_url=${destination}`)} — one click and you're signed in; no password or code needed.</p>`
+    : `<p>${linked("Sign in with this email address to get started", `/sign-in?redirect_url=${destination}`)} — no password needed, you'll receive a one-time code.</p>`;
   const html = [
     `<p>${greeting}</p>`,
     `<p>You've been added to <strong>${esc(args.timetableName)}</strong>${by}.</p>`,
     topics,
-    // Straight to the sign-in page (invitees have no session yet — landing
-    // on the forum showed them a guest view; prod QA 2026-07-27), with the
-    // forum as the post-OTP destination.
-    `<p>${linked("Sign in with this email address to get started", `/sign-in?redirect_url=${encodeURIComponent(`/f/${args.timetableSlug}/topics`)}`)} — no password needed, you'll receive a one-time code.</p>`,
+    cta,
   ].join("\n");
   return { subject, html };
 }

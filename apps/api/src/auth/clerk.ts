@@ -193,3 +193,30 @@ function usernameFor(email: string, name: string | null): string {
   const suffix = Math.random().toString(36).slice(2, 6);
   return `${base}-${suffix}`;
 }
+
+/** Invite links sign the member in with one click for this long. Matches
+ * the pending-invite TTL in @timetable/core. */
+const SIGN_IN_TICKET_TTL_SECONDS = 30 * 24 * 60 * 60;
+
+/**
+ * Mint a single-use Clerk sign-in token for an invited member. The invite
+ * email already went to the address that owns the account, so clicking a
+ * link in it IS the email-ownership proof — the ticket lets Clerk skip the
+ * OTP round-trip (QA 2026-07-28: invitees had to type their email and wait
+ * for a second email). Returns null on any failure so the caller can fall
+ * back to the plain sign-in link.
+ */
+export async function createSignInTicket(
+  userId: string,
+): Promise<string | null> {
+  try {
+    const token = await clerkClient.signInTokens.createSignInToken({
+      userId,
+      expiresInSeconds: SIGN_IN_TICKET_TTL_SECONDS,
+    });
+    return token.token || null;
+  } catch (err) {
+    console.error("[invite] sign-in ticket creation failed:", err);
+    return null;
+  }
+}

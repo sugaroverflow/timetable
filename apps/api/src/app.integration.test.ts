@@ -43,6 +43,7 @@ vi.mock("./auth/clerk", async (importOriginal) => {
   return {
     ...actual,
     getOrCreateClerkUser: vi.fn(),
+    createSignInTicket: vi.fn(async () => null),
   };
 });
 
@@ -229,6 +230,7 @@ afterEach(() => {
   vi.mocked(core.setMemberRoles).mockReset();
   vi.mocked(core.updateTimetableSettings).mockReset();
   vi.mocked(clerk.getOrCreateClerkUser).mockReset();
+  vi.mocked(clerk.createSignInTicket).mockReset();
   vi.mocked(email.sendEmail).mockClear();
 });
 
@@ -452,6 +454,41 @@ describe("createApiApp", () => {
         "membership-1",
         expect.any(Date),
       );
+    });
+  });
+
+  it("embeds the one-click sign-in ticket in the invite email", async () => {
+    mockSession("admin-1", ["admin"]);
+    vi.mocked(clerk.createSignInTicket).mockResolvedValue("tok_abc123");
+    vi.mocked(core.getMembershipById).mockResolvedValue(
+      membershipFixture({ userId: "member-9" }),
+    );
+    vi.mocked(core.getUserById).mockResolvedValue({
+      id: "member-9",
+      name: "Ada Lovelace",
+      email: "ada@example.com",
+      image: null,
+    });
+    vi.mocked(core.getTimetableById).mockResolvedValue(
+      timetableFixture({ name: "Spring Term", slug: "spring-term" }),
+    );
+    vi.mocked(core.listHostTopics).mockResolvedValue([]);
+
+    await withTestServer(async (baseUrl) => {
+      const res = await fetch(
+        `${baseUrl}/api/memberships/membership-1/invite`,
+        { method: "POST" },
+      );
+
+      expect(res.status).toBe(200);
+      expect(clerk.createSignInTicket).toHaveBeenCalledWith("member-9");
+      const sent = vi.mocked(email.sendEmail).mock.calls.at(-1)?.[0];
+      expect(sent?.html).toContain("__clerk_ticket=tok_abc123");
+      expect(sent?.html).toContain(
+        `redirect_url=${encodeURIComponent("/f/spring-term/topics")}`,
+      );
+      // One click, no OTP — the code-based copy must be gone.
+      expect(sent?.html).not.toContain("one-time code");
     });
   });
 
