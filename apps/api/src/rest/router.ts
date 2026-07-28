@@ -44,7 +44,7 @@ import {
 } from "@timetable/shared";
 
 import { buildAtomFeed } from "../atom";
-import { getOrCreateClerkUser } from "../auth/clerk";
+import { createSignInTicket, getOrCreateClerkUser } from "../auth/clerk";
 import { isSysadmin } from "../auth/sysadmin";
 import { buildContext, type ApiContext } from "../context";
 import {
@@ -371,6 +371,7 @@ restRouter.post(
       inviteeName: membership.name,
       inviterName: inviter?.name ?? user.name,
       topicsCount: topics.length,
+      signInTicket: await createSignInTicket(member.id),
     });
     try {
       await sendEmail({ to: member.email, subject, html });
