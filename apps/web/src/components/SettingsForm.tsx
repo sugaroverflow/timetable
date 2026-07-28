@@ -346,7 +346,9 @@ export function SettingsForm({
 
   return (
     <form onSubmit={submit} className="card">
-      <h2 style={{ marginTop: 0, fontSize: 18 }}>Theme</h2>
+      <h2 className="section-title" style={{ marginBottom: 10 }}>
+        Theme
+      </h2>
       <p className="faint" style={{ marginTop: 0, fontSize: 12 }}>
         Colours preview live — Save to keep them, Discard to revert.
       </p>

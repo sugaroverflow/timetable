@@ -44,7 +44,9 @@ export function SlotAdminForm({ slug }: { slug: string }) {
 
   return (
     <form onSubmit={submit} className="card">
-      <h3 style={{ marginTop: 0, fontSize: 15 }}>Add timeslot</h3>
+      <h3 className="section-title" style={{ marginBottom: 10 }}>
+        Add timeslot
+      </h3>
       <div className="field">
         <label htmlFor="slot-start">Start</label>
         <input

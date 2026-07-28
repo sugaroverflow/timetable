@@ -65,7 +65,6 @@ function TopicSection({
   page,
   host,
   heartedBy,
-  seed,
   refreshToken,
   empty,
 }: {
@@ -73,7 +72,6 @@ function TopicSection({
   page: FeedPage;
   host: string;
   heartedBy: string;
-  seed: string;
   refreshToken: string;
   empty: React.ReactNode;
 }) {
@@ -84,12 +82,12 @@ function TopicSection({
         empty
       ) : (
         <InfiniteFeed
-          key={`${host}|${heartedBy}|${seed}`}
+          key={`${host}|${heartedBy}`}
           slug={page.slug}
-          sort="random"
+          sort="recent"
           host={host}
           heartedBy={heartedBy}
-          seed={seed}
+          seed=""
           refreshToken={refreshToken}
           pageSize={FEED_PAGE_SIZE}
           initialHasNext={page.hasNext}
@@ -130,25 +128,13 @@ async function resolvePerson(
  * both, topics first. Shows the same content as /topics?host=<id> for hosts. */
 export default async function PersonPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ slug: string; hostSlug: string }>;
-  searchParams: Promise<{ shuffle?: string }>;
 }) {
   const { slug, hostSlug } = await params;
-  const { shuffle: seedParam } = await searchParams;
 
   const person = await resolvePerson(slug, hostSlug);
   if (!person) notFound();
-
-  // Same shuffle-in-URL pattern as the feed page: mint per visit, then
-  // redirect so router.refresh() after an action keeps this order.
-  if (!seedParam) {
-    // eslint-disable-next-line react-hooks/purity -- server-only, once per request
-    const minted = Math.random().toString(36).slice(2, 10);
-    redirect(`/f/${slug}/${hostSlug}?shuffle=${minted}`);
-  }
-  const seed = seedParam;
 
   const roles = person.roles as Role[];
   const host = isHost(roles);
@@ -156,12 +142,14 @@ export default async function PersonPage({
   // eslint-disable-next-line react-hooks/purity -- server-only render marker
   const refreshToken = Math.random().toString(36).slice(2, 10);
 
+  // Newest first (QA 2026-07-28) — a profile reads like a record, not a
+  // ballot, so no shuffle seed here.
   const [hostPage, heartedPage] = await Promise.all([
     host
-      ? fetchFeedPage(slug, "random", person.userId, 0, false, seed)
+      ? fetchFeedPage(slug, "recent", person.userId, 0, false)
       : Promise.resolve(null),
     elector
-      ? fetchFeedPage(slug, "random", "", 0, false, seed, person.userId)
+      ? fetchFeedPage(slug, "recent", "", 0, false, "", person.userId)
       : Promise.resolve(null),
   ]);
   const settings = (hostPage ?? heartedPage)?.settings;
@@ -180,7 +168,6 @@ export default async function PersonPage({
           page={hostPage}
           host={person.userId}
           heartedBy=""
-          seed={seed}
           refreshToken={refreshToken}
           empty={<EmptyState icon="◇" title="No published topics yet" />}
         />
@@ -191,7 +178,6 @@ export default async function PersonPage({
           page={heartedPage}
           host=""
           heartedBy={person.userId}
-          seed={seed}
           refreshToken={refreshToken}
           empty={<EmptyState icon="♥" title="No ❤️ topics yet" />}
         />

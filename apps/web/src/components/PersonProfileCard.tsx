@@ -42,7 +42,9 @@ export function PersonProfileCard({
   );
   return (
     <div className="card stack">
-      <div className="row" style={{ alignItems: "center" }}>
+      {/* Portrait with the name and role pills beneath (QA 2026-07-28).
+       * The name is the page's top heading — tier 1 of the hierarchy. */}
+      <div className="profile-head">
         {linkPhoto && pagePath ? (
           <Link href={pagePath} className="profile-photo-link">
             {photo}
@@ -50,12 +52,8 @@ export function PersonProfileCard({
         ) : (
           photo
         )}
-        <div>
-          <strong>{person.name ?? "Member"}</strong>
-          <div style={{ marginTop: "var(--space-1)" }}>
-            <RolePills roles={person.roles} labels={labels} />
-          </div>
-        </div>
+        <h1 className="page-title">{person.name ?? "Member"}</h1>
+        <RolePills roles={person.roles} labels={labels} />
       </div>
       {person.bioHtml ? (
         <div

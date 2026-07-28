@@ -132,6 +132,7 @@ function ActionsSlot({
   slug,
   viewerId,
   viewerHeartCount,
+  electorLabel,
   queueControls,
 }: {
   topic: FeedTopic;
@@ -139,6 +140,7 @@ function ActionsSlot({
   slug: string;
   viewerId: string | null;
   viewerHeartCount: number | null;
+  electorLabel: string;
   queueControls: React.ReactNode;
 }) {
   if (queueControls) return <>{queueControls}</>;
@@ -152,6 +154,7 @@ function ActionsSlot({
       canHeart={perms.canHeart}
       signedIn={viewerId != null}
       viewerHeartCount={viewerHeartCount}
+      electorLabel={electorLabel}
     />
   );
 }
@@ -209,6 +212,7 @@ export function TopicCard({
   isNew = false,
   hostLabel = "Host",
   adminLabel = "Admin",
+  electorLabel,
   viewerHeartCount = null,
   hosts = [],
   expandBody = false,
@@ -221,6 +225,7 @@ export function TopicCard({
   isNew?: boolean;
   hostLabel?: string;
   adminLabel?: string;
+  electorLabel: string;
   viewerHeartCount?: number | null;
   hosts?: { id: string; name: string | null }[];
   /** Full body, no collapse — the Topic Queue shows one topic at a time,
@@ -266,6 +271,7 @@ export function TopicCard({
         slug={slug}
         viewerId={viewerId}
         viewerHeartCount={viewerHeartCount}
+        electorLabel={electorLabel}
         queueControls={queueControls}
       />
 

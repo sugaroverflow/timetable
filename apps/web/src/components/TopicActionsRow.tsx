@@ -20,6 +20,7 @@ export function TopicActionsRow({
   canHeart,
   signedIn,
   viewerHeartCount,
+  electorLabel = "Elector",
 }: {
   topicId: string;
   slug: string;
@@ -29,6 +30,7 @@ export function TopicActionsRow({
   canHeart: boolean;
   signedIn: boolean;
   viewerHeartCount: number | null;
+  electorLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -62,7 +64,11 @@ export function TopicActionsRow({
       </div>
       {open ? (
         <div className="host-panel">
-          <BreakdownPanelBody slug={slug} topicId={topicId} />
+          <BreakdownPanelBody
+            slug={slug}
+            topicId={topicId}
+            electorLabel={electorLabel}
+          />
         </div>
       ) : null}
     </>

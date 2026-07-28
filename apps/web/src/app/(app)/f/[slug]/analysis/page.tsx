@@ -91,11 +91,13 @@ const QUERY = `
 function ElectorActivityCard({
   slug,
   electorLabel,
+  hostLabel,
   hostFilter,
   rows,
 }: {
   slug: string;
   electorLabel: string;
+  hostLabel: string;
   hostFilter: React.ReactNode;
   rows: Dashboard["electorActivity"];
 }) {
@@ -105,7 +107,7 @@ function ElectorActivityCard({
         className="row wrap"
         style={{ justifyContent: "space-between", marginBottom: 12 }}
       >
-        <h3 style={{ margin: 0, fontSize: 15 }}>{electorLabel} activity</h3>
+        <h3 className="section-title">{electorLabel} activity</h3>
         {/* This table's own host filter: counts only activity on the
             chosen host's topics (independent of the topics table's). */}
         <span className="row wrap" style={{ gap: 10, alignItems: "center" }}>
@@ -117,12 +119,13 @@ function ElectorActivityCard({
       </div>
       {rows.length === 0 ? (
         <p className="faint" style={{ fontSize: 13 }}>
-          No electors yet.
+          No {pluralLabel(electorLabel).toLowerCase()} yet.
         </p>
       ) : (
         <ElectorActivityTable
           slug={slug}
           electorLabel={electorLabel}
+          hostLabel={hostLabel}
           rows={rows}
         />
       )}
@@ -150,7 +153,7 @@ function HostActivityCard({
         style={{ justifyContent: "space-between", marginBottom: 12 }}
       >
         <div>
-          <h3 style={{ margin: 0, fontSize: 15 }}>{hostLabel} activity</h3>
+          <h3 className="section-title">{hostLabel} activity</h3>
           <p className="faint" style={{ margin: "2px 0 0", fontSize: 12 }}>
             Only visible to {adminsPlural.toLowerCase()}
           </p>
@@ -205,7 +208,7 @@ export default async function DashboardPage({
   return (
     <div className="stack">
       <div className="page-head">
-        <h2 className="section-title">Analysis</h2>
+        <h2 className="page-title">Analysis</h2>
       </div>
 
       <TopicLeaderboard
@@ -228,6 +231,7 @@ export default async function DashboardPage({
       <ElectorActivityCard
         slug={slug}
         electorLabel={electorLabel}
+        hostLabel={hostLabel}
         rows={d.electorActivity}
         hostFilter={
           <HostFilter

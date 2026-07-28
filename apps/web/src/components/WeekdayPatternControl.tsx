@@ -51,7 +51,9 @@ export function WeekdayPatternControl({ slug }: { slug: string }) {
 
   return (
     <div className="card">
-      <h3 style={{ marginTop: 0, fontSize: 15 }}>Weekly pattern</h3>
+      <h3 className="section-title" style={{ marginBottom: 10 }}>
+        Weekly pattern
+      </h3>
       <p className="faint" style={{ marginTop: 0, fontSize: 12 }}>
         Click a day to cycle availability and apply it to every slot on that
         weekday.

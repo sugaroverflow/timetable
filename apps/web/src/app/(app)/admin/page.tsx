@@ -48,7 +48,7 @@ export default async function SysadminPage() {
   return (
     <div className="stack">
       <div className="page-head">
-        <h2 className="section-title">Sysadmin</h2>
+        <h2 className="page-title">Sysadmin</h2>
         <p>
           Every forum in this deployment. &ldquo;Active&rdquo; counts members
           who viewed the forum&rsquo;s topics in the last 30 days.

@@ -222,7 +222,7 @@ export default async function PeoplePage({
   return (
     <div className="stack">
       <div className="page-head">
-        <h2 className="section-title">People</h2>
+        <h2 className="page-title">People</h2>
       </div>
       {canEdit ? (
         <AddPersonForm
@@ -241,7 +241,7 @@ export default async function PeoplePage({
           .filter((section) => section.people.length > 0)
           .map((section) => (
             <section key={section.role} className="stack">
-              <h3 className="people-heading">{section.heading}</h3>
+              <h3 className="section-title">{section.heading}</h3>
               <ul className="list">
                 {section.people.map((person) => (
                   <PersonCard

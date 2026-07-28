@@ -19,9 +19,11 @@ const QUERY = `query Breakdown($s: String!, $t: String!) {
 export function BreakdownPanelBody({
   slug,
   topicId,
+  electorLabel = "Elector",
 }: {
   slug: string;
   topicId: string;
+  electorLabel?: string;
 }) {
   const [rows, setRows] = useState<WeightedHeart[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -64,7 +66,7 @@ export function BreakdownPanelBody({
       </div>
     );
   }
-  return <BreakdownTable slug={slug} rows={rows} />;
+  return <BreakdownTable slug={slug} rows={rows} electorLabel={electorLabel} />;
 }
 
 /** The triangle that opens a ❤️ breakdown — one look everywhere. */

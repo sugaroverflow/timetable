@@ -47,7 +47,9 @@ export function ProfileForm({
 
   return (
     <form onSubmit={submit} className="card">
-      <h2 style={{ marginTop: 0, fontSize: 18 }}>Profile</h2>
+      <h2 className="section-title" style={{ marginBottom: 10 }}>
+        Profile
+      </h2>
       <div className="field">
         <label htmlFor="name">Name</label>
         <input
