@@ -149,6 +149,22 @@ const TopicType = builder.objectRef<GqlTopic>("Topic").implement({
         );
       },
     }),
+    /** The drafting thread — only the topic's owner and admins ever
+     * receive it; everyone else gets []. Lets the permalink page render
+     * every comment tier (QA 2026-07-28), so notification deep links have
+     * one home. */
+    adminComments: t.field({
+      type: [CommentType],
+      resolve: async (tp, _args, ctx) => {
+        if (!(tp.canModerate || ctx.user?.id === tp.hostId)) return [];
+        const tree = await listCommentTree(tp.id, {
+          includeHostOnly: false,
+          includeAdminOnly: true,
+          includeHidden: false,
+        });
+        return tree.filter((c) => c.visibility === "admin_only");
+      },
+    }),
   }),
 });
 
