@@ -665,6 +665,8 @@ const TopicQueueType = builder
       remainingNew: t.exposeInt("remainingNew"),
       /** All unhearted published topics in the current round. */
       roundSize: t.exposeInt("roundSize"),
+      /** Published topics never seen nor ❤️'d (the sidebar badge). */
+      neverSeenCount: t.exposeInt("neverSeenCount"),
       current: t.field({
         type: TopicType,
         nullable: true,

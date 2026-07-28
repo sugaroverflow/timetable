@@ -801,10 +801,11 @@ describe("createApiApp", () => {
       remaining: 0,
       remainingNew: 0,
       roundSize: 4,
+      neverSeenCount: 2,
     });
 
     const query = `query($s: String!) {
-      topicQueue(idOrSlug: $s) { remaining remainingNew roundSize }
+      topicQueue(idOrSlug: $s) { remaining remainingNew roundSize neverSeenCount }
     }`;
 
     await withTestServer(async (baseUrl) => {
@@ -821,6 +822,7 @@ describe("createApiApp", () => {
         remaining: 0,
         remainingNew: 0,
         roundSize: 4,
+        neverSeenCount: 2,
       });
       expect(core.getTopicQueue).toHaveBeenCalledWith(
         timetable.id,
