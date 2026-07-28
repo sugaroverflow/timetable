@@ -1,7 +1,7 @@
-import { UserButton } from "@clerk/nextjs";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import Link from "next/link";
 
+import { AccountMenu } from "@/components/AccountMenu";
 import { TopbarBrand, type BrandItem } from "@/components/TopbarBrand";
 import { TopbarHamburger } from "@/components/TopbarHamburger";
 import { TopbarHeightSync } from "@/components/TopbarHeightSync";
@@ -48,14 +48,7 @@ export default async function AppLayout({
         {userId ? (
           <>
             <TopbarRoles />
-            <Link
-              className="muted topbar-email"
-              href="/profile"
-              style={{ fontSize: 13 }}
-            >
-              {email ?? "Account"}
-            </Link>
-            <UserButton />
+            <AccountMenu email={email} />
           </>
         ) : (
           <Link className="btn" href="/sign-in">

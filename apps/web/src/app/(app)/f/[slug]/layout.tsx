@@ -226,7 +226,7 @@ function SideNav({
           filters the list to the profiles their access allows (all members
           on public forums; hosts + admins on hosts_only ones). */}
       <NavLink href={`${base}/people`}>People</NavLink>
-      {isAuthed && <NavLink href={`${base}/profile`}>Profile</NavLink>}
+      {/* Profile moved to the topbar account menu (QA 2026-07-28). */}
       {hostOrAdmin && <NavLink href={`${base}/analysis`}>Analysis</NavLink>}
       {admin && <NavLink href={`${base}/moderation`}>Pending Topics</NavLink>}
       {admin && <NavLink href={`${base}/activity`}>Activity Log</NavLink>}
