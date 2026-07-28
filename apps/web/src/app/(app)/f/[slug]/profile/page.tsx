@@ -3,10 +3,9 @@ import { redirect } from "next/navigation";
 
 import { ProfilePanel } from "@/components/ProfilePanel";
 import { gqlFetch } from "@/lib/graphql";
-import { parseDigestSettings } from "@/lib/timetableSettings";
 
 type Data = {
-  me: { email: string | null; notificationSettings: string } | null;
+  me: { email: string | null } | null;
   person: {
     name: string | null;
     bio: string | null;
@@ -15,13 +14,14 @@ type Data = {
 };
 
 const QUERY = `query Profile($s: String!) {
-  me { email notificationSettings }
+  me { email }
   person(idOrSlug: $s) { name bio image }
 }`;
 
 /** Profile inside the timetable shell (QA #59 round 3). Name/photo/bio are
  * per-forum (2026-07): this page edits the viewer's membership profile in
- * THIS forum; email and digests stay account-level. */
+ * THIS forum; email stays account-level. Appearance lives in the sidebar
+ * foot and digests on the notifications page (QA 2026-07-28). */
 export default async function TimetableProfilePage({
   params,
 }: {
@@ -34,14 +34,7 @@ export default async function TimetableProfilePage({
   const data = await gqlFetch<Data>(QUERY, { s: slug });
   if (!data.me) redirect("/sign-in");
 
-  const digest = parseDigestSettings(data.me.notificationSettings);
-
   return (
-    <ProfilePanel
-      email={data.me.email}
-      digest={digest}
-      slug={slug}
-      profile={data.person}
-    />
+    <ProfilePanel email={data.me.email} slug={slug} profile={data.person} />
   );
 }

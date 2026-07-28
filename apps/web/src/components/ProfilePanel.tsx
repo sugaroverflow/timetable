@@ -1,22 +1,16 @@
-import {
-  DigestSettingsForm,
-  type DigestSettings,
-} from "@/components/DigestSettingsForm";
 import { ProfileForm } from "@/components/ProfileForm";
-import { ThemeToggle } from "@/components/ThemeToggle";
 
-/** The profile editor stack. Profiles are per-forum (2026-07): inside a
- * forum (/f/[slug]/profile) the name/photo/bio form edits that forum's
- * membership; the standalone /profile page is account-only (email,
- * appearance, digests). */
+/** The profile editor. Profiles are per-forum (2026-07): inside a forum
+ * (/f/[slug]/profile) the name/photo/bio form edits that forum's
+ * membership; the standalone /profile page is account-only. Appearance
+ * lives in the sidebar foot and email digests on the notifications page
+ * (QA 2026-07-28). */
 export function ProfilePanel({
   email,
-  digest,
   slug,
   profile,
 }: {
   email: string | null;
-  digest: DigestSettings;
   /** Forum context; null on the standalone account page. */
   slug: string | null;
   /** The viewer's membership profile in `slug`; null when not a member. */
@@ -47,16 +41,6 @@ export function ProfilePanel({
           </p>
         </div>
       )}
-      <div className="card row" style={{ justifyContent: "space-between" }}>
-        <div>
-          <strong style={{ fontSize: 14 }}>Appearance</strong>
-          <p className="faint" style={{ margin: "2px 0 0", fontSize: 12 }}>
-            Light, dark, or follow your system.
-          </p>
-        </div>
-        <ThemeToggle />
-      </div>
-      <DigestSettingsForm current={digest} />
     </div>
   );
 }

@@ -430,11 +430,32 @@ textarea {
 .side-nav a {
   display: block;
 }
+/* Sidebar foot, one item per line (QA 2026-07-28): visibility line,
+   forum switcher, theme toggle, bug link — all quiet, text-xs utility
+   furniture. */
 .sidebar-foot {
   border-top: 1px solid var(--line);
   padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+.sidebar-privacy {
+  margin: 0;
+  font-size: var(--text-xs);
+}
+.sidebar-foot .tt-switcher-trigger {
+  align-self: stretch;
+}
+.sidebar-foot .theme-toggle {
+  padding: 4px 8px;
+  font-size: var(--text-xs);
 }
 .sidebar-bug-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: var(--text-xs);
   text-decoration: none;
 }
@@ -634,12 +655,6 @@ textarea {
   overflow: visible;
   text-overflow: clip;
   overflow-wrap: anywhere;
-}
-.tt-switcher-hint {
-  display: block;
-  font-size: var(--text-2xs);
-  font-weight: var(--fw-normal);
-  color: var(--faint);
 }
 /* Base UI Menu.Positioner owns placement (portaled); the popup is just the
    visual surface. */

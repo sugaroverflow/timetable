@@ -3,22 +3,22 @@ import { redirect } from "next/navigation";
 
 import { ProfilePanel } from "@/components/ProfilePanel";
 import { gqlFetch } from "@/lib/graphql";
-import { parseDigestSettings } from "@/lib/timetableSettings";
 
 type Data = {
-  me: { email: string | null; notificationSettings: string } | null;
+  me: { email: string | null } | null;
   myLastVisitedTimetableSlug: string | null;
 };
 
 const QUERY = `query {
-  me { email notificationSettings }
+  me { email }
   myLastVisitedTimetableSlug: myLastVisitedForumSlug
 }`;
 
 /** Standalone profile route: users inside a timetable get the in-shell
  * version (QA #59 round 3), so redirect there when we know where they
  * live. Profiles are per-forum (2026-07), so this fallback page is
- * account-only: email, appearance, digests. */
+ * account-only. Appearance lives in the sidebar foot and digests on the
+ * notifications page (QA 2026-07-28). */
 export default async function ProfilePage() {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
@@ -30,16 +30,9 @@ export default async function ProfilePage() {
     redirect(`/f/${data.myLastVisitedTimetableSlug}/profile`);
   }
 
-  const digest = parseDigestSettings(data.me.notificationSettings);
-
   return (
     <main className="container">
-      <ProfilePanel
-        email={data.me.email}
-        digest={digest}
-        slug={null}
-        profile={null}
-      />
+      <ProfilePanel email={data.me.email} slug={null} profile={null} />
     </main>
   );
 }

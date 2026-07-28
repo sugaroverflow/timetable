@@ -9,6 +9,7 @@ import { isAdmin, isElector, isHost, type Role } from "@timetable/shared";
 
 import { NavLink } from "@/components/NavLink";
 import { Sidebar } from "@/components/Sidebar";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   TimetableSwitcher,
   type SwitcherItem,
@@ -299,28 +300,26 @@ export default async function TimetableLayout({
             </div>
           ) : null}
 
-          <a
-            className="sidebar-bug-link faint"
-            href="https://github.com/sugaroverflow/timetable/issues/new"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Flag size={14} aria-hidden /> Report a bug
-          </a>
-
-          {/* Forum identity footer: the switcher with a plain-English line
-              about the forum's visibility beneath it (QA 2026-07-27 — the
-              pill was too terse; the name lives in the topbar). */}
+          {/* Sidebar foot, one item per line (QA 2026-07-28): visibility,
+              switcher, appearance, report a bug. The plain-English
+              visibility line replaced the too-terse pill (QA 2026-07-27);
+              the forum name lives in the topbar. */}
           <div className="sidebar-foot">
+            <p className="faint sidebar-privacy">
+              {privacyDescription(timetable.privacy, settings.roleLabels)}
+            </p>
             {switcherItems.length > 0 ? (
               <TimetableSwitcher items={switcherItems} currentSlug={slug} />
             ) : null}
-            <p
-              className="faint"
-              style={{ margin: "8px 0 0", fontSize: "var(--text-2xs)" }}
+            <ThemeToggle />
+            <a
+              className="sidebar-bug-link faint"
+              href="https://github.com/sugaroverflow/timetable/issues/new"
+              target="_blank"
+              rel="noopener noreferrer"
             >
-              {privacyDescription(timetable.privacy, settings.roleLabels)}
-            </p>
+              <Flag size={14} aria-hidden /> Report a bug
+            </a>
           </div>
         </Sidebar>
 

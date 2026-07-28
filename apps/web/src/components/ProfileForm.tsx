@@ -40,7 +40,13 @@ export function ProfileForm({
       {
         success: "Profile saved",
         errorFallback: "Could not save profile",
-        onSuccess: () => setSaved(true),
+        onSuccess: () => {
+          setSaved(true);
+          // The topbar AccountMenu caches this forum's avatar for the life
+          // of the app layout — tell it the profile changed (QA 2026-07-28:
+          // a new photo didn't show top right until a hard reload).
+          window.dispatchEvent(new Event("profile-updated"));
+        },
       },
     );
   }
