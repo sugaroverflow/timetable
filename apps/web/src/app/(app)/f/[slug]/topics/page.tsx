@@ -111,12 +111,15 @@ async function QueueView({ slug }: { slug: string }) {
         />
       ) : queue.current ? (
         <>
-          <TopicCard {...topicCardProps(page, queue.current)} expandBody />
-          <QueueControls
-            topicId={queue.current.id}
-            position={queue.roundSize - queue.remaining + 1}
-            roundSize={queue.roundSize}
+          <TopicCard
+            {...topicCardProps(page, queue.current)}
+            expandBody
+            queueControls={<QueueControls topicId={queue.current.id} />}
           />
+          <p className="faint queue-progress">
+            {queue.roundSize - queue.remaining + 1} of {queue.roundSize} this
+            round
+          </p>
         </>
       ) : queue.roundSize === 0 ? (
         <EmptyState

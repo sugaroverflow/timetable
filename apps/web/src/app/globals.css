@@ -1472,25 +1472,65 @@ textarea {
   margin: 2px 0 10px;
 }
 
-/* Topic Queue decision bar (?sort=queue) */
+/* Topic Queue decision buttons (?sort=queue): big round Tinder-style,
+   symbols only — 🔁 left (later), ❤️ right (yes). */
 .queue-bar {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 22px;
   justify-content: center;
-  padding: 6px 0 2px;
+  padding: 10px 0 4px;
 }
-.queue-bar .queue-heart {
-  border-color: transparent;
+.queue-btn {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 26px;
+  line-height: 1;
+  border: 1px solid var(--line-strong);
+  background: var(--wash);
+  cursor: pointer;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease;
+}
+.queue-btn:hover:not(:disabled) {
+  transform: scale(1.08);
+  box-shadow: var(--shadow);
+}
+.queue-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.queue-btn-heart {
   background: var(--heart-soft);
-  color: var(--heart);
+  border-color: transparent;
 }
-.queue-bar .queue-progress {
+.queue-progress {
+  text-align: center;
   font-size: var(--text-sm);
-  margin-left: 6px;
 }
 .queue-done {
   align-items: center;
+}
+
+/* Folded comments on the queue card */
+.comments-fold {
+  border-top: 1px solid var(--line);
+}
+.comments-fold-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 0 4px;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--muted);
+  border: none;
+  background: none;
+  cursor: pointer;
 }
 
 /* Topic card action bar */
