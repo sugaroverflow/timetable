@@ -8,6 +8,7 @@ import { Avatar } from "./Avatar";
 import { CollapsibleTopicBody } from "./CollapsibleTopicBody";
 import { CommentComposer } from "./CommentComposer";
 import { CommentList } from "./CommentList";
+import { FoldedComments } from "./FoldedComments";
 import { HostOnlyPanel } from "./HostOnlyPanel";
 import { HostTopicActions } from "./HostTopicActions";
 import { PersonChip } from "./PersonChip";
@@ -123,6 +124,70 @@ function TopicTail({
   );
 }
 
+/** The actions slot: queue mode swaps the normal heart/comment row for the
+ * big decision buttons — one call to action per card. */
+function ActionsSlot({
+  topic,
+  perms,
+  slug,
+  viewerId,
+  viewerHeartCount,
+  queueControls,
+}: {
+  topic: FeedTopic;
+  perms: FeedPerms;
+  slug: string;
+  viewerId: string | null;
+  viewerHeartCount: number | null;
+  queueControls: React.ReactNode;
+}) {
+  if (queueControls) return <>{queueControls}</>;
+  return (
+    <TopicActionsRow
+      topicId={topic.id}
+      slug={slug}
+      heartCount={topic.heartCount}
+      viewerHasHearted={topic.viewerHasHearted}
+      commentCount={topic.commentCount}
+      canHeart={perms.canHeart}
+      signedIn={viewerId != null}
+      viewerHeartCount={viewerHeartCount}
+    />
+  );
+}
+
+/** The public thread + composer — folded behind "💬 Comments (n)" in the
+ * Topic Queue, open everywhere else. */
+function CommentSection({
+  topic,
+  perms,
+  slug,
+  publicComments,
+  folded,
+}: {
+  topic: FeedTopic;
+  perms: FeedPerms;
+  slug: string;
+  publicComments: FeedTopic["comments"];
+  folded: boolean;
+}) {
+  const thread = (
+    <>
+      <CommentList
+        comments={publicComments}
+        canReply={perms.canComment}
+        canModerate={perms.canModerate}
+        slug={slug}
+      />
+      {perms.canComment ? (
+        <CommentComposer topicId={topic.id} mentionSlug={slug} />
+      ) : null}
+    </>
+  );
+  if (!folded) return thread;
+  return <FoldedComments count={topic.commentCount}>{thread}</FoldedComments>;
+}
+
 /** Collapsed by default; the Topic Queue shows the whole body. */
 function TopicBody({ html, expand }: { html: string; expand: boolean }) {
   if (expand) {
@@ -147,6 +212,7 @@ export function TopicCard({
   viewerHeartCount = null,
   hosts = [],
   expandBody = false,
+  queueControls = null,
 }: {
   topic: FeedTopic;
   perms: FeedPerms;
@@ -160,6 +226,10 @@ export function TopicCard({
   /** Full body, no collapse — the Topic Queue shows one topic at a time,
    * and deciding needs the whole thing. */
   expandBody?: boolean;
+  /** Queue mode: rendered in the actions slot INSTEAD of the normal
+   * heart/comment row (one call to action per card), with the comments
+   * folded below it. */
+  queueControls?: React.ReactNode;
 }) {
   const publicComments = topic.comments.filter(
     (c) => c.visibility !== "host_only",
@@ -190,27 +260,22 @@ export function TopicCard({
 
       <TopicBody html={topic.bodyHtml} expand={expandBody} />
 
-      <TopicActionsRow
-        topicId={topic.id}
+      <ActionsSlot
+        topic={topic}
+        perms={perms}
         slug={slug}
-        heartCount={topic.heartCount}
-        viewerHasHearted={topic.viewerHasHearted}
-        commentCount={topic.commentCount}
-        canHeart={perms.canHeart}
-        signedIn={viewerId != null}
+        viewerId={viewerId}
         viewerHeartCount={viewerHeartCount}
+        queueControls={queueControls}
       />
 
-      <CommentList
-        comments={publicComments}
-        canReply={perms.canComment}
-        canModerate={perms.canModerate}
+      <CommentSection
+        topic={topic}
+        perms={perms}
         slug={slug}
+        publicComments={publicComments}
+        folded={queueControls != null}
       />
-
-      {perms.canComment ? (
-        <CommentComposer topicId={topic.id} mentionSlug={slug} />
-      ) : null}
 
       <TopicTail
         topic={topic}
