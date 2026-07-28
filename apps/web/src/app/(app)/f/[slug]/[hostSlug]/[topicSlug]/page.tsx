@@ -5,10 +5,11 @@ import { type Role } from "@timetable/shared";
 
 import { anonGql } from "@/lib/ogCard";
 
+import { AdminCommentsPanel } from "@/components/AdminCommentsPanel";
 import { TopicCard } from "@/components/TopicCard";
 import { topicPerms } from "@/lib/feedPage";
 import type { FeedTopic } from "@/lib/feedTypes";
-import { TOPIC_FEED_FIELDS } from "@/lib/gqlFragments";
+import { commentTree, TOPIC_FEED_FIELDS } from "@/lib/gqlFragments";
 import { gqlFetch } from "@/lib/graphql";
 import { displayRolesFromCookies } from "@/lib/previewRoles.server";
 import { parseTimetableSettings, roleLabel } from "@/lib/timetableSettings";
@@ -32,6 +33,7 @@ const QUERY = `
     timetableHosts: forumHosts(idOrSlug: $s) { id name }
     topicPermalink(idOrSlug: $s, topicSlug: $topic) {
       ${TOPIC_FEED_FIELDS}
+      ${commentTree("adminComments")}
     }
   }
 `;
@@ -84,6 +86,34 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={`status-badge status-${status}`}>{status}</span>;
 }
 
+/** The drafting thread, for the topic's owner and admins only — the API
+ * already gates the data; this gates the chrome (QA 2026-07-28). */
+function DraftingThread({
+  topic,
+  slug,
+  viewerId,
+  canModerate,
+  adminLabel,
+}: {
+  topic: FeedTopic;
+  slug: string;
+  viewerId: string | null;
+  canModerate: boolean;
+  adminLabel: string;
+}) {
+  const isOwner = viewerId != null && viewerId === topic.hostId;
+  if (!canModerate && !isOwner) return null;
+  return (
+    <AdminCommentsPanel
+      topicId={topic.id}
+      comments={topic.adminComments ?? []}
+      canModerate={canModerate}
+      slug={slug}
+      adminLabel={adminLabel}
+    />
+  );
+}
+
 export default async function TopicPermalinkPage({
   params,
 }: {
@@ -101,6 +131,7 @@ export default async function TopicPermalinkPage({
   );
   const settings = parseTimetableSettings(data.timetable?.settings);
   const perms = topicPerms(roles, topic.status);
+  const viewerId = data.me?.id ?? null;
 
   return (
     <div className="stack">
@@ -111,11 +142,18 @@ export default async function TopicPermalinkPage({
         topic={topic}
         perms={perms}
         slug={slug}
-        viewerId={data.me?.id ?? null}
+        viewerId={viewerId}
         hostLabel={roleLabel(settings.roleLabels, "host")}
         adminLabel={roleLabel(settings.roleLabels, "admin")}
         viewerHeartCount={data.timetable?.viewerHeartedPublishedCount ?? null}
         hosts={data.timetableHosts}
+      />
+      <DraftingThread
+        topic={topic}
+        slug={slug}
+        viewerId={viewerId}
+        canModerate={perms.canModerate}
+        adminLabel={roleLabel(settings.roleLabels, "admin")}
       />
     </div>
   );

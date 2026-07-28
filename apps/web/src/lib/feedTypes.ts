@@ -53,6 +53,9 @@ export type FeedTopic = {
   contentUpdatedAt: string | null;
   createdAt: string;
   comments: FeedComment[];
+  /** Drafting thread — the API serves it only to the topic's owner and
+   * admins; selected by the permalink page alone. */
+  adminComments?: FeedComment[];
 };
 
 export type ManagedTopic = {
