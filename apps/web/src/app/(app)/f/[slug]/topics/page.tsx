@@ -135,7 +135,7 @@ export default async function FeedPage({
       {page.isMember ? <MarkFeedSeen slug={slug} /> : null}
       {hearted ? (
         <div className="page-head">
-          <h2 className="section-title">
+          <h2 className="page-title">
             <Heart size={14} fill="currentColor" aria-hidden /> Topics
           </h2>
         </div>

@@ -42,7 +42,8 @@ export function PersonProfileCard({
   );
   return (
     <div className="card stack">
-      {/* Portrait with the name and role pills beneath (QA 2026-07-28). */}
+      {/* Portrait with the name and role pills beneath (QA 2026-07-28).
+       * The name is the page's top heading — tier 1 of the hierarchy. */}
       <div className="profile-head">
         {linkPhoto && pagePath ? (
           <Link href={pagePath} className="profile-photo-link">
@@ -51,7 +52,7 @@ export function PersonProfileCard({
         ) : (
           photo
         )}
-        <strong>{person.name ?? "Member"}</strong>
+        <h1 className="page-title">{person.name ?? "Member"}</h1>
         <RolePills roles={person.roles} labels={labels} />
       </div>
       {person.bioHtml ? (

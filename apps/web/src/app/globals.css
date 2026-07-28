@@ -171,7 +171,7 @@ h3 {
 }
 
 .page-head h1 {
-  font-size: var(--text-4xl);
+  font-size: var(--text-3xl);
   margin: 0;
 }
 .page-head p {
@@ -335,9 +335,6 @@ textarea {
     width: 44px;
     height: 44px;
     font-size: var(--text-lg);
-  }
-  .topic-head .topic-title {
-    font-size: var(--text-3xl);
   }
   .topic-byline {
     font-size: var(--text-base);
@@ -870,11 +867,12 @@ textarea {
   margin: 2px 0;
 }
 
-/* Topic card */
+/* Topic card — tier 3 of the heading hierarchy: below page titles and
+   section headers on every screen size (QA 2026-07-28). */
 .topic-title {
   font-family: var(--serif);
   font-weight: var(--fw-semibold);
-  font-size: var(--text-2xl);
+  font-size: var(--text-lg);
   margin: 0;
 }
 .topic-body {
@@ -1770,6 +1768,15 @@ textarea {
    Utilities — reusable classes that replace repeated inline styles. Prefer
    these over one-off style={{…}} so spacing/type/color stay tokenized.
    --------------------------------------------------------------------------- */
+
+/* Heading hierarchy (QA 2026-07-28): three tiers, strictly ordered —
+   page title (24) > section header (18) > item/topic titles (16). */
+.page-title {
+  font-family: var(--serif);
+  font-size: var(--text-3xl);
+  font-weight: var(--fw-semibold);
+  margin: 0;
+}
 
 /* Section sub-heading used across page bodies (was inline fontSize:18/margin:0).
    Inherits the serif family + weight from the h1–h3 element rule. */

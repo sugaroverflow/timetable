@@ -36,7 +36,9 @@ export function DigestSettingsForm({ current }: { current: DigestSettings }) {
 
   return (
     <form onSubmit={submit} className="card">
-      <h2 style={{ marginTop: 0, fontSize: 18 }}>Email digests</h2>
+      <h2 className="section-title" style={{ marginBottom: 10 }}>
+        Email digests
+      </h2>
       <p className="faint" style={{ marginTop: 0, fontSize: 12 }}>
         Preferences are saved here. Delivery runs when cron and email are
         configured.

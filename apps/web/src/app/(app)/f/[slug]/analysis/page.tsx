@@ -107,7 +107,7 @@ function ElectorActivityCard({
         className="row wrap"
         style={{ justifyContent: "space-between", marginBottom: 12 }}
       >
-        <h3 style={{ margin: 0, fontSize: 15 }}>{electorLabel} activity</h3>
+        <h3 className="section-title">{electorLabel} activity</h3>
         {/* This table's own host filter: counts only activity on the
             chosen host's topics (independent of the topics table's). */}
         <span className="row wrap" style={{ gap: 10, alignItems: "center" }}>
@@ -153,7 +153,7 @@ function HostActivityCard({
         style={{ justifyContent: "space-between", marginBottom: 12 }}
       >
         <div>
-          <h3 style={{ margin: 0, fontSize: 15 }}>{hostLabel} activity</h3>
+          <h3 className="section-title">{hostLabel} activity</h3>
           <p className="faint" style={{ margin: "2px 0 0", fontSize: 12 }}>
             Only visible to {adminsPlural.toLowerCase()}
           </p>
@@ -208,7 +208,7 @@ export default async function DashboardPage({
   return (
     <div className="stack">
       <div className="page-head">
-        <h2 className="section-title">Analysis</h2>
+        <h2 className="page-title">Analysis</h2>
       </div>
 
       <TopicLeaderboard

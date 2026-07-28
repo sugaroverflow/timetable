@@ -57,7 +57,9 @@ export function AddPersonForm({
 
   return (
     <form onSubmit={submit} className="card">
-      <h3 style={{ marginTop: 0, fontSize: 16 }}>Add a person</h3>
+      <h3 className="section-title" style={{ marginBottom: 10 }}>
+        Add a person
+      </h3>
       <p className="faint" style={{ marginTop: 0, fontSize: 12 }}>
         Creates their account right away — no email goes out until you press
         “Send invite” on their card, so you can set up their profile and topics

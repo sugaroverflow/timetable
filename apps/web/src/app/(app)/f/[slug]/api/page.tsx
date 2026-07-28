@@ -11,7 +11,7 @@ export default async function ApiPage({
   return (
     <div className="stack">
       <div className="page-head">
-        <h2 className="section-title">API</h2>
+        <h2 className="page-title">API</h2>
         <p>
           Machine-readable access to this forum. Everything here returns exactly
           what the viewer&rsquo;s role can already see in the app.

@@ -172,7 +172,7 @@ export function TopicLeaderboard({
           marginBottom: 4,
         }}
       >
-        <h3 style={{ margin: 0, fontSize: 15 }}>{title}</h3>
+        <h3 className="section-title">{title}</h3>
         <span className="row wrap" style={{ gap: 10, alignItems: "center" }}>
           {hostFilter}
           <SelectMinimal

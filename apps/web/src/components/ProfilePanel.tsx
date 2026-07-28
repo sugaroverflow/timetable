@@ -29,7 +29,7 @@ export function ProfilePanel({
   return (
     <div className="stack">
       <div className="page-head">
-        <h2 className="section-title">Profile</h2>
+        <h2 className="page-title">Profile</h2>
         <p>{email}</p>
       </div>
       {slug && profile ? (

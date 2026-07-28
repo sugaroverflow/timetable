@@ -222,7 +222,7 @@ export default async function PeoplePage({
   return (
     <div className="stack">
       <div className="page-head">
-        <h2 className="section-title">People</h2>
+        <h2 className="page-title">People</h2>
       </div>
       {canEdit ? (
         <AddPersonForm
