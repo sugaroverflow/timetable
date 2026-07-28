@@ -55,10 +55,7 @@ export function TimetableSwitcher({
     <Menu.Root>
       <Menu.Trigger className="tt-switcher-trigger">
         {current ? <ItemIcon item={current} /> : null}
-        <span className="tt-menu-name">
-          {current?.name ?? "Forums"}
-          <span className="tt-switcher-hint">Switch forum</span>
-        </span>
+        <span className="tt-menu-name">{current?.name ?? "Forums"}</span>
         <ChevronsUpDown size={14} aria-hidden />
       </Menu.Trigger>
       <Menu.Portal>
