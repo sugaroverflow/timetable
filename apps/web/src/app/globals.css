@@ -851,13 +851,6 @@ textarea {
   padding-top: 12px;
 }
 
-.people-heading {
-  font-size: var(--text-base);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--faint);
-  margin: 10px 0 0;
-}
 .person-topics ul {
   margin: 6px 0 0;
   padding-left: 18px;
@@ -874,6 +867,10 @@ textarea {
   font-weight: var(--fw-semibold);
   font-size: var(--text-xl);
   margin: 0;
+}
+/* On its own permalink page the topic title IS the page title — tier 1. */
+.topic-permalink .topic-title {
+  font-size: var(--text-4xl);
 }
 .topic-body {
   color: var(--ink);

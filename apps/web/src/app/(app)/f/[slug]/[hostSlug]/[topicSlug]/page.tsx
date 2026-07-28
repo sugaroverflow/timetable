@@ -134,7 +134,9 @@ export default async function TopicPermalinkPage({
   const viewerId = data.me?.id ?? null;
 
   return (
-    <div className="stack">
+    // topic-permalink: here the topic title IS the page title, so it
+    // renders at tier 1 (QA 2026-07-28) — see globals.css.
+    <div className="stack topic-permalink">
       <div className="toolbar">
         <StatusBadge status={topic.status} />
       </div>
