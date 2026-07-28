@@ -3,10 +3,12 @@ import Link from "next/link";
 import { isAdmin, type Role } from "@timetable/shared";
 
 import { Avatar } from "@/components/Avatar";
+import { DigestSettingsForm } from "@/components/DigestSettingsForm";
 import { EmptyState } from "@/components/EmptyState";
 import { MarkNotificationsSeen } from "@/components/MarkNotificationsSeen";
 import { PersonChip } from "@/components/PersonChip";
 import { gqlFetch } from "@/lib/graphql";
+import { parseDigestSettings } from "@/lib/timetableSettings";
 import { topicPath } from "@/lib/topicPath";
 
 type Notification = {
@@ -25,12 +27,14 @@ type Notification = {
 
 type Data = {
   timetable: { viewerRoles: string[] } | null;
+  me: { notificationSettings: string } | null;
   notifications: Notification[];
 };
 
 const QUERY = `
   query Notifications($s: String!) {
     timetable: forum(idOrSlug: $s) { viewerRoles }
+    me { notificationSettings }
     notifications(idOrSlug: $s) {
       commentId kind authorId authorName authorImage body visibility createdAt
       topicTitle topicSlug topicHostSlug
@@ -59,8 +63,14 @@ export default async function NotificationsPage({
       <MarkNotificationsSeen slug={slug} />
       <div className="page-head">
         <h2 className="page-title">Notifications</h2>
-        <p>Comments on your topics and replies to your comments.</p>
       </div>
+      {/* Email digest preferences live with the notifications they gate
+          (QA 2026-07-28 — moved off the profile page). */}
+      {data.me ? (
+        <DigestSettingsForm
+          current={parseDigestSettings(data.me.notificationSettings)}
+        />
+      ) : null}
       {data.notifications.length === 0 ? (
         <EmptyState
           icon="🔔"

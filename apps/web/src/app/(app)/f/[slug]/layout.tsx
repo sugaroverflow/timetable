@@ -9,6 +9,7 @@ import { isAdmin, isElector, isHost, type Role } from "@timetable/shared";
 
 import { NavLink } from "@/components/NavLink";
 import { Sidebar } from "@/components/Sidebar";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   TimetableSwitcher,
   type SwitcherItem,
@@ -299,18 +300,11 @@ export default async function TimetableLayout({
             </div>
           ) : null}
 
-          <a
-            className="sidebar-bug-link faint"
-            href="https://github.com/sugaroverflow/timetable/issues/new"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Flag size={14} aria-hidden /> Report a bug
-          </a>
-
           {/* Forum identity footer: the switcher with a plain-English line
               about the forum's visibility beneath it (QA 2026-07-27 — the
-              pill was too terse; the name lives in the topbar). */}
+              pill was too terse; the name lives in the topbar), then the
+              utility row: theme toggle + bug link (QA 2026-07-28 —
+              Appearance moved here from the profile page). */}
           <div className="sidebar-foot">
             {switcherItems.length > 0 ? (
               <TimetableSwitcher items={switcherItems} currentSlug={slug} />
@@ -321,6 +315,17 @@ export default async function TimetableLayout({
             >
               {privacyDescription(timetable.privacy, settings.roleLabels)}
             </p>
+            <div className="sidebar-utils">
+              <ThemeToggle />
+              <a
+                className="sidebar-bug-link faint"
+                href="https://github.com/sugaroverflow/timetable/issues/new"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Flag size={14} aria-hidden /> Report a bug
+              </a>
+            </div>
           </div>
         </Sidebar>
 

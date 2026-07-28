@@ -438,6 +438,19 @@ textarea {
   font-size: var(--text-xs);
   text-decoration: none;
 }
+/* Sidebar utility row under the visibility line: theme toggle + bug link
+   (QA 2026-07-28). */
+.sidebar-utils {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+}
+.sidebar-utils .theme-toggle {
+  padding: 4px 8px;
+  font-size: var(--text-xs);
+}
 .nav-badge {
   display: inline-flex;
   align-items: center;

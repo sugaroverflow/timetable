@@ -32,6 +32,16 @@ export function AccountMenu({ email }: { email: string | null }) {
     name: string | null;
     image: string | null;
   } | null>(null);
+  // Bumped by ProfileForm's "profile-updated" event: the app layout (and
+  // this menu) survives client navigations, so without it a freshly saved
+  // photo wouldn't show until a hard reload (QA 2026-07-28).
+  const [version, setVersion] = useState(0);
+
+  useEffect(() => {
+    const bump = () => setVersion((v) => v + 1);
+    window.addEventListener("profile-updated", bump);
+    return () => window.removeEventListener("profile-updated", bump);
+  }, []);
 
   useEffect(() => {
     if (!slug) return;
@@ -56,7 +66,7 @@ export function AccountMenu({ email }: { email: string | null }) {
     return () => {
       cancelled = true;
     };
-  }, [slug]);
+  }, [slug, version]);
 
   const inForum = slug != null && state?.slug === slug;
   return (
