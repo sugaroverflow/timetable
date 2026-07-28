@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { TopbarBrand, type BrandItem } from "@/components/TopbarBrand";
 import { TopbarHamburger } from "@/components/TopbarHamburger";
+import { TopbarHeightSync } from "@/components/TopbarHeightSync";
 import { TopbarRoles } from "@/components/TopbarRoles";
 import { ToastProvider } from "@/components/Toast";
 import { getMyTimetables } from "@/lib/myTimetables";
@@ -37,6 +38,7 @@ export default async function AppLayout({
   return (
     <ToastProvider>
       <header className="topbar">
+        <TopbarHeightSync />
         <TopbarHamburger />
         <TopbarBrand
           items={brandItems}

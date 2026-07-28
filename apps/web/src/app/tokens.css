@@ -217,8 +217,10 @@
   --shadow-pop: 0 8px 28px rgba(20, 30, 50, 0.16);
 
   /* --- Layout --- */
-  /* Rendered topbar height: 12px padding ×2 + 30px brand row + 1px border.
-     Used as the sticky offset for headers that pin beneath the topbar. */
+  /* Sticky offset for headers that pin beneath the topbar. This value is
+     only the SSR estimate — the real height varies with the bar's content,
+     so TopbarHeightSync overwrites it with the measured height after
+     hydration. */
   --topbar-h: 55px;
 
   /* --- Z-index scale --- */

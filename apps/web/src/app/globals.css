@@ -930,8 +930,11 @@ textarea {
   border: 0;
   border-radius: 0;
   box-shadow: none;
-  padding: 8px 0 10px;
-  margin-bottom: 8px;
+  padding: 8px 0;
+  /* Pull the list up: with the .stack gap (14px) this nets 14px between
+     the controls and the first card — the same rhythm as card-to-card
+     (QA 2026-07-28: "the feed needs to be higher"). */
+  margin-bottom: -8px;
 }
 .feed-toolbar select {
   font-size: var(--text-xs);
