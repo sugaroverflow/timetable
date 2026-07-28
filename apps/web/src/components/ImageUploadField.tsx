@@ -128,12 +128,8 @@ export function ImageUploadField({
       </div>
       {value ? (
         <>
-          <div
-            className="media-preview"
-            role="img"
-            style={{ backgroundImage: `url(${value})` }}
-            aria-label={`${label} preview`}
-          />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="media-preview" src={value} alt={`${label} preview`} />
           <button
             type="button"
             className="btn btn-ghost btn-sm"

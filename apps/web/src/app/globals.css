@@ -271,13 +271,13 @@ textarea {
 .media-input input[type="file"] {
   padding: 7px 9px;
 }
+/* Upload preview: the whole image at its own aspect ratio, capped at the
+   card width — never cropped (QA 2026-07-28). */
 .media-preview {
   display: block;
-  width: 100%;
-  height: 140px;
+  max-width: 100%;
+  height: auto;
   margin-top: 8px;
-  background-position: center;
-  background-size: cover;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background-color: var(--wash);
