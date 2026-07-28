@@ -62,7 +62,7 @@ export default async function ModerationPage({
           comments.
         </p>
       </div>
-      <h3 className="people-heading">Unpublished Topics</h3>
+      <h3 className="section-title">Unpublished Topics</h3>
       {data.moderationQueue.length > 1 ? (
         <div className="toolbar feed-toolbar">
           <ListSortControl value={sort} options={PENDING_SORTS} />

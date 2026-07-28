@@ -28,6 +28,9 @@ export default async function QueuePage({
   return (
     <div className="stack">
       {page.isMember ? <MarkFeedSeen slug={slug} /> : null}
+      <div className="page-head">
+        <h2 className="page-title">Topic Queue</h2>
+      </div>
       {publishedCount === 0 ? (
         <EmptyState
           icon="◇"

@@ -19,7 +19,7 @@ export default async function ApiPage({
       </div>
 
       <section className="stack">
-        <h3 className="people-heading">Data export</h3>
+        <h3 className="section-title">Data export</h3>
         <p>
           The download is a timestamped JSON file. It contains the published
           topics with their body markdown, comments, heart counts, weighted
@@ -33,7 +33,7 @@ export default async function ApiPage({
       </section>
 
       <section className="stack">
-        <h3 className="people-heading">GraphQL API</h3>
+        <h3 className="section-title">GraphQL API</h3>
         <p>
           The endpoint is <code>{env.graphqlUrl}</code>. Read queries return the
           same role-filtered data as the app. The schema is discoverable via
@@ -44,7 +44,7 @@ export default async function ApiPage({
       </section>
 
       <section className="stack">
-        <h3 className="people-heading">Atom feed</h3>
+        <h3 className="section-title">Atom feed</h3>
         <p>
           The published topics are available as an Atom feed at{" "}
           <code>{`${env.apiUrl}/api/forums/${slug}/feed.atom`}</code> — the
@@ -55,7 +55,7 @@ export default async function ApiPage({
       </section>
 
       <section className="stack">
-        <h3 className="people-heading">Planned</h3>
+        <h3 className="section-title">Planned</h3>
         <ul className="list">
           <li>Personal API tokens (read-only).</li>
           <li>An MCP server.</li>

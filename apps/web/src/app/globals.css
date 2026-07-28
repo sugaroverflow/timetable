@@ -171,7 +171,7 @@ h3 {
 }
 
 .page-head h1 {
-  font-size: var(--text-3xl);
+  font-size: var(--text-4xl);
   margin: 0;
 }
 .page-head p {
@@ -872,7 +872,7 @@ textarea {
 .topic-title {
   font-family: var(--serif);
   font-weight: var(--fw-semibold);
-  font-size: var(--text-lg);
+  font-size: var(--text-xl);
   margin: 0;
 }
 .topic-body {
@@ -1769,11 +1769,12 @@ textarea {
    these over one-off style={{…}} so spacing/type/color stay tokenized.
    --------------------------------------------------------------------------- */
 
-/* Heading hierarchy (QA 2026-07-28): three tiers, strictly ordered —
-   page title (24) > section header (18) > item/topic titles (16). */
+/* Heading hierarchy (QA 2026-07-28): three tiers, strictly ordered and
+   sized generously for skimming (per Ed) — page title (26) > section
+   header (20) > item/topic titles (18). */
 .page-title {
   font-family: var(--serif);
-  font-size: var(--text-3xl);
+  font-size: var(--text-4xl);
   font-weight: var(--fw-semibold);
   margin: 0;
 }
@@ -1782,7 +1783,7 @@ textarea {
    Inherits the serif family + weight from the h1–h3 element rule. */
 .section-title {
   font-family: var(--serif);
-  font-size: var(--text-xl);
+  font-size: var(--text-2xl);
   font-weight: var(--fw-semibold);
   margin: 0;
 }
