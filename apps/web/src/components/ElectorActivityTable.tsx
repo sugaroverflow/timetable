@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Fragment, useState } from "react";
 
+import { Avatar } from "@/components/Avatar";
 import { BreakdownCaret } from "@/components/BreakdownPanel";
 import { SortHeader } from "@/components/SortHeader";
 import { formatExactTime } from "@/lib/dates";
@@ -22,6 +23,7 @@ type HeartedTopic = {
 export type ElectorRow = {
   electorId: string;
   electorName: string | null;
+  electorImage: string | null;
   heartCount: number;
   commentCount: number;
   /** Published topics this elector has never seen nor ❤️'d. */
@@ -131,6 +133,11 @@ function ElectorRowItem({
         <td>
           <span className="row" style={{ gap: 6, alignItems: "center" }}>
             <BreakdownCaret open={open} onToggle={() => setOpen(!open)} />
+            <Avatar
+              small
+              name={elector.electorName}
+              image={elector.electorImage}
+            />
             <strong>{elector.electorName ?? electorLabel}</strong>
           </span>
         </td>

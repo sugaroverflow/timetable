@@ -48,6 +48,14 @@ h3 {
   border-radius: var(--radius-xs);
 }
 
+/* Lucide icons inline with text sit ON the baseline by default and look
+   raised; nudge them to optical center (QA 2026-07-28). vertical-align is
+   ignored inside flex containers, so flex-centered contexts (selects,
+   table rows) are untouched — this only fixes inline text flow. */
+.lucide {
+  vertical-align: -0.125em;
+}
+
 /* Layout */
 .topbar {
   position: sticky;

@@ -46,6 +46,7 @@ type Dashboard = {
   electorActivity: {
     electorId: string;
     electorName: string | null;
+    electorImage: string | null;
     heartCount: number;
     commentCount: number;
     queueCount: number;
@@ -80,7 +81,7 @@ const QUERY = `
       topicLeaderboard { id title slug hostId hostName hostImage hostSlug weightedScore l2Score devotionScore heartCount commentTotal commenterCount commentL2 commentL1 commentDevotion }
       hostActivity { hostId hostName hostImage hostSlug topicCount commentCount latestActivityAt }
       electorActivity {
-        electorId electorName heartCount commentCount queueCount
+        electorId electorName electorImage heartCount commentCount queueCount
         latestActivityAt
         heartedTopics { topicId title slug hostId hostName hostSlug commentCount }
       }

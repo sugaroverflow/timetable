@@ -93,9 +93,8 @@ function LeaderboardRow({
           <Avatar small name={entry.hostName} image={entry.hostImage} />
           <span>
             <Link href={personPath(slug, entry.hostSlug ?? entry.hostId)}>
-              {entry.hostName ?? hostLabel}
-            </Link>
-            {": "}
+              {entry.hostName ?? hostLabel}:
+            </Link>{" "}
             <strong>
               {href ? <Link href={href}>{entry.title}</Link> : entry.title}
             </strong>
