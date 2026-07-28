@@ -69,6 +69,11 @@ export function CollapsibleTopicBody({ html }: { html: string }) {
   const [hydrated, setHydrated] = useState(false);
   const [collapsible, setCollapsible] = useState(false);
 
+  // No dependency array — this must re-run after EVERY commit: React's
+  // first update after hydration re-applies dangerouslySetInnerHTML,
+  // recreating the children and wiping the inline styles set here (so an
+  // [expanded, html]-keyed effect leaves every body fully expanded). The
+  // state setters bail out on unchanged values, so this doesn't loop.
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -79,7 +84,7 @@ export function CollapsibleTopicBody({ html }: { html: string }) {
     }
     setHydrated(true);
     setCollapsible(cutoff < kids.length);
-  }, [expanded, html]);
+  });
 
   return (
     <>

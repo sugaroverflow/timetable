@@ -112,5 +112,9 @@ Lint covers everything: `apps/web` has its own Next config; the root
 - `apps/web/.next/` build output pollutes searches — scope greps to `src/`.
 - Seed fixture bodies in `dev-sample-data.md` must not contain `^## ` lines
   (breaks the section parser); `###` is safe.
+- React 19 re-applies `dangerouslySetInnerHTML` on the first post-hydration
+  update even when `__html` is unchanged, recreating the children. Any DOM
+  patched inside such a container (see `CollapsibleTopicBody`) must be
+  re-applied in an every-commit layout effect, not keyed on props.
 - The API refuses to boot when `SPACES_BUCKET` is set without
   `SPACES_KEY`/`SPACES_SECRET` — keep app specs and workflow env in sync.
