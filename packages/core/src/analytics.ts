@@ -77,6 +77,7 @@ export type DashboardData = {
   electorActivity: {
     electorId: string;
     electorName: string | null;
+    electorImage: string | null;
     heartCount: number;
     commentCount: number;
     availabilityCount: number;
@@ -169,7 +170,7 @@ async function countTopicsByStatus(
 
 /** Members with their roles; electors keep their name for the activity list. */
 async function loadMembers(timetableId: string): Promise<{
-  electorRows: { userId: string; name: string | null }[];
+  electorRows: { userId: string; name: string | null; image: string | null }[];
   hostRows: {
     userId: string;
     name: string | null;
@@ -540,7 +541,7 @@ function compareElectorActivity(
 }
 
 function buildElectorActivity(args: {
-  electorRows: { userId: string; name: string | null }[];
+  electorRows: { userId: string; name: string | null; image: string | null }[];
   heartActivityRows: HeartActivityRow[];
   commentsByElector: Map<string, Stat>;
   commentsByElectorTopic: Map<string, number>;
@@ -562,6 +563,7 @@ function buildElectorActivity(args: {
       return {
         electorId: elector.userId,
         electorName: elector.name,
+        electorImage: elector.image,
         heartCount: heartStat?.count ?? 0,
         commentCount: commentStat?.count ?? 0,
         availabilityCount: availabilityStat?.count ?? 0,

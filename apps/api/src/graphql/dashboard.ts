@@ -114,6 +114,7 @@ const ElectorActivityType = builder
     fields: (t) => ({
       electorId: t.exposeID("electorId"),
       electorName: t.exposeString("electorName", { nullable: true }),
+      electorImage: t.exposeString("electorImage", { nullable: true }),
       heartCount: t.exposeInt("heartCount"),
       commentCount: t.exposeInt("commentCount"),
       availabilityCount: t.exposeInt("availabilityCount"),
