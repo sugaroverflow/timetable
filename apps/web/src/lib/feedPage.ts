@@ -117,6 +117,7 @@ export function topicCardProps(page: FeedPage, topic: FeedTopic) {
     isNew: isTopicNew(topic, page.lastSeenAt),
     hostLabel: roleLabel(page.settings.roleLabels, "host"),
     adminLabel: roleLabel(page.settings.roleLabels, "admin"),
+    electorLabel: roleLabel(page.settings.roleLabels, "elector"),
     viewerHeartCount: page.viewerHeartCount,
     hosts: page.hosts,
   };

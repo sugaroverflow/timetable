@@ -653,6 +653,16 @@ textarea {
 .person-trigger:hover {
   text-decoration: underline;
 }
+/* Person pages + host-filtered feed: portrait with name + role pills
+   beneath it (QA 2026-07-28). */
+.profile-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
 /* Person pages + host-filtered feed: the ~200px desktop profile photo. */
 .profile-photo-xl {
   width: 200px;

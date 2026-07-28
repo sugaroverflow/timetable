@@ -91,11 +91,13 @@ const QUERY = `
 function ElectorActivityCard({
   slug,
   electorLabel,
+  hostLabel,
   hostFilter,
   rows,
 }: {
   slug: string;
   electorLabel: string;
+  hostLabel: string;
   hostFilter: React.ReactNode;
   rows: Dashboard["electorActivity"];
 }) {
@@ -117,12 +119,13 @@ function ElectorActivityCard({
       </div>
       {rows.length === 0 ? (
         <p className="faint" style={{ fontSize: 13 }}>
-          No electors yet.
+          No {pluralLabel(electorLabel).toLowerCase()} yet.
         </p>
       ) : (
         <ElectorActivityTable
           slug={slug}
           electorLabel={electorLabel}
+          hostLabel={hostLabel}
           rows={rows}
         />
       )}
@@ -228,6 +231,7 @@ export default async function DashboardPage({
       <ElectorActivityCard
         slug={slug}
         electorLabel={electorLabel}
+        hostLabel={hostLabel}
         rows={d.electorActivity}
         hostFilter={
           <HostFilter

@@ -145,6 +145,7 @@ export default async function TopicPermalinkPage({
         viewerId={viewerId}
         hostLabel={roleLabel(settings.roleLabels, "host")}
         adminLabel={roleLabel(settings.roleLabels, "admin")}
+        electorLabel={roleLabel(settings.roleLabels, "elector")}
         viewerHeartCount={data.timetable?.viewerHeartedPublishedCount ?? null}
         hosts={data.timetableHosts}
       />

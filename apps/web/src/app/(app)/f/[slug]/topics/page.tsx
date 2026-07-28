@@ -138,7 +138,6 @@ export default async function FeedPage({
           <h2 className="section-title">
             <Heart size={14} fill="currentColor" aria-hidden /> Topics
           </h2>
-          <p>Published topics you currently ❤️.</p>
         </div>
       ) : null}
       <div className="toolbar feed-toolbar">

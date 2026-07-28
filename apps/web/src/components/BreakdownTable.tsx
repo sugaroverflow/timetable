@@ -23,9 +23,12 @@ function fmt(n: number): string {
 export function BreakdownTable({
   slug,
   rows,
+  electorLabel = "Elector",
 }: {
   slug: string;
   rows: WeightedHeart[];
+  /** The forum's custom role label (QA 2026-07-28). */
+  electorLabel?: string;
 }) {
   const [sortKey, setSortKey] = useState<SortKey>("l1");
   const [dir, setDir] = useState<"asc" | "desc">("desc");
@@ -81,7 +84,7 @@ export function BreakdownTable({
       <table className="data-table sortable-table breakdown-table">
         <thead>
           <tr>
-            {header("name", "Elector")}
+            {header("name", electorLabel)}
             {header("l1", "L1")}
             {header("l2", "L2")}
             {header("devotion", "Devotion")}
@@ -98,7 +101,7 @@ export function BreakdownTable({
                     style={{ gap: 6, alignItems: "center" }}
                   >
                     <Avatar name={w.electorName} image={w.electorImage} small />
-                    {w.electorName ?? "Elector"}
+                    {w.electorName ?? electorLabel}
                   </span>
                 </PersonChip>
               </td>
@@ -113,9 +116,7 @@ export function BreakdownTable({
         </tbody>
         <tfoot>
           <tr className="breakdown-sums">
-            <td>
-              Σ · {rows.length} heart{rows.length === 1 ? "" : "s"}
-            </td>
+            <td>Σ · {rows.length} ❤️</td>
             <td className="mono">{fmt(sum((w) => w.weight))}</td>
             <td className="mono">{fmt(sum((w) => w.l2Weight))}</td>
             <td className="mono">{fmt(sum((w) => w.devotionWeight))}</td>

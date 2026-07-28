@@ -107,7 +107,7 @@ export function HostActivityTable({
                 <span className="row" style={{ gap: 8, alignItems: "center" }}>
                   <Avatar small name={host.hostName} image={host.hostImage} />
                   <Link href={personPath(slug, host.hostSlug ?? host.hostId)}>
-                    <strong>{host.hostName ?? "Host"}</strong>
+                    <strong>{host.hostName ?? hostLabel}</strong>
                   </Link>
                 </span>
               </td>

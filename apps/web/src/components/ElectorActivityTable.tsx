@@ -39,9 +39,11 @@ type TopicSortKey = "name" | "host" | "comments";
 function HeartedTopicsTable({
   slug,
   topics,
+  hostLabel,
 }: {
   slug: string;
   topics: HeartedTopic[];
+  hostLabel: string;
 }) {
   const [key, setKey] = useState<TopicSortKey>("name");
   const [dir, setDir] = useState<"asc" | "desc">("asc");
@@ -82,7 +84,7 @@ function HeartedTopicsTable({
             onToggle={() => toggle("name")}
           />
           <SortHeader
-            label="Host"
+            label={hostLabel}
             active={key === "host"}
             dir={dir}
             onToggle={() => toggle("host")}
@@ -101,7 +103,7 @@ function HeartedTopicsTable({
           return (
             <tr key={t.topicId}>
               <td>{href ? <Link href={href}>{t.title}</Link> : t.title}</td>
-              <td>{t.hostName ?? "Host"}</td>
+              <td>{t.hostName ?? hostLabel}</td>
               <td className="mono">{t.commentCount}</td>
             </tr>
           );
@@ -114,9 +116,13 @@ function HeartedTopicsTable({
 function ElectorRowItem({
   slug,
   elector,
+  electorLabel,
+  hostLabel,
 }: {
   slug: string;
   elector: ElectorRow;
+  electorLabel: string;
+  hostLabel: string;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -125,7 +131,7 @@ function ElectorRowItem({
         <td>
           <span className="row" style={{ gap: 6, alignItems: "center" }}>
             <BreakdownCaret open={open} onToggle={() => setOpen(!open)} />
-            <strong>{elector.electorName ?? "Elector"}</strong>
+            <strong>{elector.electorName ?? electorLabel}</strong>
           </span>
         </td>
         <td className="mono">{elector.heartCount}</td>
@@ -154,7 +160,11 @@ function ElectorRowItem({
                 No ❤️s yet.
               </span>
             ) : (
-              <HeartedTopicsTable slug={slug} topics={elector.heartedTopics} />
+              <HeartedTopicsTable
+                slug={slug}
+                topics={elector.heartedTopics}
+                hostLabel={hostLabel}
+              />
             )}
           </td>
         </tr>
@@ -172,10 +182,12 @@ function ElectorRowItem({
 export function ElectorActivityTable({
   slug,
   electorLabel,
+  hostLabel = "Host",
   rows,
 }: {
   slug: string;
   electorLabel: string;
+  hostLabel?: string;
   rows: ElectorRow[];
 }) {
   const [sortKey, setSortKey] = useState<SortKey>("activity");
@@ -258,6 +270,8 @@ export function ElectorActivityTable({
               key={elector.electorId}
               slug={slug}
               elector={elector}
+              electorLabel={electorLabel}
+              hostLabel={hostLabel}
             />
           ))}
         </tbody>

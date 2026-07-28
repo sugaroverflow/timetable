@@ -74,10 +74,12 @@ function LeaderboardRow({
   norm,
   slug,
   hostLabel,
+  electorLabel,
 }: {
   entry: LeaderboardEntry;
   norm: AnyNormKey;
   slug: string;
+  electorLabel: string;
   hostLabel: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -105,7 +107,11 @@ function LeaderboardRow({
       </div>
       {open ? (
         <div className="dash-breakdown">
-          <BreakdownPanelBody slug={slug} topicId={entry.id} />
+          <BreakdownPanelBody
+            slug={slug}
+            topicId={entry.id}
+            electorLabel={electorLabel}
+          />
         </div>
       ) : null}
     </li>
@@ -207,6 +213,7 @@ export function TopicLeaderboard({
               norm={norm}
               slug={slug}
               hostLabel={hostLabel}
+              electorLabel={electorLabel}
             />
           ))}
         </ul>
