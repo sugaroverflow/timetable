@@ -90,9 +90,11 @@ Codex/agent workflows are separate from the app runtime.
 - topic feed with infinite scroll, sort controls (the four heart
   normalisations, latest comments, newest-including-edits, seeded random),
   host filter with profile card, and "new since last visit" highlights;
-  electors also get the **Topic Queue** (`?sort=queue`): one unhearted
-  topic at a time in a per-user stable shuffle with ❤️/Later buttons,
-  round-based with an explicit restart (`packages/core/src/queue.ts`);
+  electors also get the **Topic Queue** (`/f/[slug]/queue`, its own
+  sidebar page with a red never-seen badge; old `?sort=queue` redirects):
+  one unhearted topic at a time in a per-user stable shuffle with big
+  🔁/❤️ decision buttons, round-based with an explicit restart
+  (`packages/core/src/queue.ts`);
   hosts/admins get a sortable per-elector breakdown table (the shared
   `BreakdownTable` component: L1/L2/devotion weights + hearted-at, footer
   sums matching the topic's scores, names linking to person pages)

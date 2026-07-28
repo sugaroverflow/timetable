@@ -96,6 +96,7 @@ export async function generateMetadata({
 const UNREAD_QUERY = `
   query Unread($s: String!) {
     notificationsUnread(idOrSlug: $s)
+    topicQueue(idOrSlug: $s) { neverSeenCount }
   }
 `;
 
@@ -121,13 +122,20 @@ async function loadSwitcherAndUnread(
   isAuthed: boolean,
   isMember: boolean,
   slug: string,
-): Promise<{ switcherItems: SwitcherItem[]; unread: number }> {
-  if (!isAuthed) return { switcherItems: [], unread: 0 };
+): Promise<{
+  switcherItems: SwitcherItem[];
+  unread: number;
+  queueNeverSeen: number;
+}> {
+  if (!isAuthed) return { switcherItems: [], unread: 0, queueNeverSeen: 0 };
   const [mine, unreadData] = await Promise.all([
     getMyTimetables(),
     isMember
-      ? gqlFetch<{ notificationsUnread: number }>(UNREAD_QUERY, { s: slug })
-      : Promise.resolve({ notificationsUnread: 0 }),
+      ? gqlFetch<{
+          notificationsUnread: number;
+          topicQueue: { neverSeenCount: number } | null;
+        }>(UNREAD_QUERY, { s: slug })
+      : Promise.resolve({ notificationsUnread: 0, topicQueue: null }),
   ]);
   const switcherItems = mine.map((t) => {
     const s = parseTimetableSettings(t.settings);
@@ -139,7 +147,11 @@ async function loadSwitcherAndUnread(
       iconEmoji: s.iconEmoji ?? null,
     };
   });
-  return { switcherItems, unread: unreadData.notificationsUnread };
+  return {
+    switcherItems,
+    unread: unreadData.notificationsUnread,
+    queueNeverSeen: unreadData.topicQueue?.neverSeenCount ?? 0,
+  };
 }
 
 function NotificationsNavLink({
@@ -159,6 +171,25 @@ function NotificationsNavLink({
   );
 }
 
+/** Elector-only. The badge is the never-seen count (the Analysis "Queue"
+ * number) — always red, gone at zero; round restarts don't revive it. */
+function QueueNavLink({
+  base,
+  neverSeen,
+}: {
+  base: string;
+  neverSeen: number;
+}) {
+  return (
+    <NavLink href={`${base}/queue`}>
+      Topic Queue
+      {neverSeen > 0 ? (
+        <span className="nav-badge">{neverSeen > 99 ? "99+" : neverSeen}</span>
+      ) : null}
+    </NavLink>
+  );
+}
+
 function SideNav({
   base,
   isAuthed,
@@ -167,6 +198,7 @@ function SideNav({
   hostOrAdmin,
   admin,
   unread,
+  queueNeverSeen,
 }: {
   base: string;
   isAuthed: boolean;
@@ -175,10 +207,14 @@ function SideNav({
   hostOrAdmin: boolean;
   admin: boolean;
   unread: number;
+  queueNeverSeen: number;
 }) {
   return (
     <nav className="nav side-nav">
-      <NavLink href={`${base}/topics`}>All Topics</NavLink>
+      <NavLink href={`${base}/topics`} whenAbsent={["hearted"]}>
+        All Topics
+      </NavLink>
+      {elector && <QueueNavLink base={base} neverSeen={queueNeverSeen} />}
       {hostOrAdmin && <NavLink href={`${base}/my-topics`}>My Topics</NavLink>}
       {elector && (
         <NavLink href={`${base}/topics?hearted=me`}>
@@ -225,7 +261,7 @@ export default async function TimetableLayout({
   const { previewUserId, previewName } = await loadPreview(slug);
   const settings = parseTimetableSettings(timetable.settings);
   const base = `/f/${slug}`;
-  const { switcherItems, unread } = await loadSwitcherAndUnread(
+  const { switcherItems, unread, queueNeverSeen } = await loadSwitcherAndUnread(
     isAuthed,
     isMember,
     slug,
@@ -250,6 +286,7 @@ export default async function TimetableLayout({
             hostOrAdmin={isHost(roles) || isAdmin(roles)}
             admin={isAdmin(roles)}
             unread={unread}
+            queueNeverSeen={queueNeverSeen}
           />
 
           {previewUserId ? (

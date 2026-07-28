@@ -28,6 +28,10 @@ export type TopicQueueState = {
   remainingNew: number;
   /** All unhearted published topics — the size of the current round. */
   roundSize: number;
+  /** Published topics NEVER seen nor ❤️'d — the sidebar badge and the
+   * Analysis "Queue" column. Unlike `remaining` this ignores round
+   * restarts, so it only ever shrinks (to zero, where the badge hides). */
+  neverSeenCount: number;
 };
 
 /** Per-user deterministic shuffle: order by md5(userId:topicId). Stable
@@ -66,6 +70,7 @@ export async function getTopicQueue(
       remaining: 0,
       remainingNew: 0,
       roundSize: 0,
+      neverSeenCount: 0,
     };
   }
 
@@ -86,6 +91,7 @@ export async function getTopicQueue(
       .filter((r) => roundStart === null || r.seenAt >= roundStart)
       .map((r) => r.topicId),
   );
+  const seenEver = new Set(seenRows.map((r) => r.topicId));
 
   const eligible = published.filter((t) => !hearted.has(t.id));
   const isNew = (t: { publishedAt: Date | null }): boolean =>
@@ -108,6 +114,7 @@ export async function getTopicQueue(
     remaining: remaining.length,
     remainingNew: remaining.filter(isNew).length,
     roundSize: eligible.length,
+    neverSeenCount: eligible.filter((t) => !seenEver.has(t.id)).length,
   };
 }
 
