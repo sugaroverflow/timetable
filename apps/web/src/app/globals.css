@@ -94,10 +94,35 @@ h3 {
 }
 
 @media (max-width: 640px) {
-  .topbar-email,
   .topbar-roles {
     display: none;
   }
+}
+
+/* The account menu (QA 2026-07-28): the viewer's avatar as the single
+   account control — replaced Clerk's UserButton and the email link. */
+.account-trigger {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  line-height: 0;
+  border-radius: 50%;
+}
+.account-trigger:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.account-menu {
+  min-width: 200px;
+}
+.account-menu-email {
+  padding: 6px 10px 8px;
+  font-size: var(--text-xs);
+  color: var(--faint);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 4px;
+  overflow-wrap: anywhere;
 }
 
 .brand {

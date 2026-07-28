@@ -4,6 +4,7 @@
  */
 import {
   countViewerPublishedHearts,
+  getPerson,
   type CommentNode,
   type WeightedHeartEntry,
 } from "@timetable/core";
@@ -12,6 +13,16 @@ import type { Timetable } from "@timetable/db";
 import { builder } from "./builder";
 
 export type GqlTimetable = Timetable & { viewerRoles: string[] };
+
+/** The viewer's own per-forum profile — powers the account menu's avatar. */
+const ViewerProfileType = builder
+  .objectRef<{ name: string | null; image: string | null }>("ViewerProfile")
+  .implement({
+    fields: (t) => ({
+      name: t.exposeString("name", { nullable: true }),
+      image: t.exposeString("image", { nullable: true }),
+    }),
+  });
 
 export const TimetableType = builder
   .objectRef<GqlTimetable>("Forum")
@@ -40,6 +51,17 @@ export const TimetableType = builder
         nullable: true,
         resolve: (tt, _args, ctx) =>
           ctx.user ? countViewerPublishedHearts(tt.id, ctx.user.id) : null,
+      }),
+      /** The viewer's own membership profile here; null for anonymous
+       * viewers and non-members. */
+      viewerProfile: t.field({
+        type: ViewerProfileType,
+        nullable: true,
+        resolve: async (tt, _args, ctx) => {
+          if (!ctx.user) return null;
+          const person = await getPerson(tt.id, ctx.user.id);
+          return person ? { name: person.name, image: person.image } : null;
+        },
       }),
       createdAt: t.string({ resolve: (tt) => tt.createdAt.toISOString() }),
     }),
