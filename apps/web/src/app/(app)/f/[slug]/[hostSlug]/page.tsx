@@ -152,15 +152,16 @@ export default async function PersonPage({
       ? fetchFeedPage(slug, "recent", "", 0, false, "", person.userId)
       : Promise.resolve(null),
   ]);
-  const settings = (hostPage ?? heartedPage)?.settings;
+  const feed = hostPage ?? heartedPage;
 
   return (
     <div className="stack">
       <PersonProfileCard
         slug={slug}
         person={person}
-        labels={settings?.roleLabels}
+        labels={feed?.settings.roleLabels}
         linkPhoto={false}
+        isSelf={feed?.viewerId === person.userId}
       />
       {hostPage ? (
         <TopicSection

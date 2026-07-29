@@ -163,6 +163,7 @@ export default async function FeedPage({
           slug={slug}
           person={hostCard}
           labels={page.settings.roleLabels}
+          isSelf={page.viewerId === hostCard.userId}
         />
       ) : null}
 
