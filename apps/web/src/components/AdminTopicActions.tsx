@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useGqlAction } from "@/lib/useGqlAction";
 
 import { TopicEditForm } from "./TopicEditForm";
+import { useTopicEditing } from "./TopicEditScope";
 
 const UNPUBLISH = `mutation($id: String!){ unpublishTopic(topicId: $id){ id } }`;
 const PUBLISH = `mutation($id: String!){ moderateTopic(topicId: $id, action: "publish"){ id } }`;
@@ -31,7 +32,12 @@ export function AdminTopicActions({
 }) {
   const topicId = topic.id;
   const { run, busy } = useGqlAction();
-  const [editing, setEditing] = useState(false);
+  // Inside a TopicEditScope, Edit swaps the card content for the form
+  // (QA 2026-07-29); local below-the-bar rendering is the unscoped fallback.
+  const scope = useTopicEditing();
+  const [localEditing, setLocalEditing] = useState(false);
+  const editing = scope ? scope.editing : localEditing;
+  const setEditing = scope ? scope.setEditing : setLocalEditing;
   const [newHost, setNewHost] = useState("");
 
   const published = topic.status == null || topic.status === "published";
@@ -71,7 +77,7 @@ export function AdminTopicActions({
         <button
           className="btn btn-ghost"
           type="button"
-          onClick={() => setEditing((v) => !v)}
+          onClick={() => setEditing(!editing)}
         >
           {editing ? "Close editor" : "Edit"}
         </button>
@@ -109,11 +115,11 @@ export function AdminTopicActions({
           </>
         ) : null}
       </div>
-      {editing ? (
+      {!scope && localEditing ? (
         <TopicEditForm
           topic={topic}
           slug={slug}
-          onDone={() => setEditing(false)}
+          onDone={() => setLocalEditing(false)}
         />
       ) : null}
     </div>

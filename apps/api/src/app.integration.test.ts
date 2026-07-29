@@ -20,6 +20,7 @@ vi.mock("@timetable/core", async (importOriginal) => {
     ...actual,
     countViewerPublishedHearts: vi.fn(),
     createLocalUser: vi.fn(),
+    getCommentById: vi.fn(),
     getMembership: vi.fn(),
     getMembershipById: vi.fn(),
     getPerson: vi.fn(),
@@ -34,6 +35,8 @@ vi.mock("@timetable/core", async (importOriginal) => {
     listHostTopics: vi.fn(),
     markInviteSent: vi.fn(),
     setMemberRoles: vi.fn(),
+    softDeleteComment: vi.fn(),
+    updateCommentBody: vi.fn(),
     updateTimetableSettings: vi.fn(),
   };
 });
@@ -227,7 +230,10 @@ afterEach(() => {
   vi.mocked(core.listDigestRecipients).mockReset();
   vi.mocked(core.listHostTopics).mockReset();
   vi.mocked(core.markInviteSent).mockReset();
+  vi.mocked(core.getCommentById).mockReset();
   vi.mocked(core.setMemberRoles).mockReset();
+  vi.mocked(core.softDeleteComment).mockReset();
+  vi.mocked(core.updateCommentBody).mockReset();
   vi.mocked(core.updateTimetableSettings).mockReset();
   vi.mocked(clerk.getOrCreateClerkUser).mockReset();
   vi.mocked(clerk.createSignInTicket).mockReset();
@@ -942,6 +948,83 @@ describe("createApiApp", () => {
       expect(res.status).toBe(200);
       expect(body.data.timetable.viewerHeartedPublishedCount).toBeNull();
       expect(core.countViewerPublishedHearts).not.toHaveBeenCalled();
+    });
+  });
+
+  it("only lets authors edit or delete their own comments", async () => {
+    const commentRow = {
+      id: "comment-1",
+      topicId: "topic-1",
+      parentId: null,
+      authorId: "author-1",
+      body: "original",
+      visibility: "public" as const,
+      hiddenAt: null,
+      hiddenByUserId: null,
+      deletedAt: null,
+      editedAt: null,
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    };
+    const gql = (baseUrl: string, query: string) =>
+      fetch(`${baseUrl}/graphql`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query }),
+      });
+    const editMutation = `mutation {
+      editComment(commentId: "comment-1", body: "changed") { id body editedAt }
+    }`;
+    const deleteMutation = `mutation { deleteComment(commentId: "comment-1") }`;
+
+    await withTestServer(async (baseUrl) => {
+      // Someone else: both refused (errors, no data), nothing written.
+      mockSession("intruder-1", ["elector"]);
+      vi.mocked(core.getCommentById).mockResolvedValue(commentRow);
+      const editDenied = (await (await gql(baseUrl, editMutation)).json()) as {
+        errors?: unknown[];
+        data?: { editComment: unknown };
+      };
+      expect(editDenied.errors?.length).toBeGreaterThan(0);
+      expect(editDenied.data?.editComment ?? null).toBeNull();
+      const delDenied = (await (await gql(baseUrl, deleteMutation)).json()) as {
+        errors?: unknown[];
+        data?: { deleteComment: unknown };
+      };
+      expect(delDenied.errors?.length).toBeGreaterThan(0);
+      expect(delDenied.data?.deleteComment ?? null).toBeNull();
+      expect(core.updateCommentBody).not.toHaveBeenCalled();
+      expect(core.softDeleteComment).not.toHaveBeenCalled();
+
+      // The author: edit succeeds and stamps editedAt.
+      mockSession("author-1", ["elector"]);
+      const editedAt = new Date("2026-07-29T10:00:00.000Z");
+      vi.mocked(core.updateCommentBody).mockResolvedValue({
+        ...commentRow,
+        body: "changed",
+        editedAt,
+        updatedAt: editedAt,
+      });
+      const edited = (await (await gql(baseUrl, editMutation)).json()) as {
+        data: { editComment: { body: string; editedAt: string | null } };
+      };
+      expect(edited.data.editComment.body).toBe("changed");
+      expect(edited.data.editComment.editedAt).toBe(editedAt.toISOString());
+      expect(core.updateCommentBody).toHaveBeenCalledWith(
+        "comment-1",
+        "changed",
+      );
+
+      // The author: delete goes through the soft-delete path.
+      vi.mocked(core.softDeleteComment).mockResolvedValue({
+        ...commentRow,
+        deletedAt: new Date(),
+      });
+      const deleted = (await (await gql(baseUrl, deleteMutation)).json()) as {
+        data: { deleteComment: boolean };
+      };
+      expect(deleted.data.deleteComment).toBe(true);
+      expect(core.softDeleteComment).toHaveBeenCalledWith("comment-1");
     });
   });
 });

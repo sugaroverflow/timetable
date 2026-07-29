@@ -21,12 +21,14 @@ export function AdminCommentsPanel({
   topicId,
   comments,
   canModerate,
+  viewerId = null,
   slug,
   adminLabel = "Admin",
 }: {
   topicId: string;
   comments: FeedComment[];
   canModerate: boolean;
+  viewerId?: string | null;
   slug?: string;
   adminLabel?: string;
 }) {
@@ -56,6 +58,7 @@ export function AdminCommentsPanel({
               comments={comments}
               canReply={true}
               canModerate={canModerate}
+              viewerId={viewerId}
               slug={slug}
             />
             <CommentComposer

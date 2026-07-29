@@ -104,6 +104,13 @@ export const comments = pgTable(
     visibility: commentVisibilityEnum().notNull().default("public"),
     hiddenAt: timestamp({ withTimezone: true }),
     hiddenByUserId: text().references(() => users.id, { onDelete: "set null" }),
+    /** Author soft-delete (QA 2026-07-29): tombstoned in threads when
+     * replies exist, dropped otherwise; excluded from counts everywhere.
+     * Distinct from hiddenAt, which is admin moderation. */
+    deletedAt: timestamp({ withTimezone: true }),
+    /** Set on author edits only — updatedAt also moves on hide/unhide, so
+     * it can't drive the "(edited)" marker. */
+    editedAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },

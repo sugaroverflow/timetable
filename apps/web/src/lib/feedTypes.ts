@@ -14,6 +14,9 @@ export type FeedComment = {
   body: string;
   visibility: CommentVisibility;
   hidden: boolean;
+  /** Author-deleted tombstone: body/author arrive blanked from the API. */
+  deleted: boolean;
+  editedAt: string | null;
   createdAt: string;
   replies: FeedComment[];
 };

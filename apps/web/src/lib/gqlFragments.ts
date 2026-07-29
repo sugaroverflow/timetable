@@ -1,7 +1,7 @@
 /** Shared GraphQL selection fragments for the web app's queries. */
 
 export const COMMENT_FIELDS = `
-  id parentId authorId authorName authorImage body visibility hidden createdAt
+  id parentId authorId authorName authorImage body visibility hidden deleted editedAt createdAt
 `;
 
 /** Three-level comment selection (top level + two reply levels) — the

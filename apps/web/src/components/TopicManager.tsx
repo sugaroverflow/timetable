@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 
 import { AdminCommentsPanel } from "@/components/AdminCommentsPanel";
 import { AdminTopicActions } from "@/components/AdminTopicActions";
@@ -9,7 +8,7 @@ import { CollapsibleTopicBody } from "@/components/CollapsibleTopicBody";
 import { CommentComposer } from "@/components/CommentComposer";
 import { CommentList } from "@/components/CommentList";
 import { HostOnlyPanel } from "@/components/HostOnlyPanel";
-import { TopicEditForm } from "@/components/TopicEditForm";
+import { TopicEditScope, useTopicEditing } from "@/components/TopicEditScope";
 import type { ManagedTopic } from "@/lib/feedTypes";
 import { topicPath } from "@/lib/topicPath";
 import { useGqlAction } from "@/lib/useGqlAction";
@@ -34,7 +33,9 @@ function ManageControls({
   hosts: { id: string; name: string | null }[];
 }) {
   const { run: runAction, busy } = useGqlAction();
-  const [editing, setEditing] = useState(false);
+  // Editing lives on the surrounding TopicEditScope: the form replaces the
+  // topic's rendered content, not this control row (QA 2026-07-29).
+  const scope = useTopicEditing();
 
   function run(
     query: string,
@@ -61,16 +62,6 @@ function ManageControls({
         label={adminLabel}
         hosts={hosts}
         currentHostId={topic.hostId}
-      />
-    );
-  }
-
-  if (editing) {
-    return (
-      <TopicEditForm
-        topic={topic}
-        slug={slug}
-        onDone={() => setEditing(false)}
       />
     );
   }
@@ -105,9 +96,9 @@ function ManageControls({
       <button
         className="btn btn-ghost"
         type="button"
-        onClick={() => setEditing(true)}
+        onClick={() => scope?.setEditing(!scope.editing)}
       >
-        Edit
+        {scope?.editing ? "Close editor" : "Edit"}
       </button>
     </div>
   );
@@ -118,6 +109,7 @@ function ManageControls({
 export function TopicManager({
   topic,
   slug,
+  viewerId,
   hostLabel,
   adminLabel,
   isAdmin,
@@ -125,6 +117,7 @@ export function TopicManager({
 }: {
   topic: ManagedTopic;
   slug: string;
+  viewerId: string | null;
   hostLabel: string;
   adminLabel: string;
   isAdmin: boolean;
@@ -144,69 +137,90 @@ export function TopicManager({
 
   return (
     <li className="card stack">
-      <div className="row wrap" style={{ justifyContent: "space-between" }}>
-        <h3 className="topic-title" style={{ margin: 0 }}>
-          {permalink ? (
-            <Link href={permalink} className="topic-title-link">
-              {topic.title}
-            </Link>
-          ) : (
-            topic.title
-          )}
-        </h3>
-        <span className={`status-badge status-${topic.status}`}>
-          {topic.status}
-        </span>
-      </div>
+      {/* Editing swaps the title/cover/body for the form in place
+          (QA 2026-07-29) — comments, panels, and controls stay put. */}
+      <TopicEditScope
+        topic={{
+          id: topic.id,
+          title: topic.title,
+          bodyMd: topic.bodyMd,
+          coverImageUrl: topic.coverImageUrl,
+        }}
+        slug={slug}
+        content={
+          <>
+            <div
+              className="row wrap"
+              style={{ justifyContent: "space-between" }}
+            >
+              <h3 className="topic-title" style={{ margin: 0 }}>
+                {permalink ? (
+                  <Link href={permalink} className="topic-title-link">
+                    {topic.title}
+                  </Link>
+                ) : (
+                  topic.title
+                )}
+              </h3>
+              <span className={`status-badge status-${topic.status}`}>
+                {topic.status}
+              </span>
+            </div>
 
-      {topic.coverImageUrl ? (
-        <div
-          className="topic-cover"
-          style={{ backgroundImage: `url(${topic.coverImageUrl})` }}
-          aria-label={`${topic.title} cover image`}
-        />
-      ) : null}
+            {topic.coverImageUrl ? (
+              <div
+                className="topic-cover"
+                style={{ backgroundImage: `url(${topic.coverImageUrl})` }}
+                aria-label={`${topic.title} cover image`}
+              />
+            ) : null}
 
-      <CollapsibleTopicBody html={topic.bodyHtml} />
+            <CollapsibleTopicBody html={topic.bodyHtml} />
+          </>
+        }
+      >
+        {publicComments.length > 0 ? (
+          <CommentList
+            comments={publicComments}
+            canReply={true}
+            canModerate={false}
+            viewerId={viewerId}
+            slug={slug}
+          />
+        ) : null}
+        {topic.status === "published" ? (
+          <CommentComposer topicId={topic.id} mentionSlug={slug} />
+        ) : null}
 
-      {publicComments.length > 0 ? (
-        <CommentList
-          comments={publicComments}
-          canReply={true}
-          canModerate={false}
-          slug={slug}
-        />
-      ) : null}
-      {topic.status === "published" ? (
-        <CommentComposer topicId={topic.id} mentionSlug={slug} />
-      ) : null}
+        {hostComments.length > 0 ? (
+          <HostOnlyPanel
+            topicId={topic.id}
+            viewerId={viewerId}
+            comments={hostComments}
+            canModerate={false}
+            slug={slug}
+            hostLabel={hostLabel}
+          />
+        ) : null}
 
-      {hostComments.length > 0 ? (
-        <HostOnlyPanel
+        {/* Drafting thread with the admins (QA #59 round 3). */}
+        <AdminCommentsPanel
           topicId={topic.id}
-          comments={hostComments}
+          viewerId={viewerId}
+          comments={topic.adminComments ?? []}
           canModerate={false}
           slug={slug}
-          hostLabel={hostLabel}
+          adminLabel={adminLabel}
         />
-      ) : null}
 
-      {/* Drafting thread with the admins (QA #59 round 3). */}
-      <AdminCommentsPanel
-        topicId={topic.id}
-        comments={topic.adminComments ?? []}
-        canModerate={false}
-        slug={slug}
-        adminLabel={adminLabel}
-      />
-
-      <ManageControls
-        topic={topic}
-        slug={slug}
-        adminLabel={adminLabel}
-        isAdmin={isAdmin}
-        hosts={hosts}
-      />
+        <ManageControls
+          topic={topic}
+          slug={slug}
+          adminLabel={adminLabel}
+          isAdmin={isAdmin}
+          hosts={hosts}
+        />
+      </TopicEditScope>
     </li>
   );
 }

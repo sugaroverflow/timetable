@@ -8,6 +8,7 @@ import type { FeedComment } from "@/lib/feedTypes";
 import { Avatar } from "./Avatar";
 import { CommentActions } from "./CommentActions";
 import { CommentBody } from "./CommentBody";
+import { CommentEditForm } from "./CommentEditForm";
 import { PersonChip } from "./PersonChip";
 
 const VISIBLE_TOP_LEVEL = 3;
@@ -31,15 +32,79 @@ function subtreeContains(comments: FeedComment[], id: string | null): boolean {
   );
 }
 
+/** The name row + body for a live (non-deleted) comment; the body swaps
+ * for the inline editor while editing (edit-in-place, QA 2026-07-29). */
+function CommentBubble({
+  comment,
+  slug,
+  editing,
+  onEditDone,
+}: {
+  comment: FeedComment;
+  slug?: string;
+  editing: boolean;
+  onEditDone(): void;
+}) {
+  const visibilityPill = VISIBILITY_PILLS[comment.visibility];
+  return (
+    <div className="c-bubble">
+      <span className="c-name">
+        {slug ? (
+          <PersonChip slug={slug} userId={comment.authorId}>
+            {comment.authorName ?? "Someone"}
+          </PersonChip>
+        ) : (
+          (comment.authorName ?? "Someone")
+        )}
+      </span>
+      {visibilityPill ? (
+        <span
+          className={visibilityPill.className}
+          style={{ marginLeft: 6, fontSize: 10 }}
+        >
+          {visibilityPill.label}
+        </span>
+      ) : null}
+      {comment.hidden ? (
+        <span className="faint" style={{ marginLeft: 6, fontSize: 11 }}>
+          hidden
+        </span>
+      ) : null}
+      {comment.editedAt && !editing ? (
+        <span
+          className="faint"
+          style={{ marginLeft: 6, fontSize: 11 }}
+          title={new Date(comment.editedAt).toLocaleString()}
+        >
+          (edited)
+        </span>
+      ) : null}
+      <div className="c-text">
+        {editing ? (
+          <CommentEditForm
+            commentId={comment.id}
+            initialBody={comment.body}
+            onDone={onEditDone}
+          />
+        ) : (
+          <CommentBody body={comment.body} />
+        )}
+      </div>
+    </div>
+  );
+}
+
 function CommentItem({
   comment,
   canReply,
   canModerate,
+  viewerId,
   slug,
 }: {
   comment: FeedComment;
   canReply: boolean;
   canModerate: boolean;
+  viewerId: string | null;
   slug?: string;
 }) {
   const replies = comment.replies ?? [];
@@ -47,49 +112,47 @@ function CommentItem({
   const [showReplies, setShowReplies] = useState(() =>
     subtreeContains(replies, searchParams.get("reply")),
   );
+  const [editing, setEditing] = useState(false);
   const replyCount = countNested(replies);
-  const visibilityPill = VISIBILITY_PILLS[comment.visibility];
+  const isOwn = viewerId != null && viewerId === comment.authorId;
 
   return (
     <div
       id={`comment-${comment.id}`}
       className={`comment ${comment.hidden ? "hidden" : ""}`}
     >
-      <Avatar name={comment.authorName} image={comment.authorImage} small />
+      <Avatar
+        name={comment.deleted ? null : comment.authorName}
+        image={comment.authorImage}
+        small
+      />
       <div className="comment-main">
-        <div className="c-bubble">
-          <span className="c-name">
-            {slug ? (
-              <PersonChip slug={slug} userId={comment.authorId}>
-                {comment.authorName ?? "Someone"}
-              </PersonChip>
-            ) : (
-              (comment.authorName ?? "Someone")
-            )}
-          </span>
-          {visibilityPill ? (
-            <span
-              className={visibilityPill.className}
-              style={{ marginLeft: 6, fontSize: 10 }}
-            >
-              {visibilityPill.label}
+        {comment.deleted ? (
+          // Author-deleted tombstone: only present at all because replies
+          // hang off it (childless deletions are pruned server-side).
+          <div className="c-bubble">
+            <span className="c-text faint" style={{ fontStyle: "italic" }}>
+              This comment was deleted by its author.
             </span>
-          ) : null}
-          {comment.hidden ? (
-            <span className="faint" style={{ marginLeft: 6, fontSize: 11 }}>
-              hidden
-            </span>
-          ) : null}
-          <div className="c-text">
-            <CommentBody body={comment.body} />
           </div>
-        </div>
-        <CommentActions
-          commentId={comment.id}
-          canReply={canReply}
-          canModerate={canModerate}
-          hidden={comment.hidden}
-        />
+        ) : (
+          <CommentBubble
+            comment={comment}
+            slug={slug}
+            editing={editing}
+            onEditDone={() => setEditing(false)}
+          />
+        )}
+        {comment.deleted ? null : (
+          <CommentActions
+            commentId={comment.id}
+            canReply={canReply}
+            canModerate={canModerate}
+            hidden={comment.hidden}
+            isOwn={isOwn}
+            onEdit={() => setEditing(true)}
+          />
+        )}
         {replies.length > 0 ? (
           showReplies ? (
             <div className="replies">
@@ -99,6 +162,7 @@ function CommentItem({
                   comment={r}
                   canReply={canReply}
                   canModerate={canModerate}
+                  viewerId={viewerId}
                   slug={slug}
                 />
               ))}
@@ -122,11 +186,14 @@ export function CommentList({
   comments,
   canReply,
   canModerate,
+  viewerId = null,
   slug,
 }: {
   comments: FeedComment[];
   canReply: boolean;
   canModerate: boolean;
+  /** Enables Edit/Delete on the viewer's own comments (QA 2026-07-29). */
+  viewerId?: string | null;
   slug?: string;
 }) {
   const searchParams = useSearchParams();
@@ -152,6 +219,7 @@ export function CommentList({
           comment={c}
           canReply={canReply}
           canModerate={canModerate}
+          viewerId={viewerId}
           slug={slug}
         />
       ))}

@@ -13,6 +13,7 @@ import { HostOnlyPanel } from "./HostOnlyPanel";
 import { HostTopicActions } from "./HostTopicActions";
 import { PersonChip } from "./PersonChip";
 import { TopicActionsRow } from "./TopicActionsRow";
+import { TopicEditScope } from "./TopicEditScope";
 
 export type FeedPerms = {
   canHeart: boolean;
@@ -74,6 +75,7 @@ function TopicTail({
   perms,
   slug,
   isOwner,
+  viewerId,
   hostLabel,
   adminLabel,
   hosts,
@@ -83,6 +85,7 @@ function TopicTail({
   perms: FeedPerms;
   slug: string;
   isOwner: boolean;
+  viewerId: string | null;
   hostLabel: string;
   adminLabel: string;
   hosts: { id: string; name: string | null }[];
@@ -102,6 +105,7 @@ function TopicTail({
           topicId={topic.id}
           comments={hostComments}
           canModerate={perms.canModerate}
+          viewerId={viewerId}
           slug={slug}
           hostLabel={hostLabel}
         />
@@ -167,12 +171,14 @@ function CommentSection({
   slug,
   publicComments,
   folded,
+  viewerId,
 }: {
   topic: FeedTopic;
   perms: FeedPerms;
   slug: string;
   publicComments: FeedTopic["comments"];
   folded: boolean;
+  viewerId: string | null;
 }) {
   const thread = (
     <>
@@ -180,6 +186,7 @@ function CommentSection({
         comments={publicComments}
         canReply={perms.canComment}
         canModerate={perms.canModerate}
+        viewerId={viewerId}
         slug={slug}
       />
       {perms.canComment ? (
@@ -247,52 +254,70 @@ export function TopicCard({
 
   return (
     <article className={`card stack${isNew ? " topic-new" : ""}`}>
-      <TopicHead
-        topic={topic}
+      {/* While editing, the scope swaps this content block for the edit
+          form in place (QA 2026-07-29) — the Edit buttons live in the
+          tail below and drive it via context. */}
+      <TopicEditScope
+        topic={{
+          id: topic.id,
+          title: topic.title,
+          bodyMd: topic.bodyMd,
+          coverImageUrl: topic.coverImageUrl,
+        }}
         slug={slug}
-        hostLabel={hostLabel}
-        isNew={isNew}
-        permalink={permalink}
-      />
+        content={
+          <>
+            <TopicHead
+              topic={topic}
+              slug={slug}
+              hostLabel={hostLabel}
+              isNew={isNew}
+              permalink={permalink}
+            />
 
-      {topic.coverImageUrl ? (
-        <div
-          className="topic-cover"
-          style={{ backgroundImage: `url(${topic.coverImageUrl})` }}
-          aria-label={`${topic.title} cover image`}
+            {topic.coverImageUrl ? (
+              <div
+                className="topic-cover"
+                style={{ backgroundImage: `url(${topic.coverImageUrl})` }}
+                aria-label={`${topic.title} cover image`}
+              />
+            ) : null}
+
+            <TopicBody html={topic.bodyHtml} expand={expandBody} />
+          </>
+        }
+      >
+        <ActionsSlot
+          topic={topic}
+          perms={perms}
+          slug={slug}
+          viewerId={viewerId}
+          viewerHeartCount={viewerHeartCount}
+          electorLabel={electorLabel}
+          queueControls={queueControls}
         />
-      ) : null}
 
-      <TopicBody html={topic.bodyHtml} expand={expandBody} />
+        <CommentSection
+          topic={topic}
+          perms={perms}
+          slug={slug}
+          publicComments={publicComments}
+          folded={queueControls != null}
+          viewerId={viewerId}
+        />
 
-      <ActionsSlot
-        topic={topic}
-        perms={perms}
-        slug={slug}
-        viewerId={viewerId}
-        viewerHeartCount={viewerHeartCount}
-        electorLabel={electorLabel}
-        queueControls={queueControls}
-      />
-
-      <CommentSection
-        topic={topic}
-        perms={perms}
-        slug={slug}
-        publicComments={publicComments}
-        folded={queueControls != null}
-      />
-
-      <TopicTail
-        topic={topic}
-        perms={perms}
-        slug={slug}
-        isOwner={isOwner}
-        hostLabel={hostLabel}
-        adminLabel={adminLabel}
-        hosts={hosts}
-        hostComments={hostComments}
-      />
+        <TopicTail
+          topic={topic}
+          perms={perms}
+          slug={slug}
+          isOwner={isOwner}
+          viewerId={viewerId}
+          hostLabel={hostLabel}
+          adminLabel={adminLabel}
+          hosts={hosts}
+          hostComments={hostComments}
+        />
+      </TopicEditScope>
     </article>
   );
 }

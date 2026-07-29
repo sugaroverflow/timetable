@@ -6,6 +6,8 @@ import {
   getCommentById,
   getUserById,
   setCommentHidden,
+  softDeleteComment,
+  updateCommentBody,
 } from "@timetable/core";
 import { canComment, canModerate, canSeeHostOnly } from "@timetable/shared";
 
@@ -61,6 +63,8 @@ builder.mutationFields((t) => ({
         body: comment.body,
         visibility: comment.visibility,
         hidden: false,
+        deleted: false,
+        editedAt: null,
         createdAt: comment.createdAt,
         replies: [],
       };
@@ -104,6 +108,8 @@ builder.mutationFields((t) => ({
         body: reply.body,
         visibility: reply.visibility,
         hidden: false,
+        deleted: false,
+        editedAt: null,
         createdAt: reply.createdAt,
         replies: [],
       };
@@ -134,9 +140,69 @@ builder.mutationFields((t) => ({
         body: updated.body,
         visibility: updated.visibility,
         hidden: updated.hiddenAt !== null,
+        deleted: updated.deletedAt !== null,
+        editedAt: updated.editedAt,
         createdAt: updated.createdAt,
         replies: [],
       };
+    },
+  }),
+}));
+
+// Author self-service (QA 2026-07-29) — separate block from the
+// add/reply/moderate set above (max-lines budget).
+builder.mutationFields((t) => ({
+  /** Author-only body edit. No time limit: comments carry no hearts, so
+   * there's no vote-integrity concern. */
+  editComment: t.field({
+    type: CommentType,
+    args: {
+      commentId: t.arg.string({ required: true }),
+      body: t.arg.string({ required: true }),
+    },
+    resolve: async (_p, args, ctx) => {
+      const user = await requireUser(ctx);
+      const existing = await getCommentById(args.commentId);
+      if (!existing || existing.deletedAt) notFound("Comment not found");
+      if (existing.authorId !== user.id) {
+        forbidden("You can only edit your own comments");
+      }
+      const body = args.body.trim();
+      if (!body) throw new GraphQLError("Comment cannot be empty");
+      const updated = await updateCommentBody(existing.id, body);
+      if (!updated) notFound("Comment not found");
+      const author = await getUserById(updated.authorId);
+      return {
+        id: updated.id,
+        parentId: updated.parentId,
+        authorId: updated.authorId,
+        authorName: author?.name ?? null,
+        authorImage: author?.image ?? null,
+        body: updated.body,
+        visibility: updated.visibility,
+        hidden: updated.hiddenAt !== null,
+        deleted: false,
+        editedAt: updated.editedAt,
+        createdAt: updated.createdAt,
+        replies: [],
+      };
+    },
+  }),
+
+  /** Author-only soft delete: tombstones under replies, vanishes
+   * otherwise. Admin moderation stays on hideComment. */
+  deleteComment: t.field({
+    type: "Boolean",
+    args: { commentId: t.arg.string({ required: true }) },
+    resolve: async (_p, args, ctx) => {
+      const user = await requireUser(ctx);
+      const existing = await getCommentById(args.commentId);
+      if (!existing || existing.deletedAt) notFound("Comment not found");
+      if (existing.authorId !== user.id) {
+        forbidden("You can only delete your own comments");
+      }
+      await softDeleteComment(existing.id);
+      return true;
     },
   }),
 }));

@@ -19,12 +19,14 @@ export function HostOnlyPanel({
   topicId,
   comments,
   canModerate,
+  viewerId = null,
   slug,
   hostLabel = "Host",
 }: {
   topicId: string;
   comments: FeedComment[];
   canModerate: boolean;
+  viewerId?: string | null;
   slug?: string;
   hostLabel?: string;
 }) {
@@ -54,6 +56,7 @@ export function HostOnlyPanel({
               comments={comments}
               canReply={true}
               canModerate={canModerate}
+              viewerId={viewerId}
               slug={slug}
             />
             <CommentComposer
