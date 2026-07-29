@@ -425,6 +425,44 @@ describe("createApiApp", () => {
     });
   });
 
+  it("digest-test emails the requesting admin a sample digest", async () => {
+    mockSession("admin-1", ["admin"]);
+    vi.mocked(core.getReadableTimetable).mockResolvedValue({
+      timetable: timetableFixture({ name: "Spring Term", slug: "spring-term" }),
+      roles: ["admin"],
+    } as ReadableTimetable);
+
+    await withTestServer(async (baseUrl) => {
+      const res = await fetch(`${baseUrl}/api/forums/spring-term/digest-test`, {
+        method: "POST",
+      });
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toEqual({
+        sentTo: "admin-1@example.com",
+      });
+      const sent = vi.mocked(email.sendEmail).mock.calls.at(-1)?.[0];
+      expect(sent?.subject).toMatch(/^\[Test\] Your Topic digest/);
+      expect(sent?.html).toContain("Spring Term");
+    });
+  });
+
+  it("refuses digest-test for non-admins", async () => {
+    mockSession("host-1", ["host"]);
+    vi.mocked(core.getReadableTimetable).mockResolvedValue({
+      timetable: timetableFixture({ slug: "spring-term" }),
+      roles: ["host"],
+    } as ReadableTimetable);
+
+    await withTestServer(async (baseUrl) => {
+      const res = await fetch(`${baseUrl}/api/forums/spring-term/digest-test`, {
+        method: "POST",
+      });
+      expect(res.status).toBe(403);
+      expect(email.sendEmail).not.toHaveBeenCalled();
+    });
+  });
+
   it("sends the invite email and records inviteSentAt", async () => {
     mockSession("admin-1", ["admin"]);
     vi.mocked(core.getMembershipById).mockResolvedValue(

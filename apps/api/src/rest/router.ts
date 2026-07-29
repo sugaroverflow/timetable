@@ -50,6 +50,7 @@ import { buildContext, type ApiContext } from "../context";
 import {
   linkBase,
   renderDigest,
+  sampleDigest,
   renderInvite,
   renderNewForum,
   sendEmail,
@@ -564,6 +565,59 @@ restRouter.post(
       contentType: body.contentType,
       size: body.size,
     });
+  }),
+);
+
+/**
+ * POST /api/forums/:idOrSlug/digest-test
+ * Admin-only: emails the requesting admin a digest built from example
+ * notifications (the real renderer over sample data), so the Forum
+ * Settings "Send test digest" button shows exactly what members receive.
+ */
+restRouter.post(
+  "/forums/:idOrSlug/digest-test",
+  h(async (req, res) => {
+    const ctx = await contextFromRequest(req);
+    const user = requireUserCtx(ctx, res);
+    if (!user) return;
+    const readable = await getReadableTimetable(
+      user.id,
+      req.params.idOrSlug as string,
+    );
+    if (!readable) {
+      res.status(404).json({ error: "Forum not found" });
+      return;
+    }
+    const viewer = await ctx.getViewer(readable.timetable.id);
+    if (!canEditSettings(viewer)) {
+      res.status(403).json({ error: "Admins only" });
+      return;
+    }
+    if (!user.email) {
+      res.status(400).json({ error: "Your account has no email address" });
+      return;
+    }
+    if (!(await enforceActionLimit(res, user.id, "invite"))) return;
+
+    const digest = sampleDigest({
+      email: user.email,
+      name: user.name,
+      forumName: readable.timetable.name,
+      forumSlug: readable.timetable.slug,
+    });
+    const { subject, html } = renderDigest(digest);
+    try {
+      await sendEmail({ to: user.email, subject: `[Test] ${subject}`, html });
+    } catch (err) {
+      logRequestError(req, err, { component: "digest-test-email" });
+      const detail =
+        err instanceof Error ? err.message.slice(0, 300) : "unknown error";
+      res.status(502).json({
+        error: `The test digest could not be sent — check the email configuration. (${detail})`,
+      });
+      return;
+    }
+    res.json({ sentTo: user.email });
   }),
 );
 
