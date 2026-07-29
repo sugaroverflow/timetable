@@ -37,6 +37,13 @@ export const inviteSchema = z.object({
 });
 export type InviteInput = z.infer<typeof inviteSchema>;
 
+/** Admin email correction for a member who has never signed in
+ * (2026-07-29): fixing pre-created accounts and invite typos. */
+export const updateMemberEmailSchema = z.object({
+  email: z.string().email().max(320),
+});
+export type UpdateMemberEmailInput = z.infer<typeof updateMemberEmailSchema>;
+
 /** Admin "add person" (product feedback round 2): pre-create an account with
  * a real email, populate it, then send the invite email separately. */
 export const addPersonSchema = z.object({

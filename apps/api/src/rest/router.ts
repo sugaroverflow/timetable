@@ -14,6 +14,7 @@ import {
   buildFeed,
   getMembership,
   getUsersByEmails,
+  logActivity,
   getMembershipById,
   getPerson,
   getReadableTimetable,
@@ -30,6 +31,7 @@ import {
   markInviteSent,
   removeMembership,
   setMemberRoles,
+  updateUserEmail,
 } from "@timetable/core";
 import {
   addPersonSchema,
@@ -40,12 +42,17 @@ import {
   createTimetableSchema,
   inviteSchema,
   normalizeEmail,
+  updateMemberEmailSchema,
   updateMemberRolesSchema,
   type Role,
 } from "@timetable/shared";
 
 import { buildAtomFeed } from "../atom";
-import { createSignInTicket, getOrCreateClerkUser } from "../auth/clerk";
+import {
+  createSignInTicket,
+  getOrCreateClerkUser,
+  replaceClerkEmail,
+} from "../auth/clerk";
 import { isSysadmin } from "../auth/sysadmin";
 import { buildContext, type ApiContext } from "../context";
 import {
@@ -331,6 +338,59 @@ restRouter.post(
       accountCreated: clerkUser.created,
       status: outcome?.status ?? "added",
     });
+  }),
+);
+
+/**
+ * PATCH /api/memberships/:id/email
+ * Admin email correction (2026-07-29) for members who have NEVER signed
+ * in — pre-created accounts and invite typos. After first sign-in the
+ * address is the member's own credential (409). Updates Clerk (verified +
+ * primary, old addresses removed) then the local mirror, and logs it.
+ */
+restRouter.patch(
+  "/memberships/:id/email",
+  h(async (req, res) => {
+    const ctx = await contextFromRequest(req);
+    const user = requireUserCtx(ctx, res);
+    if (!user) return;
+    const admin = await requireAdminMembership(
+      ctx,
+      req.params.id as string,
+      res,
+    );
+    if (!admin) return;
+    const input = parseBody(updateMemberEmailSchema, req, res);
+    if (!input) return;
+
+    const { membership } = admin;
+    try {
+      const outcome = await replaceClerkEmail(membership.userId, input.email);
+      if (outcome === "signed_in") {
+        res.status(409).json({
+          error:
+            "This member has signed in — the email is their login credential now, and only they can change it (Account & security).",
+        });
+        return;
+      }
+    } catch (err) {
+      logRequestError(req, err, { component: "member-email-change" });
+      const detail =
+        err instanceof Error ? err.message.slice(0, 300) : "unknown error";
+      res.status(502).json({
+        error: `Could not update the login email — it may already belong to another account. (${detail})`,
+      });
+      return;
+    }
+    await updateUserEmail(membership.userId, input.email);
+    await logActivity({
+      timetableId: membership.timetableId,
+      actorId: user.id,
+      action: "member.email_change",
+      payload: { targetUserId: membership.userId },
+      note: `Login email changed to ${normalizeEmail(input.email)}`,
+    });
+    res.json({ email: normalizeEmail(input.email) });
   }),
 );
 

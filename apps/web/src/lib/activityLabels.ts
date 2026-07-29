@@ -13,6 +13,7 @@ export const ACTION_LABELS: Record<string, string> = {
   "heart.remove": "removed their heart from a topic",
   "comment.add": "commented on a topic",
   "comment.reply": "replied to a comment",
+  "member.email_change": "changed a member's login email",
   "member.invite": "invited someone",
   "member.first_login": "logged in for the first time",
   "member.remove": "removed a member",

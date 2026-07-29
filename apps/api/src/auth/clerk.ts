@@ -220,3 +220,31 @@ export async function createSignInTicket(
     return null;
   }
 }
+
+/**
+ * Replace a member's login email — admin correction for PRE-CREATED
+ * accounts (2026-07-29). Guarded to users who have NEVER signed in: after
+ * first sign-in the address is the member's own credential (they change
+ * it themselves via Account & security), and letting forum admins move it
+ * would be an account-takeover vector. Returns "signed_in" instead of
+ * changing anything in that case.
+ */
+export async function replaceClerkEmail(
+  userId: string,
+  newEmail: string,
+): Promise<"ok" | "signed_in"> {
+  const clerkUser = await clerkClient.users.getUser(userId);
+  if (clerkUser.lastSignInAt) return "signed_in";
+  const created = await clerkClient.emailAddresses.createEmailAddress({
+    userId,
+    emailAddress: normalizeEmail(newEmail),
+    verified: true,
+    primary: true,
+  });
+  for (const address of clerkUser.emailAddresses) {
+    if (address.id !== created.id) {
+      await clerkClient.emailAddresses.deleteEmailAddress(address.id);
+    }
+  }
+  return "ok";
+}
