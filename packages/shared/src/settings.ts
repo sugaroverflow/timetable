@@ -16,8 +16,16 @@ export type RoleLabels = {
 export type DigestFrequency = "daily" | "weekly";
 
 export type NotificationSettings = {
+  /** Master switch (2026-07-29): a digest always includes every section —
+   * there are no per-section choices. */
+  digestEnabled?: boolean;
+  /** @deprecated Pre-2026-07-29 per-section flags, kept only so stored
+   * settings still parse. Any of them true reads as enabled — use
+   * `isDigestEnabled`, never these directly. */
   digestNewTopics?: boolean;
+  /** @deprecated See digestNewTopics. */
   digestReplies?: boolean;
+  /** @deprecated See digestNewTopics. */
   digestActivity?: boolean;
   /** How often digests arrive (2026-07-29): daily (the default) or
    * weekly on `digestWeekday`. */
@@ -27,6 +35,21 @@ export type NotificationSettings = {
   /** Sysadmins only: email when any new forum is created. */
   newForumEmails?: boolean;
 };
+
+/** Whether this user (or a forum's defaults) opt into digest emails. An
+ * explicit `digestEnabled` wins; otherwise any legacy per-section flag
+ * counts as opted in, so nobody subscribed before the switch loses their
+ * digest. */
+export function isDigestEnabled(settings: NotificationSettings): boolean {
+  return (
+    settings.digestEnabled ??
+    Boolean(
+      settings.digestNewTopics ||
+      settings.digestReplies ||
+      settings.digestActivity,
+    )
+  );
+}
 
 /** Canonical font-pairing keys (QA #59; expanded 2026-07-29). The API
  * validates against this list; the web app maps each key to label + CSS

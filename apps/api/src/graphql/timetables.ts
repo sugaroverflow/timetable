@@ -244,9 +244,9 @@ builder.mutationFields((t) => ({
       iconUrl: t.arg.string({ required: false }),
       iconDarkUrl: t.arg.string({ required: false }),
       iconEmoji: t.arg.string({ required: false }),
-      digestNewTopics: t.arg.boolean({ required: false }),
-      digestReplies: t.arg.boolean({ required: false }),
-      digestActivity: t.arg.boolean({ required: false }),
+      /** Digests are all-or-nothing (2026-07-29): the default for new
+       * members is just on or off. */
+      digestEnabled: t.arg.boolean({ required: false }),
     },
     // eslint-disable-next-line complexity, sonarjs/cognitive-complexity -- audit debt (2026-07-22): 13-arg settings-patch assembly; decomposition queued
     resolve: async (_p, args, ctx) => {
@@ -313,22 +313,10 @@ builder.mutationFields((t) => ({
         patch.iconEmoji = args.iconEmoji.trim().slice(0, 24) || null;
       }
 
-      if (
-        args.digestNewTopics != null ||
-        args.digestReplies != null ||
-        args.digestActivity != null
-      ) {
+      if (args.digestEnabled != null) {
         patch.digestDefaults = {
           ...(current.digestDefaults ?? {}),
-          ...(args.digestNewTopics != null
-            ? { digestNewTopics: args.digestNewTopics }
-            : {}),
-          ...(args.digestReplies != null
-            ? { digestReplies: args.digestReplies }
-            : {}),
-          ...(args.digestActivity != null
-            ? { digestActivity: args.digestActivity }
-            : {}),
+          digestEnabled: args.digestEnabled,
         };
       }
 

@@ -1033,8 +1033,7 @@ describe("createApiApp", () => {
           query: `mutation($s: String!) {
             updateTimetableSettings: updateForumSettings(
               idOrSlug: $s
-              digestNewTopics: true
-              digestReplies: false
+              digestEnabled: true
             ) { id }
           }`,
           variables: { s: timetable.slug },
@@ -1043,7 +1042,7 @@ describe("createApiApp", () => {
 
       expect(res.status).toBe(200);
       expect(core.updateTimetableSettings).toHaveBeenCalledWith(timetable.id, {
-        digestDefaults: { digestNewTopics: true, digestReplies: false },
+        digestDefaults: { digestEnabled: true },
       });
     });
   });

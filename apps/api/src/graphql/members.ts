@@ -308,9 +308,9 @@ builder.mutationFields((t) => ({
   updateMyNotificationSettings: t.field({
     type: UserType,
     args: {
-      digestNewTopics: t.arg.boolean({ required: false }),
-      digestReplies: t.arg.boolean({ required: false }),
-      digestActivity: t.arg.boolean({ required: false }),
+      /** Digests are all-or-nothing (2026-07-29) — every section is
+       * always included, this just switches them on or off. */
+      digestEnabled: t.arg.boolean({ required: false }),
       /** "daily" or "weekly" (digest v2, 2026-07-29). */
       digestFrequency: t.arg.string({ required: false }),
       /** Weekly send day, 0 = Sunday … 6 = Saturday (UTC). */
@@ -322,14 +322,8 @@ builder.mutationFields((t) => ({
       const frequency = validDigestFrequency(args.digestFrequency);
       const weekday = validDigestWeekday(args.digestWeekday);
       const updated = await updateUserNotificationSettings(user.id, {
-        ...(args.digestNewTopics != null
-          ? { digestNewTopics: args.digestNewTopics }
-          : {}),
-        ...(args.digestReplies != null
-          ? { digestReplies: args.digestReplies }
-          : {}),
-        ...(args.digestActivity != null
-          ? { digestActivity: args.digestActivity }
+        ...(args.digestEnabled != null
+          ? { digestEnabled: args.digestEnabled }
           : {}),
         ...(frequency ? { digestFrequency: frequency } : {}),
         ...(weekday != null ? { digestWeekday: weekday } : {}),
