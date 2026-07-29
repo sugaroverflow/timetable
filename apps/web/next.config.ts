@@ -36,6 +36,19 @@ const config: NextConfig = {
         destination: "/f/:slug/analysis",
         permanent: true,
       },
+      // Admin pages renamed (2026-07-29): /moderation → /pending,
+      // /activity → /log. Notification emails and bookmarks link the old
+      // paths — never remove.
+      {
+        source: "/f/:slug/moderation",
+        destination: "/f/:slug/pending",
+        permanent: true,
+      },
+      {
+        source: "/f/:slug/activity",
+        destination: "/f/:slug/log",
+        permanent: true,
+      },
     ];
   },
 };

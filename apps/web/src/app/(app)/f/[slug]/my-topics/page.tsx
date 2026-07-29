@@ -75,7 +75,6 @@ export default async function MyTopicsPage({
       <div className="stack">
         <div className="page-head">
           <h2 className="page-title">My Topics</h2>
-          <p>Create topics for an admin to publish, and unpublish your own.</p>
         </div>
         {data.hostDashboard.length > 1 ? (
           <div className="toolbar feed-toolbar">
