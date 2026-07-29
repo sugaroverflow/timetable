@@ -1,6 +1,7 @@
 import { isAdmin, isHost, type Role } from "@timetable/shared";
 
 import { CreateTopicForm } from "@/components/CreateTopicForm";
+import { CreateTopicReveal } from "@/components/CreateTopicReveal";
 import { ListSortControl } from "@/components/ListSortControl";
 import { TopicManager } from "@/components/TopicManager";
 import type { ManagedTopic } from "@/lib/feedTypes";
@@ -70,7 +71,10 @@ export default async function MyTopicsPage({
 
   return (
     <div className="grid grid-2">
-      <CreateTopicForm slug={slug} hosts={otherHosts} hostLabel={hostLabel} />
+      {/* Hidden behind the big button until pressed (QA 2026-07-29). */}
+      <CreateTopicReveal>
+        <CreateTopicForm slug={slug} hosts={otherHosts} hostLabel={hostLabel} />
+      </CreateTopicReveal>
 
       <div className="stack">
         <div className="page-head">

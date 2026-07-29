@@ -167,7 +167,7 @@ function NotificationsNavLink({
     <NavLink href={`${base}/notifications`}>
       Notifications
       {unread > 0 ? (
-        <span className="nav-badge">{unread > 99 ? "99+" : unread}</span>
+        <span className="nav-badge">{unread > 999 ? "999+" : unread}</span>
       ) : null}
     </NavLink>
   );
@@ -192,7 +192,7 @@ function QueueNavLink({
       Topic Queue
       {neverSeen > 0 ? (
         <span className={`nav-badge${elector ? "" : " nav-badge-quiet"}`}>
-          {neverSeen > 99 ? "99+" : neverSeen}
+          {neverSeen > 999 ? "999+" : neverSeen}
         </span>
       ) : null}
     </NavLink>
