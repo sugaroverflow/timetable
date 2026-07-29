@@ -1,3 +1,4 @@
+import { Pencil } from "lucide-react";
 import Link from "next/link";
 
 import { personPath } from "@/lib/personPath";
@@ -23,11 +24,15 @@ export function PersonProfileCard({
   person,
   labels,
   linkPhoto = true,
+  isSelf = false,
 }: {
   slug: string;
   person: ProfileCardPerson;
   labels: RoleLabels | undefined;
   linkPhoto?: boolean;
+  /** This is the viewer's own profile: show the edit link to
+   * /f/[slug]/profile (QA 2026-07-29). */
+  isSelf?: boolean;
 }) {
   const pagePath = person.slug ? personPath(slug, person.slug) : null;
   const photo = person.image ? (
@@ -54,6 +59,11 @@ export function PersonProfileCard({
         )}
         <h1 className="page-title">{person.name ?? "Member"}</h1>
         <RolePills roles={person.roles} labels={labels} />
+        {isSelf ? (
+          <Link className="btn btn-ghost btn-sm" href={`/f/${slug}/profile`}>
+            <Pencil size={14} aria-hidden /> Edit profile
+          </Link>
+        ) : null}
       </div>
       {person.bioHtml ? (
         <div

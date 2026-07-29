@@ -1,3 +1,4 @@
+import { Pencil } from "lucide-react";
 import Link from "next/link";
 
 import { isAdmin, primaryRole, type Role } from "@timetable/shared";
@@ -171,6 +172,17 @@ function PersonCard({
             <RolePills roles={person.roles} labels={roleLabels} />
           </div>
         </div>
+        {person.userId === meId ? (
+          // The viewer's own card: straight to the profile editor
+          // (QA 2026-07-29).
+          <Link
+            className="btn btn-ghost btn-sm"
+            style={{ marginLeft: "auto", alignSelf: "flex-start" }}
+            href={`/f/${slug}/profile`}
+          >
+            <Pencil size={14} aria-hidden /> Edit profile
+          </Link>
+        ) : null}
       </div>
       {person.bioHtml ? <CollapsibleTopicBody html={person.bioHtml} /> : null}
       <PersonTopics slug={slug} person={person} />
