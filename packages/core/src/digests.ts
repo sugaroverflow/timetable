@@ -1,4 +1,4 @@
-import { and, eq, gt, inArray, ne, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, ne, sql } from "drizzle-orm";
 
 import {
   activityEvents,
@@ -188,6 +188,10 @@ async function repliesSection(
         inArray(comments.parentId, myCommentIds),
         gt(comments.createdAt, since),
         ne(comments.authorId, ctx.recipient.id),
+        // Moderated-away or author-deleted replies don't get digested
+        // (deletedAt added 2026-07-29; hiddenAt was always meant to apply).
+        isNull(comments.hiddenAt),
+        isNull(comments.deletedAt),
       ),
     );
   return rows.map((r) => ({

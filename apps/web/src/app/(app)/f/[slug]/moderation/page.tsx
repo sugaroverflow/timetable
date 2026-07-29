@@ -17,6 +17,7 @@ import { parseTimetableSettings, roleLabel } from "@/lib/timetableSettings";
 type Data = {
   timetable: { viewerRoles: string[]; settings: string } | null;
   timetableHosts: { id: string; name: string | null }[];
+  me: { id: string } | null;
   moderationQueue: ManagedTopic[];
 };
 
@@ -24,6 +25,7 @@ const QUERY = `
   query Moderation($s: String!) {
     timetable: forum(idOrSlug: $s) { viewerRoles settings }
     timetableHosts: forumHosts(idOrSlug: $s) { id name }
+    me { id }
     moderationQueue(idOrSlug: $s) {
       id title slug hostId hostSlug hostName hostImage status bodyMd bodyHtml coverImageUrl updatedAt
       ${commentTree("adminComments")}
@@ -81,6 +83,7 @@ export default async function ModerationPage({
               key={topic.id}
               topic={topic}
               slug={slug}
+              viewerId={data.me?.id ?? null}
               hostLabel={hostLabel}
               adminLabel={adminLabel}
               hosts={data.timetableHosts}

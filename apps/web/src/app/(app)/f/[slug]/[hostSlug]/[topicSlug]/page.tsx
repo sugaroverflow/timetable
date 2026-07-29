@@ -108,6 +108,7 @@ function DraftingThread({
       topicId={topic.id}
       comments={topic.adminComments ?? []}
       canModerate={canModerate}
+      viewerId={viewerId}
       slug={slug}
       adminLabel={adminLabel}
     />

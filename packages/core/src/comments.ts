@@ -128,6 +128,37 @@ export async function addReply(
   return comment;
 }
 
+/** Author edit (QA 2026-07-29). Stamps editedAt — the "(edited)" marker's
+ * source; updatedAt can't drive it because hide/unhide also bumps it. */
+export async function updateCommentBody(
+  commentId: string,
+  body: string,
+): Promise<Comment | null> {
+  const now = new Date();
+  const [updated] = await db
+    .update(comments)
+    .set({ body, editedAt: now, updatedAt: now })
+    .where(eq(comments.id, commentId))
+    .returning();
+  return updated ?? null;
+}
+
+/** Author soft-delete (QA 2026-07-29): the row stays (thread shape,
+ * audit), but the comment tombstones in threads when replies exist,
+ * vanishes otherwise, and drops out of every count. Admin moderation
+ * stays on hiddenAt — deliberately separate. */
+export async function softDeleteComment(
+  commentId: string,
+): Promise<Comment | null> {
+  const now = new Date();
+  const [updated] = await db
+    .update(comments)
+    .set({ deletedAt: now, updatedAt: now })
+    .where(eq(comments.id, commentId))
+    .returning();
+  return updated ?? null;
+}
+
 export async function setCommentHidden(
   commentId: string,
   hidden: boolean,
@@ -154,6 +185,10 @@ export type CommentNode = {
   body: string;
   visibility: CommentVisibility;
   hidden: boolean;
+  /** Author-deleted tombstone: body/author are blanked server-side; it only
+   * survives in the tree at all when replies hang off it. */
+  deleted: boolean;
+  editedAt: Date | null;
   createdAt: Date;
   replies: CommentNode[];
 };
@@ -174,6 +209,8 @@ type CommentTreeRow = {
   body: string;
   visibility: CommentVisibility;
   hiddenAt: Date | null;
+  deletedAt: Date | null;
+  editedAt: Date | null;
   createdAt: Date;
 };
 
@@ -206,6 +243,8 @@ async function fetchCommentRows(
       body: comments.body,
       visibility: comments.visibility,
       hiddenAt: comments.hiddenAt,
+      deletedAt: comments.deletedAt,
+      editedAt: comments.editedAt,
       createdAt: comments.createdAt,
     })
     .from(comments)
@@ -234,6 +273,8 @@ function buildCommentTree(rows: CommentTreeRow[]): CommentNode[] {
       body: r.body,
       visibility: r.visibility,
       hidden: r.hiddenAt !== null,
+      deleted: r.deletedAt !== null,
+      editedAt: r.editedAt,
       createdAt: r.createdAt,
       replies: [],
     });
@@ -247,7 +288,27 @@ function buildCommentTree(rows: CommentTreeRow[]): CommentNode[] {
     if (parent) parent.replies.push(node);
     else roots.push(node);
   }
-  return roots;
+  return pruneDeleted(roots);
+}
+
+/** Author-deleted comments (QA 2026-07-29): drop them from the tree unless
+ * replies survive beneath — then keep a tombstone with body and author
+ * blanked HERE, server-side, so deleted text never reaches a client.
+ * Bottom-up, so a deleted chain with no live leaves vanishes entirely. */
+function pruneDeleted(nodes: CommentNode[]): CommentNode[] {
+  const out: CommentNode[] = [];
+  for (const node of nodes) {
+    node.replies = pruneDeleted(node.replies);
+    if (node.deleted) {
+      if (node.replies.length === 0) continue;
+      node.body = "";
+      node.authorId = "";
+      node.authorName = null;
+      node.authorImage = null;
+    }
+    out.push(node);
+  }
+  return out;
 }
 
 /** Threaded comments for a topic, filtered by the viewer's visibility scope.

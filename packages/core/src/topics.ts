@@ -503,6 +503,7 @@ async function loadCommentStats(
         inArray(comments.topicId, topicIds),
         eq(comments.visibility, "public"),
         isNull(comments.hiddenAt),
+        isNull(comments.deletedAt),
       ),
     )
     .groupBy(comments.topicId);

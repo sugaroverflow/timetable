@@ -92,6 +92,12 @@ CommentType.implement({
     body: t.exposeString("body"),
     visibility: t.exposeString("visibility"),
     hidden: t.exposeBoolean("hidden"),
+    /** Author-deleted tombstone (body/author already blanked server-side). */
+    deleted: t.exposeBoolean("deleted"),
+    editedAt: t.string({
+      nullable: true,
+      resolve: (c) => c.editedAt?.toISOString() ?? null,
+    }),
     createdAt: t.string({ resolve: (c) => c.createdAt.toISOString() }),
     replies: t.field({ type: [CommentType], resolve: (c) => c.replies }),
   }),

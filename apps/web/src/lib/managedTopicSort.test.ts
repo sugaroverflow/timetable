@@ -19,6 +19,8 @@ function comment(createdAt: string, replies: FeedComment[] = []): FeedComment {
     body: "hi",
     visibility: "public",
     hidden: false,
+    deleted: false,
+    editedAt: null,
     createdAt,
     replies,
   };

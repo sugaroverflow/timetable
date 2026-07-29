@@ -91,6 +91,7 @@ export default async function MyTopicsPage({
                 key={topic.id}
                 topic={topic}
                 slug={slug}
+                viewerId={data.me?.id ?? null}
                 hostLabel={hostLabel}
                 adminLabel={adminLabel}
                 isAdmin={admin}

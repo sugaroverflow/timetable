@@ -449,6 +449,7 @@ async function loadCommentActivity(
         ...activityTopicConds,
         eq(comments.visibility, "public" as const),
         isNull(comments.hiddenAt),
+        isNull(comments.deletedAt),
         ...(activitySince ? [gte(comments.createdAt, activitySince)] : []),
       ),
     )
@@ -494,6 +495,7 @@ async function loadCommentTallies(
         eq(topics.status, "published" as const),
         eq(comments.visibility, "public" as const),
         isNull(comments.hiddenAt),
+        isNull(comments.deletedAt),
         sql`'elector' = ANY(${timetableMemberships.roles})`,
         ne(comments.authorId, topics.hostId),
         ...(activitySince ? [gte(comments.createdAt, activitySince)] : []),

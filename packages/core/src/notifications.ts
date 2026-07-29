@@ -86,6 +86,7 @@ export async function listNotifications(
         eq(topics.timetableId, timetableId),
         ne(comments.authorId, userId),
         isNull(comments.hiddenAt),
+        isNull(comments.deletedAt),
         or(
           eq(topics.hostId, userId),
           eq(parents.authorId, userId),
@@ -140,6 +141,7 @@ export async function countUnreadNotifications(
     eq(topics.timetableId, timetableId),
     ne(comments.authorId, userId),
     isNull(comments.hiddenAt),
+    isNull(comments.deletedAt),
     or(
       eq(topics.hostId, userId),
       eq(parents.authorId, userId),

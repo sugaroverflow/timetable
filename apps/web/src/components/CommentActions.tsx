@@ -14,16 +14,25 @@ const HIDE = `mutation Hide($id: String!, $hidden: Boolean!) {
   hideComment(commentId: $id, hidden: $hidden) { id }
 }`;
 
+const DELETE = `mutation Delete($id: String!) {
+  deleteComment(commentId: $id)
+}`;
+
 export function CommentActions({
   commentId,
   canReply,
   canModerate,
   hidden,
+  isOwn = false,
+  onEdit,
 }: {
   commentId: string;
   canReply: boolean;
   canModerate: boolean;
   hidden: boolean;
+  /** The viewer authored this comment: shows Edit/Delete (QA 2026-07-29). */
+  isOwn?: boolean;
+  onEdit?: () => void;
 }) {
   const { run, busy } = useGqlAction();
   const searchParams = useSearchParams();
@@ -69,12 +78,34 @@ export function CommentActions({
     );
   }
 
+  function remove() {
+    if (!confirm("Delete this comment? This can't be undone.")) return;
+    void run(
+      DELETE,
+      { id: commentId },
+      {
+        success: "Comment deleted",
+        errorFallback: "Could not delete comment",
+      },
+    );
+  }
+
   return (
     <>
       <div className="comment-actions">
         {canReply ? (
           <button type="button" onClick={() => setOpen((v) => !v)}>
             Reply
+          </button>
+        ) : null}
+        {isOwn ? (
+          <button type="button" onClick={onEdit} disabled={busy}>
+            Edit
+          </button>
+        ) : null}
+        {isOwn ? (
+          <button type="button" onClick={remove} disabled={busy}>
+            Delete
           </button>
         ) : null}
         {canModerate ? (
