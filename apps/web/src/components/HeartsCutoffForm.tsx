@@ -18,8 +18,10 @@ function toLocalInputValue(iso: string | null): string {
 }
 
 /** Admin control for the heart-count cutoff (QA #42): hearts placed before
- * this moment stop counting everywhere. The date may be in the past.
- * Clearing it counts every heart again. */
+ * this moment stop counting everywhere. Since queue v2 (2026-07-29) it
+ * also resets everyone's Topic Queue — the fresh-eyes review at the start
+ * of a term. The date may be in the past. Clearing it counts every heart
+ * again. */
 export function HeartsCutoffForm({
   slug,
   current,
@@ -50,7 +52,9 @@ export function HeartsCutoffForm({
         <h2 className="section-title">Hearts count from</h2>
         <p>
           Hearts placed before this moment are ignored in every count and vote
-          weight. Default is the forum&rsquo;s creation — everything counts.
+          weight, and everyone&rsquo;s Topic Queue starts over — a fresh-eyes
+          review of every topic, ❤️&rsquo;d ones included. Default is the
+          forum&rsquo;s creation — everything counts.
         </p>
       </div>
       <form

@@ -1,6 +1,6 @@
 "use client";
 
-import { RotateCcw } from "lucide-react";
+import { ArrowRight, RotateCcw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -11,23 +11,49 @@ const HEART = `mutation QueueHeart($id: String!) {
   heartTopic(topicId: $id) { hearted }
 }`;
 
-const LATER = `mutation QueueLater($id: String!) {
+const NEXT = `mutation QueueNext($id: String!) {
   queueMarkSeen(topicId: $id)
 }`;
 
-/** The Topic Queue's decision buttons — big, round, symbols only, in
- * swipe-convention order: 🔁 (no/later) left, ❤️ (yes) right. Rendered in
- * the card's actions slot; both record the topic as seen and the server
- * re-render shows the next one. */
-export function QueueControls({ topicId }: { topicId: string }) {
+/**
+ * The Topic Queue's decision controls (v2 2026-07-29): a ❤️ on/off
+ * SWITCHER and a Next button — the member decides whether the topic is
+ * hearted, then moves on. Same big round layout as v1's two buttons.
+ * Toggling the heart saves immediately but does NOT advance (no refresh —
+ * hearting marks the topic seen server-side, so a refresh would skip it);
+ * only Next advances. Non-electors (hosts read the queue too) get Next
+ * alone.
+ */
+export function QueueControls({
+  topicId,
+  hearted: initialHearted,
+  canHeart,
+}: {
+  topicId: string;
+  hearted: boolean;
+  canHeart: boolean;
+}) {
   const router = useRouter();
   const { toastError } = useToast();
   const [busy, setBusy] = useState(false);
+  const [hearted, setHearted] = useState(initialHearted);
 
-  async function act(mutation: string) {
+  async function toggleHeart() {
     setBusy(true);
     try {
-      await clientGql(mutation, { id: topicId });
+      await clientGql(HEART, { id: topicId });
+      setHearted((h) => !h);
+      setBusy(false);
+    } catch {
+      toastError("That didn't save — try again.");
+      setBusy(false);
+    }
+  }
+
+  async function next() {
+    setBusy(true);
+    try {
+      await clientGql(NEXT, { id: topicId });
       router.refresh();
     } catch {
       toastError("That didn't save — try again.");
@@ -37,25 +63,29 @@ export function QueueControls({ topicId }: { topicId: string }) {
 
   return (
     <div className="queue-bar">
+      {canHeart ? (
+        <button
+          type="button"
+          className={`queue-btn queue-btn-heart${hearted ? " on" : ""}`}
+          role="switch"
+          aria-checked={hearted}
+          aria-label={hearted ? "❤️'d — click to remove" : "❤️ this topic"}
+          title={hearted ? "❤️'d — click to remove" : "❤️ this topic"}
+          disabled={busy}
+          onClick={toggleHeart}
+        >
+          <span aria-hidden>{hearted ? "❤️" : "🤍"}</span>
+        </button>
+      ) : null}
       <button
         type="button"
-        className="queue-btn"
-        aria-label="Later — show me this again next round"
-        title="Later"
+        className="queue-btn queue-btn-next"
+        aria-label="Next topic"
+        title="Next topic"
         disabled={busy}
-        onClick={() => act(LATER)}
+        onClick={next}
       >
-        <span aria-hidden>🔁</span>
-      </button>
-      <button
-        type="button"
-        className="queue-btn queue-btn-heart"
-        aria-label="❤️ this topic"
-        title="❤️ this topic"
-        disabled={busy}
-        onClick={() => act(HEART)}
-      >
-        <span aria-hidden>❤️</span>
+        <ArrowRight size={30} aria-hidden />
       </button>
     </div>
   );

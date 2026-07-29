@@ -30,6 +30,7 @@ import type { Topic } from "@timetable/db";
 import {
   canEditTopic,
   canHeart,
+  canUseQueue,
   canModerate,
   canProposeTopics,
   canSeeComments,
@@ -676,8 +677,9 @@ const TopicQueueType = builder
   });
 
 builder.queryFields((t) => ({
-  /** The viewer's Topic Queue. Null for guests and non-electors — the
-   * queue is a voting surface. */
+  /** The viewer's Topic Queue. Null for guests and non-members; every
+   * member gets one (v2 2026-07-29 — hosts read through, electors vote).
+   * The forum's heartsCountFrom cutoff resets everyone's review state. */
   topicQueue: t.field({
     type: TopicQueueType,
     nullable: true,
@@ -687,9 +689,13 @@ builder.queryFields((t) => ({
       const readable = await readTimetable(ctx, args.idOrSlug);
       if (!readable) return null;
       const viewer = await ctx.getViewer(readable.timetable.id);
-      if (!canHeart(viewer)) return null;
+      if (!canUseQueue(viewer)) return null;
 
-      const state = await getTopicQueue(readable.timetable.id, ctx.user.id);
+      const state = await getTopicQueue(
+        readable.timetable.id,
+        ctx.user.id,
+        readable.timetable.heartsCountFrom,
+      );
       let current: GqlTopic | null = null;
       if (state.currentTopicId) {
         const [topic] = await buildFeed(readable.timetable.id, ctx.user.id, {
@@ -713,14 +719,14 @@ builder.queryFields((t) => ({
 }));
 
 builder.mutationFields((t) => ({
-  /** The queue's "Later" button: record the topic as seen this round and
+  /** The queue's Next button: record the topic as seen this round and
    * move on. */
   queueMarkSeen: t.boolean({
     args: { topicId: t.arg.string({ required: true }) },
     resolve: async (_p, args, ctx) => {
       const user = await requireUser(ctx);
       const { topic, viewer } = await loadTopicAndViewer(ctx, args.topicId);
-      if (!canHeart(viewer)) forbidden("Electors only");
+      if (!canUseQueue(viewer)) forbidden("Members only");
       if (topic.status !== "published") {
         throw new GraphQLError("Only published topics can be queued");
       }
@@ -729,7 +735,7 @@ builder.mutationFields((t) => ({
     },
   }),
 
-  /** End-of-round "Start another round": everything still unhearted comes
+  /** End-of-round "Start another round": every published topic comes
    * around again. */
   queueRestartRound: t.boolean({
     args: { idOrSlug: t.arg.string({ required: true }) },
@@ -738,7 +744,7 @@ builder.mutationFields((t) => ({
         ctx,
         args.idOrSlug,
       );
-      if (!canHeart(viewer)) forbidden("Electors only");
+      if (!canUseQueue(viewer)) forbidden("Members only");
       return restartQueueRound(readable.timetable.id, user.id);
     },
   }),

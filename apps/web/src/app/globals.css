@@ -484,6 +484,11 @@ textarea {
   font-size: var(--text-2xs);
   font-weight: var(--fw-bold);
 }
+/* Non-electors' queue badge (v2 2026-07-29): informational grey — they
+   don't get in trouble for not doing the reading. */
+.nav-badge-quiet {
+  background: var(--muted);
+}
 .sidebar-bug-link:hover {
   text-decoration: underline;
 }
@@ -1607,9 +1612,17 @@ textarea {
   opacity: 0.5;
   cursor: default;
 }
+/* The ❤️ switcher (v2 2026-07-29): quiet until ON, then the heart-soft
+   fill announces the saved state. */
 .queue-btn-heart {
+  background: var(--wash);
+}
+.queue-btn-heart.on {
   background: var(--heart-soft);
-  border-color: transparent;
+  border-color: var(--heart);
+}
+.queue-btn-next {
+  color: var(--ink);
 }
 .queue-progress {
   text-align: center;

@@ -726,7 +726,10 @@ export async function getDashboard(
     commentsByElector: commentActivity.byElector,
     commentsByElectorTopic: commentActivity.byElectorTopic,
     availabilityByElector,
-    queueCoverage: await loadQueueCoverage(timetableId),
+    queueCoverage: await loadQueueCoverage(
+      timetableId,
+      await getHeartsCountFrom(timetableId),
+    ),
     filter: opts.electorActivity ?? "all",
   });
 
