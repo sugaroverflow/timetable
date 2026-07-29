@@ -150,7 +150,8 @@ export function TopicLeaderboard({
   const sorted = [...entries].sort(
     (a, b) => scoreFor(b, norm) - scoreFor(a, norm),
   );
-  // The former stat cards, folded into the title (QA 2026-07-27):
+  // The former stat cards, folded into a SUBTITLE under a plain "Topics"
+  // title (QA 2026-07-29; the sentence was the title itself before):
   // "12 topics from 20 hosts sorted by 87 ❤️ from 9 electors". hostCount
   // is ALL the forum's hosts, topic-less ones included (per Ed). Under a
   // 💬 norm the sorted-by clause switches to the comment total.
@@ -159,7 +160,7 @@ export function TopicLeaderboard({
   const sortedBy = norm.startsWith("c_")
     ? `${entries.reduce((sum, e) => sum + e.commentTotal, 0)} 💬`
     : `${totalHearts} ❤️`;
-  const title = `${entries.length} topic${entries.length === 1 ? "" : "s"} from ${count(hostCount, hostLabel)} sorted by ${sortedBy} from ${count(electorCount, electorLabel)}`;
+  const subtitle = `${entries.length} topic${entries.length === 1 ? "" : "s"} from ${count(hostCount, hostLabel)} sorted by ${sortedBy} from ${count(electorCount, electorLabel)}`;
 
   return (
     <div className="card">
@@ -167,11 +168,16 @@ export function TopicLeaderboard({
         className="row wrap"
         style={{
           justifyContent: "space-between",
-          alignItems: "center",
+          alignItems: "flex-start",
           marginBottom: 4,
         }}
       >
-        <h3 className="section-title">{title}</h3>
+        <div>
+          <h3 className="section-title">Topics</h3>
+          <p className="faint" style={{ margin: "2px 0 0", fontSize: 12 }}>
+            {subtitle}
+          </p>
+        </div>
         <span className="row wrap" style={{ gap: 10, alignItems: "center" }}>
           {hostFilter}
           <SelectMinimal
