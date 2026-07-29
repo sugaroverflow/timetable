@@ -4,7 +4,7 @@ import type { Server } from "node:http";
 
 import type { IcsSlot, ReadableTimetable } from "@timetable/core";
 import * as core from "@timetable/core";
-import type { Timetable, TimetableMembership } from "@timetable/db";
+import type { Timetable, TimetableMembership, Topic } from "@timetable/db";
 import type { Role } from "@timetable/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -20,7 +20,9 @@ vi.mock("@timetable/core", async (importOriginal) => {
     ...actual,
     countViewerPublishedHearts: vi.fn(),
     createLocalUser: vi.fn(),
+    deleteTopic: vi.fn(),
     getCommentById: vi.fn(),
+    getTopicById: vi.fn(),
     getMembership: vi.fn(),
     getMembershipById: vi.fn(),
     getPerson: vi.fn(),
@@ -175,6 +177,24 @@ function membershipFixture(
   };
 }
 
+function topicFixture(patch: Partial<Topic> = {}): Topic {
+  return {
+    id: "22222222-2222-2222-2222-222222222222",
+    timetableId: "11111111-1111-1111-1111-111111111111",
+    hostId: "host-1",
+    title: "A topic",
+    slug: "a-topic",
+    bodyMd: "",
+    coverImageUrl: null,
+    status: "submitted",
+    publishedAt: null,
+    contentUpdatedAt: null,
+    createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    ...patch,
+  };
+}
+
 async function startTestServer(): Promise<{ baseUrl: string; server: Server }> {
   const server = createServer(createApiApp());
 
@@ -221,6 +241,8 @@ afterEach(() => {
   vi.mocked(context.buildContext).mockReset();
   vi.mocked(core.countViewerPublishedHearts).mockReset();
   vi.mocked(core.createLocalUser).mockReset();
+  vi.mocked(core.deleteTopic).mockReset();
+  vi.mocked(core.getTopicById).mockReset();
   vi.mocked(core.getMembership).mockReset();
   vi.mocked(core.getMembershipById).mockReset();
   vi.mocked(core.getReadableTimetable).mockReset();
@@ -1043,6 +1065,63 @@ describe("createApiApp", () => {
       expect(res.status).toBe(200);
       expect(core.updateTimetableSettings).toHaveBeenCalledWith(timetable.id, {
         digestDefaults: { digestEnabled: true },
+      });
+    });
+  });
+
+  describe("deleteTopic", () => {
+    const DELETE = `mutation($id: String!){ deleteTopic(topicId: $id) }`;
+
+    async function requestDelete(baseUrl: string, topicId: string) {
+      const res = await fetch(`${baseUrl}/graphql`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: DELETE, variables: { id: topicId } }),
+      });
+      return (await res.json()) as {
+        data: { deleteTopic: boolean | null } | null;
+        errors?: unknown[];
+      };
+    }
+
+    it("lets the owning host delete their not-yet-published topic", async () => {
+      const topic = topicFixture({ status: "submitted" });
+      mockSession("host-1", ["host"]);
+      vi.mocked(core.getTopicById).mockResolvedValue(topic);
+
+      await withTestServer(async (baseUrl) => {
+        const body = await requestDelete(baseUrl, topic.id);
+        expect(body.errors).toBeUndefined();
+        expect(body.data?.deleteTopic).toBe(true);
+        expect(core.deleteTopic).toHaveBeenCalledWith(topic, "host-1");
+      });
+    });
+
+    it("refuses for published topics", async () => {
+      const topic = topicFixture({
+        status: "published",
+        publishedAt: new Date("2026-02-01T00:00:00.000Z"),
+      });
+      mockSession("host-1", ["host"]);
+      vi.mocked(core.getTopicById).mockResolvedValue(topic);
+
+      await withTestServer(async (baseUrl) => {
+        const body = await requestDelete(baseUrl, topic.id);
+        // Error text is masked outside dev — assert presence + no write.
+        expect(body.errors?.length).toBeGreaterThan(0);
+        expect(core.deleteTopic).not.toHaveBeenCalled();
+      });
+    });
+
+    it("refuses for anyone but the owning host, admins included", async () => {
+      const topic = topicFixture({ status: "submitted", hostId: "host-2" });
+      mockSession("admin-1", ["admin"]);
+      vi.mocked(core.getTopicById).mockResolvedValue(topic);
+
+      await withTestServer(async (baseUrl) => {
+        const body = await requestDelete(baseUrl, topic.id);
+        expect(body.errors?.length).toBeGreaterThan(0);
+        expect(core.deleteTopic).not.toHaveBeenCalled();
       });
     });
   });

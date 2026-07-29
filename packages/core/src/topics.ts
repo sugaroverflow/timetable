@@ -179,6 +179,23 @@ export async function unpublishTopic(
   return updated;
 }
 
+/** Host permanently deletes their own not-yet-published topic (launch QA
+ * 2026-07-29). Hard delete: comments, hearts, seen rows and slot links all
+ * cascade (FKs verified). Logged first — the log payload is jsonb with no
+ * FK, so it survives the row. */
+export async function deleteTopic(
+  topic: Topic,
+  actorId: string,
+): Promise<void> {
+  await logActivity({
+    timetableId: topic.timetableId,
+    actorId,
+    action: "topic.delete",
+    payload: { topicId: topic.id, title: topic.title },
+  });
+  await db.delete(topics).where(eq(topics.id, topic.id));
+}
+
 /** Moderation actions. request_changes is gone (QA #59 round 3) — admins
  * discuss in the admin-only comment thread and hosts resubmit themselves. */
 export type ModerationAction = "publish" | "reject";
