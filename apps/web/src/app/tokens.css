@@ -193,7 +193,9 @@
   --text-xl: 18px;
   --text-2xl: 20px;
   --text-3xl: 24px;
-  --text-4xl: 26px;
+  /* Tier-1 headings (page titles) — bumped 26→30 in the rhythm pass
+     (QA 2026-07-29, "err toward larger"). */
+  --text-4xl: 30px;
 
   /* --- Typography: weights --- */
   --fw-normal: 400;
