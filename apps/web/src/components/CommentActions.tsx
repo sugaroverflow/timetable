@@ -4,6 +4,7 @@ import { Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
+import { GrowingTextarea } from "@/components/GrowingTextarea";
 import { useGqlAction } from "@/lib/useGqlAction";
 
 const REPLY = `mutation Reply($id: String!, $body: String!) {
@@ -116,7 +117,7 @@ export function CommentActions({
       </div>
       {open ? (
         <form onSubmit={reply} className="inline-form" style={{ marginTop: 6 }}>
-          <textarea
+          <GrowingTextarea
             ref={textareaRef}
             value={body}
             onChange={(e) => setBody(e.target.value)}

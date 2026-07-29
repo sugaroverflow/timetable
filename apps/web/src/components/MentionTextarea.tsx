@@ -2,6 +2,8 @@
 
 import { useRef, useState } from "react";
 
+import { GrowingTextarea } from "@/components/GrowingTextarea";
+
 export type MentionCandidate = { name: string | null; slug: string | null };
 
 // The in-progress "@handle" immediately before the caret, if any.
@@ -95,7 +97,7 @@ export function MentionTextarea({
 
   return (
     <div className="mention-field">
-      <textarea
+      <GrowingTextarea
         ref={ref}
         value={value}
         placeholder={placeholder}
