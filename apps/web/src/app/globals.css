@@ -408,20 +408,27 @@ textarea {
 .topic-body-collapsed > *:not(:first-child) {
   display: none;
 }
+/* Show more/less: a small pill in the accent colour — easy to miss as
+   bare muted text, and readers skipped past without realising text was
+   hidden (QA 2026-07-29). Pulled up against the stack gap so it hugs the
+   body it truncates rather than floating between body and divider. */
 .topic-body-toggle {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   align-self: flex-start;
-  border: none;
-  background: transparent;
-  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--wash);
+  padding: 3px 11px;
   font-size: var(--text-xs);
   font-weight: var(--fw-semibold);
-  color: var(--muted);
+  color: var(--primary);
+  margin-top: -8px;
 }
 .topic-body-toggle:hover {
-  color: var(--ink);
+  background: var(--primary-soft);
+  border-color: var(--primary);
 }
 .side-nav {
   flex-direction: column;
@@ -1117,6 +1124,13 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+/* Directly under the action bar, the row-to-divider space was 8px padding
+   + 14px stack gap + the 14px margin above = 36px of dead air (QA
+   2026-07-29). Pull the divider up so the row sits 14px from it — the
+   same rhythm as the body-to-divider space above the bar. */
+.card-actions + .comments {
+  margin-top: -8px;
 }
 .comment {
   display: flex;
