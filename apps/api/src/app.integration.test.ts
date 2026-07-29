@@ -442,7 +442,7 @@ describe("createApiApp", () => {
         sentTo: "admin-1@example.com",
       });
       const sent = vi.mocked(email.sendEmail).mock.calls.at(-1)?.[0];
-      expect(sent?.subject).toMatch(/^\[Test\] Your Topic digest/);
+      expect(sent?.subject).toMatch(/^\[Test\] \[Spring Term\] Digest — /);
       expect(sent?.html).toContain("Spring Term");
     });
   });
