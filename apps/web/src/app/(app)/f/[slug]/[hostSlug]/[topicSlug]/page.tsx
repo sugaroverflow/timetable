@@ -101,12 +101,14 @@ function DraftingThread({
   viewerId,
   canModerate,
   adminLabel,
+  hostLabel,
 }: {
   topic: FeedTopic;
   slug: string;
   viewerId: string | null;
   canModerate: boolean;
   adminLabel: string;
+  hostLabel: string;
 }) {
   const isOwner = viewerId != null && viewerId === topic.hostId;
   if (!canModerate && !isOwner) return null;
@@ -118,6 +120,7 @@ function DraftingThread({
       viewerId={viewerId}
       slug={slug}
       adminLabel={adminLabel}
+      hostLabel={hostLabel}
     />
   );
 }
@@ -163,6 +166,7 @@ export default async function TopicPermalinkPage({
         viewerId={viewerId}
         canModerate={perms.canModerate}
         adminLabel={roleLabel(settings.roleLabels, "admin")}
+        hostLabel={roleLabel(settings.roleLabels, "host")}
       />
     </div>
   );
