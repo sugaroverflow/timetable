@@ -81,9 +81,16 @@ function redirectIfStaleHost(slug: string, hostSlug: string, topic: FeedTopic) {
   }
 }
 
-function StatusBadge({ status }: { status: string }) {
+/** Unpublished/submitted topics get a status bar; published ones render
+ * nothing — including the bar itself (QA 2026-07-29: the empty toolbar
+ * showed as a bare stripe above every published topic). */
+function StatusBar({ status }: { status: string }) {
   if (status === "published") return null;
-  return <span className={`status-badge status-${status}`}>{status}</span>;
+  return (
+    <div className="toolbar">
+      <span className={`status-badge status-${status}`}>{status}</span>
+    </div>
+  );
 }
 
 /** The drafting thread, for the topic's owner and admins only — the API
@@ -138,9 +145,7 @@ export default async function TopicPermalinkPage({
     // topic-permalink: here the topic title IS the page title, so it
     // renders at tier 1 (QA 2026-07-28) — see globals.css.
     <div className="stack topic-permalink">
-      <div className="toolbar">
-        <StatusBadge status={topic.status} />
-      </div>
+      <StatusBar status={topic.status} />
       <TopicCard
         topic={topic}
         perms={perms}
