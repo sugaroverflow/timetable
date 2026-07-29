@@ -8,6 +8,7 @@ import {
   timetableMemberships,
   timetables,
   topics,
+  topicSeen,
   users,
   type NotificationSettings,
 } from "@timetable/db";
@@ -88,8 +89,9 @@ type DigestContext = {
   recipientSlugByTimetable: Map<string, string | null>;
   /** Per-forum "seen it in the app" watermarks (2026-07-29): the digest
    * only emails what the member has NOT already seen — feed visits cover
-   * new topics and heart counts, notifications-page visits cover
-   * comments/replies. */
+   * ambient heart counts, notifications-page visits cover
+   * comments/replies. New topics use topic_seen rows instead (deliberate
+   * queue reviews), not the superficial feed watermark. */
   seenFeedAt: Map<string, Date | null>;
   seenNotificationsAt: Map<string, Date | null>;
   electorTimetableIds: string[];
@@ -148,10 +150,10 @@ async function newTopicsSection(
   }
   const rows = await db
     .select({
+      id: topics.id,
       title: topics.title,
       timetableId: topics.timetableId,
       slug: topics.slug,
-      publishedAt: topics.publishedAt,
       hostSlug: timetableMemberships.slug,
     })
     .from(topics)
@@ -169,24 +171,33 @@ async function newTopicsSection(
         gt(topics.publishedAt, since),
       ),
     );
-  return (
-    rows
-      // Already seen in the app: a feed visit after publication means the
-      // topic was on their All Topics page — don't email it (2026-07-29).
-      .filter((r) => {
-        const cutoff = afterSeen(since, ctx.seenFeedAt.get(r.timetableId));
-        return r.publishedAt !== null && r.publishedAt > cutoff;
-      })
-      .map((r) => ({
-        title: r.title,
-        timetableName: ctx.timetableName.get(r.timetableId) ?? "",
-        path: topicPath(
-          ctx.timetableSlug.get(r.timetableId),
-          r.hostSlug,
-          r.slug,
+  if (rows.length === 0) return [];
+
+  // "Seen" for a NEW TOPIC means deliberately reviewed — a topic_seen row,
+  // written only by the queue's Next button and by hearting. A feed visit
+  // is deliberately NOT enough: scrolling All Topics is superficial, the
+  // queue is a considered read (Ed, 2026-07-29).
+  const seenRows = await db
+    .select({ topicId: topicSeen.topicId })
+    .from(topicSeen)
+    .where(
+      and(
+        eq(topicSeen.userId, ctx.recipient.id),
+        inArray(
+          topicSeen.topicId,
+          rows.map((r) => r.id),
         ),
-      }))
-  );
+      ),
+    );
+  const seen = new Set(seenRows.map((r) => r.topicId));
+
+  return rows
+    .filter((r) => !seen.has(r.id))
+    .map((r) => ({
+      title: r.title,
+      timetableName: ctx.timetableName.get(r.timetableId) ?? "",
+      path: topicPath(ctx.timetableSlug.get(r.timetableId), r.hostSlug, r.slug),
+    }));
 }
 
 async function repliesSection(
