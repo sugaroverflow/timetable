@@ -970,7 +970,12 @@ textarea {
   border: 0;
   border-radius: 0;
   box-shadow: none;
-  padding: 8px 0;
+  /* Cards' box-shadow (8px blur) bleeds past their edges — widen the
+     pinned bar's opaque background so scrolled-under card shadows can't
+     peek out its sides (QA 2026-07-29). The .container's 20px side
+     padding absorbs the overhang at every viewport. */
+  margin-inline: -14px;
+  padding: 8px 14px;
   /* Pull the list up: with the .stack gap (14px) this nets 14px between
      the controls and the first card — the same rhythm as card-to-card
      (QA 2026-07-28: "the feed needs to be higher"). */
