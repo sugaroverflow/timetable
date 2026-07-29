@@ -4,21 +4,24 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ImageUploadField } from "@/components/ImageUploadField";
 import {
+  BRAND_FONTS,
   DEFAULT_THEME_DARK,
   DEFAULT_THEME_LIGHT,
   FONT_PAIRINGS,
+  PRESET_PALETTES,
   themeVars,
   type DigestSettings,
   type ThemeSettings,
 } from "@/lib/timetableSettings";
 import { useGqlAction } from "@/lib/useGqlAction";
 
-const MUTATION = `mutation Theme($s: String!, $theme: String, $cover: String, $icon: String, $emoji: String) {
+const MUTATION = `mutation Theme($s: String!, $theme: String, $cover: String, $icon: String, $iconDark: String, $emoji: String) {
   updateTimetableSettings: updateForumSettings(
     idOrSlug: $s
     themeJson: $theme
     coverImageUrl: $cover
     iconUrl: $icon
+    iconDarkUrl: $iconDark
     iconEmoji: $emoji
   ) { id }
 }`;
@@ -57,6 +60,7 @@ export type SettingsValues = {
   theme?: ThemeSettings;
   coverImageUrl?: string | null;
   iconUrl?: string | null;
+  iconDarkUrl?: string | null;
   iconEmoji?: string | null;
   digestDefaults?: DigestSettings;
 };
@@ -69,6 +73,7 @@ type ThemeState = {
   topbarText: string;
   text: string;
   font: string;
+  brandFont: string;
   darkPrimary: string;
   darkSecondary: string;
   darkBackground: string;
@@ -77,6 +82,7 @@ type ThemeState = {
   darkText: string;
   cover: string;
   icon: string;
+  iconDark: string;
   iconEmoji: string;
 };
 
@@ -89,6 +95,7 @@ function initialLightFields(theme: ThemeSettings) {
     topbarText: theme.topbarText ?? DEFAULT_THEME_LIGHT.topbarText,
     text: theme.text ?? DEFAULT_THEME_LIGHT.text,
     font: theme.font ?? DEFAULT_THEME_LIGHT.font,
+    brandFont: theme.brandFont ?? DEFAULT_THEME_LIGHT.brandFont,
   };
 }
 
@@ -113,6 +120,7 @@ function initialState(current: SettingsValues): ThemeState {
     ...initialDarkFields(theme),
     cover: current.coverImageUrl ?? "",
     icon: current.iconUrl ?? "",
+    iconDark: current.iconDarkUrl ?? "",
     iconEmoji: current.iconEmoji ?? "",
   };
 }
@@ -126,6 +134,7 @@ function toTheme(state: ThemeState): ThemeSettings {
     topbarText: state.topbarText,
     text: state.text,
     font: state.font,
+    brandFont: state.brandFont,
     dark: {
       primary: state.darkPrimary,
       secondary: state.darkSecondary,
@@ -184,20 +193,69 @@ function ColourGroup({
   );
 }
 
-function FontPicker({
-  value,
+/** Fonts first, above the colours (QA 2026-07-29): the reading pairing and
+ * a separate display face for the forum name in the topbar. */
+function FontsBlock({
+  state,
   onChange,
 }: {
-  value: string;
-  onChange: (value: string) => void;
+  state: ThemeState;
+  onChange: (key: keyof ThemeState, value: string) => void;
 }) {
   return (
-    <div className="field" style={{ marginTop: 12 }}>
-      <label htmlFor="tf">Fonts</label>
-      <select id="tf" value={value} onChange={(e) => onChange(e.target.value)}>
-        {Object.entries(FONT_PAIRINGS).map(([key, pairing]) => (
+    <div className="row wrap" style={{ alignItems: "flex-end" }}>
+      <div
+        className="field"
+        style={{ marginBottom: 0, flex: 1, minWidth: 220 }}
+      >
+        <label htmlFor="tf">Fonts</label>
+        <select
+          id="tf"
+          value={state.font}
+          onChange={(e) => onChange("font", e.target.value)}
+        >
+          {Object.entries(FONT_PAIRINGS).map(([key, pairing]) => (
+            <option key={key} value={key}>
+              {pairing.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div
+        className="field"
+        style={{ marginBottom: 0, flex: 1, minWidth: 220 }}
+      >
+        <label htmlFor="tbf">Forum name font</label>
+        <select
+          id="tbf"
+          value={state.brandFont}
+          onChange={(e) => onChange("brandFont", e.target.value)}
+        >
+          {Object.entries(BRAND_FONTS).map(([key, brand]) => (
+            <option key={key} value={key}>
+              {brand.label}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+}
+
+/** A "command" select: picking a preset fills every light + dark colour
+ * field at once, then snaps back to the placeholder — the individual
+ * swatches below remain the source of truth and stay tweakable. */
+function PresetPicker({ onApply }: { onApply: (key: string) => void }) {
+  return (
+    <div className="field" style={{ margin: "14px 0 0", maxWidth: 320 }}>
+      <label htmlFor="tpp">Colour presets</label>
+      <select id="tpp" value="" onChange={(e) => onApply(e.target.value)}>
+        <option value="" disabled>
+          Apply a preset palette…
+        </option>
+        {Object.entries(PRESET_PALETTES).map(([key, p]) => (
           <option key={key} value={key}>
-            {pairing.label}
+            {p.label}
           </option>
         ))}
       </select>
@@ -242,6 +300,68 @@ function EmojiPicker({
         </button>
       ) : null}
     </div>
+  );
+}
+
+/** Cover image + icons (light/dark/emoji) — the non-colour media half of
+ * the Theme card. */
+function MediaBlock({
+  slug,
+  state,
+  onField,
+  onIcon,
+  onEmoji,
+  setUploadingCover,
+  setUploadingIcon,
+}: {
+  slug: string;
+  state: ThemeState;
+  onField: (key: keyof ThemeState, value: string) => void;
+  onIcon: (value: string) => void;
+  onEmoji: (value: string) => void;
+  setUploadingCover: (v: boolean) => void;
+  setUploadingIcon: (v: boolean) => void;
+}) {
+  return (
+    <>
+      <div style={{ marginTop: 12 }}>
+        <ImageUploadField
+          id="cover"
+          label="Cover image"
+          hint="Shown full-width above every page at its natural aspect ratio — you choose how tall. Around 1600px wide looks sharp; up to 5 MB."
+          value={state.cover}
+          onChange={(value) => onField("cover", value)}
+          purpose="timetable-cover"
+          timetableIdOrSlug={slug}
+          onUploadingChange={setUploadingCover}
+        />
+      </div>
+
+      <div style={{ marginTop: 12 }}>
+        <ImageUploadField
+          id="icon"
+          label="Icon"
+          hint="Square image, shown small in the switcher and top bar — 128×128px is plenty; up to 5 MB."
+          value={state.icon}
+          onChange={onIcon}
+          purpose="timetable-icon"
+          timetableIdOrSlug={slug}
+          onUploadingChange={setUploadingIcon}
+        />
+        <ImageUploadField
+          id="icon-dark"
+          label="Icon (dark mode)"
+          hint="Optional alternative shown to members in dark mode — useful when the main icon vanishes on dark backgrounds. Falls back to the icon above."
+          value={state.iconDark}
+          onChange={(value) => onField("iconDark", value)}
+          purpose="timetable-icon"
+          timetableIdOrSlug={slug}
+          onUploadingChange={setUploadingIcon}
+        />
+      </div>
+
+      <EmojiPicker value={state.iconEmoji} onChoose={onEmoji} />
+    </>
   );
 }
 
@@ -302,12 +422,39 @@ export function SettingsForm({
     applyPreview(toTheme({ ...state, [key]: value }));
   }
 
+  // A preset fills every light+dark colour field at once (QA 2026-07-29);
+  // fonts are untouched and everything stays individually tweakable after.
+  function applyPreset(key: string) {
+    const p = PRESET_PALETTES[key];
+    if (!p) return;
+    const next: ThemeState = {
+      ...state,
+      primary: p.light.primary,
+      secondary: p.light.secondary,
+      background: p.light.background,
+      topbar: p.light.topbar,
+      topbarText: p.light.topbarText,
+      text: p.light.text,
+      darkPrimary: p.dark.primary,
+      darkSecondary: p.dark.secondary,
+      darkBackground: p.dark.background,
+      darkTopbar: p.dark.topbar,
+      darkTopbarText: p.dark.topbarText,
+      darkText: p.dark.text,
+    };
+    setState(next);
+    applyPreview(toTheme(next));
+  }
+
   // Emoji and uploaded image are mutually exclusive icon sources — setting one
   // clears the other so the render precedence (emoji > image > letter) is
   // unambiguous.
   function chooseEmoji(value: string) {
     setField("iconEmoji", value);
-    if (value) setField("icon", "");
+    if (value) {
+      setField("icon", "");
+      setField("iconDark", "");
+    }
   }
   function handleIconChange(value: string) {
     setField("icon", value);
@@ -334,6 +481,7 @@ export function SettingsForm({
         // so clearing a field must send "" for the image/emoji to be removed.
         cover: state.cover.trim(),
         icon: state.icon.trim(),
+        iconDark: state.iconDark.trim(),
         emoji: state.iconEmoji.trim(),
       },
       {
@@ -353,20 +501,24 @@ export function SettingsForm({
         Colours preview live — Save to keep them, Discard to revert.
       </p>
 
+      <FontsBlock state={state} onChange={setThemeField} />
+
+      <PresetPicker onApply={applyPreset} />
+
+      <h3 style={{ fontSize: "var(--text-md)", margin: "14px 0 2px" }}>
+        Light palette
+      </h3>
       <ColourGroup
         fields={LIGHT_COLOUR_FIELDS}
         state={state}
         onChange={setThemeField}
       />
 
-      <FontPicker
-        value={state.font}
-        onChange={(value) => setThemeField("font", value)}
-      />
-
-      <h3 style={{ fontSize: 15, margin: "18px 0 2px" }}>Dark mode palette</h3>
-      <p className="faint" style={{ marginTop: 0, fontSize: 12 }}>
-        Used when a member switches to dark mode (toggle on their Profile page).
+      <h3 style={{ fontSize: "var(--text-md)", margin: "18px 0 2px" }}>
+        Dark mode palette
+      </h3>
+      <p className="faint" style={{ marginTop: 0, fontSize: "var(--text-xs)" }}>
+        Used when a member switches to dark mode (sidebar toggle).
       </p>
       <ColourGroup
         fields={DARK_COLOUR_FIELDS}
@@ -374,57 +526,61 @@ export function SettingsForm({
         onChange={setThemeField}
       />
 
-      <div style={{ marginTop: 12 }}>
-        <ImageUploadField
-          id="cover"
-          label="Cover image"
-          hint="Shown full-width above every page at its natural aspect ratio — you choose how tall. Around 1600px wide looks sharp; up to 5 MB."
-          value={state.cover}
-          onChange={(value) => setField("cover", value)}
-          purpose="timetable-cover"
-          timetableIdOrSlug={slug}
-          onUploadingChange={setUploadingCover}
-        />
-      </div>
+      <MediaBlock
+        slug={slug}
+        state={state}
+        onField={setField}
+        onIcon={handleIconChange}
+        onEmoji={chooseEmoji}
+        setUploadingCover={setUploadingCover}
+        setUploadingIcon={setUploadingIcon}
+      />
 
-      <div style={{ marginTop: 12 }}>
-        <ImageUploadField
-          id="icon"
-          label="Icon"
-          hint="Square image, shown small in the switcher and top bar — 128×128px is plenty; up to 5 MB."
-          value={state.icon}
-          onChange={handleIconChange}
-          purpose="timetable-icon"
-          timetableIdOrSlug={slug}
-          onUploadingChange={setUploadingIcon}
-        />
-      </div>
-
-      <EmojiPicker value={state.iconEmoji} onChoose={chooseEmoji} />
-
-      <div className="row" style={{ marginTop: 12 }}>
-        <button
-          className="btn btn-primary"
-          type="submit"
-          disabled={busy || uploadingCover || uploadingIcon}
-        >
-          {uploadingCover || uploadingIcon
-            ? "Uploading…"
-            : busy
-              ? "Saving…"
-              : saved
-                ? "Saved"
-                : "Save theme"}
-        </button>
-        <button
-          className="btn btn-ghost"
-          type="button"
-          onClick={discard}
-          disabled={busy}
-        >
-          Discard
-        </button>
-      </div>
+      <FormFooter
+        busy={busy}
+        saved={saved}
+        uploading={uploadingCover || uploadingIcon}
+        onDiscard={discard}
+      />
     </form>
+  );
+}
+
+function FormFooter({
+  busy,
+  saved,
+  uploading,
+  onDiscard,
+}: {
+  busy: boolean;
+  saved: boolean;
+  uploading: boolean;
+  onDiscard: () => void;
+}) {
+  const label = uploading
+    ? "Uploading…"
+    : busy
+      ? "Saving…"
+      : saved
+        ? "Saved"
+        : "Save theme";
+  return (
+    <div className="row" style={{ marginTop: 12 }}>
+      <button
+        className="btn btn-primary"
+        type="submit"
+        disabled={busy || uploading}
+      >
+        {label}
+      </button>
+      <button
+        className="btn btn-ghost"
+        type="button"
+        onClick={onDiscard}
+        disabled={busy}
+      >
+        Discard
+      </button>
+    </div>
   );
 }

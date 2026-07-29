@@ -118,6 +118,53 @@ export const FONT_PAIRINGS: Record<
     serif: '"IBM Plex Mono", ui-monospace, Menlo, monospace',
     sans: '"Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
   },
+  elegant: {
+    label: "Playfair Display + Inter",
+    serif: '"Playfair Display", Georgia, serif',
+    sans: '"Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+  },
+  grotesk: {
+    label: "All sans (Space Grotesk)",
+    serif: '"Space Grotesk", system-ui, sans-serif',
+    sans: '"Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif',
+  },
+  literary: {
+    label: "All serif (Fraunces)",
+    serif: '"Fraunces", Georgia, serif',
+    sans: '"Fraunces", Georgia, serif',
+  },
+  system: {
+    label: "System fonts",
+    serif: "ui-serif, Georgia, 'Times New Roman', serif",
+    sans: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+  },
+};
+
+/** Display faces for the forum name in the topbar (2026-07-29) — chosen
+ * separately from the reading pairing; keys mirror shared BRAND_FONT_KEYS. */
+export const BRAND_FONTS: Record<string, { label: string; stack: string }> = {
+  default: {
+    label: "Poetsen One (default)",
+    stack: '"Poetsen One", "Fraunces", Georgia, serif',
+  },
+  fraunces: { label: "Fraunces", stack: '"Fraunces", Georgia, serif' },
+  playfair: {
+    label: "Playfair Display",
+    stack: '"Playfair Display", Georgia, serif',
+  },
+  abril: { label: "Abril Fatface", stack: '"Abril Fatface", Georgia, serif' },
+  bebas: { label: "Bebas Neue", stack: '"Bebas Neue", Impact, sans-serif' },
+  grotesk: {
+    label: "Space Grotesk",
+    stack: '"Space Grotesk", system-ui, sans-serif',
+  },
+  lobster: { label: "Lobster", stack: '"Lobster", cursive' },
+  caveat: { label: "Caveat", stack: '"Caveat", cursive' },
+  mono: {
+    label: "IBM Plex Mono",
+    stack: '"IBM Plex Mono", ui-monospace, Menlo, monospace',
+  },
+  sans: { label: "Inter (plain)", stack: '"Inter", system-ui, sans-serif' },
 };
 
 /**
@@ -134,6 +181,7 @@ export const DEFAULT_THEME_LIGHT = {
   topbarText: "#1b2330", // --ink
   text: "#1b2330", // --ink
   font: "default",
+  brandFont: "default",
 } as const;
 
 export const DEFAULT_THEME_DARK = {
@@ -144,6 +192,252 @@ export const DEFAULT_THEME_DARK = {
   topbarText: "#e7eaf1", // --ink (dark)
   text: "#e7eaf1", // --ink (dark)
 } as const;
+
+/** One preset palette: fills every light + dark colour field in the
+ * Settings form at once (2026-07-29). Purely a form convenience — the
+ * individual colours are what's persisted, so admins can tweak after. */
+export type PresetPalette = {
+  label: string;
+  light: {
+    primary: string;
+    secondary: string;
+    background: string;
+    topbar: string;
+    topbarText: string;
+    text: string;
+  };
+  dark: {
+    primary: string;
+    secondary: string;
+    background: string;
+    topbar: string;
+    topbarText: string;
+    text: string;
+  };
+};
+
+const preset = (
+  label: string,
+  light: PresetPalette["light"],
+  dark: PresetPalette["dark"],
+): PresetPalette => ({ label, light, dark });
+
+export const PRESET_PALETTES: Record<string, PresetPalette> = {
+  classic: preset(
+    "Classic Blue (default)",
+    { ...DEFAULT_THEME_LIGHT },
+    { ...DEFAULT_THEME_DARK },
+  ),
+  forest: preset(
+    "Forest",
+    {
+      primary: "#1f7a4d",
+      secondary: "#4f9e75",
+      background: "#edf2ee",
+      topbar: "#ffffff",
+      topbarText: "#1c2a22",
+      text: "#1c2a22",
+    },
+    {
+      primary: "#2ea36b",
+      secondary: "#5cb890",
+      background: "#101815",
+      topbar: "#182420",
+      topbarText: "#e2ece6",
+      text: "#dfe9e3",
+    },
+  ),
+  ocean: preset(
+    "Ocean",
+    {
+      primary: "#0369a1",
+      secondary: "#0ea5e9",
+      background: "#e9f1f6",
+      topbar: "#ffffff",
+      topbarText: "#0f2532",
+      text: "#132b3a",
+    },
+    {
+      primary: "#38bdf8",
+      secondary: "#7dd3fc",
+      background: "#0b1620",
+      topbar: "#122230",
+      topbarText: "#dcedf7",
+      text: "#d7e8f2",
+    },
+  ),
+  plum: preset(
+    "Plum",
+    {
+      primary: "#7c3aed",
+      secondary: "#a78bfa",
+      background: "#f1eef6",
+      topbar: "#ffffff",
+      topbarText: "#241b38",
+      text: "#251d38",
+    },
+    {
+      primary: "#a78bfa",
+      secondary: "#c4b5fd",
+      background: "#161221",
+      topbar: "#201a30",
+      topbarText: "#e9e4f5",
+      text: "#e6e1f2",
+    },
+  ),
+  crimson: preset(
+    "Crimson",
+    {
+      primary: "#be123c",
+      secondary: "#e11d48",
+      background: "#f6eeef",
+      topbar: "#ffffff",
+      topbarText: "#31121a",
+      text: "#33151d",
+    },
+    {
+      primary: "#fb7185",
+      secondary: "#fda4af",
+      background: "#1c1013",
+      topbar: "#2a171c",
+      topbarText: "#f6dfe4",
+      text: "#f2dce1",
+    },
+  ),
+  terracotta: preset(
+    "Terracotta",
+    {
+      primary: "#c2542e",
+      secondary: "#e07b54",
+      background: "#f5efe9",
+      topbar: "#fdf8f3",
+      topbarText: "#33201a",
+      text: "#33201a",
+    },
+    {
+      primary: "#e07b54",
+      secondary: "#f0a583",
+      background: "#1a1310",
+      topbar: "#271c16",
+      topbarText: "#f2e4dc",
+      text: "#efe1d9",
+    },
+  ),
+  amber: preset(
+    "Amber",
+    {
+      primary: "#b45309",
+      secondary: "#f59e0b",
+      background: "#f6f1e7",
+      topbar: "#fffbf2",
+      topbarText: "#2e2410",
+      text: "#2e2512",
+    },
+    {
+      primary: "#fbbf24",
+      secondary: "#fcd34d",
+      background: "#191510",
+      topbar: "#252017",
+      topbarText: "#f3ecdd",
+      text: "#f0e9da",
+    },
+  ),
+  rose: preset(
+    "Rose",
+    {
+      primary: "#be185d",
+      secondary: "#ec4899",
+      background: "#f6eef3",
+      topbar: "#ffffff",
+      topbarText: "#33111f",
+      text: "#341422",
+    },
+    {
+      primary: "#f472b6",
+      secondary: "#f9a8d4",
+      background: "#1c1017",
+      topbar: "#2a1720",
+      topbarText: "#f6dfe9",
+      text: "#f2dce6",
+    },
+  ),
+  teal: preset(
+    "Teal",
+    {
+      primary: "#0f766e",
+      secondary: "#14b8a6",
+      background: "#ebf2f1",
+      topbar: "#ffffff",
+      topbarText: "#122a27",
+      text: "#132b28",
+    },
+    {
+      primary: "#2dd4bf",
+      secondary: "#5eead4",
+      background: "#0e1716",
+      topbar: "#152321",
+      topbarText: "#daece9",
+      text: "#d7e9e6",
+    },
+  ),
+  slate: preset(
+    "Slate",
+    {
+      primary: "#475569",
+      secondary: "#64748b",
+      background: "#eef0f3",
+      topbar: "#ffffff",
+      topbarText: "#1e2530",
+      text: "#1e2530",
+    },
+    {
+      primary: "#94a3b8",
+      secondary: "#b6c2d2",
+      background: "#131720",
+      topbar: "#1c222d",
+      topbarText: "#e4e8ee",
+      text: "#e1e5eb",
+    },
+  ),
+  midnight: preset(
+    "Midnight bar",
+    {
+      primary: "#4c6ef5",
+      secondary: "#748ffc",
+      background: "#eceef3",
+      topbar: "#101623",
+      topbarText: "#f0f3fa",
+      text: "#1b2330",
+    },
+    {
+      primary: "#748ffc",
+      secondary: "#91a7ff",
+      background: "#111521",
+      topbar: "#0b0f1a",
+      topbarText: "#eef1f8",
+      text: "#e6eaf2",
+    },
+  ),
+  noir: preset(
+    "Noir",
+    {
+      primary: "#18181b",
+      secondary: "#52525b",
+      background: "#f1f1f2",
+      topbar: "#ffffff",
+      topbarText: "#111113",
+      text: "#151517",
+    },
+    {
+      primary: "#e4e4e7",
+      secondary: "#a1a1aa",
+      background: "#111113",
+      topbar: "#1a1a1d",
+      topbarText: "#f1f1f2",
+      text: "#ececee",
+    },
+  ),
+};
 
 /** Pick legible ink for text on a solid `hex` background: white on dark
  * colours, dark ink (#1b2330) on light ones, via WCAG relative luminance. The
@@ -209,9 +503,15 @@ function baseVars(theme: ThemeSettings, dark: boolean): Record<string, string> {
 }
 
 function fontVars(theme: ThemeSettings): Record<string, string> {
+  const vars: Record<string, string> = {};
   const font = theme.font ? FONT_PAIRINGS[theme.font] : undefined;
-  if (!font) return {};
-  return { "--serif": font.serif, "--sans": font.sans };
+  if (font) {
+    vars["--serif"] = font.serif;
+    vars["--sans"] = font.sans;
+  }
+  const brand = theme.brandFont ? BRAND_FONTS[theme.brandFont] : undefined;
+  if (brand) vars["--brand-display"] = brand.stack;
+  return vars;
 }
 
 /**

@@ -145,6 +145,7 @@ async function loadSwitcherAndUnread(
       name: t.name,
       privacy: t.privacy,
       iconUrl: s.iconUrl ?? null,
+      iconDarkUrl: s.iconDarkUrl ?? null,
       iconEmoji: s.iconEmoji ?? null,
     };
   });

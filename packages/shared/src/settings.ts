@@ -21,9 +21,40 @@ export type NotificationSettings = {
   newForumEmails?: boolean;
 };
 
+/** Canonical font-pairing keys (QA #59; expanded 2026-07-29). The API
+ * validates against this list; the web app maps each key to label + CSS
+ * stacks. One list so the two can't drift. */
+export const THEME_FONT_KEYS = [
+  "default",
+  "editorial",
+  "humanist",
+  "modern",
+  "technical",
+  "elegant",
+  "grotesk",
+  "literary",
+  "system",
+] as const;
+
+/** Canonical brand-font keys (2026-07-29): the display face for the forum
+ * name in the topbar, independent of the reading-font pairing. */
+export const BRAND_FONT_KEYS = [
+  "default",
+  "fraunces",
+  "playfair",
+  "abril",
+  "bebas",
+  "grotesk",
+  "lobster",
+  "caveat",
+  "mono",
+  "sans",
+] as const;
+
 /** Per-timetable theme (QA #59 full theming). All colours are #rrggbb.
  * `dark` overrides apply when the viewer uses dark mode; unset dark values
- * fall back to the built-in dark palette. `font` picks a curated pairing. */
+ * fall back to the built-in dark palette. `font` picks a curated pairing;
+ * `brandFont` sets the topbar forum-name face separately. */
 export type ThemeSettings = {
   primary?: string;
   secondary?: string;
@@ -32,6 +63,7 @@ export type ThemeSettings = {
   topbarText?: string;
   text?: string;
   font?: string;
+  brandFont?: string;
   dark?: {
     primary?: string;
     secondary?: string;
@@ -50,6 +82,9 @@ export type TimetableSettings = {
   coverImageUrl?: string | null;
   /** Small square icon shown in the topbar timetable menu. */
   iconUrl?: string | null;
+  /** Optional dark-mode alternative for iconUrl (2026-07-29) — shown when
+   * the viewer's resolved theme is dark; falls back to iconUrl unset. */
+  iconDarkUrl?: string | null;
   /** Emoji shown as the icon instead of an uploaded image (takes precedence). */
   iconEmoji?: string | null;
   /** Digest settings seeded onto new members who haven't customized theirs. */
