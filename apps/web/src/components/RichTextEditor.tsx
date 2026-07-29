@@ -40,7 +40,11 @@ export function RichTextEditor({
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ heading: { levels: [2, 3] } }),
-      Link.configure({ openOnClick: false }),
+      // inclusive:false is the documented one-liner for "I kept typing and
+      // the link got longer" (user bug 2026-07-29): TipTap ties mark
+      // inclusivity to the autolink option, so by default text typed at a
+      // link's edge joins the link. This keeps autolink but stops the growth.
+      Link.extend({ inclusive: false }).configure({ openOnClick: false }),
       Image,
       Placeholder.configure({ placeholder }),
       Markdown.configure({ transformPastedText: true }),
@@ -119,14 +123,18 @@ export function RichTextEditor({
           label={<Link2 size={16} aria-hidden />}
           title="Link"
           onClick={() => {
-            if (editor.isActive("link")) {
-              editor.chain().focus().unsetLink().run();
-              return;
-            }
-            const url = window.prompt("Link URL");
-            if (url) {
-              editor.chain().focus().setLink({ href: url }).run();
-            }
+            // Inside a link the button EDITS it (prefilled; clear the URL
+            // to remove) instead of silently deleting the whole link —
+            // the other half of the 2026-07-29 user bug. extendMarkRange
+            // applies the change to the whole link from a bare cursor.
+            const previous = editor.getAttributes("link").href as
+              | string
+              | undefined;
+            const url = window.prompt("Link URL (empty removes)", previous);
+            if (url === null) return;
+            const chain = editor.chain().focus().extendMarkRange("link");
+            if (url.trim()) chain.setLink({ href: url.trim() }).run();
+            else chain.unsetLink().run();
           }}
         />
         <ToolButton
