@@ -209,6 +209,21 @@ builder.queryFields((t) => ({
 // Mutations
 // ---------------------------------------------------------------------------
 
+/** Digest v2 (2026-07-29) arg guards — invalid values are ignored, not
+ * errors, matching the mutation's leave-unchanged-when-absent semantics. */
+function validDigestFrequency(
+  value: string | null | undefined,
+): "daily" | "weekly" | undefined {
+  return value === "daily" || value === "weekly" ? value : undefined;
+}
+function validDigestWeekday(
+  value: number | null | undefined,
+): number | undefined {
+  return value != null && Number.isInteger(value) && value >= 0 && value <= 6
+    ? value
+    : undefined;
+}
+
 builder.mutationFields((t) => ({
   /** Audit trail for the view-as-user preview (QA #59 round 3): called
    * as the admin enters the preview, before the cookie applies. The
@@ -296,10 +311,16 @@ builder.mutationFields((t) => ({
       digestNewTopics: t.arg.boolean({ required: false }),
       digestReplies: t.arg.boolean({ required: false }),
       digestActivity: t.arg.boolean({ required: false }),
+      /** "daily" or "weekly" (digest v2, 2026-07-29). */
+      digestFrequency: t.arg.string({ required: false }),
+      /** Weekly send day, 0 = Sunday … 6 = Saturday (UTC). */
+      digestWeekday: t.arg.int({ required: false }),
       newForumEmails: t.arg.boolean({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
       const user = await requireUser(ctx);
+      const frequency = validDigestFrequency(args.digestFrequency);
+      const weekday = validDigestWeekday(args.digestWeekday);
       const updated = await updateUserNotificationSettings(user.id, {
         ...(args.digestNewTopics != null
           ? { digestNewTopics: args.digestNewTopics }
@@ -310,6 +331,8 @@ builder.mutationFields((t) => ({
         ...(args.digestActivity != null
           ? { digestActivity: args.digestActivity }
           : {}),
+        ...(frequency ? { digestFrequency: frequency } : {}),
+        ...(weekday != null ? { digestWeekday: weekday } : {}),
         // Harmless for non-sysadmins to set — the sender only ever mails
         // addresses on the SYSADMIN_EMAILS list.
         ...(args.newForumEmails != null

@@ -13,10 +13,17 @@ export type RoleLabels = {
 
 /** Per-user digest/notification preferences. Also used as per-timetable
  * digest defaults seeded onto new members who haven't customized theirs. */
+export type DigestFrequency = "daily" | "weekly";
+
 export type NotificationSettings = {
   digestNewTopics?: boolean;
   digestReplies?: boolean;
   digestActivity?: boolean;
+  /** How often digests arrive (2026-07-29): daily (the default) or
+   * weekly on `digestWeekday`. */
+  digestFrequency?: DigestFrequency;
+  /** Weekly only: day to send on, 0 = Sunday … 6 = Saturday (UTC). */
+  digestWeekday?: number;
   /** Sysadmins only: email when any new forum is created. */
   newForumEmails?: boolean;
 };

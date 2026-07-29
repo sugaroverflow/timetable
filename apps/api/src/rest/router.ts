@@ -7,7 +7,7 @@ import {
 
 import {
   buildDataExport,
-  computeUserDigest,
+  computeUserForumDigests,
   createLocalUser,
   createTimetable,
   deleteForum,
@@ -22,7 +22,8 @@ import {
   getUserById,
   getUserByIcsToken,
   inviteEmails,
-  isDigestEmpty,
+  digestWindowDays,
+  isDigestDue,
   listDigestRecipients,
   listHostTopics,
   markDigestSent,
@@ -602,8 +603,12 @@ restRouter.post(
     const digest = sampleDigest({
       email: user.email,
       name: user.name,
+      forumId: readable.timetable.id,
       forumName: readable.timetable.name,
       forumSlug: readable.timetable.slug,
+      accent:
+        (readable.timetable.settings as { theme?: { primary?: string } } | null)
+          ?.theme?.primary ?? null,
     });
     const { subject, html } = renderDigest(digest);
     try {
@@ -643,7 +648,11 @@ restRouter.post(
 
     const now = new Date();
     const dayMs = 24 * 60 * 60 * 1000;
-    const recipients = await listDigestRecipients();
+    // Weekly recipients are only due on their chosen weekday; skipping
+    // leaves lastDigestAt untouched so their window keeps accumulating.
+    const recipients = (await listDigestRecipients()).filter((r) =>
+      isDigestDue(r.notificationSettings, now),
+    );
     let sent = 0;
 
     // Recipients are independent, so process them in concurrent chunks of
@@ -655,20 +664,24 @@ restRouter.post(
       const chunk = recipients.slice(i, i + chunkSize);
       const results = await Promise.all(
         chunk.map(async (recipient) => {
+          const windowMs =
+            digestWindowDays(recipient.notificationSettings) * dayMs;
           const since =
-            recipient.lastDigestAt ?? new Date(now.getTime() - dayMs);
-          const digest = await computeUserDigest(recipient, since);
-          let didSend = false;
-          if (!isDigestEmpty(digest) && digest.email) {
+            recipient.lastDigestAt ?? new Date(now.getTime() - windowMs);
+          // Digest v2: one email per forum with news.
+          const digests = await computeUserForumDigests(recipient, since);
+          let didSend = 0;
+          for (const digest of digests) {
+            if (!digest.email) continue;
             const { subject, html } = renderDigest(digest);
             await sendEmail({ to: digest.email, subject, html });
-            didSend = true;
+            didSend += 1;
           }
           await markDigestSent(recipient.id, now);
           return didSend;
         }),
       );
-      sent += results.filter(Boolean).length;
+      sent += results.reduce((a, b) => a + b, 0);
     }
 
     res.json({ processed: recipients.length, sent });
