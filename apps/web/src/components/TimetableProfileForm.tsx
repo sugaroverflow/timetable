@@ -132,7 +132,7 @@ function RoleLabelFields({
       <p className="preview-roles">
         A <b>{value.host || "Host"}</b> proposes topics; an{" "}
         <b>{value.elector || "Elector"}</b> hearts and comments; an{" "}
-        <b>{value.admin || "Admin"}</b> moderates and runs settings.
+        <b>{value.admin || "Admin"}</b> reviews topics and runs settings.
       </p>
     </>
   );

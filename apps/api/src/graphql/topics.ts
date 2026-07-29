@@ -4,6 +4,7 @@ import {
   buildFeed,
   type FeedSort,
   createTopic,
+  deleteTopic,
   getPerson,
   getTopicBySlug,
   getTopicQueue,
@@ -610,6 +611,24 @@ builder.mutationFields((t) => ({
     },
   }),
 
+  /** Host permanently deletes their own not-yet-published topic (launch QA
+   * 2026-07-29). Owner-only — admins reject/unpublish instead. Published
+   * and archived topics refuse: unpublish first, so nothing with public
+   * hearts/comments vanishes in one click. */
+  deleteTopic: t.boolean({
+    args: { topicId: t.arg.string({ required: true }) },
+    resolve: async (_p, args, ctx) => {
+      const user = await requireUser(ctx);
+      const { topic, viewer } = await loadTopicAndViewer(ctx, args.topicId);
+      if (!ownsTopicAsHost(viewer, topic.hostId)) forbidden();
+      if (topic.status !== "unpublished" && topic.status !== "submitted") {
+        throw new GraphQLError("Only not-yet-published topics can be deleted");
+      }
+      await deleteTopic(topic, user.id);
+      return true;
+    },
+  }),
+
   moderateTopic: t.field({
     type: ManagedTopicType,
     args: {
@@ -623,7 +642,7 @@ builder.mutationFields((t) => ({
       if (!canModerate(viewer)) forbidden("Admins only");
       const action = args.action;
       if (action !== "publish" && action !== "reject") {
-        throw new GraphQLError("Invalid moderation action");
+        throw new GraphQLError("Invalid review action");
       }
       const updated = await moderateTopic(
         topic,

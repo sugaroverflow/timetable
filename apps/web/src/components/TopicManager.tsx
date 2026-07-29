@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 
 import { AdminCommentsPanel } from "@/components/AdminCommentsPanel";
 import { AdminTopicActions } from "@/components/AdminTopicActions";
@@ -15,6 +16,57 @@ import { useGqlAction } from "@/lib/useGqlAction";
 
 const SUBMIT = `mutation($id: String!){ submitTopic(topicId: $id){ id } }`;
 const UNPUBLISH = `mutation($id: String!){ unpublishTopic(topicId: $id){ id } }`;
+const DELETE = `mutation($id: String!){ deleteTopic(topicId: $id) }`;
+
+/** Two-step red Delete for a host's own not-yet-published topic (launch QA
+ * 2026-07-29) — same confirm pattern as PersonAdminPanel's remove. */
+function DeleteTopicButton({
+  topicId,
+  busy,
+  onDelete,
+}: {
+  topicId: string;
+  busy: boolean;
+  onDelete: (topicId: string) => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+
+  if (!confirming) {
+    return (
+      <button
+        className="btn btn-ghost"
+        type="button"
+        style={{ color: "var(--red)" }}
+        onClick={() => setConfirming(true)}
+      >
+        Delete
+      </button>
+    );
+  }
+  return (
+    <>
+      <span className="faint" style={{ fontSize: 13 }}>
+        Delete this topic and its comments forever?
+      </span>
+      <button
+        className="btn"
+        type="button"
+        style={{ color: "var(--red)" }}
+        disabled={busy}
+        onClick={() => onDelete(topicId)}
+      >
+        Yes, delete
+      </button>
+      <button
+        className="btn btn-ghost"
+        type="button"
+        onClick={() => setConfirming(false)}
+      >
+        Cancel
+      </button>
+    </>
+  );
+}
 
 /** The manage block under a My Topics card. Hosts get submit/unpublish/edit
  * gated by status; admins get the shared admin set instead (publish, edit,
@@ -100,6 +152,13 @@ function ManageControls({
       >
         {scope?.editing ? "Close editor" : "Edit"}
       </button>
+      {topic.status !== "published" && topic.status !== "archived" && (
+        <DeleteTopicButton
+          topicId={topic.id}
+          busy={busy}
+          onDelete={(id) => run(DELETE, { id }, "Topic deleted")}
+        />
+      )}
     </div>
   );
 }

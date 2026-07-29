@@ -301,7 +301,7 @@ export default async function ActivityPage({
         <EmptyState
           icon="≣"
           title="No activity yet"
-          hint="Moderation and lifecycle actions will appear here."
+          hint="Review and lifecycle actions will appear here."
         />
       ) : (
         <div className="timeline">
