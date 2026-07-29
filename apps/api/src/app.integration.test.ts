@@ -870,9 +870,10 @@ describe("createApiApp", () => {
       expect(core.getTopicQueue).toHaveBeenCalledWith(
         timetable.id,
         "elector-1",
+        timetable.heartsCountFrom,
       );
 
-      // Hosts don't vote — no queue.
+      // Hosts read the queue too (v2 2026-07-29 — they asked for it).
       mockSession("host-1", ["host"]);
       vi.mocked(core.getReadableTimetable).mockResolvedValue({
         timetable,
@@ -884,9 +885,25 @@ describe("createApiApp", () => {
         body: JSON.stringify({ query, variables: { s: timetable.slug } }),
       });
       const hostBody = (await asHost.json()) as {
+        data: { topicQueue: { roundSize: number } | null };
+      };
+      expect(hostBody.data.topicQueue?.roundSize).toBe(4);
+
+      // Non-members (readable public forum, no roles) get none.
+      mockSession("stranger-1", []);
+      vi.mocked(core.getReadableTimetable).mockResolvedValue({
+        timetable,
+        roles: [],
+      });
+      const asStranger = await fetch(`${baseUrl}/graphql`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, variables: { s: timetable.slug } }),
+      });
+      const strangerBody = (await asStranger.json()) as {
         data: { topicQueue: unknown };
       };
-      expect(hostBody.data.topicQueue).toBeNull();
+      expect(strangerBody.data.topicQueue).toBeNull();
     });
   });
 

@@ -173,20 +173,27 @@ function NotificationsNavLink({
   );
 }
 
-/** Elector-only. The badge is the never-seen count (the Analysis "Queue"
- * number) — always red, gone at zero; round restarts don't revive it. */
+/** Every member (v2 2026-07-29 — hosts asked for the queue too). The
+ * badge is the never-seen count (the Analysis "Queue" number), gone at
+ * zero; round restarts don't revive it, moving the ❤️-count-from cutoff
+ * does. Red for electors (the reading is their vote); grey for everyone
+ * else — they don't get in trouble for not doing the reading. */
 function QueueNavLink({
   base,
   neverSeen,
+  elector,
 }: {
   base: string;
   neverSeen: number;
+  elector: boolean;
 }) {
   return (
     <NavLink href={`${base}/queue`}>
       Topic Queue
       {neverSeen > 0 ? (
-        <span className="nav-badge">{neverSeen > 99 ? "99+" : neverSeen}</span>
+        <span className={`nav-badge${elector ? "" : " nav-badge-quiet"}`}>
+          {neverSeen > 99 ? "99+" : neverSeen}
+        </span>
       ) : null}
     </NavLink>
   );
@@ -216,7 +223,13 @@ function SideNav({
       <NavLink href={`${base}/topics`} whenAbsent={["hearted"]}>
         All Topics
       </NavLink>
-      {elector && <QueueNavLink base={base} neverSeen={queueNeverSeen} />}
+      {isMember && (
+        <QueueNavLink
+          base={base}
+          neverSeen={queueNeverSeen}
+          elector={elector}
+        />
+      )}
       {hostOrAdmin && <NavLink href={`${base}/my-topics`}>My Topics</NavLink>}
       {elector && (
         <NavLink href={`${base}/topics?hearted=me`}>

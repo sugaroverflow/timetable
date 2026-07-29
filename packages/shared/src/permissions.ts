@@ -72,6 +72,15 @@ export function canHeart(viewer: Viewer): boolean {
   return isAuthenticated(viewer) && isElector(viewer.roles);
 }
 
+/** Every member gets a Topic Queue (v2 2026-07-29 — hosts asked for it):
+ * electors review with the ❤️ switcher, other members read through. */
+export function canUseQueue(viewer: Viewer): boolean {
+  return (
+    isAuthenticated(viewer) &&
+    (isElector(viewer.roles) || isHost(viewer.roles) || isAdmin(viewer.roles))
+  );
+}
+
 /** Logged-in members (elector/host/admin) can post public comments. */
 export function canComment(viewer: Viewer): boolean {
   return (

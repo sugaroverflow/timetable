@@ -4,6 +4,7 @@ import {
   ANONYMOUS,
   canEditTopic,
   canSeePersonProfile,
+  canUseQueue,
   ownsTopicAsHost,
   type Viewer,
 } from "./permissions";
@@ -38,6 +39,16 @@ describe("canSeePersonProfile", () => {
     expect(
       canSeePersonProfile("hosts_only", SIGNED_IN_GUEST, ["elector"]),
     ).toBe(false);
+  });
+});
+
+describe("canUseQueue", () => {
+  it("every member role gets a queue; guests and non-members none", () => {
+    expect(canUseQueue({ userId: "u", roles: ["elector"] })).toBe(true);
+    expect(canUseQueue({ userId: "u", roles: ["host"] })).toBe(true);
+    expect(canUseQueue({ userId: "u", roles: ["admin"] })).toBe(true);
+    expect(canUseQueue(SIGNED_IN_GUEST)).toBe(false);
+    expect(canUseQueue(ANONYMOUS)).toBe(false);
   });
 });
 

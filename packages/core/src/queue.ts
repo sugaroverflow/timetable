@@ -11,26 +11,33 @@ import {
 } from "@timetable/db";
 
 /**
- * Topic Queue (2026-07-28): every elector gets a private, stable ordering of
- * the published topics they haven't ❤️'d, shown one at a time. Marking a
- * topic seen (the "Later" button) or hearting it advances the queue; when
- * everything has been seen the round ends explicitly, and restarting begins
- * a fresh round of whatever is still unhearted. Topics published after the
- * current round started are "new" and jump to the front.
+ * Topic Queue (2026-07-28; v2 2026-07-29): every member gets a private,
+ * stable ordering of the published topics they haven't reviewed, shown one
+ * at a time. Electors review with a ❤️ switcher and a Next button; other
+ * members read through with Next alone. When everything has been seen the
+ * round ends explicitly; restarting begins a fresh review of EVERY
+ * published topic. Topics published after the current round started are
+ * "new" and jump to the front.
+ *
+ * The forum's `heartsCountFrom` cutoff resets the queue for everyone
+ * (fresh-eyes review, e.g. at the start of a term): seen marks and hearts
+ * from before the cutoff stop counting as "reviewed", so previously
+ * ❤️'d topics come back around to be re-affirmed or un-❤️'d.
  */
 
 export type TopicQueueState = {
   /** The topic to show next, or null when the round is complete. */
   currentTopicId: string | null;
-  /** Unseen-this-round, unhearted topics (includes the new ones). */
+  /** Not-yet-reviewed-this-round topics (includes the new ones). */
   remaining: number;
   /** Subset of `remaining` published after the round started (🆕). */
   remainingNew: number;
-  /** All unhearted published topics — the size of the current round. */
+  /** All published topics — the size of a full round. */
   roundSize: number;
-  /** Published topics NEVER seen nor ❤️'d — the sidebar badge and the
-   * Analysis "Queue" column. Unlike `remaining` this ignores round
-   * restarts, so it only ever shrinks (to zero, where the badge hides). */
+  /** Published topics never seen (nor ❤️'d) since the forum's cutoff —
+   * the sidebar badge and the Analysis "Queue" column. Unlike `remaining`
+   * this ignores round restarts, so it only ever shrinks (to zero, where
+   * the badge hides) until the cutoff moves. */
   neverSeenCount: number;
 };
 
@@ -42,9 +49,18 @@ function queueOrderKey(userId: string, topicId: string): string {
   return createHash("md5").update(`${userId}:${topicId}`).digest("hex");
 }
 
+/** The later of two nullable instants; null when both are unset. */
+function laterOf(a: Date | null, b: Date | null): Date | null {
+  if (a === null) return b;
+  if (b === null) return a;
+  return a > b ? a : b;
+}
+
 export async function getTopicQueue(
   timetableId: string,
   userId: string,
+  /** The forum's heartsCountFrom: review marks before this don't count. */
+  cutoff: Date | null = null,
 ): Promise<TopicQueueState> {
   const [membership] = await db
     .select({ roundStartedAt: timetableMemberships.queueRoundStartedAt })
@@ -56,7 +72,9 @@ export async function getTopicQueue(
       ),
     )
     .limit(1);
-  const roundStart = membership?.roundStartedAt ?? null;
+  // The round effectively starts at the later of the member's own restart
+  // and the forum-wide cutoff — moving the cutoff restarts every queue.
+  const roundStart = laterOf(membership?.roundStartedAt ?? null, cutoff);
 
   const published = await db
     .select({ id: topics.id, publishedAt: topics.publishedAt })
@@ -75,30 +93,36 @@ export async function getTopicQueue(
   }
 
   const ids = published.map((t) => t.id);
+  // Hearts union in as "reviewed" because pre-queue hearts have no seen
+  // row; since the queue shipped, hearting also writes one (toggleHeart).
   const heartedRows = await db
-    .select({ topicId: hearts.topicId })
+    .select({ topicId: hearts.topicId, heartedAt: hearts.createdAt })
     .from(hearts)
     .where(and(eq(hearts.userId, userId), inArray(hearts.topicId, ids)));
-  const hearted = new Set(heartedRows.map((r) => r.topicId));
-
   const seenRows = await db
     .select({ topicId: topicSeen.topicId, seenAt: topicSeen.seenAt })
     .from(topicSeen)
     .where(and(eq(topicSeen.userId, userId), inArray(topicSeen.topicId, ids)));
-  // Null roundStart = the first round: every seen row counts as seen.
-  const seenThisRound = new Set(
-    seenRows
-      .filter((r) => roundStart === null || r.seenAt >= roundStart)
-      .map((r) => r.topicId),
-  );
-  const seenEver = new Set(seenRows.map((r) => r.topicId));
 
-  const eligible = published.filter((t) => !hearted.has(t.id));
+  const reviewedSince = (since: Date | null): Set<string> => {
+    const set = new Set<string>();
+    for (const r of seenRows) {
+      if (since === null || r.seenAt >= since) set.add(r.topicId);
+    }
+    for (const r of heartedRows) {
+      if (since === null || r.heartedAt >= since) set.add(r.topicId);
+    }
+    return set;
+  };
+
+  const reviewedThisRound = reviewedSince(roundStart);
+  const reviewedSinceCutoff = reviewedSince(cutoff);
+
   const isNew = (t: { publishedAt: Date | null }): boolean =>
     roundStart !== null && t.publishedAt !== null && t.publishedAt > roundStart;
 
-  const remaining = eligible
-    .filter((t) => !seenThisRound.has(t.id))
+  const remaining = published
+    .filter((t) => !reviewedThisRound.has(t.id))
     .sort((a, b) => {
       // Just-published topics jump the queue; within each group the
       // per-user shuffle order holds.
@@ -113,17 +137,21 @@ export async function getTopicQueue(
     currentTopicId: remaining[0]?.id ?? null,
     remaining: remaining.length,
     remainingNew: remaining.filter(isNew).length,
-    roundSize: eligible.length,
-    neverSeenCount: eligible.filter((t) => !seenEver.has(t.id)).length,
+    roundSize: published.length,
+    neverSeenCount: published.filter((t) => !reviewedSinceCutoff.has(t.id))
+      .length,
   };
 }
 
-/** Analysis coverage (the Elector activity table's "Queue" column): how
- * many published topics each user has EVER seen or hearted. Unlike the
- * personal queue count this ignores round restarts — it answers "how much
- * has this elector never been exposed to", stably. Hearts are unioned in
- * because pre-queue hearts have no seen row. */
-export async function loadQueueCoverage(timetableId: string): Promise<{
+/** Analysis coverage (the activity tables' "Queue" column): how many
+ * published topics each user has seen or hearted since the forum's
+ * cutoff. Ignores round restarts — it answers "how much has this member
+ * never been exposed to", stably — but moving `heartsCountFrom` resets it
+ * for everyone (the fresh-eyes review). */
+export async function loadQueueCoverage(
+  timetableId: string,
+  cutoff: Date | null = null,
+): Promise<{
   publishedCount: number;
   coveredByUser: Map<string, number>;
 }> {
@@ -140,17 +168,26 @@ export async function loadQueueCoverage(timetableId: string): Promise<{
 
   const [seenRows, heartRows] = await Promise.all([
     db
-      .select({ userId: topicSeen.userId, topicId: topicSeen.topicId })
+      .select({
+        userId: topicSeen.userId,
+        topicId: topicSeen.topicId,
+        at: topicSeen.seenAt,
+      })
       .from(topicSeen)
       .where(inArray(topicSeen.topicId, ids)),
     db
-      .select({ userId: hearts.userId, topicId: hearts.topicId })
+      .select({
+        userId: hearts.userId,
+        topicId: hearts.topicId,
+        at: hearts.createdAt,
+      })
       .from(hearts)
       .where(inArray(hearts.topicId, ids)),
   ]);
 
   const covered = new Map<string, Set<string>>();
   for (const row of [...seenRows, ...heartRows]) {
+    if (cutoff !== null && row.at < cutoff) continue;
     const set = covered.get(row.userId) ?? new Set<string>();
     set.add(row.topicId);
     covered.set(row.userId, set);
@@ -163,7 +200,7 @@ export async function loadQueueCoverage(timetableId: string): Promise<{
   };
 }
 
-/** Record that the user has been shown this topic (the queue's "Later"
+/** Record that the user has been shown this topic (the queue's Next
  * button; hearting records it too via toggleHeart). Upsert bumps seenAt so
  * the row also means "last seen". */
 export async function markTopicSeen(
@@ -179,7 +216,7 @@ export async function markTopicSeen(
     });
 }
 
-/** Begin a fresh queue round: everything unhearted comes around again. */
+/** Begin a fresh queue round: every published topic comes around again. */
 export async function restartQueueRound(
   timetableId: string,
   userId: string,
