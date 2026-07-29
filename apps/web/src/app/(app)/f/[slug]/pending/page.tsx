@@ -59,10 +59,6 @@ export default async function ModerationPage({
     <div className="stack">
       <div className="page-head">
         <h2 className="page-title">Pending topics</h2>
-        <p>
-          Review submitted topics: publish, edit, or discuss in the {adminLabel}{" "}
-          comments.
-        </p>
       </div>
       <h3 className="section-title">Unpublished Topics</h3>
       {data.moderationQueue.length > 1 ? (

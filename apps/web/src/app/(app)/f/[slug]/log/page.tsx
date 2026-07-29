@@ -291,7 +291,6 @@ export default async function ActivityPage({
     <div className="stack">
       <div className="page-head">
         <h2 className="page-title">Activity log</h2>
-        <p>Every moderation and lifecycle action in this forum.</p>
       </div>
       <ActivityToolbar
         filters={{ action, actor, role, from, to }}

@@ -88,7 +88,7 @@ export default async function NotificationsPage({
             const base =
               topicPath(slug, n.topicHostSlug, n.topicSlug) ??
               (n.visibility === "admin_only"
-                ? `/f/${slug}/${viewerIsAdmin ? "moderation" : "my-topics"}`
+                ? `/f/${slug}/${viewerIsAdmin ? "pending" : "my-topics"}`
                 : null);
             const href = base ? `${base}#comment-${n.commentId}` : null;
             const replyHref = base

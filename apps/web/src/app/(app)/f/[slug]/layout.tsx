@@ -230,8 +230,8 @@ function SideNav({
       <NavLink href={`${base}/people`}>People</NavLink>
       {/* Profile moved to the topbar account menu (QA 2026-07-28). */}
       {hostOrAdmin && <NavLink href={`${base}/analysis`}>Analysis</NavLink>}
-      {admin && <NavLink href={`${base}/moderation`}>Pending Topics</NavLink>}
-      {admin && <NavLink href={`${base}/activity`}>Activity Log</NavLink>}
+      {admin && <NavLink href={`${base}/pending`}>Pending Topics</NavLink>}
+      {admin && <NavLink href={`${base}/log`}>Activity Log</NavLink>}
       {admin && <NavLink href={`${base}/settings`}>Forum Settings</NavLink>}
       {isMember && <NavLink href={`${base}/api`}>API</NavLink>}
     </nav>
