@@ -8,6 +8,7 @@ import {
   timetableMemberships,
   timetables,
   topics,
+  topicSeen,
   users,
   type NotificationSettings,
 } from "@timetable/db";
@@ -86,9 +87,21 @@ type DigestContext = {
   timetableSlug: Map<string, string>;
   /** The recipient's per-forum slug, by timetable (per-forum profiles). */
   recipientSlugByTimetable: Map<string, string | null>;
+  /** Per-forum "seen it in the app" watermarks (2026-07-29): the digest
+   * only emails what the member has NOT already seen — feed visits cover
+   * ambient heart counts, notifications-page visits cover
+   * comments/replies. New topics use topic_seen rows instead (deliberate
+   * queue reviews), not the superficial feed watermark. */
+  seenFeedAt: Map<string, Date | null>;
+  seenNotificationsAt: Map<string, Date | null>;
   electorTimetableIds: string[];
   isHostSomewhere: boolean;
 };
+
+/** The later of the digest window start and an in-app seen watermark. */
+function afterSeen(since: Date, seen: Date | null | undefined): Date {
+  return seen && seen > since ? seen : since;
+}
 
 async function loadDigestContext(
   recipient: DigestRecipient,
@@ -98,6 +111,8 @@ async function loadDigestContext(
       timetableId: timetableMemberships.timetableId,
       roles: timetableMemberships.roles,
       memberSlug: timetableMemberships.slug,
+      lastSeenFeedAt: timetableMemberships.lastSeenFeedAt,
+      lastSeenNotificationsAt: timetableMemberships.lastSeenNotificationsAt,
       name: timetables.name,
       slug: timetables.slug,
     })
@@ -111,6 +126,12 @@ async function loadDigestContext(
     timetableSlug: new Map(memberships.map((m) => [m.timetableId, m.slug])),
     recipientSlugByTimetable: new Map(
       memberships.map((m) => [m.timetableId, m.memberSlug]),
+    ),
+    seenFeedAt: new Map(
+      memberships.map((m) => [m.timetableId, m.lastSeenFeedAt]),
+    ),
+    seenNotificationsAt: new Map(
+      memberships.map((m) => [m.timetableId, m.lastSeenNotificationsAt]),
     ),
     electorTimetableIds: memberships
       .filter((m) => m.roles.includes("elector"))
@@ -129,6 +150,7 @@ async function newTopicsSection(
   }
   const rows = await db
     .select({
+      id: topics.id,
       title: topics.title,
       timetableId: topics.timetableId,
       slug: topics.slug,
@@ -149,11 +171,33 @@ async function newTopicsSection(
         gt(topics.publishedAt, since),
       ),
     );
-  return rows.map((r) => ({
-    title: r.title,
-    timetableName: ctx.timetableName.get(r.timetableId) ?? "",
-    path: topicPath(ctx.timetableSlug.get(r.timetableId), r.hostSlug, r.slug),
-  }));
+  if (rows.length === 0) return [];
+
+  // "Seen" for a NEW TOPIC means deliberately reviewed — a topic_seen row,
+  // written only by the queue's Next button and by hearting. A feed visit
+  // is deliberately NOT enough: scrolling All Topics is superficial, the
+  // queue is a considered read (Ed, 2026-07-29).
+  const seenRows = await db
+    .select({ topicId: topicSeen.topicId })
+    .from(topicSeen)
+    .where(
+      and(
+        eq(topicSeen.userId, ctx.recipient.id),
+        inArray(
+          topicSeen.topicId,
+          rows.map((r) => r.id),
+        ),
+      ),
+    );
+  const seen = new Set(seenRows.map((r) => r.topicId));
+
+  return rows
+    .filter((r) => !seen.has(r.id))
+    .map((r) => ({
+      title: r.title,
+      timetableName: ctx.timetableName.get(r.timetableId) ?? "",
+      path: topicPath(ctx.timetableSlug.get(r.timetableId), r.hostSlug, r.slug),
+    }));
 }
 
 async function repliesSection(
@@ -171,8 +215,10 @@ async function repliesSection(
   const rows = await db
     .select({
       topicTitle: topics.title,
+      timetableId: topics.timetableId,
       by: timetableMemberships.name,
       body: comments.body,
+      createdAt: comments.createdAt,
     })
     .from(comments)
     .innerJoin(topics, eq(topics.id, comments.topicId))
@@ -194,11 +240,21 @@ async function repliesSection(
         isNull(comments.deletedAt),
       ),
     );
-  return rows.map((r) => ({
-    topicTitle: r.topicTitle,
-    by: r.by,
-    snippet: r.body.slice(0, 100),
-  }));
+  return (
+    rows
+      // Replies live on the Notifications page — a visit there after the
+      // reply means it was seen in the app; don't email it (2026-07-29).
+      .filter(
+        (r) =>
+          r.createdAt >
+          afterSeen(since, ctx.seenNotificationsAt.get(r.timetableId)),
+      )
+      .map((r) => ({
+        topicTitle: r.topicTitle,
+        by: r.by,
+        snippet: r.body.slice(0, 100),
+      }))
+  );
 }
 
 async function hostActivitySection(
@@ -233,16 +289,21 @@ async function hostActivitySection(
   const myTopicIds = myTopics.map((t) => t.id);
   if (myTopicIds.length === 0) return [];
 
+  const timetableByTopic = new Map(myTopics.map((t) => [t.id, t.timetableId]));
+
+  // Individual rows, not SQL counts: each row is checked against the
+  // per-forum "seen in the app" watermark (2026-07-29) — heart counts are
+  // visible on feed cards (lastSeenFeedAt), comments surface on the
+  // Notifications page (lastSeenNotificationsAt).
   const [heartRows, commentRows] = await Promise.all([
     db
-      .select({ topicId: hearts.topicId, n: sql<number>`count(*)::int` })
+      .select({ topicId: hearts.topicId, createdAt: hearts.createdAt })
       .from(hearts)
       .where(
         and(inArray(hearts.topicId, myTopicIds), gt(hearts.createdAt, since)),
-      )
-      .groupBy(hearts.topicId),
+      ),
     db
-      .select({ topicId: comments.topicId, n: sql<number>`count(*)::int` })
+      .select({ topicId: comments.topicId, createdAt: comments.createdAt })
       .from(comments)
       .where(
         and(
@@ -252,26 +313,44 @@ async function hostActivitySection(
           // Faculty-only thread stays out of email.
           inArray(comments.visibility, ["public", "admin_only"]),
           ne(comments.authorId, ctx.recipient.id),
+          isNull(comments.hiddenAt),
+          isNull(comments.deletedAt),
         ),
-      )
-      .groupBy(comments.topicId),
+      ),
   ]);
 
+  const countUnseen = (
+    rows: { topicId: string; createdAt: Date }[],
+    seenBy: Map<string, Date | null>,
+  ): Map<string, number> => {
+    const counts = new Map<string, number>();
+    for (const row of rows) {
+      const timetableId = timetableByTopic.get(row.topicId);
+      const cutoff = afterSeen(since, seenBy.get(timetableId ?? ""));
+      if (row.createdAt <= cutoff) continue;
+      counts.set(row.topicId, (counts.get(row.topicId) ?? 0) + 1);
+    }
+    return counts;
+  };
+
   const hostActivity: UserDigest["hostActivity"] = [];
-  for (const h of heartRows) {
+  for (const [topicId, n] of countUnseen(heartRows, ctx.seenFeedAt)) {
     hostActivity.push({
-      topicTitle: titleById.get(h.topicId) ?? "",
+      topicTitle: titleById.get(topicId) ?? "",
       kind: "heart",
-      count: h.n,
-      path: pathById.get(h.topicId) ?? null,
+      count: n,
+      path: pathById.get(topicId) ?? null,
     });
   }
-  for (const c of commentRows) {
+  for (const [topicId, n] of countUnseen(
+    commentRows,
+    ctx.seenNotificationsAt,
+  )) {
     hostActivity.push({
-      topicTitle: titleById.get(c.topicId) ?? "",
+      topicTitle: titleById.get(topicId) ?? "",
       kind: "comment",
-      count: c.n,
-      path: pathById.get(c.topicId) ?? null,
+      count: n,
+      path: pathById.get(topicId) ?? null,
     });
   }
   return hostActivity;
