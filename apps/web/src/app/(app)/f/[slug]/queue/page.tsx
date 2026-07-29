@@ -45,6 +45,11 @@ export default async function QueuePage({
       ) : queue.current ? (
         <>
           <TopicCard
+            // Keyed by topic so the CLIENT state inside remounts per topic
+            // — without it, QueueControls kept its busy=true (Next worked
+            // once then wedged) and its stale heart-switch state across
+            // the server refresh (user bug, 2026-07-29).
+            key={queue.current.id}
             {...topicCardProps(page, queue.current)}
             expandBody
             queueControls={
