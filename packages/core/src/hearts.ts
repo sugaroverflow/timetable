@@ -4,11 +4,16 @@ import { db, hearts, topics } from "@timetable/db";
 
 import { logActivity } from "./activity";
 import { markTopicSeen } from "./queue";
+import { getHeartsCountFrom } from "./topics";
 
 /** Toggle an elector's heart on a published topic. Returns the new state.
- * Hearts are logged to the activity feed (QA #42). Whether a heart *counts*
- * is a separate question — hearts created before the timetable's
- * heartsCountFrom cutoff are ignored by the counting queries. */
+ * Hearts are logged to the activity feed (QA #42).
+ *
+ * The toggle is relative to the COUNTED state (queue v2, 2026-07-29): a
+ * heart row from before the timetable's heartsCountFrom cutoff is a dead
+ * vote — every surface shows the topic as unhearted — so hearting again
+ * must revive it (bump createdAt past the cutoff), not delete the dead
+ * row and silently invert the user's intent. */
 export async function toggleHeart(
   topicId: string,
   userId: string,
@@ -29,17 +34,20 @@ export async function toggleHeart(
   }
 
   const [existing] = await db
-    .select({ id: hearts.id })
+    .select({ id: hearts.id, createdAt: hearts.createdAt })
     .from(hearts)
     .where(and(eq(hearts.topicId, topicId), eq(hearts.userId, userId)))
     .limit(1);
+  const cutoff = await getHeartsCountFrom(topic.timetableId);
+  const counted =
+    existing !== undefined && (cutoff === null || existing.createdAt >= cutoff);
 
-  if (existing) {
-    await db.delete(hearts).where(eq(hearts.id, existing.id));
+  if (counted) {
+    await db.delete(hearts).where(eq(hearts.id, existing!.id));
   } else {
-    // Re-hearting after removing (or after a cutoff) is a fresh vote with a
-    // fresh createdAt. onConflictDoUpdate guards the rare double-submit race
-    // against the unique (topicId, userId) index.
+    // A fresh vote with a fresh createdAt. onConflictDoUpdate both guards
+    // the rare double-submit race against the unique (topicId, userId)
+    // index AND revives a pre-cutoff row by bumping it past the cutoff.
     await db
       .insert(hearts)
       .values({ topicId, userId })
@@ -55,9 +63,9 @@ export async function toggleHeart(
   await logActivity({
     timetableId: topic.timetableId,
     actorId: userId,
-    action: existing ? "heart.remove" : "heart.add",
+    action: counted ? "heart.remove" : "heart.add",
     payload: { topicId, title: topic.title },
   });
 
-  return { hearted: !existing };
+  return { hearted: !counted };
 }
