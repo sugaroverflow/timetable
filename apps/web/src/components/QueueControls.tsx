@@ -64,9 +64,11 @@ export function QueueControls({
   return (
     <div className="queue-bar">
       {canHeart ? (
+        // A real switch (QA 2026-07-29: the 🤍/❤️ glyph swap read as
+        // ambiguous): heart + track/thumb toggle inside one pill.
         <button
           type="button"
-          className={`queue-btn queue-btn-heart${hearted ? " on" : ""}`}
+          className={`queue-switch${hearted ? " on" : ""}`}
           role="switch"
           aria-checked={hearted}
           aria-label={hearted ? "❤️'d — click to remove" : "❤️ this topic"}
@@ -74,7 +76,12 @@ export function QueueControls({
           disabled={busy}
           onClick={toggleHeart}
         >
-          <span aria-hidden>{hearted ? "❤️" : "🤍"}</span>
+          <span className="queue-switch-heart" aria-hidden>
+            {hearted ? "❤️" : "🤍"}
+          </span>
+          <span className="queue-switch-track" aria-hidden>
+            <span className="queue-switch-thumb" />
+          </span>
         </button>
       ) : null}
       <button

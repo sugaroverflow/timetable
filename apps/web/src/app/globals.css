@@ -1638,14 +1638,65 @@ textarea {
   opacity: 0.5;
   cursor: default;
 }
-/* The ❤️ switcher (v2 2026-07-29): quiet until ON, then the heart-soft
-   fill announces the saved state. */
-.queue-btn-heart {
+/* The ❤️ switch (QA 2026-07-29, replacing the ambiguous glyph-swap
+   toggle): heart + a real track/thumb switch inside one pill, so the
+   on/off state is legible at a glance. */
+.queue-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  height: 64px;
+  padding: 0 20px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line-strong);
   background: var(--wash);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.12s ease,
+    box-shadow 0.12s ease;
 }
-.queue-btn-heart.on {
+.queue-switch:hover:not(:disabled) {
+  transform: scale(1.04);
+  box-shadow: var(--shadow);
+}
+.queue-switch:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.queue-switch.on {
   background: var(--heart-soft);
   border-color: var(--heart);
+}
+.queue-switch-heart {
+  font-size: 26px;
+  line-height: 1;
+}
+.queue-switch-track {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  border-radius: var(--radius-pill);
+  background: var(--line-strong);
+  transition: background 0.15s ease;
+}
+.queue-switch.on .queue-switch-track {
+  background: var(--heart);
+}
+.queue-switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--card);
+  box-shadow: var(--shadow);
+  transition: left 0.15s ease;
+}
+.queue-switch.on .queue-switch-thumb {
+  left: 22px;
 }
 .queue-btn-next {
   color: var(--ink);
