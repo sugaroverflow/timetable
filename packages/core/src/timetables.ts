@@ -172,10 +172,14 @@ export type ReadableTimetable = {
   roles: Role[];
 };
 
-/** Load a timetable by id or slug, enforcing read access for the viewer. */
+/** Load a timetable by id or slug, enforcing read access for the viewer.
+ * `sysadmin` (set by the API layer from SYSADMIN_EMAILS) grants read-only
+ * operator access to otherwise-unreadable forums (2026-07-29); the
+ * returned roles stay the member roles, so writes remain gated. */
 export async function getReadableTimetable(
   userId: string | null,
   idOrSlug: string,
+  opts: { sysadmin?: boolean } = {},
 ): Promise<ReadableTimetable | null> {
   const [timetable] = await db
     .select()
@@ -190,7 +194,8 @@ export async function getReadableTimetable(
   if (!timetable) return null;
 
   const roles = await getViewerRoles(userId, timetable.id);
-  if (!canReadTimetable(timetable.privacy, { userId, roles })) return null;
+  const viewer = { userId, roles, sysadmin: opts.sysadmin };
+  if (!canReadTimetable(timetable.privacy, viewer)) return null;
 
   return { timetable, roles };
 }

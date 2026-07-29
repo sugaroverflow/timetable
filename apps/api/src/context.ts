@@ -7,6 +7,8 @@ import {
 import { isAdmin, type Role, type Viewer } from "@timetable/shared";
 
 import { getUserFromRequest, type SessionUser } from "./auth/clerk";
+import { isSysadmin } from "./auth/sysadmin";
+import { structuredLogger } from "./http/request-log";
 
 type Impersonation = {
   /** The real signed-in admin driving the preview. */
@@ -91,17 +93,42 @@ export async function buildContext(args: {
   // roles don't re-read them today).
   const readableCache = new Map<string, Promise<ReadableTimetable | null>>();
 
+  const sysadmin = isSysadmin(user);
+
   return {
     user,
     impersonation,
     async getViewer(timetableId: string): Promise<Viewer> {
       const roles = await getViewerRoles(user?.id ?? null, timetableId);
-      return { userId: user?.id ?? null, roles };
+      // The sysadmin flag unlocks READ checks only (see shared Viewer docs);
+      // it never rides under an impersonation preview.
+      return {
+        userId: user?.id ?? null,
+        roles,
+        sysadmin: sysadmin && !impersonation,
+      };
     },
     readableTimetable(idOrSlug: string): Promise<ReadableTimetable | null> {
       let promise = readableCache.get(idOrSlug);
       if (!promise) {
-        promise = getReadableTimetable(user?.id ?? null, idOrSlug);
+        promise = getReadableTimetable(user?.id ?? null, idOrSlug, {
+          sysadmin: sysadmin && !impersonation,
+        }).then((readable) => {
+          // Operator oversight is accountable: reads of forums the member
+          // roles alone wouldn't unlock leave a log line (2026-07-29).
+          if (
+            readable &&
+            sysadmin &&
+            !impersonation &&
+            readable.roles.length === 0 &&
+            ["private", "deactivated"].includes(readable.timetable.privacy)
+          ) {
+            structuredLogger("sysadmin").info(
+              `${user?.email} read ${readable.timetable.privacy} forum "${readable.timetable.slug}" via operator access`,
+            );
+          }
+          return readable;
+        });
         readableCache.set(idOrSlug, promise);
       }
       return promise;

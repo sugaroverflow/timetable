@@ -284,12 +284,24 @@ export default async function TimetableLayout({
 
   const themeCss = buildThemeCss(settings);
 
+  // Non-members can only be looking at a private/deactivated forum via
+  // sysadmin operator access (guards block everyone else) — make the
+  // privileged mode unmistakable and state that it's read-only.
+  const sysadminView =
+    !isMember && ["private", "deactivated"].includes(timetable.privacy);
+
   return (
     <main className="container">
       {/* The timetable's theme applies globally (topbar included) while
        * this layout is mounted; dark overrides ride the same tag. */}
       {themeCss ? (
         <style dangerouslySetInnerHTML={{ __html: themeCss }} />
+      ) : null}
+      {sysadminView ? (
+        <div className="notice sysadmin-banner">
+          Sysadmin view — you are reading a {timetable.privacy} forum with
+          operator access. Read-only; members cannot see you here.
+        </div>
       ) : null}
       <div className="shell">
         <Sidebar>
