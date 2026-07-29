@@ -28,6 +28,18 @@ export async function findUserByEmail(
  * Safe to call when the row already exists (first-request JIT creation may
  * have won a race) — the existing row wins.
  */
+/** Admin email correction (2026-07-29): sync the local mirror after the
+ * Clerk-side replacement. Caller enforces the never-signed-in guard. */
+export async function updateUserEmail(
+  userId: string,
+  email: string,
+): Promise<void> {
+  await db
+    .update(users)
+    .set({ email: normalizeEmail(email) })
+    .where(eq(users.id, userId));
+}
+
 export async function createLocalUser(args: {
   id: string;
   email: string;

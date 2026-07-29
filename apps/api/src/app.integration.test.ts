@@ -34,9 +34,11 @@ vi.mock("@timetable/core", async (importOriginal) => {
     listDigestRecipients: vi.fn(),
     listHostTopics: vi.fn(),
     markInviteSent: vi.fn(),
+    logActivity: vi.fn(),
     setMemberRoles: vi.fn(),
     softDeleteComment: vi.fn(),
     updateCommentBody: vi.fn(),
+    updateUserEmail: vi.fn(),
     updateTimetableSettings: vi.fn(),
   };
 });
@@ -47,6 +49,7 @@ vi.mock("./auth/clerk", async (importOriginal) => {
     ...actual,
     getOrCreateClerkUser: vi.fn(),
     createSignInTicket: vi.fn(async () => null),
+    replaceClerkEmail: vi.fn(async () => "ok" as const),
   };
 });
 
@@ -234,9 +237,12 @@ afterEach(() => {
   vi.mocked(core.setMemberRoles).mockReset();
   vi.mocked(core.softDeleteComment).mockReset();
   vi.mocked(core.updateCommentBody).mockReset();
+  vi.mocked(core.updateUserEmail).mockReset();
+  vi.mocked(core.logActivity).mockReset();
   vi.mocked(core.updateTimetableSettings).mockReset();
   vi.mocked(clerk.getOrCreateClerkUser).mockReset();
   vi.mocked(clerk.createSignInTicket).mockReset();
+  vi.mocked(clerk.replaceClerkEmail).mockReset();
   vi.mocked(email.sendEmail).mockClear();
 });
 
@@ -406,6 +412,71 @@ describe("createApiApp", () => {
         ["host"],
       );
       expect(email.sendEmail).not.toHaveBeenCalled();
+    });
+  });
+
+  it("lets admins change a never-signed-in member's login email", async () => {
+    mockSession("admin-1", ["admin"]);
+    vi.mocked(clerk.replaceClerkEmail).mockResolvedValue("ok");
+    vi.mocked(core.getMembershipById).mockResolvedValue(
+      membershipFixture({ userId: "member-9" }),
+    );
+
+    await withTestServer(async (baseUrl) => {
+      const res = await fetch(`${baseUrl}/api/memberships/membership-1/email`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "Fixed.Typo@Example.com" }),
+      });
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toEqual({
+        email: "fixed.typo@example.com",
+      });
+      expect(clerk.replaceClerkEmail).toHaveBeenCalledWith(
+        "member-9",
+        "Fixed.Typo@Example.com",
+      );
+      expect(core.updateUserEmail).toHaveBeenCalledWith(
+        "member-9",
+        "Fixed.Typo@Example.com",
+      );
+      expect(core.logActivity).toHaveBeenCalledWith(
+        expect.objectContaining({ action: "member.email_change" }),
+      );
+    });
+  });
+
+  it("refuses the email change once the member has signed in", async () => {
+    mockSession("admin-1", ["admin"]);
+    vi.mocked(clerk.replaceClerkEmail).mockResolvedValue("signed_in");
+    vi.mocked(core.getMembershipById).mockResolvedValue(membershipFixture());
+
+    await withTestServer(async (baseUrl) => {
+      const res = await fetch(`${baseUrl}/api/memberships/membership-1/email`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "new@example.com" }),
+      });
+
+      expect(res.status).toBe(409);
+      expect(core.updateUserEmail).not.toHaveBeenCalled();
+    });
+  });
+
+  it("refuses the email change from non-admins", async () => {
+    mockSession("host-1", ["host"]);
+    vi.mocked(core.getMembershipById).mockResolvedValue(membershipFixture());
+
+    await withTestServer(async (baseUrl) => {
+      const res = await fetch(`${baseUrl}/api/memberships/membership-1/email`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "new@example.com" }),
+      });
+
+      expect(res.status).toBe(403);
+      expect(clerk.replaceClerkEmail).not.toHaveBeenCalled();
     });
   });
 
