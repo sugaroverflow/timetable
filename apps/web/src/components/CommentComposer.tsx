@@ -19,6 +19,22 @@ const PEOPLE_QUERY = `query MentionPeople($s: String!) {
   timetablePeople: forumPeople(idOrSlug: $s) { name slug }
 }`;
 
+/** Placeholder + success toast: explicit overrides win, else derived from
+ * the composer's visibility scope. */
+function composerCopy(
+  scopeLabel: string | null,
+  overrides: { placeholder?: string; successMessage?: string },
+) {
+  return {
+    placeholder:
+      overrides.placeholder ??
+      (scopeLabel ? `Add a ${scopeLabel} note…` : "Add a comment…"),
+    success:
+      overrides.successMessage ??
+      (scopeLabel ? `${scopeLabel} note added` : "Comment added"),
+  };
+}
+
 /** Comment box fixed to one visibility: the public, host-only, and
  * admin-only threads each get their own composer (QA #42/#59). Public
  * composers support @mention autocomplete when the timetable slug is known. */
@@ -28,6 +44,8 @@ export function CommentComposer({
   hostLabel = "Host",
   adminLabel = "Admin",
   mentionSlug,
+  placeholder,
+  successMessage,
 }: {
   topicId: string;
   visibility?: "public" | "host_only" | "admin_only";
@@ -35,6 +53,11 @@ export function CommentComposer({
   adminLabel?: string;
   /** Timetable slug — enables @mention autocomplete on the public composer. */
   mentionSlug?: string;
+  /** Override the scope-derived placeholder (the drafting thread explains
+   * its audience instead — QA 2026-07-29). */
+  placeholder?: string;
+  /** Override the scope-derived success toast. */
+  successMessage?: string;
 }) {
   const { run, busy } = useGqlAction();
   const [body, setBody] = useState("");
@@ -61,6 +84,7 @@ export function CommentComposer({
       : visibility === "admin_only"
         ? adminLabel
         : null;
+  const copy = composerCopy(scopeLabel, { placeholder, successMessage });
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -70,7 +94,7 @@ export function CommentComposer({
       MUTATION,
       { id: topicId, body: text, visibility },
       {
-        success: scopeLabel ? `${scopeLabel} note added` : "Comment added",
+        success: copy.success,
         errorFallback: "Could not post comment",
         onSuccess: () => setBody(""),
       },
@@ -94,9 +118,7 @@ export function CommentComposer({
         <GrowingTextarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
-          placeholder={
-            scopeLabel ? `Add a ${scopeLabel} note…` : "Add a comment…"
-          }
+          placeholder={copy.placeholder}
           aria-label={scopeLabel ? `${scopeLabel} comment` : "Comment"}
           data-topic-composer={scopeLabel ? undefined : topicId}
         />
