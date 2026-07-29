@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { clientGql } from "@/lib/clientGraphql";
-import type { DigestSettings, RoleLabels } from "@/lib/timetableSettings";
+import type { RoleLabels } from "@/lib/timetableSettings";
 import { useGqlAction } from "@/lib/useGqlAction";
 
 const MUTATION = `mutation($s: String!, $name: String, $privacy: String, $cd: String) {
@@ -11,17 +11,13 @@ const MUTATION = `mutation($s: String!, $name: String, $privacy: String, $cd: St
 }`;
 
 const SETTINGS_MUTATION = `mutation Labels(
-  $s: String!, $ra: String, $rh: String, $re: String,
-  $dnt: Boolean, $dr: Boolean, $da: Boolean
+  $s: String!, $ra: String, $rh: String, $re: String
 ) {
   updateTimetableSettings: updateForumSettings(
     idOrSlug: $s
     roleLabelAdmin: $ra
     roleLabelHost: $rh
     roleLabelElector: $re
-    digestNewTopics: $dnt
-    digestReplies: $dr
-    digestActivity: $da
   ) { id }
 }`;
 
@@ -33,21 +29,11 @@ type IdentityState = {
 
 type LabelsState = { admin: string; host: string; elector: string };
 
-type DigestState = { topics: boolean; replies: boolean; activity: boolean };
-
 function initialLabels(roleLabels: RoleLabels = {}): LabelsState {
   return {
     admin: roleLabels.admin ?? "Admin",
     host: roleLabels.host ?? "Host",
     elector: roleLabels.elector ?? "Elector",
-  };
-}
-
-function initialDigests(digestDefaults: DigestSettings = {}): DigestState {
-  return {
-    topics: digestDefaults.digestNewTopics ?? false,
-    replies: digestDefaults.digestReplies ?? false,
-    activity: digestDefaults.digestActivity ?? false,
   };
 }
 
@@ -152,53 +138,9 @@ function RoleLabelFields({
   );
 }
 
-function DigestFields({
-  value,
-  onChange,
-}: {
-  value: DigestState;
-  onChange: (patch: Partial<DigestState>) => void;
-}) {
-  return (
-    <>
-      <h3 style={{ fontSize: 15, margin: "18px 0 2px" }}>Default digest</h3>
-      <p className="faint" style={{ marginTop: 0, fontSize: 12 }}>
-        New members start with these. Each person can change their own from
-        their profile.
-      </p>
-      <label className="row" style={{ marginBottom: 8 }}>
-        <input
-          type="checkbox"
-          checked={value.topics}
-          onChange={(e) => onChange({ topics: e.target.checked })}
-          style={{ width: "auto" }}
-        />
-        New topics
-      </label>
-      <label className="row" style={{ marginBottom: 8 }}>
-        <input
-          type="checkbox"
-          checked={value.replies}
-          onChange={(e) => onChange({ replies: e.target.checked })}
-          style={{ width: "auto" }}
-        />
-        Replies to their comments
-      </label>
-      <label className="row" style={{ marginBottom: 12 }}>
-        <input
-          type="checkbox"
-          checked={value.activity}
-          onChange={(e) => onChange({ activity: e.target.checked })}
-          style={{ width: "auto" }}
-        />
-        Activity on their topics (hosts)
-      </label>
-    </>
-  );
-}
-
 /** Timetable profile section (QA #59 reorg): identity, visibility, role
- * labels with a live preview sentence, and digest defaults at the bottom.
+ * labels with a live preview sentence. Digest defaults moved to the Email
+ * digest card (2026-07-29).
  * Colours/cover/icon live in the Theme section. */
 export function TimetableProfileForm({
   slug,
@@ -206,14 +148,12 @@ export function TimetableProfileForm({
   privacy: initialPrivacy,
   customDomain: initialCustomDomain,
   roleLabels,
-  digestDefaults,
 }: {
   slug: string;
   name: string;
   privacy: string;
   customDomain: string | null;
   roleLabels?: RoleLabels;
-  digestDefaults?: DigestSettings;
 }) {
   const { run, busy } = useGqlAction();
   const [identity, setIdentity] = useState<IdentityState>({
@@ -223,9 +163,6 @@ export function TimetableProfileForm({
   });
   const [labels, setLabels] = useState<LabelsState>(() =>
     initialLabels(roleLabels),
-  );
-  const [digests, setDigests] = useState<DigestState>(() =>
-    initialDigests(digestDefaults),
   );
   const [saved, setSaved] = useState(false);
 
@@ -252,9 +189,6 @@ export function TimetableProfileForm({
             ra: labels.admin,
             rh: labels.host,
             re: labels.elector,
-            dnt: digests.topics,
-            dr: digests.replies,
-            da: digests.activity,
           });
           setSaved(true);
         },
@@ -275,10 +209,6 @@ export function TimetableProfileForm({
       <RoleLabelFields
         value={labels}
         onChange={(patch) => setLabels((s) => ({ ...s, ...patch }))}
-      />
-      <DigestFields
-        value={digests}
-        onChange={(patch) => setDigests((s) => ({ ...s, ...patch }))}
       />
       <button className="btn btn-primary" type="submit" disabled={busy}>
         {busy ? "Saving…" : saved ? "Saved" : "Save"}

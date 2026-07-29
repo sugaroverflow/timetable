@@ -4,6 +4,7 @@ import { isAdmin, type Role } from "@timetable/shared";
 
 import Link from "next/link";
 
+import { EmailDigestForm } from "@/components/EmailDigestForm";
 import { HeartsCutoffForm } from "@/components/HeartsCutoffForm";
 import { InviteForm } from "@/components/InviteForm";
 import { SettingsForm, type SettingsValues } from "@/components/SettingsForm";
@@ -59,12 +60,13 @@ export default async function SettingsPage({
           privacy={first.timetable.privacy}
           customDomain={first.timetable.customDomain}
           roleLabels={settings.roleLabels}
-          digestDefaults={settings.digestDefaults}
         />
         <SettingsForm slug={slug} current={settings} />
       </div>
 
       <HeartsCutoffForm slug={slug} current={first.timetable.heartsCountFrom} />
+
+      <EmailDigestForm slug={slug} digestDefaults={settings.digestDefaults} />
 
       <div className="grid grid-2">
         <InviteForm timetableId={first.timetable.id} />
