@@ -3,6 +3,7 @@
 import { Send } from "lucide-react";
 import { useState } from "react";
 
+import { GrowingTextarea } from "@/components/GrowingTextarea";
 import {
   MentionTextarea,
   type MentionCandidate,
@@ -90,7 +91,7 @@ export function CommentComposer({
           />
         </div>
       ) : (
-        <textarea
+        <GrowingTextarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
           placeholder={

@@ -3,6 +3,7 @@
 import { Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { GrowingTextarea } from "@/components/GrowingTextarea";
 import { useGqlAction } from "@/lib/useGqlAction";
 
 const EDIT = `mutation Edit($id: String!, $body: String!) {
@@ -50,7 +51,7 @@ export function CommentEditForm({
 
   return (
     <form onSubmit={save} className="inline-form" style={{ marginTop: 4 }}>
-      <textarea
+      <GrowingTextarea
         ref={textareaRef}
         value={body}
         onChange={(e) => setBody(e.target.value)}
