@@ -45,10 +45,11 @@ export default async function QueuePage({
       ) : queue.current ? (
         <>
           <TopicCard
-            // Keyed by topic so the CLIENT state inside remounts per topic
-            // — without it, QueueControls kept its busy=true (Next worked
-            // once then wedged) and its stale heart-switch state across
-            // the server refresh (user bug, 2026-07-29).
+            // NOTE: this key does NOT remount the client components inside
+            // across router.refresh() (server-component keys reconcile in
+            // place — reproduced on dev, 2026-07-29). QueueControls resets
+            // its own per-topic state instead; the key stays for ordinary
+            // navigations.
             key={queue.current.id}
             {...topicCardProps(page, queue.current)}
             expandBody

@@ -2,7 +2,7 @@
 
 import { ArrowRight, RotateCcw } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 
 import { useToast } from "@/components/Toast";
 import { clientGql } from "@/lib/clientGraphql";
@@ -35,29 +35,48 @@ export function QueueControls({
 }) {
   const router = useRouter();
   const { toastError } = useToast();
-  const [busy, setBusy] = useState(false);
+  const [inFlight, setInFlight] = useState(false);
+  const [isPending, startTransition] = useTransition();
   const [hearted, setHearted] = useState(initialHearted);
+  const [lastTopicId, setLastTopicId] = useState(topicId);
+
+  // router.refresh() reconciles this client component IN PLACE — even the
+  // key #179 put on the queue's TopicCard (a server component) doesn't
+  // force a remount, so the previous topic's busy/hearted state leaked
+  // into the next card (Next wedged after one click — reproduced on dev,
+  // 2026-07-29, twice). Reset per-topic state during render instead: the
+  // React "derive state from props" pattern survives either behaviour.
+  if (topicId !== lastTopicId) {
+    setLastTopicId(topicId);
+    setHearted(initialHearted);
+    setInFlight(false);
+  }
+
+  // isPending covers the refresh transition, so even a reconciled-in-place
+  // update re-enables the controls the moment the new card's data lands.
+  const busy = inFlight || isPending;
 
   async function toggleHeart() {
-    setBusy(true);
+    setInFlight(true);
     try {
       await clientGql(HEART, { id: topicId });
       setHearted((h) => !h);
-      setBusy(false);
     } catch {
       toastError("That didn't save — try again.");
-      setBusy(false);
+    } finally {
+      setInFlight(false);
     }
   }
 
   async function next() {
-    setBusy(true);
+    setInFlight(true);
     try {
       await clientGql(NEXT, { id: topicId });
-      router.refresh();
+      startTransition(() => router.refresh());
     } catch {
       toastError("That didn't save — try again.");
-      setBusy(false);
+    } finally {
+      setInFlight(false);
     }
   }
 
@@ -113,16 +132,19 @@ export function QueueRestartButton({
 }) {
   const router = useRouter();
   const { toastError } = useToast();
-  const [busy, setBusy] = useState(false);
+  const [inFlight, setInFlight] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const busy = inFlight || isPending;
 
   async function restart() {
-    setBusy(true);
+    setInFlight(true);
     try {
       await clientGql(RESTART, { s: slug });
-      router.refresh();
+      startTransition(() => router.refresh());
     } catch {
       toastError("That didn't save — try again.");
-      setBusy(false);
+    } finally {
+      setInFlight(false);
     }
   }
 
