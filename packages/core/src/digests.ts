@@ -1,5 +1,7 @@
 import { and, eq, gt, inArray, isNull, ne, sql } from "drizzle-orm";
 
+import { isDigestEnabled } from "@timetable/shared";
+
 import type { NotificationSettings, TimetableSettings } from "@timetable/db";
 import {
   activityEvents,
@@ -69,7 +71,7 @@ function topicPath(
   return `/f/${timetableSlug}/${hostSlug}/${topicSlug}`;
 }
 
-/** Users who have opted into at least one digest channel and have an email. */
+/** Users who have digests switched on and have an email. */
 export async function listDigestRecipients(): Promise<DigestRecipient[]> {
   const rows = await db
     .select({
@@ -81,11 +83,7 @@ export async function listDigestRecipients(): Promise<DigestRecipient[]> {
     })
     .from(users);
 
-  return rows.filter((u) => {
-    if (!u.email) return false;
-    const s = u.notificationSettings;
-    return Boolean(s.digestNewTopics || s.digestReplies || s.digestActivity);
-  });
+  return rows.filter((u) => u.email && isDigestEnabled(u.notificationSettings));
 }
 
 /** Whether this recipient's digest should go out on `now`'s (UTC) day:
@@ -191,12 +189,7 @@ async function newTopicRows(
   ctx: DigestContext,
   since: Date,
 ): Promise<PerForum<{ title: string; path: string | null }>> {
-  if (
-    !ctx.recipient.notificationSettings.digestNewTopics ||
-    ctx.electorTimetableIds.length === 0
-  ) {
-    return [];
-  }
+  if (ctx.electorTimetableIds.length === 0) return [];
   const rows = await db
     .select({
       id: topics.id,
@@ -253,7 +246,6 @@ async function replyRows(
   ctx: DigestContext,
   since: Date,
 ): Promise<PerForum<ForumDigest["replies"][number]>> {
-  if (!ctx.recipient.notificationSettings.digestReplies) return [];
   const myComments = await db
     .select({ id: comments.id })
     .from(comments)
@@ -473,9 +465,10 @@ function groupByForum<T extends { timetableId: string }>(
 
 /**
  * Digest v2 (2026-07-29): compute one digest PER FORUM the user belongs
- * to, honouring the channels they enabled and the per-forum seen
- * watermarks. Forums with no news yield no digest. Drafts are a standing
- * reminder attached to otherwise non-empty digests only.
+ * to, honouring the per-forum seen watermarks. Every section is always
+ * included — the only choice is whether to receive digests at all
+ * (`isDigestEnabled`). Forums with no news yield no digest. Drafts are a
+ * standing reminder attached to otherwise non-empty digests only.
  */
 export async function computeUserForumDigests(
   recipient: DigestRecipient,
@@ -485,8 +478,7 @@ export async function computeUserForumDigests(
   const { myTopics, pathById } = await loadMyTopics(ctx);
   const titleById = new Map(myTopics.map((t) => [t.id, t.title]));
   const timetableByTopic = new Map(myTopics.map((t) => [t.id, t.timetableId]));
-  const activityOn = Boolean(recipient.notificationSettings.digestActivity);
-  const activityTopicIds = activityOn ? myTopics.map((t) => t.id) : [];
+  const activityTopicIds = myTopics.map((t) => t.id);
 
   const [newTopics, replies, myComments, heartCounts, assigned] =
     await Promise.all([

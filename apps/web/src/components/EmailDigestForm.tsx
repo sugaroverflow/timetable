@@ -3,47 +3,24 @@
 import { Send } from "lucide-react";
 import { useState } from "react";
 
+import { isDigestEnabled } from "@timetable/shared";
+
 import { useToast } from "@/components/Toast";
 import { clientApi } from "@/lib/clientApi";
 import type { DigestSettings } from "@/lib/timetableSettings";
 import { useGqlAction } from "@/lib/useGqlAction";
 
-const MUTATION = `mutation DigestDefaults($s: String!, $dnt: Boolean, $dr: Boolean, $da: Boolean) {
+const MUTATION = `mutation DigestDefaults($s: String!, $e: Boolean) {
   updateTimetableSettings: updateForumSettings(
     idOrSlug: $s
-    digestNewTopics: $dnt
-    digestReplies: $dr
-    digestActivity: $da
+    digestEnabled: $e
   ) { id }
 }`;
 
-type DigestState = { topics: boolean; replies: boolean; activity: boolean };
-
-function DigestToggle({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <label className="row" style={{ marginBottom: 8 }}>
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        style={{ width: "auto" }}
-      />
-      {label}
-    </label>
-  );
-}
-
 /** Forum Settings "Email Digest" card (2026-07-29): the per-forum digest
- * defaults (moved out of the profile form) plus a send-test button that
- * emails the admin the real template filled with example notifications. */
+ * default (on/off — digests always include everything) plus a send-test
+ * button that emails the admin the real template filled with example
+ * notifications. */
 export function EmailDigestForm({
   slug,
   digestDefaults,
@@ -53,11 +30,9 @@ export function EmailDigestForm({
 }) {
   const { run, busy } = useGqlAction();
   const { toast, toastError } = useToast();
-  const [state, setState] = useState<DigestState>({
-    topics: digestDefaults?.digestNewTopics ?? false,
-    replies: digestDefaults?.digestReplies ?? false,
-    activity: digestDefaults?.digestActivity ?? false,
-  });
+  const [enabled, setEnabled] = useState(
+    digestDefaults ? isDigestEnabled(digestDefaults) : false,
+  );
   const [saved, setSaved] = useState(false);
   const [sendingTest, setSendingTest] = useState(false);
 
@@ -66,7 +41,7 @@ export function EmailDigestForm({
     setSaved(false);
     void run(
       MUTATION,
-      { s: slug, dnt: state.topics, dr: state.replies, da: state.activity },
+      { s: slug, e: enabled },
       {
         success: "Digest defaults saved",
         errorFallback: "Could not save digest defaults",
@@ -99,24 +74,19 @@ export function EmailDigestForm({
         Email digest
       </h2>
       <p className="faint" style={{ marginTop: 0, fontSize: "var(--text-xs)" }}>
-        A daily email summary of forum activity. New members start with these
-        defaults; each person can change their own on their Notifications page.
+        A regular email summary of forum activity — comments on their topics,
+        replies, and new topics. New members start with this default; each
+        person can switch it on or off on their Notifications page.
       </p>
-      <DigestToggle
-        label="New topics"
-        checked={state.topics}
-        onChange={(v) => setState((s) => ({ ...s, topics: v }))}
-      />
-      <DigestToggle
-        label="Replies to their comments"
-        checked={state.replies}
-        onChange={(v) => setState((s) => ({ ...s, replies: v }))}
-      />
-      <DigestToggle
-        label="Activity on their topics (hosts)"
-        checked={state.activity}
-        onChange={(v) => setState((s) => ({ ...s, activity: v }))}
-      />
+      <label className="row" style={{ marginBottom: 8 }}>
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(e) => setEnabled(e.target.checked)}
+          style={{ width: "auto" }}
+        />
+        Send digests to new members
+      </label>
       <div className="row wrap" style={{ marginTop: 12 }}>
         <button className="btn btn-primary" type="submit" disabled={busy}>
           {busy ? "Saving…" : saved ? "Saved" : "Save"}

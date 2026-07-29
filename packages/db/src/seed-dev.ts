@@ -936,9 +936,7 @@ function buildRows(fixture: Fixture): {
     emailVerified: BASE_TIME,
     image: null,
     notificationSettings: {
-      digestNewTopics: true,
-      digestReplies: true,
-      digestActivity: person.roles.includes("admin"),
+      digestEnabled: true,
     },
     lastDigestAt: null,
     icsToken: stableUuid("ics", person.label),
