@@ -451,6 +451,10 @@ textarea {
 .sidebar-foot .theme-toggle {
   padding: 4px 8px;
   font-size: var(--text-xs);
+  /* Ghost buttons carry invisible padding+border — pull the box left so
+     the LABEL aligns with the column edge like its neighbours; the hover
+     wash bleeds left harmlessly (QA 2026-07-29). */
+  margin-left: -9px;
 }
 .sidebar-bug-link {
   display: inline-flex;
@@ -909,11 +913,13 @@ textarea {
 }
 
 /* Topic card — tier 3 of the heading hierarchy: below page titles and
-   section headers on every screen size (QA 2026-07-28). */
+   section headers on every screen size (QA 2026-07-28; 18→20 in the
+   2026-07-29 rhythm pass). */
 .topic-title {
   font-family: var(--serif);
   font-weight: var(--fw-semibold);
-  font-size: var(--text-xl);
+  font-size: var(--text-2xl);
+  line-height: var(--lh-tight);
   margin: 0;
 }
 /* On its own permalink page the topic title IS the page title — tier 1. */
@@ -1120,7 +1126,14 @@ textarea {
 }
 .comment {
   display: flex;
+  align-items: flex-start;
   gap: 10px;
+}
+/* Centre the avatar on the username line: the name's line box sits 8px
+   into the bubble (padding) with a ~19px height, so its midpoint is
+   ~18px — a 26px avatar needs a 5px nudge to share it (QA 2026-07-29). */
+.comment > .avatar {
+  margin-top: 5px;
 }
 .comment-main {
   flex: 1;
@@ -1164,13 +1177,23 @@ textarea {
   letter-spacing: 0.04em;
   color: var(--host-ink);
 }
+/* Composer rows: the send button stretches to EXACTLY the textarea's
+   height (its intrinsic height is ~41px, not the 38px the button assumed
+   — QA 2026-07-29), staying matched when the field grows or is resized. */
 .inline-form {
   display: flex;
   gap: 8px;
-  align-items: flex-start;
+  align-items: stretch;
 }
 .inline-form textarea {
   min-height: 38px;
+}
+.inline-form .btn-send {
+  height: auto;
+  align-self: stretch;
+}
+.inline-form .btn-ghost {
+  align-self: center;
 }
 
 /* @mention autocomplete */
@@ -1599,12 +1622,15 @@ textarea {
   cursor: pointer;
 }
 
-/* Topic card action bar */
+/* Topic card action bar. No horizontal padding: the ❤️ pill and counters
+   share the body text's left edge and the weight chip the right edge —
+   the old 12px inset misaligned the row with everything around it
+   (QA 2026-07-29). */
 .card-actions {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 12px;
+  padding: 8px 0;
   border-top: 1px solid var(--line);
 }
 .act {
@@ -1822,13 +1848,14 @@ textarea {
    these over one-off style={{…}} so spacing/type/color stay tokenized.
    --------------------------------------------------------------------------- */
 
-/* Heading hierarchy (QA 2026-07-28): three tiers, strictly ordered and
-   sized generously for skimming (per Ed) — page title (26) > section
-   header (20) > item/topic titles (18). */
+/* Heading hierarchy (QA 2026-07-28, resized 2026-07-29): three tiers,
+   strictly ordered and sized generously for skimming (per Ed) — page
+   title (30) > section header (24) > item/topic titles (20). */
 .page-title {
   font-family: var(--serif);
   font-size: var(--text-4xl);
   font-weight: var(--fw-semibold);
+  line-height: var(--lh-tight);
   margin: 0;
 }
 
@@ -1836,9 +1863,18 @@ textarea {
    Inherits the serif family + weight from the h1–h3 element rule. */
 .section-title {
   font-family: var(--serif);
-  font-size: var(--text-2xl);
+  font-size: var(--text-3xl);
   font-weight: var(--fw-semibold);
+  line-height: var(--lh-tight);
   margin: 0;
+}
+
+/* Headings bind DOWNWARD (QA 2026-07-29): inside a stack, a section
+   header gets more air above than below, so it reads as introducing what
+   follows rather than floating between blocks. */
+.stack > .section-title {
+  margin-top: 10px;
+  margin-bottom: -4px;
 }
 
 /* Hairline divider above an action row (was inline borderTop:1px solid var(--line)). */
