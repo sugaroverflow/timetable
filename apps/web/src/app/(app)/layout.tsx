@@ -30,6 +30,7 @@ export default async function AppLayout({
         slug: t.slug,
         name: t.name,
         iconUrl: s.iconUrl ?? null,
+        iconDarkUrl: s.iconDarkUrl ?? null,
         iconEmoji: s.iconEmoji ?? null,
       };
     });

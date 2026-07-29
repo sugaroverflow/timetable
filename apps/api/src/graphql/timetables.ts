@@ -242,6 +242,7 @@ builder.mutationFields((t) => ({
       themeJson: t.arg.string({ required: false }),
       coverImageUrl: t.arg.string({ required: false }),
       iconUrl: t.arg.string({ required: false }),
+      iconDarkUrl: t.arg.string({ required: false }),
       iconEmoji: t.arg.string({ required: false }),
       digestNewTopics: t.arg.boolean({ required: false }),
       digestReplies: t.arg.boolean({ required: false }),
@@ -301,6 +302,10 @@ builder.mutationFields((t) => ({
 
       if (args.iconUrl != null) {
         patch.iconUrl = args.iconUrl.trim() || null;
+      }
+
+      if (args.iconDarkUrl != null) {
+        patch.iconDarkUrl = args.iconDarkUrl.trim() || null;
       }
 
       // A short emoji sequence (capped to guard against arbitrary payloads).

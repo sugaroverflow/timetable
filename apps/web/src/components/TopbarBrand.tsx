@@ -11,6 +11,8 @@ export type BrandItem = {
   slug: string;
   name: string;
   iconUrl: string | null;
+  /** Dark-mode alternative (2026-07-29); falls back to iconUrl. */
+  iconDarkUrl?: string | null;
   iconEmoji?: string | null;
 };
 
@@ -19,6 +21,42 @@ const PUBLIC_BRAND_QUERY = `
     timetable: forum(idOrSlug: $s) { name settings }
   }
 `;
+
+function BrandIcon({ item }: { item: BrandItem }) {
+  if (item.iconEmoji) {
+    return (
+      <span className="tt-menu-icon tt-menu-icon-emoji" aria-hidden>
+        {item.iconEmoji}
+      </span>
+    );
+  }
+  if (item.iconUrl) {
+    // Both mode variants render; CSS shows the html[data-theme] match.
+    return (
+      <>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          className={`tt-menu-icon${item.iconDarkUrl ? " mode-light-only" : ""}`}
+          src={item.iconUrl}
+          alt=""
+        />
+        {item.iconDarkUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            className="tt-menu-icon mode-dark-only"
+            src={item.iconDarkUrl}
+            alt=""
+          />
+        ) : null}
+      </>
+    );
+  }
+  return (
+    <span className="tt-menu-icon tt-menu-icon-fallback" aria-hidden>
+      {item.name.slice(0, 1).toUpperCase()}
+    </span>
+  );
+}
 
 /**
  * Topbar identity (QA #59): inside a timetable the topbar shows that
@@ -58,6 +96,7 @@ export function TopbarBrand({
           slug: currentSlug,
           name: data.timetable.name,
           iconUrl: parsed.iconUrl ?? null,
+          iconDarkUrl: parsed.iconDarkUrl ?? null,
           iconEmoji: parsed.iconEmoji ?? null,
         });
       })
@@ -72,18 +111,7 @@ export function TopbarBrand({
   if (current) {
     return (
       <Link className="brand" href={`/f/${current.slug}/topics`}>
-        {current.iconEmoji ? (
-          <span className="tt-menu-icon tt-menu-icon-emoji" aria-hidden>
-            {current.iconEmoji}
-          </span>
-        ) : current.iconUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img className="tt-menu-icon" src={current.iconUrl} alt="" />
-        ) : (
-          <span className="tt-menu-icon tt-menu-icon-fallback" aria-hidden>
-            {current.name.slice(0, 1).toUpperCase()}
-          </span>
-        )}
+        <BrandIcon item={current} />
         <span>{current.name}</span>
       </Link>
     );

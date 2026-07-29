@@ -99,6 +99,20 @@ h3 {
   }
 }
 
+/* Mode-conditional rendering (2026-07-29): elements shown only in one
+   resolved theme mode — the pre-paint script always stamps html[data-theme]
+   with "light" or "dark", so exactly one variant shows. Used for the
+   forum icon's optional dark-mode alternative. */
+.mode-dark-only {
+  display: none;
+}
+html[data-theme="dark"] .mode-dark-only {
+  display: revert;
+}
+html[data-theme="dark"] .mode-light-only {
+  display: none;
+}
+
 /* The account menu (QA 2026-07-28): the viewer's avatar as the single
    account control — replaced Clerk's UserButton and the email link. */
 .account-trigger {

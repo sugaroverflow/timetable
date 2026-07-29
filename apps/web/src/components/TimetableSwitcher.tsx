@@ -10,6 +10,8 @@ export type SwitcherItem = {
   slug: string;
   name: string;
   iconUrl: string | null;
+  /** Dark-mode alternative (2026-07-29); falls back to iconUrl. */
+  iconDarkUrl?: string | null;
   iconEmoji?: string | null;
   privacy: string;
 };
@@ -23,8 +25,26 @@ function ItemIcon({ item }: { item: SwitcherItem }) {
     );
   }
   if (item.iconUrl) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img className="tt-menu-icon" src={item.iconUrl} alt="" />;
+    // Both mode variants render; CSS shows the one matching html[data-theme]
+    // (the pre-paint script always stamps a resolved light/dark value).
+    return (
+      <>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          className={`tt-menu-icon${item.iconDarkUrl ? " mode-light-only" : ""}`}
+          src={item.iconUrl}
+          alt=""
+        />
+        {item.iconDarkUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            className="tt-menu-icon mode-dark-only"
+            src={item.iconDarkUrl}
+            alt=""
+          />
+        ) : null}
+      </>
+    );
   }
   return (
     <span className="tt-menu-icon tt-menu-icon-fallback" aria-hidden>

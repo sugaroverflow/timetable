@@ -11,10 +11,12 @@ import {
 } from "@timetable/core";
 import type { TimetableSettings } from "@timetable/db";
 import {
+  BRAND_FONT_KEYS,
   canManageMembers,
   canModerate,
   isAdmin,
   isHost,
+  THEME_FONT_KEYS,
 } from "@timetable/shared";
 
 import type { SessionUser } from "../auth/clerk";
@@ -153,13 +155,10 @@ export function parseElectorActivityFilter(
 // Theme validation
 // ---------------------------------------------------------------------------
 
-const THEME_FONTS = new Set([
-  "default",
-  "editorial",
-  "humanist",
-  "modern",
-  "technical",
-]);
+// Canonical key lists live in @timetable/shared so this validator and the
+// web's pickers can't drift (they did: this Set used to be hand-kept).
+const THEME_FONTS = new Set<string>(THEME_FONT_KEYS);
+const BRAND_FONTS = new Set<string>(BRAND_FONT_KEYS);
 const HEX_COLOUR = /^#[0-9a-fA-F]{6}$/;
 
 /** A validated #rrggbb hex, or undefined. Shared by the themeJson parser and
@@ -191,6 +190,12 @@ export function parseThemeJson(
   theme.text = colour(source.text);
   if (typeof source.font === "string" && THEME_FONTS.has(source.font)) {
     theme.font = source.font;
+  }
+  if (
+    typeof source.brandFont === "string" &&
+    BRAND_FONTS.has(source.brandFont)
+  ) {
+    theme.brandFont = source.brandFont;
   }
   if (typeof source.dark === "object" && source.dark !== null) {
     const d = source.dark as Record<string, unknown>;
