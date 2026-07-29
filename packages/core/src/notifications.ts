@@ -18,6 +18,9 @@ export type NotificationItem = {
   authorId: string;
   authorName: string | null;
   authorImage: string | null;
+  /** The author's roles in this forum (for the notifications filter,
+   * 2026-07-29); empty for ex-members. */
+  authorRoles: string[];
   body: string;
   visibility: string;
   createdAt: Date;
@@ -51,6 +54,7 @@ export async function listNotifications(
       mentionUserId: mentions.userId,
       authorId: comments.authorId,
       authorName: authorMembers.name,
+      authorRoles: authorMembers.roles,
       authorImage: authorMembers.image,
       body: comments.body,
       visibility: comments.visibility,
@@ -107,6 +111,7 @@ export async function listNotifications(
           : "mention",
     authorId: r.authorId,
     authorName: r.authorName,
+    authorRoles: (r.authorRoles ?? []) as string[],
     authorImage: r.authorImage,
     body: r.body,
     visibility: r.visibility,
