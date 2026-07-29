@@ -1518,6 +1518,16 @@ textarea {
   margin-bottom: 2px;
 }
 
+/* Sysadmin operator access to private forums (2026-07-29): the mode must
+   be unmistakable. */
+.sysadmin-banner {
+  background: var(--warning-soft);
+  border-color: var(--warning-ink);
+  color: var(--warning-ink);
+  font-weight: var(--fw-semibold);
+  margin-bottom: 14px;
+}
+
 /* The My Topics "Create New Topic" reveal (QA 2026-07-29): one big
    unmissable call to action standing in for the hidden form. */
 .btn-create {

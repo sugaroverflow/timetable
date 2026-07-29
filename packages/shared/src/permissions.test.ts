@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   ANONYMOUS,
+  canComment,
+  canEditSettings,
   canEditTopic,
+  canHeart,
+  canModerate,
+  canReadTimetable,
+  canSeeComments,
   canSeePersonProfile,
   canUseQueue,
   ownsTopicAsHost,
@@ -39,6 +45,29 @@ describe("canSeePersonProfile", () => {
     expect(
       canSeePersonProfile("hosts_only", SIGNED_IN_GUEST, ["elector"]),
     ).toBe(false);
+  });
+});
+
+describe("sysadmin oversight (read-only)", () => {
+  const SYSADMIN: Viewer = { userId: "op", roles: [], sysadmin: true };
+
+  it("reads everything, private and deactivated forums included", () => {
+    expect(canReadTimetable("private", SYSADMIN)).toBe(true);
+    expect(canReadTimetable("deactivated", SYSADMIN)).toBe(true);
+    expect(canSeeComments("private", SYSADMIN)).toBe(true);
+    expect(canSeePersonProfile("private", SYSADMIN, ["elector"])).toBe(true);
+  });
+
+  it("never unlocks writes — the flag is ignored by action checks", () => {
+    expect(canHeart(SYSADMIN)).toBe(false);
+    expect(canComment(SYSADMIN)).toBe(false);
+    expect(canModerate(SYSADMIN)).toBe(false);
+    expect(canEditSettings(SYSADMIN)).toBe(false);
+    expect(canUseQueue(SYSADMIN)).toBe(false);
+  });
+
+  it("changes nothing for ordinary non-members", () => {
+    expect(canReadTimetable("private", SIGNED_IN_GUEST)).toBe(false);
   });
 });
 

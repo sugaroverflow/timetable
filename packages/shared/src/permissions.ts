@@ -10,10 +10,14 @@ import {
 /**
  * The acting user evaluated in the context of a single timetable. `userId` is
  * null for anonymous visitors; `roles` are that user's roles in this timetable.
+ * `sysadmin` marks a site operator (SYSADMIN_EMAILS, set by the API layer):
+ * it unlocks READ checks only — every write check ignores it, so operator
+ * oversight of private forums is read-only by construction (2026-07-29).
  */
 export type Viewer = {
   userId: string | null;
   roles: readonly Role[];
+  sysadmin?: boolean;
 };
 
 export const ANONYMOUS: Viewer = { userId: null, roles: [] };
@@ -24,6 +28,9 @@ export function isAuthenticated(viewer: Viewer): boolean {
 
 /** Can the viewer load the timetable at all? */
 export function canReadTimetable(privacy: Privacy, viewer: Viewer): boolean {
+  // Site operators read everything, private forums included — in-product
+  // and accountable rather than ad hoc via the database (2026-07-29).
+  if (viewer.sysadmin) return true;
   switch (privacy) {
     case "public":
     case "hosts_only":
@@ -46,6 +53,7 @@ export function canReadTimetable(privacy: Privacy, viewer: Viewer): boolean {
  * restricted by the hosts_only / no_comments levels.
  */
 export function canSeeComments(privacy: Privacy, viewer: Viewer): boolean {
+  if (viewer.sysadmin) return true;
   if (isMember(viewer.roles)) return true;
   return privacy === "public";
 }
@@ -56,6 +64,7 @@ export function canSeePersonProfile(
   viewer: Viewer,
   personRoles: readonly Role[],
 ): boolean {
+  if (viewer.sysadmin) return true;
   if (isMember(viewer.roles)) return true;
   if (privacy === "public" || privacy === "no_comments") return true;
   if (privacy === "hosts_only") {
