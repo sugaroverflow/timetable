@@ -78,6 +78,27 @@ const E = {
 // One font family across every email (QA 2026-07-30 — "too many fonts").
 const SANS = "-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
 
+// Dark-mode overrides (QA 2026-07-30). Inline styles carry the light look;
+// a <style> block flips a handful of classes for clients that honour
+// prefers-color-scheme (Apple Mail, iOS Mail, others). The accent, pills
+// and avatars stay legible on both grounds, so only surfaces/ink/rules
+// flip. Values mirror tokens.css's dark palette.
+const DARK = {
+  bg: "#14171e",
+  card: "#1d222c",
+  ink: "#e7eaf1",
+  muted: "#9aa4b2",
+  line: "#2b3240",
+};
+const DARK_STYLE =
+  `@media (prefers-color-scheme:dark){` +
+  `.em-bg{background:${DARK.bg}!important}` +
+  `.em-card{background:${DARK.card}!important;border-color:${DARK.line}!important}` +
+  `.em-ink{color:${DARK.ink}!important}` +
+  `.em-muted{color:${DARK.muted}!important}` +
+  `.em-rule{border-color:${DARK.line}!important}` +
+  `}`;
+
 /** Wrap a body in the branded frame: wordmark, content, footer. `footer`
  * is already-escaped HTML. The wordmark carries the FORUM name in its
  * accent colour. By default the body sits in one white card; pass
@@ -91,15 +112,19 @@ export function emailShell(
   const title = opts.title ?? "Topic";
   const accent = opts.accent ?? E.ink;
   const content = opts.uncarded
-    ? `<tr><td style="font-family:${SANS};font-size:15px;line-height:1.55;color:${E.ink};">${body}</td></tr>`
-    : `<tr><td style="background:${E.card};border:1px solid ${E.line};border-radius:12px;padding:26px 28px;font-family:${SANS};font-size:15px;line-height:1.55;color:${E.ink};">${body}</td></tr>`;
+    ? `<tr><td class="em-ink" style="font-family:${SANS};font-size:15px;line-height:1.55;color:${E.ink};">${body}</td></tr>`
+    : `<tr><td class="em-card em-ink" style="background:${E.card};border:1px solid ${E.line};border-radius:12px;padding:26px 28px;font-family:${SANS};font-size:15px;line-height:1.55;color:${E.ink};">${body}</td></tr>`;
   return [
-    `<!doctype html><html><body style="margin:0;padding:0;background:${E.bg};">`,
-    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${E.bg};"><tr><td align="center" style="padding:28px 12px;">`,
+    `<!doctype html><html><head>`,
+    `<meta name="color-scheme" content="light dark">`,
+    `<meta name="supported-color-schemes" content="light dark">`,
+    `<style>${DARK_STYLE}</style></head>`,
+    `<body class="em-bg" style="margin:0;padding:0;background:${E.bg};">`,
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="em-bg" style="background:${E.bg};"><tr><td align="center" style="padding:28px 12px;">`,
     `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;max-width:560px;">`,
     `<tr><td style="padding:0 6px 12px;font-family:${SANS};font-size:20px;font-weight:700;color:${accent};">${esc(title)}</td></tr>`,
     content,
-    `<tr><td style="padding:14px 6px;font-family:${SANS};font-size:12px;line-height:1.5;color:${E.muted};">${footer}</td></tr>`,
+    `<tr><td class="em-muted" style="padding:14px 6px;font-family:${SANS};font-size:12px;line-height:1.5;color:${E.muted};">${footer}</td></tr>`,
     `</table></td></tr></table></body></html>`,
   ].join("");
 }
@@ -184,7 +209,8 @@ function threadLine(
 ): string {
   const name = personLink(forumSlug, node.comment.author, accent);
   const color = node.isNew ? accent : E.muted;
-  const line = `<div style="padding-left:${depth * INDENT}px;margin:3px 0;white-space:pre-wrap;">${name}<span style="color:${E.muted};">: </span><span style="color:${color};">${esc(node.comment.body)}</span></div>`;
+  const bodyCls = node.isNew ? "" : ' class="em-muted"';
+  const line = `<div style="padding-left:${depth * INDENT}px;margin:3px 0;white-space:pre-wrap;">${name}<span class="em-muted" style="color:${E.muted};">: </span><span${bodyCls} style="color:${color};">${esc(node.comment.body)}</span></div>`;
   if (!node.isNew || !path) return line;
   const id = node.comment.id;
   const href = `${linkBase}${path}?reply=${encodeURIComponent(id)}#comment-${encodeURIComponent(id)}`;
@@ -293,10 +319,10 @@ function bodyExcerpt(
       : truncated
         ? "…"
         : "";
-  return `<div style="white-space:pre-wrap;color:${E.ink};">${esc(shown)}${more}</div>`;
+  return `<div class="em-ink" style="white-space:pre-wrap;color:${E.ink};">${esc(shown)}${more}</div>`;
 }
 
-const divider = `<div style="border-top:1px solid ${E.line};margin:12px 0;"></div>`;
+const divider = `<div class="em-rule" style="border-top:1px solid ${E.line};margin:12px 0;"></div>`;
 
 /** Naive plural for role labels (mirrors the web pluralLabel). */
 function pluralize(label: string): string {
@@ -317,7 +343,7 @@ function threadLabel(
         ? `You and ${pluralize(adminLabel)}`
         : "";
   if (!text) return "";
-  return `<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:${E.muted};margin:0 0 4px;">${esc(text)}</div>`;
+  return `<div class="em-muted" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:${E.muted};margin:0 0 4px;">${esc(text)}</div>`;
 }
 
 type Discussion = Extract<DigestActivity, { kind: "comment" | "reply" }>;
@@ -372,12 +398,17 @@ function renderCard(
     `<td valign="top" style="padding-right:10px;">${avatarCell(card.author, 40)}</td>` +
     `<td valign="top">` +
     `<div style="font-size:17px;font-weight:700;line-height:1.3;">${accentLink(card.title, card.path, accent)}${pills}</div>` +
-    `<div style="color:${E.muted};font-size:13px;margin-top:2px;">by ${personLink(forumSlug, card.author, accent)}</div>` +
+    `<div class="em-muted" style="color:${E.muted};font-size:13px;margin-top:2px;">by ${personLink(forumSlug, card.author, accent)}</div>` +
     `</td></tr></table>`;
 
   const sections: string[] = [];
   if (statuses.length > 0 && card.body) {
     sections.push(bodyExcerpt(card.body, card.path, accent));
+  }
+  // ❤️s before comments — the same order as a topic card in the app, where
+  // the actions row sits above the thread (QA 2026-07-30).
+  if (heart && heart.kind === "heart") {
+    sections.push(renderHearts(heart.hearters, forumSlug, accent));
   }
   sections.push(
     ...renderDiscussion(
@@ -389,14 +420,11 @@ function renderCard(
       adminLabel,
     ),
   );
-  if (heart && heart.kind === "heart") {
-    sections.push(renderHearts(heart.hearters, forumSlug, accent));
-  }
   const bodyHtml = sections
     .map((s, i) => (i === 0 ? s : `${divider}${s}`))
     .join("");
 
-  return `<div style="background:${E.card};border:1px solid ${E.line};border-radius:12px;padding:16px 18px;margin:0 0 12px;">${header}<div style="margin-top:8px;">${bodyHtml}</div></div>`;
+  return `<div class="em-card" style="background:${E.card};border:1px solid ${E.line};border-radius:12px;padding:16px 18px;margin:0 0 12px;">${header}<div style="margin-top:8px;">${bodyHtml}</div></div>`;
 }
 
 /** "3 comments, 2 replies …" — the subject's tail, counted across cards. */
