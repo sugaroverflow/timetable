@@ -173,7 +173,7 @@ export default async function NotificationsPage({
 
       <h3 className="section-title">Notifications</h3>
       {data.notifications.length > 0 ? (
-        <div className="toolbar">
+        <div className="toolbar feed-toolbar wrap">
           <ActorFilter value={actor} actors={authors} />
           <ActivityRoleFilter value={role} options={roleOptions} />
         </div>
