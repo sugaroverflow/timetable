@@ -25,11 +25,14 @@ const WEEKDAYS = [
   "Saturday",
 ];
 
+type Cadence = "never" | "daily" | "weekly";
+
 export function DigestSettingsForm({ current }: { current: DigestSettings }) {
   const { run, busy } = useGqlAction();
-  const [enabled, setEnabled] = useState(isDigestEnabled(current));
-  const [frequency, setFrequency] = useState(
-    current.digestFrequency ?? "daily",
+  // "Never" folds the enabled flag into the same dropdown as the cadence
+  // (2026-07-30) — one control instead of a checkbox + frequency select.
+  const [cadence, setCadence] = useState<Cadence>(
+    isDigestEnabled(current) ? (current.digestFrequency ?? "daily") : "never",
   );
   const [weekday, setWeekday] = useState(current.digestWeekday ?? 1);
   const [saved, setSaved] = useState(false);
@@ -37,9 +40,12 @@ export function DigestSettingsForm({ current }: { current: DigestSettings }) {
   function submit(e: React.FormEvent) {
     e.preventDefault();
     setSaved(false);
+    const enabled = cadence !== "never";
     void run(
       MUTATION,
-      { e: enabled, f: frequency, w: weekday },
+      // Leave the stored frequency untouched when Never is picked (the
+      // mutation ignores an absent frequency) so re-enabling remembers it.
+      { e: enabled, f: enabled ? cadence : undefined, w: weekday },
       {
         success: "Digest settings saved",
         errorFallback: "Could not save settings",
@@ -57,50 +63,38 @@ export function DigestSettingsForm({ current }: { current: DigestSettings }) {
         One email per forum with what you haven&rsquo;t seen — comments on your
         topics, replies, and new topics.
       </p>
-      <label className="row" style={{ marginBottom: 12 }}>
-        <input
-          type="checkbox"
-          checked={enabled}
-          onChange={(e) => setEnabled(e.target.checked)}
-          style={{ width: "auto" }}
-        />
-        Email me digests
-      </label>
-      {enabled ? (
-        <div className="row wrap" style={{ marginBottom: 12 }}>
+      <div className="row wrap" style={{ marginBottom: 12 }}>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label htmlFor="digest-frequency">How often</label>
+          <select
+            id="digest-frequency"
+            value={cadence}
+            onChange={(e) => setCadence(e.target.value as Cadence)}
+            style={{ width: "auto" }}
+          >
+            <option value="never">Never</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+          </select>
+        </div>
+        {cadence === "weekly" ? (
           <div className="field" style={{ marginBottom: 0 }}>
-            <label htmlFor="digest-frequency">How often</label>
+            <label htmlFor="digest-weekday">On</label>
             <select
-              id="digest-frequency"
-              value={frequency}
-              onChange={(e) =>
-                setFrequency(e.target.value as "daily" | "weekly")
-              }
+              id="digest-weekday"
+              value={weekday}
+              onChange={(e) => setWeekday(Number(e.target.value))}
               style={{ width: "auto" }}
             >
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
+              {WEEKDAYS.map((day, i) => (
+                <option key={day} value={i}>
+                  {day}
+                </option>
+              ))}
             </select>
           </div>
-          {frequency === "weekly" ? (
-            <div className="field" style={{ marginBottom: 0 }}>
-              <label htmlFor="digest-weekday">On</label>
-              <select
-                id="digest-weekday"
-                value={weekday}
-                onChange={(e) => setWeekday(Number(e.target.value))}
-                style={{ width: "auto" }}
-              >
-                {WEEKDAYS.map((day, i) => (
-                  <option key={day} value={i}>
-                    {day}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
+        ) : null}
+      </div>
       <button className="btn btn-primary" type="submit" disabled={busy}>
         {busy ? "Saving…" : saved ? "Saved" : "Save preferences"}
       </button>
