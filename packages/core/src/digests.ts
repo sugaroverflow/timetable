@@ -34,8 +34,14 @@ export type DigestPerson = {
   image: string | null;
 };
 
-/** One comment in a thread, for the ancestor context above a new comment. */
-export type DigestComment = { author: DigestPerson; body: string };
+/** One comment in a thread. `id`/`parentId` let the email merge several
+ * replies into a single tree (shared ancestors shown once). */
+export type DigestComment = {
+  id: string;
+  parentId: string | null;
+  author: DigestPerson;
+  body: string;
+};
 
 /**
  * Digest v3 (2026-07-30): the digest is a list of TOPIC CARDS, not
@@ -51,10 +57,13 @@ export type DigestActivity =
    * `replyToCommentId` deep-links the Reply button to this comment. */
   | {
       kind: "comment" | "reply";
-      author: DigestPerson;
-      body: string;
+      /** Which thread this belongs to — the email labels host-only and
+       * you-and-admin threads and keeps each kind in its own tree. */
+      visibility: "public" | "host_only" | "admin_only";
+      /** The new comment itself; `comment.id` is the Reply deep-link target. */
+      comment: DigestComment;
+      /** Thread above it (root → its parent), for merging into one tree. */
       ancestors: DigestComment[];
-      replyToCommentId: string;
       at: Date;
     }
   /** ❤️s on the recipient's topic — every hearter named (no cap). */
@@ -69,8 +78,11 @@ export type DigestActivity =
 export type DigestTopicCard = {
   topicId: string;
   title: string;
-  /** The topic's host — rendered "Author: Title", linked to their profile. */
+  /** The topic's host — the card head shows their avatar + "by {author}". */
   author: DigestPerson;
+  /** The topic's markdown body — shown (truncated) on status cards
+   * (assigned / newly published / draft) so the reader sees what it is. */
+  body: string | null;
   /** The topic's permalink; the email builds per-comment reply links on it. */
   path: string | null;
   activities: DigestActivity[];
@@ -91,6 +103,10 @@ export type ForumDigest = {
   /** The forum theme's primary colour — the email's link/accent colour.
    * Null falls back to the app default. */
   accent: string | null;
+  /** The forum's own role labels, for the host-only / you-and-admin thread
+   * headings (defaults "Host" / "Admin"). */
+  hostLabel: string;
+  adminLabel: string;
   topics: DigestTopicCard[];
 };
 
@@ -151,6 +167,9 @@ type DigestContext = {
   forumSlug: Map<string, string>;
   /** The forum theme's primary colour, for email branding. */
   accent: Map<string, string | null>;
+  /** Per-forum role labels (host/admin) for thread headings. */
+  hostLabel: Map<string, string>;
+  adminLabel: Map<string, string>;
   /** Per-forum "seen it in the app" watermarks: feed visits cover ambient
    * ❤️ counts; notifications-page visits cover comments/replies. New topics
    * use topic_seen rows instead (deliberate queue reviews). */
@@ -192,6 +211,18 @@ async function loadDigestContext(
         (m.settings as TimetableSettings | null)?.theme?.primary ?? null,
       ]),
     ),
+    hostLabel: new Map(
+      memberships.map((m) => [
+        m.timetableId,
+        (m.settings as TimetableSettings | null)?.roleLabels?.host ?? "Host",
+      ]),
+    ),
+    adminLabel: new Map(
+      memberships.map((m) => [
+        m.timetableId,
+        (m.settings as TimetableSettings | null)?.roleLabels?.admin ?? "Admin",
+      ]),
+    ),
     seenFeedAt: new Map(
       memberships.map((m) => [m.timetableId, m.lastSeenFeedAt]),
     ),
@@ -216,6 +247,7 @@ type TopicMeta = {
   timetableId: string;
   title: string;
   author: DigestPerson;
+  body: string | null;
   path: string | null;
 };
 
@@ -232,6 +264,7 @@ async function resolveTopicMeta(
     .select({
       id: topics.id,
       title: topics.title,
+      body: topics.bodyMd,
       timetableId: topics.timetableId,
       topicSlug: topics.slug,
       hostId: topics.hostId,
@@ -252,6 +285,7 @@ async function resolveTopicMeta(
     meta.set(r.id, {
       timetableId: r.timetableId,
       title: r.title,
+      body: r.body,
       author: { name: r.hostName, userId: r.hostId, image: r.hostImage },
       path: topicPath(
         ctx.forumSlug.get(r.timetableId),
@@ -327,7 +361,12 @@ function chainFor(
   while (cursor) {
     const node = loaded.get(cursor);
     if (!node) break;
-    chain.push({ author: node.author, body: node.body });
+    chain.push({
+      id: cursor,
+      parentId: node.parentId,
+      author: node.author,
+      body: node.body,
+    });
     cursor = node.parentId;
   }
   return chain.reverse();
@@ -359,6 +398,7 @@ async function commentActivities(
       parentId: comments.parentId,
       topicId: comments.topicId,
       authorId: comments.authorId,
+      visibility: comments.visibility,
       by: timetableMemberships.name,
       body: comments.body,
       createdAt: comments.createdAt,
@@ -376,9 +416,9 @@ async function commentActivities(
       and(
         inArray(comments.topicId, myTopicIds),
         gt(comments.createdAt, since),
-        // The owner sees public comments and their admin thread; the
-        // host-only thread stays out of email.
-        inArray(comments.visibility, ["public", "admin_only"]),
+        // The topic owner is party to all three threads on their own topic
+        // (public, {host}-only, and the {admin} drafting thread).
+        inArray(comments.visibility, ["public", "host_only", "admin_only"]),
         ne(comments.authorId, ctx.recipient.id),
         isNull(comments.hiddenAt),
         isNull(comments.deletedAt),
@@ -402,10 +442,14 @@ async function commentActivities(
     timetableId: timetableByTopic.get(r.topicId) ?? "",
     activity: {
       kind: "comment" as const,
-      author: { name: r.by, userId: r.authorId, image: null },
-      body: r.body,
+      visibility: r.visibility,
+      comment: {
+        id: r.id,
+        parentId: r.parentId,
+        author: { name: r.by, userId: r.authorId, image: null },
+        body: r.body,
+      },
       ancestors: chains.get(r.id) ?? [],
-      replyToCommentId: r.id,
       at: r.createdAt,
     },
   }));
@@ -430,6 +474,7 @@ async function replyActivities(
       topicId: comments.topicId,
       timetableId: topics.timetableId,
       authorId: comments.authorId,
+      visibility: comments.visibility,
       by: timetableMemberships.name,
       body: comments.body,
       createdAt: comments.createdAt,
@@ -467,10 +512,14 @@ async function replyActivities(
     timetableId: r.timetableId,
     activity: {
       kind: "reply" as const,
-      author: { name: r.by, userId: r.authorId, image: null },
-      body: r.body,
+      visibility: r.visibility,
+      comment: {
+        id: r.id,
+        parentId: r.parentId,
+        author: { name: r.by, userId: r.authorId, image: null },
+        body: r.body,
+      },
       ancestors: chains.get(r.id) ?? [],
-      replyToCommentId: r.id,
       at: r.createdAt,
     },
   }));
@@ -705,6 +754,8 @@ export async function computeUserForumDigests(
       forumName: ctx.forumName.get(forumId) ?? "",
       forumSlug: ctx.forumSlug.get(forumId) ?? "",
       accent: ctx.accent.get(forumId) ?? null,
+      hostLabel: ctx.hostLabel.get(forumId) ?? "Host",
+      adminLabel: ctx.adminLabel.get(forumId) ?? "Admin",
       topics: cards,
     };
   });
@@ -736,6 +787,7 @@ function buildCards(
       topicId,
       title: m?.title ?? "A topic",
       author: m?.author ?? { name: null, userId: null, image: null },
+      body: m?.body ?? null,
       path: m?.path ?? null,
       activities,
     });
