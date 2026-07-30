@@ -251,25 +251,17 @@ builder.mutationFields((t) => ({
     },
   }),
 
-  /** Companion audit entry when the preview ends (cookie already
-   * cleared, so this runs as the real admin again). */
+  /** Ends the view-as preview. The START is logged (member.impersonate);
+   * the end is not — it's a guaranteed follow-up that only added noise to
+   * the log (QA 2026-07-30). Kept as the client's end-of-preview signal. */
   stopUserPreview: t.boolean({
     args: {
       idOrSlug: t.arg.string({ required: true }),
       userId: t.arg.string({ required: true }),
     },
     resolve: async (_p, args, ctx) => {
-      const { user, readable, viewer } = await loadTimetableAndViewer(
-        ctx,
-        args.idOrSlug,
-      );
+      const { viewer } = await loadTimetableAndViewer(ctx, args.idOrSlug);
       if (!canModerate(viewer)) forbidden("Admins only");
-      await logActivity({
-        timetableId: readable.timetable.id,
-        actorId: user.id,
-        action: "member.impersonate_end",
-        payload: { targetUserId: args.userId },
-      });
       return true;
     },
   }),
@@ -300,6 +292,11 @@ builder.mutationFields((t) => ({
         },
       );
       if (!updated) notFound("Membership not found");
+      await logActivity({
+        timetableId: readable.timetable.id,
+        actorId: user.id,
+        action: "member.profile_edit",
+      });
       return getPerson(readable.timetable.id, user.id);
     },
   }),

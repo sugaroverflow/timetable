@@ -173,7 +173,28 @@ export async function setCommentHidden(
     })
     .where(eq(comments.id, commentId))
     .returning();
-  return updated ?? null;
+  if (!updated) return null;
+  // Moderation is audit-worthy: log the hide/unhide with the same topic +
+  // snippet shape as comment.add so the timeline can show and link it.
+  const [topic] = await db
+    .select({ title: topics.title, timetableId: topics.timetableId })
+    .from(topics)
+    .where(eq(topics.id, updated.topicId))
+    .limit(1);
+  if (topic) {
+    await logActivity({
+      timetableId: topic.timetableId,
+      actorId: byUserId,
+      action: hidden ? "comment.hide" : "comment.unhide",
+      payload: {
+        topicId: updated.topicId,
+        title: topic.title,
+        snippet: updated.body.slice(0, 140),
+        commentId: updated.id,
+      },
+    });
+  }
+  return updated;
 }
 
 export type CommentNode = {

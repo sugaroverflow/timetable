@@ -6,6 +6,7 @@ import {
   createTopic,
   deleteTopic,
   getPerson,
+  getTimetableById,
   getTopicBySlug,
   getTopicQueue,
   getWeightedBreakdown,
@@ -523,6 +524,13 @@ builder.mutationFields((t) => ({
             newHostId: hostId,
           },
         });
+      } else {
+        await logActivity({
+          timetableId: readable.timetable.id,
+          actorId: user.id,
+          action: "topic.create",
+          payload: { topicId: created.id, title: created.title },
+        });
       }
       return created;
     },
@@ -540,7 +548,6 @@ builder.mutationFields((t) => ({
       const user = await requireUser(ctx);
       const { topic, viewer } = await loadTopicAndViewer(ctx, args.topicId);
       if (!canEditTopic(viewer, topic.hostId)) forbidden();
-      const ownerHost = ownsTopicAsHost(viewer, topic.hostId);
       const updated = await updateTopic(topic.id, {
         title: args.title ?? undefined,
         bodyMd: args.bodyMd ?? undefined,
@@ -550,14 +557,14 @@ builder.mutationFields((t) => ({
             : undefined,
       });
       if (!updated) notFound("Topic not found");
-      if (!ownerHost) {
-        await logActivity({
-          timetableId: topic.timetableId,
-          actorId: user.id,
-          action: "topic.edit",
-          payload: { topicId: topic.id, title: updated.title },
-        });
-      }
+      // Log every edit — a host editing their own topic as well as an admin
+      // editing someone else's (QA 2026-07-30; was admin-only before).
+      await logActivity({
+        timetableId: topic.timetableId,
+        actorId: user.id,
+        action: "topic.edit",
+        payload: { topicId: topic.id, title: updated.title },
+      });
       return updated;
     },
   }),
@@ -750,6 +757,22 @@ builder.mutationFields((t) => ({
         throw new GraphQLError("Only published topics can be queued");
       }
       await markTopicSeen(topic.id, user.id);
+      // Reaching the end of a round is the meaningful "I've reviewed
+      // everything" moment — log it once, when this Next empties the queue.
+      const tt = await getTimetableById(topic.timetableId);
+      const state = await getTopicQueue(
+        topic.timetableId,
+        user.id,
+        tt?.heartsCountFrom ?? null,
+      );
+      if (state.remaining === 0) {
+        await logActivity({
+          timetableId: topic.timetableId,
+          actorId: user.id,
+          action: "queue.finish",
+          payload: { roundSize: state.roundSize },
+        });
+      }
       return true;
     },
   }),
