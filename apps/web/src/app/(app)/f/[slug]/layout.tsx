@@ -98,6 +98,7 @@ const UNREAD_QUERY = `
   query Unread($s: String!) {
     notificationsUnread(idOrSlug: $s)
     topicQueue(idOrSlug: $s) { neverSeenCount }
+    moderationQueue(idOrSlug: $s) { id }
   }
 `;
 
@@ -127,16 +128,23 @@ async function loadSwitcherAndUnread(
   switcherItems: SwitcherItem[];
   unread: number;
   queueNeverSeen: number;
+  pendingCount: number;
 }> {
-  if (!isAuthed) return { switcherItems: [], unread: 0, queueNeverSeen: 0 };
+  if (!isAuthed)
+    return { switcherItems: [], unread: 0, queueNeverSeen: 0, pendingCount: 0 };
   const [mine, unreadData] = await Promise.all([
     getMyTimetables(),
     isMember
       ? gqlFetch<{
           notificationsUnread: number;
           topicQueue: { neverSeenCount: number } | null;
+          moderationQueue: { id: string }[];
         }>(UNREAD_QUERY, { s: slug })
-      : Promise.resolve({ notificationsUnread: 0, topicQueue: null }),
+      : Promise.resolve({
+          notificationsUnread: 0,
+          topicQueue: null,
+          moderationQueue: [],
+        }),
   ]);
   const switcherItems = mine.map((t) => {
     const s = parseTimetableSettings(t.settings);
@@ -153,6 +161,7 @@ async function loadSwitcherAndUnread(
     switcherItems,
     unread: unreadData.notificationsUnread,
     queueNeverSeen: unreadData.topicQueue?.neverSeenCount ?? 0,
+    pendingCount: unreadData.moderationQueue?.length ?? 0,
   };
 }
 
@@ -208,6 +217,7 @@ function SideNav({
   admin,
   unread,
   queueNeverSeen,
+  pendingCount,
 }: {
   base: string;
   isAuthed: boolean;
@@ -217,6 +227,7 @@ function SideNav({
   admin: boolean;
   unread: number;
   queueNeverSeen: number;
+  pendingCount: number;
 }) {
   return (
     <nav className="nav side-nav">
@@ -243,7 +254,16 @@ function SideNav({
       <NavLink href={`${base}/people`}>People</NavLink>
       {/* Profile moved to the topbar account menu (QA 2026-07-28). */}
       {hostOrAdmin && <NavLink href={`${base}/analysis`}>Analysis</NavLink>}
-      {admin && <NavLink href={`${base}/pending`}>Pending Topics</NavLink>}
+      {admin && (
+        <NavLink href={`${base}/pending`}>
+          Pending Topics
+          {pendingCount > 0 ? (
+            <span className="nav-badge">
+              {pendingCount > 999 ? "999+" : pendingCount}
+            </span>
+          ) : null}
+        </NavLink>
+      )}
       {admin && <NavLink href={`${base}/log`}>Activity Log</NavLink>}
       {admin && <NavLink href={`${base}/settings`}>Forum Settings</NavLink>}
       {isMember && <NavLink href={`${base}/api`}>API</NavLink>}
@@ -276,11 +296,8 @@ export default async function TimetableLayout({
   const { previewUserId, previewName } = await loadPreview(slug);
   const settings = parseTimetableSettings(timetable.settings);
   const base = `/f/${slug}`;
-  const { switcherItems, unread, queueNeverSeen } = await loadSwitcherAndUnread(
-    isAuthed,
-    isMember,
-    slug,
-  );
+  const { switcherItems, unread, queueNeverSeen, pendingCount } =
+    await loadSwitcherAndUnread(isAuthed, isMember, slug);
 
   const themeCss = buildThemeCss(settings);
 
@@ -314,6 +331,7 @@ export default async function TimetableLayout({
             admin={isAdmin(roles)}
             unread={unread}
             queueNeverSeen={queueNeverSeen}
+            pendingCount={pendingCount}
           />
 
           {previewUserId ? (
