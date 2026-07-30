@@ -1,4 +1,8 @@
-import type { ForumDigest } from "@timetable/core";
+import type {
+  DigestActivity,
+  DigestTopicCard,
+  ForumDigest,
+} from "@timetable/core";
 
 const EMAIL_FROM = process.env.EMAIL_FROM ?? "Topic <no-reply@example.com>";
 
@@ -96,117 +100,128 @@ export function emailShell(
   ].join("");
 }
 
-const sectionTitle = (label: string): string =>
-  `<h2 style="font-family:${SERIF};font-size:17px;font-weight:600;margin:20px 0 8px;color:${E.ink};">${esc(label)}</h2>`;
-
 const item = (html: string): string => `<p style="margin:0 0 7px;">${html}</p>`;
 
 const dim = (text: string): string =>
   `<span style="color:${E.muted};">${esc(text)}</span>`;
 
-/** Full-text quote block for comments/replies (digest v2: Ed wants the
- * whole comment readable from the inbox). */
+/** Full-text quote block for comments/replies (Ed wants the whole comment
+ * readable from the inbox). */
 const quoted = (body: string): string =>
   `<blockquote style="margin:4px 0 0;padding:6px 12px;border-left:3px solid ${E.line};color:${E.ink};white-space:pre-wrap;">${esc(body)}</blockquote>`;
 
-type Linker = (label: string, path: string | null) => string;
-
-/** One "<Author> on <topic>" + full-text quote section (comments/replies). */
-function quotedSection(
-  title: string,
-  rows: {
-    topicTitle: string;
-    by: string | null;
-    body: string;
-    path: string | null;
-  }[],
-  link: Linker,
-): string[] {
-  if (rows.length === 0) return [];
-  return [
-    sectionTitle(title),
-    ...rows.map((r) =>
-      item(
-        `<strong>${esc(r.by ?? "Someone")}</strong> on ${link(r.topicTitle, r.path)}${quoted(r.body)}`,
-      ),
-    ),
-  ];
+function accentLink(
+  label: string,
+  path: string | null,
+  accent: string,
+): string {
+  return path
+    ? `<a href="${esc(`${linkBase}${path}`)}" style="color:${accent};font-weight:600;">${esc(label)}</a>`
+    : `<strong>${esc(label)}</strong>`;
 }
 
-function listSection(title: string, items: string[]): string[] {
-  return items.length === 0 ? [] : [sectionTitle(title), ...items];
+/** A "Reply →" deep-link to the composer for one comment (digest v3): the
+ * topic permalink with the ?reply anchor the permalink page consumes. */
+function replyLink(
+  path: string | null,
+  commentId: string,
+  accent: string,
+): string {
+  if (!path) return "";
+  const href = `${linkBase}${path}?reply=${encodeURIComponent(commentId)}#comment-${encodeURIComponent(commentId)}`;
+  return ` <a href="${esc(href)}" style="color:${accent};font-weight:600;">Reply →</a>`;
 }
 
-function digestSections(digest: ForumDigest, link: Linker): string[] {
-  return [
-    // Comments on the recipient's topics lead, full text (Ed, 2026-07-29).
-    ...quotedSection("Comments on your topics", digest.comments, link),
-    ...quotedSection("Replies to your comments", digest.replies, link),
-    ...listSection(
-      "New topics",
-      digest.newTopics.map((t) => item(link(t.title, t.path))),
-    ),
-    ...listSection(
-      "❤️ on your topics",
-      digest.heartActivity.map((a) =>
-        item(`${link(a.topicTitle, a.path)} ${dim(`+${a.count} ❤️`)}`),
-      ),
-    ),
-    ...listSection(
-      "You have a topic",
-      digest.assignedTopics.map((a) =>
-        item(`${link(a.topicTitle, a.path)} ${dim("was assigned to you")}`),
-      ),
-    ),
-    // Standing reminder, never the sole content (isForumDigestEmpty
-    // ignores drafts, so this only renders alongside real news).
-    ...listSection(
-      "Your unpublished drafts",
-      digest.drafts.map((d) => item(link(d.title, d.path))),
-    ),
-  ];
+/** The ancestor chain above a reply (topic root → your comment), quoted as
+ * dim context so you can see what's being replied to. */
+function ancestors(chain: { by: string | null; body: string }[]): string {
+  if (chain.length === 0) return "";
+  const lines = chain
+    .map(
+      (a) =>
+        `<div style="margin:2px 0;"><strong>${esc(a.by ?? "Someone")}:</strong> ${esc(a.body)}</div>`,
+    )
+    .join("");
+  return `<div style="margin:2px 0 5px;padding-left:10px;border-left:2px solid ${E.line};color:${E.muted};font-size:13px;">${lines}</div>`;
 }
 
-/** "3 comments, 2 replies" — the subject's tail. */
+/** "Author: Title" — the card heading (mirrors the Analysis table). */
+function cardHeader(card: DigestTopicCard, accent: string): string {
+  const prefix = card.author
+    ? `<span style="color:${E.muted};">${esc(card.author)}: </span>`
+    : "";
+  return `<div style="margin:22px 0 4px;font-family:${SERIF};font-size:16px;">${prefix}${accentLink(card.title, card.path, accent)}</div>`;
+}
+
+function renderActivity(
+  card: DigestTopicCard,
+  a: DigestActivity,
+  accent: string,
+): string {
+  switch (a.kind) {
+    case "comment":
+      return item(
+        `<strong>${esc(a.by ?? "Someone")}</strong> commented:${quoted(a.body)}${replyLink(card.path, a.replyToCommentId, accent)}`,
+      );
+    case "reply":
+      return item(
+        `${ancestors(a.ancestors)}<strong>${esc(a.by ?? "Someone")}</strong> replied to your comment:${quoted(a.body)}${replyLink(card.path, a.replyToCommentId, accent)}`,
+      );
+    case "heart":
+      return item(
+        `${dim(`❤️ from `)}<span style="color:${E.ink};">${esc(a.hearters.join(", "))}</span>`,
+      );
+    case "new":
+      return item(dim("Newly published — take a look."));
+    case "assignment":
+      return item(dim("This topic was assigned to you."));
+    case "draft":
+      return item(dim("Still an unpublished draft."));
+  }
+}
+
+function digestCards(digest: ForumDigest, accent: string): string[] {
+  return digest.topics.flatMap((card) => [
+    cardHeader(card, accent),
+    ...card.activities.map((a) => renderActivity(card, a, accent)),
+  ]);
+}
+
+/** "3 comments, 2 replies …" — the subject's tail, counted across cards. */
 function digestSummary(digest: ForumDigest): string {
+  const counts = { comment: 0, reply: 0, heart: 0, new: 0, assignment: 0 };
+  for (const card of digest.topics) {
+    for (const a of card.activities) {
+      if (a.kind in counts) counts[a.kind as keyof typeof counts] += 1;
+    }
+  }
   const bits: string[] = [];
   const n = (count: number, one: string, many: string) =>
     count > 0 && bits.push(`${count} ${count === 1 ? one : many}`);
-  n(
-    digest.comments.length,
-    "comment on your topics",
-    "comments on your topics",
-  );
-  n(digest.replies.length, "reply", "replies");
-  n(digest.newTopics.length, "new topic", "new topics");
-  n(digest.heartActivity.length, "❤️ update", "❤️ updates");
-  n(
-    digest.assignedTopics.length,
-    "topic assigned to you",
-    "topics assigned to you",
-  );
+  n(counts.comment, "comment on your topics", "comments on your topics");
+  n(counts.reply, "reply", "replies");
+  n(counts.heart, "topic with new ❤️", "topics with new ❤️");
+  n(counts.new, "new topic", "new topics");
+  n(counts.assignment, "topic assigned to you", "topics assigned to you");
   return bits.join(", ");
 }
 
-/** Digest v2 (2026-07-29): per-forum, forum-branded — the wordmark and
- * subject carry the FORUM's name, links wear its accent colour, and the
- * footer points at that forum's Notifications page. */
+/** Digest v3 (2026-07-30): per-forum, forum-branded — one card per topic,
+ * ordered your-content first. The wordmark and subject carry the FORUM's
+ * name, links wear its accent colour, the footer points at that forum's
+ * Notifications page. */
 export function renderDigest(digest: ForumDigest): {
   subject: string;
   html: string;
 } {
   const accent = digest.accent ?? E.primary;
-  const link = (label: string, path: string | null): string =>
-    path
-      ? `<a href="${esc(`${linkBase}${path}`)}" style="color:${accent};">${esc(label)}</a>`
-      : esc(label);
   const summary = digestSummary(digest);
   const greeting = digest.name ? `Hi ${esc(digest.name)},` : "Hi,";
   const body = [
     `<p style="margin:0;">${greeting}</p>`,
-    ...digestSections(digest, link),
+    ...digestCards(digest, accent),
   ].join("\n");
-  const footer = `You're getting this because you switched on email digests. Adjust them any time on ${link(`your ${digest.forumName} Notifications page`, `/f/${digest.forumSlug}/notifications`)}.`;
+  const footer = `You're getting this because you switched on email digests. Adjust them any time on ${accentLink(`your ${digest.forumName} Notifications page`, `/f/${digest.forumSlug}/notifications`, accent)}.`;
   return {
     subject: summary
       ? `[${digest.forumName}] Digest — ${summary}`
@@ -215,10 +230,9 @@ export function renderDigest(digest: ForumDigest): {
   };
 }
 
-/** Example digest for the Forum Settings "Send test digest" button
- * (2026-07-29): the real renderer over invented-but-plausible items, so
- * admins can see exactly what members will receive. Topic links land on
- * the forum's All Topics page. */
+/** Example digest for the Forum Settings "Send test digest" button — the
+ * real renderer over invented-but-plausible cards, one of every activity
+ * type, already in display order (your content first, drafts last). */
 export function sampleDigest(args: {
   email: string;
   name: string | null;
@@ -227,7 +241,10 @@ export function sampleDigest(args: {
   forumSlug: string;
   accent?: string | null;
 }): ForumDigest {
-  const path = `/f/${args.forumSlug}/topics`;
+  const name = args.name ?? "you";
+  const p = (host: string, topic: string) =>
+    `/f/${args.forumSlug}/${host}/${topic}`;
+  const t = (iso: string) => new Date(iso);
   return {
     userId: "sample",
     email: args.email,
@@ -236,29 +253,88 @@ export function sampleDigest(args: {
     forumName: args.forumName,
     forumSlug: args.forumSlug,
     accent: args.accent ?? null,
-    comments: [
+    topics: [
+      // Someone replied to your comment — the whole thread above it, and a
+      // one-click Reply.
       {
-        topicTitle: "Your example topic",
-        by: "Sam Example",
-        body: "This is exactly the kind of thing we should be doing more of. I especially like the second half — could we pair it with the newcomers session?",
-        path,
+        topicId: "sample-garden",
+        title: "A community garden for the north courtyard",
+        author: "Priya Okafor",
+        path: p("priya", "community-garden"),
+        activities: [
+          {
+            kind: "reply",
+            by: "Robin Vale",
+            body: "Count me in — I can bring tools on the first weekend.",
+            ancestors: [
+              {
+                by: "Jordan Lee",
+                body: "Should we use raised beds or dig straight into the ground?",
+              },
+              {
+                by: name,
+                body: "Raised beds near the wall — the soil there is thin.",
+              },
+            ],
+            replyToCommentId: "sample-reply-1",
+            at: t("2026-07-30T09:12:00Z"),
+          },
+        ],
+      },
+      // Your own topic: a new comment (with Reply) and a wave of ❤️s, every
+      // hearter named.
+      {
+        topicId: "sample-mine",
+        title: "Rethinking the weekly assembly format",
+        author: name,
+        path: p("you", "weekly-assembly"),
+        activities: [
+          {
+            kind: "comment",
+            by: "Sam Whitfield",
+            body: "This is exactly what we've needed — could we pair it with the newcomers session?",
+            replyToCommentId: "sample-comment-1",
+            at: t("2026-07-30T08:40:00Z"),
+          },
+          {
+            kind: "heart",
+            hearters: [
+              "Amara Okafor",
+              "Tariq Hassan",
+              "Rosa Delgado",
+              "Ben Fletcher",
+              "Maya Iyer",
+              "Kwame Mensah",
+            ],
+            at: t("2026-07-30T07:55:00Z"),
+          },
+        ],
+      },
+      // An admin handed you a topic to run.
+      {
+        topicId: "sample-assigned",
+        title: "Welcome newcomers session",
+        author: name,
+        path: p("you", "welcome-newcomers"),
+        activities: [{ kind: "assignment", at: t("2026-07-29T18:20:00Z") }],
+      },
+      // A freshly published topic to read and vote on.
+      {
+        topicId: "sample-new",
+        title: "Open data standards for local councils",
+        author: "Hana Kim",
+        path: p("hana", "open-data-standards"),
+        activities: [{ kind: "new", at: t("2026-07-29T16:00:00Z") }],
+      },
+      // Your standing reminder — a draft you haven't published.
+      {
+        topicId: "sample-draft",
+        title: "Half-finished idea about peer mentoring",
+        author: name,
+        path: p("you", "peer-mentoring"),
+        activities: [{ kind: "draft", at: t("2026-07-20T10:00:00Z") }],
       },
     ],
-    replies: [
-      {
-        topicTitle: "A community garden for the north courtyard",
-        by: "Robin Example",
-        body: "Count me in — I can bring tools on the first weekend.",
-        path,
-      },
-    ],
-    newTopics: [
-      { title: "A community garden for the north courtyard", path },
-      { title: "Rethinking the weekly assembly format", path },
-    ],
-    heartActivity: [{ topicTitle: "Your example topic", count: 3, path }],
-    drafts: [{ title: "Half-finished idea about mentoring", path }],
-    assignedTopics: [{ topicTitle: "Welcome newcomers session", path }],
   };
 }
 
