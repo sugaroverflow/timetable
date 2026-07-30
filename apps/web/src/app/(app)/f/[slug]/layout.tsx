@@ -208,6 +208,25 @@ function QueueNavLink({
   );
 }
 
+function PendingNavLink({
+  base,
+  pendingCount,
+}: {
+  base: string;
+  pendingCount: number;
+}) {
+  return (
+    <NavLink href={`${base}/pending`}>
+      Pending Topics
+      {pendingCount > 0 ? (
+        <span className="nav-badge">
+          {pendingCount > 999 ? "999+" : pendingCount}
+        </span>
+      ) : null}
+    </NavLink>
+  );
+}
+
 function SideNav({
   base,
   isAuthed,
@@ -252,18 +271,11 @@ function SideNav({
           filters the list to the profiles their access allows (all members
           on public forums; hosts + admins on hosts_only ones). */}
       <NavLink href={`${base}/people`}>People</NavLink>
-      {/* Profile moved to the topbar account menu (QA 2026-07-28). */}
+      {/* Also in the topbar account menu — kept here too for discoverability
+          (QA 2026-07-30). */}
+      {isAuthed && <NavLink href={`${base}/profile`}>Profile</NavLink>}
       {hostOrAdmin && <NavLink href={`${base}/analysis`}>Analysis</NavLink>}
-      {admin && (
-        <NavLink href={`${base}/pending`}>
-          Pending Topics
-          {pendingCount > 0 ? (
-            <span className="nav-badge">
-              {pendingCount > 999 ? "999+" : pendingCount}
-            </span>
-          ) : null}
-        </NavLink>
-      )}
+      {admin && <PendingNavLink base={base} pendingCount={pendingCount} />}
       {admin && <NavLink href={`${base}/log`}>Activity Log</NavLink>}
       {admin && <NavLink href={`${base}/settings`}>Forum Settings</NavLink>}
       {isMember && <NavLink href={`${base}/api`}>API</NavLink>}

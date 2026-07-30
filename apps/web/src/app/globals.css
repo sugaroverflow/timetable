@@ -658,6 +658,32 @@ textarea {
   text-decoration: underline;
 }
 
+/* People page: jump-to-section table of contents */
+.people-toc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.people-toc-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  color: inherit;
+  text-decoration: none;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+}
+.people-toc-link:hover {
+  border-color: var(--line-strong);
+  background: var(--wash);
+}
+.people-section {
+  scroll-margin-top: 80px;
+}
+
 /* People card head (QA 2026-07-30): a big photo with the name — and its
    role pills to the right on the same line — stacked underneath it. */
 .person-head {
