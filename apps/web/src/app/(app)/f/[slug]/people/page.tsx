@@ -155,9 +155,21 @@ function PersonCard({
   const canManage = canEdit && member != null;
   return (
     <li className="card stack">
-      <div className="row" style={{ alignItems: "center" }}>
-        <Avatar name={person.name} image={person.image} large />
-        <div>
+      <div className="person-head">
+        <Avatar name={person.name} image={person.image} xlarge />
+        {person.userId === meId ? (
+          // The viewer's own card: straight to the profile editor
+          // (QA 2026-07-29).
+          <Link
+            className="btn btn-ghost btn-sm person-head-edit"
+            href={`/f/${slug}/profile`}
+          >
+            <Pencil size={14} aria-hidden /> Edit profile
+          </Link>
+        ) : null}
+        {/* Name with its role pills on the same line, to the right
+            (QA 2026-07-30). */}
+        <div className="person-head-titles">
           {hasTopics ? (
             <Link
               className="person-name-link"
@@ -168,21 +180,8 @@ function PersonCard({
           ) : (
             <strong>{person.name ?? "Member"}</strong>
           )}
-          <div style={{ marginTop: 4 }}>
-            <RolePills roles={person.roles} labels={roleLabels} />
-          </div>
+          <RolePills roles={person.roles} labels={roleLabels} />
         </div>
-        {person.userId === meId ? (
-          // The viewer's own card: straight to the profile editor
-          // (QA 2026-07-29).
-          <Link
-            className="btn btn-ghost btn-sm"
-            style={{ marginLeft: "auto", alignSelf: "flex-start" }}
-            href={`/f/${slug}/profile`}
-          >
-            <Pencil size={14} aria-hidden /> Edit profile
-          </Link>
-        ) : null}
       </div>
       {person.bioHtml ? <CollapsibleTopicBody html={person.bioHtml} /> : null}
       <PersonTopics slug={slug} person={person} />

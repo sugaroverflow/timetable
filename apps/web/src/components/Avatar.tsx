@@ -25,14 +25,22 @@ export function Avatar({
   image,
   small = false,
   large = false,
+  xlarge = false,
 }: {
   name: string | null;
   image?: string | null;
   small?: boolean;
   large?: boolean;
+  xlarge?: boolean;
 }) {
   const label = name ?? "?";
-  const sizeClass = small ? " avatar-sm" : large ? " avatar-lg" : "";
+  const sizeClass = small
+    ? " avatar-sm"
+    : xlarge
+      ? " avatar-xl"
+      : large
+        ? " avatar-lg"
+        : "";
   if (image) {
     return (
       // eslint-disable-next-line @next/next/no-img-element

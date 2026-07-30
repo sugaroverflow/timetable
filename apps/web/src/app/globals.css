@@ -218,7 +218,7 @@ html[data-theme="dark"] .mode-light-only {
 }
 
 .page-head h1 {
-  font-size: var(--text-4xl);
+  font-size: var(--text-h1);
   margin: 0;
 }
 .page-head p {
@@ -658,6 +658,29 @@ textarea {
   text-decoration: underline;
 }
 
+/* People card head (QA 2026-07-30): a big photo with the name — and its
+   role pills to the right on the same line — stacked underneath it. */
+.person-head {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+.person-head-titles {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: var(--text-lg);
+}
+/* The viewer's own card: editor link parked top-right, clear of the photo. */
+.person-head-edit {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
 /* Sidebar timetable switcher (QA #59 — moved from topbar) */
 .tt-switcher {
   position: relative;
@@ -866,6 +889,11 @@ textarea {
   height: 56px;
   font-size: var(--text-2xl);
 }
+.avatar-xl {
+  width: 96px;
+  height: 96px;
+  font-size: var(--text-4xl);
+}
 .avatar-img {
   object-fit: cover;
   background: var(--wash);
@@ -944,13 +972,13 @@ textarea {
 .topic-title {
   font-family: var(--serif);
   font-weight: var(--fw-semibold);
-  font-size: var(--text-2xl);
+  font-size: var(--text-h3);
   line-height: var(--lh-tight);
   margin: 0;
 }
 /* On its own permalink page the topic title IS the page title — tier 1. */
 .topic-permalink .topic-title {
-  font-size: var(--text-4xl);
+  font-size: var(--text-h1);
 }
 .topic-body {
   color: var(--ink);
@@ -1967,7 +1995,7 @@ textarea {
    title (30) > section header (24) > item/topic titles (20). */
 .page-title {
   font-family: var(--serif);
-  font-size: var(--text-4xl);
+  font-size: var(--text-h1);
   font-weight: var(--fw-semibold);
   line-height: var(--lh-tight);
   margin: 0;
@@ -1977,7 +2005,7 @@ textarea {
    Inherits the serif family + weight from the h1–h3 element rule. */
 .section-title {
   font-family: var(--serif);
-  font-size: var(--text-3xl);
+  font-size: var(--text-h2);
   font-weight: var(--fw-semibold);
   line-height: var(--lh-tight);
   margin: 0;
