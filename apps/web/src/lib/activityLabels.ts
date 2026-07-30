@@ -1,5 +1,6 @@
 /** Human labels for activity_events actions, shared by the timeline and its filter. */
 export const ACTION_LABELS: Record<string, string> = {
+  "topic.create": "created a topic",
   "topic.submit": "submitted a topic",
   "topic.publish": "published a topic",
   "topic.reject": "rejected a topic",
@@ -9,15 +10,22 @@ export const ACTION_LABELS: Record<string, string> = {
   "topic.reassign": "reassigned a topic's owner",
   "hearts.cutoff": "changed the hearts cutoff",
   "comment.hide": "hid a comment",
+  "comment.unhide": "un-hid a comment",
   "member.bio_edit": "edited a member bio",
+  "member.profile_edit": "updated their profile",
   "heart.add": "hearted a topic",
   "heart.remove": "removed their heart from a topic",
   "comment.add": "commented on a topic",
   "comment.reply": "replied to a comment",
   "member.email_change": "changed a member's login email",
+  "member.role_change": "changed a member's roles",
   "member.invite": "invited someone",
   "member.first_login": "logged in for the first time",
   "member.remove": "removed a member",
   "member.impersonate": "previewed the forum as a member",
+  // Retained for historical rows; the preview-end event is no longer logged.
   "member.impersonate_end": "ended a member preview",
+  "queue.finish": "finished the topic queue",
+  "forum.settings": "changed forum settings",
+  "forum.privacy": "changed the forum's visibility",
 };

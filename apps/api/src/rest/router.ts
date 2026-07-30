@@ -465,7 +465,8 @@ restRouter.patch(
   "/memberships/:id/roles",
   h(async (req, res) => {
     const ctx = await contextFromRequest(req);
-    if (!requireUserCtx(ctx, res)) return;
+    const user = requireUserCtx(ctx, res);
+    if (!user) return;
 
     const admin = await requireAdminMembership(
       ctx,
@@ -489,6 +490,22 @@ restRouter.patch(
     }
 
     const updated = await setMemberRoles(membership.id, roles);
+    // Permission changes are audit-worthy — log unless nothing changed.
+    const before = [...membership.roles].sort().join(",");
+    const after = [...roles].sort().join(",");
+    if (before !== after) {
+      await logActivity({
+        timetableId: membership.timetableId,
+        actorId: user.id,
+        action: "member.role_change",
+        payload: {
+          targetUserId: membership.userId,
+          from: membership.roles,
+          to: roles,
+        },
+        note: `Roles set to ${roles.join(", ") || "none"}`,
+      });
+    }
     res.json(updated);
   }),
 );

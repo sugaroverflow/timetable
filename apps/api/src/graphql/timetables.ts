@@ -7,6 +7,7 @@ import {
   getTimetableByDomain,
   getViewerRoles,
   listMembershipsForUser,
+  logActivity,
   markFeedSeen,
   setHeartsCountFrom,
   updateTimetableProfile,
@@ -166,7 +167,7 @@ builder.mutationFields((t) => ({
       customDomain: t.arg.string({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
-      const { readable, viewer } = await loadTimetableAndViewer(
+      const { user, readable, viewer } = await loadTimetableAndViewer(
         ctx,
         args.idOrSlug,
       );
@@ -187,6 +188,16 @@ builder.mutationFields((t) => ({
           args.customDomain != null ? args.customDomain.trim() : undefined,
       });
       if (!updated) notFound("Forum not found");
+      // A privacy change is a distinct, high-signal audit event; a plain
+      // name/domain edit is logged as an ordinary settings change.
+      const privacyChanged =
+        privacy != null && privacy !== readable.timetable.privacy;
+      await logActivity({
+        timetableId: readable.timetable.id,
+        actorId: user.id,
+        action: privacyChanged ? "forum.privacy" : "forum.settings",
+        ...(privacyChanged ? { note: `Visibility set to ${privacy}` } : {}),
+      });
       return { ...updated, viewerRoles: readable.roles as string[] };
     },
   }),
@@ -250,7 +261,7 @@ builder.mutationFields((t) => ({
     },
     // eslint-disable-next-line complexity, sonarjs/cognitive-complexity -- audit debt (2026-07-22): 13-arg settings-patch assembly; decomposition queued
     resolve: async (_p, args, ctx) => {
-      const { readable, viewer } = await loadTimetableAndViewer(
+      const { user, readable, viewer } = await loadTimetableAndViewer(
         ctx,
         args.idOrSlug,
       );
@@ -325,6 +336,11 @@ builder.mutationFields((t) => ({
         patch,
       );
       if (!updated) notFound("Forum not found");
+      await logActivity({
+        timetableId: readable.timetable.id,
+        actorId: user.id,
+        action: "forum.settings",
+      });
       return { ...updated, viewerRoles: readable.roles as string[] };
     },
   }),
