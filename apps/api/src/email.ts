@@ -105,6 +105,47 @@ export function emailShell(
 
 const INDENT = 16; // px per thread level
 
+// Initials-avatar palette + hash — mirrors apps/web Avatar.tsx and the
+// --avatar-1…8 tokens, so an author's email avatar colour matches the app.
+const AVATAR_PALETTE = [
+  "#7048e8",
+  "#e8590c",
+  "#1098ad",
+  "#2f9e44",
+  "#c2255c",
+  "#3b5bdb",
+  "#0c8599",
+  "#5f3dc4",
+];
+function avatarColour(seed: string): string {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = (hash << 5) - hash + seed.charCodeAt(i);
+    hash |= 0;
+  }
+  return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length]!;
+}
+function initials(name: string): string {
+  return name
+    .split(" ")
+    .map((w) => w[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
+/** The author's avatar: their photo, or a colour-hashed initials circle
+ * matching the app. (Rounds in most clients; a few — notably Outlook —
+ * ignore border-radius and show it square.) */
+function avatarCell(person: DigestPerson, size: number): string {
+  if (person.image) {
+    return `<img src="${esc(person.image)}" width="${size}" height="${size}" alt="" style="width:${size}px;height:${size}px;border-radius:${size / 2}px;object-fit:cover;display:block;">`;
+  }
+  const label = person.name ?? "?";
+  return `<div style="width:${size}px;height:${size}px;border-radius:${size / 2}px;background:${avatarColour(label)};color:#ffffff;font-weight:700;font-size:15px;text-align:center;line-height:${size}px;">${esc(initials(label))}</div>`;
+}
+
 /** A comment/reply title link, or plain bold text without a path. */
 function accentLink(
   label: string,
@@ -224,13 +265,20 @@ function renderActivity(
   }
 }
 
-/** One topic on its own card: "Author: Title" then its activities. */
+/** One topic on its own card: an avatar + title + "by Author" byline (the
+ * same head as a /topics feed card), then its activities. */
 function renderCard(
   card: DigestTopicCard,
   forumSlug: string,
   accent: string,
 ): string {
-  const header = `<div style="font-size:16px;margin:0 0 8px;">${personLink(forumSlug, card.author, accent)}<span style="color:${E.muted};">: </span>${accentLink(card.title, card.path, accent)}</div>`;
+  const header =
+    `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 10px;"><tr>` +
+    `<td valign="top" style="padding-right:10px;">${avatarCell(card.author, 40)}</td>` +
+    `<td valign="top">` +
+    `<div style="font-size:17px;font-weight:700;line-height:1.25;">${accentLink(card.title, card.path, accent)}</div>` +
+    `<div style="color:${E.muted};font-size:13px;margin-top:2px;">by ${personLink(forumSlug, card.author, accent)}</div>` +
+    `</td></tr></table>`;
   const activities = card.activities
     .map(
       (a) =>
@@ -295,10 +343,15 @@ export function sampleDigest(args: {
   forumSlug: string;
   accent?: string | null;
 }): ForumDigest {
-  const me: DigestPerson = { name: args.name ?? "You", userId: "sample-you" };
+  const me: DigestPerson = {
+    name: args.name ?? "You",
+    userId: "sample-you",
+    image: null,
+  };
   const who = (name: string, userId: string): DigestPerson => ({
     name,
     userId,
+    image: null,
   });
   const p = (host: string, topic: string) =>
     `/f/${args.forumSlug}/${host}/${topic}`;

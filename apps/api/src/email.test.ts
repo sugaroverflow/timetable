@@ -67,12 +67,12 @@ describe("renderDigest (v3, topic cards)", () => {
         {
           topicId: "x",
           title: "<script>alert(1)</script>",
-          author: { name: "<b>Eve</b>", userId: "u1" },
+          author: { name: "<b>Eve</b>", userId: "u1", image: null },
           path: null,
           activities: [
             {
               kind: "comment",
-              author: { name: "<i>Mallory</i>", userId: "u2" },
+              author: { name: "<i>Mallory</i>", userId: "u2", image: null },
               body: "<img src=x onerror=alert(1)>",
               ancestors: [],
               replyToCommentId: "c1",
@@ -80,7 +80,7 @@ describe("renderDigest (v3, topic cards)", () => {
             },
             {
               kind: "heart",
-              hearters: [{ name: "<u>Trudy</u>", userId: "u3" }],
+              hearters: [{ name: "<u>Trudy</u>", userId: "u3", image: null }],
               at: new Date("2026-07-30T00:00:00Z"),
             },
           ],

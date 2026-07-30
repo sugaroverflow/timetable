@@ -24,8 +24,15 @@ export type DigestRecipient = {
 };
 
 /** A named member with a stable link target. The email links `userId` to
- * their per-forum profile (the person page redirects id → slug). */
-export type DigestPerson = { name: string | null; userId: string | null };
+ * their per-forum profile (the person page redirects id → slug); `image`
+ * is the per-forum avatar (null → the initials fallback). Only the topic
+ * author's avatar is currently rendered, so comment/heart authors leave
+ * `image` null. */
+export type DigestPerson = {
+  name: string | null;
+  userId: string | null;
+  image: string | null;
+};
 
 /** One comment in a thread, for the ancestor context above a new comment. */
 export type DigestComment = { author: DigestPerson; body: string };
@@ -230,6 +237,7 @@ async function resolveTopicMeta(
       hostId: topics.hostId,
       hostName: timetableMemberships.name,
       hostSlug: timetableMemberships.slug,
+      hostImage: timetableMemberships.image,
     })
     .from(topics)
     .leftJoin(
@@ -244,7 +252,7 @@ async function resolveTopicMeta(
     meta.set(r.id, {
       timetableId: r.timetableId,
       title: r.title,
-      author: { name: r.hostName, userId: r.hostId },
+      author: { name: r.hostName, userId: r.hostId, image: r.hostImage },
       path: topicPath(
         ctx.forumSlug.get(r.timetableId),
         r.hostSlug,
@@ -300,7 +308,7 @@ async function loadAncestorComments(
       loaded.set(row.id, {
         parentId: row.parentId,
         body: row.deletedAt ? "[comment removed]" : row.body,
-        author: { name: row.authorName, userId: row.authorId },
+        author: { name: row.authorName, userId: row.authorId, image: null },
       });
       if (row.parentId && !loaded.has(row.parentId)) next.push(row.parentId);
     }
@@ -394,7 +402,7 @@ async function commentActivities(
     timetableId: timetableByTopic.get(r.topicId) ?? "",
     activity: {
       kind: "comment" as const,
-      author: { name: r.by, userId: r.authorId },
+      author: { name: r.by, userId: r.authorId, image: null },
       body: r.body,
       ancestors: chains.get(r.id) ?? [],
       replyToCommentId: r.id,
@@ -459,7 +467,7 @@ async function replyActivities(
     timetableId: r.timetableId,
     activity: {
       kind: "reply" as const,
-      author: { name: r.by, userId: r.authorId },
+      author: { name: r.by, userId: r.authorId, image: null },
       body: r.body,
       ancestors: chains.get(r.id) ?? [],
       replyToCommentId: r.id,
@@ -510,7 +518,11 @@ async function heartActivities(
       at: row.createdAt,
       timetableId,
     };
-    entry.hearters.push({ name: row.hearter, userId: row.userId });
+    entry.hearters.push({
+      name: row.hearter,
+      userId: row.userId,
+      image: null,
+    });
     if (row.createdAt > entry.at) entry.at = row.createdAt;
     byTopic.set(row.topicId, entry);
   }
@@ -723,7 +735,7 @@ function buildCards(
     cards.push({
       topicId,
       title: m?.title ?? "A topic",
-      author: m?.author ?? { name: null, userId: null },
+      author: m?.author ?? { name: null, userId: null, image: null },
       path: m?.path ?? null,
       activities,
     });
