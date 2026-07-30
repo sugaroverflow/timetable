@@ -138,6 +138,14 @@ export const FONT_PAIRINGS: Record<
     serif: "ui-serif, Georgia, 'Times New Roman', serif",
     sans: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
   },
+  // Matches newspeak.house: a high-contrast literary serif (their Galaxie
+  // Copernicus; Fraunces is the closest face we load, Georgia their own
+  // fallback) over Lato (their body sans). QA 2026-07-30.
+  newspeak: {
+    label: "Fraunces + Lato (Newspeak House)",
+    serif: '"Fraunces", Georgia, serif',
+    sans: '"Lato", system-ui, -apple-system, "Segoe UI", sans-serif',
+  },
 };
 
 /** Display faces for the forum name in the topbar (2026-07-29) — chosen
@@ -283,6 +291,28 @@ export const PRESET_PALETTES: Record<string, PresetPalette> = {
       topbar: "#201a30",
       topbarText: "#e9e4f5",
       text: "#e6e1f2",
+    },
+  ),
+  // newspeak.house: bright vermilion red on a light warm-grey / white
+  // base with near-black ink (QA 2026-07-30). Sampled from their CSS —
+  // #fd433e accent, #f1f1f1 page, #171717 text.
+  newspeak: preset(
+    "Newspeak House",
+    {
+      primary: "#fd433e",
+      secondary: "#da3531",
+      background: "#f1f1f1",
+      topbar: "#ffffff",
+      topbarText: "#171717",
+      text: "#171717",
+    },
+    {
+      primary: "#fd6b5f",
+      secondary: "#fd433e",
+      background: "#161413",
+      topbar: "#1f1b1a",
+      topbarText: "#f1efee",
+      text: "#ece9e8",
     },
   ),
   crimson: preset(

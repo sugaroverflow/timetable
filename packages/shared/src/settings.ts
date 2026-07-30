@@ -64,6 +64,7 @@ export const THEME_FONT_KEYS = [
   "grotesk",
   "literary",
   "system",
+  "newspeak",
 ] as const;
 
 /** Canonical brand-font keys (2026-07-29): the display face for the forum
