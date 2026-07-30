@@ -197,6 +197,13 @@
      (QA 2026-07-29, "err toward larger"). */
   --text-4xl: 30px;
 
+  /* Heading tiers get their OWN scale (QA 2026-07-30, "larger headings
+     everywhere"): bumping these never disturbs the size ramp above, which
+     avatars/topbar/calendar reuse. Strictly ordered h1 > h2 > h3. */
+  --text-h1: 34px;
+  --text-h2: 27px;
+  --text-h3: 22px;
+
   /* --- Typography: weights --- */
   --fw-normal: 400;
   --fw-medium: 500;
