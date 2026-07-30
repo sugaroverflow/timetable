@@ -92,7 +92,7 @@ export function AccountMenu({ email }: { email: string | null }) {
                 <Link href={inForum ? `/f/${slug}/profile` : "/profile"} />
               }
             >
-              Profile
+              Edit Profile
             </Menu.Item>
             <Menu.Item
               className="tt-menu-item"

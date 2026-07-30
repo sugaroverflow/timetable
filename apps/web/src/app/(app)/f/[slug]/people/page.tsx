@@ -225,10 +225,15 @@ export default async function PeoplePage({
   const sections = (["admin", "host", "elector"] as const).map((role) => ({
     role,
     heading: pluralLabel(roleLabel(settings.roleLabels, role)),
-    people: data.timetablePeople.filter(
-      (p) => primaryRole(p.roles as Role[]) === role,
-    ),
+    people: data.timetablePeople
+      .filter((p) => primaryRole(p.roles as Role[]) === role)
+      .sort((a, b) =>
+        (a.name ?? "Member").localeCompare(b.name ?? "Member", undefined, {
+          sensitivity: "base",
+        }),
+      ),
   }));
+  const visibleSections = sections.filter((s) => s.people.length > 0);
 
   return (
     <div className="stack">
@@ -248,10 +253,27 @@ export default async function PeoplePage({
           hint="Members appear here once they join."
         />
       ) : (
-        sections
-          .filter((section) => section.people.length > 0)
-          .map((section) => (
-            <section key={section.role} className="stack">
+        <>
+          {visibleSections.length > 1 ? (
+            <nav className="people-toc" aria-label="Jump to section">
+              {visibleSections.map((section) => (
+                <a
+                  key={section.role}
+                  className="people-toc-link"
+                  href={`#people-${section.role}`}
+                >
+                  {section.heading}
+                  <span className="faint">{section.people.length}</span>
+                </a>
+              ))}
+            </nav>
+          ) : null}
+          {visibleSections.map((section) => (
+            <section
+              key={section.role}
+              id={`people-${section.role}`}
+              className="stack people-section"
+            >
               <h3 className="section-title">{section.heading}</h3>
               <ul className="list">
                 {section.people.map((person) => (
@@ -267,7 +289,8 @@ export default async function PeoplePage({
                 ))}
               </ul>
             </section>
-          ))
+          ))}
+        </>
       )}
     </div>
   );

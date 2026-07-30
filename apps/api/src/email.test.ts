@@ -66,20 +66,25 @@ describe("renderDigest (v3, topic cards)", () => {
     expect(html).not.toContain("Public only");
   });
 
-  it("names each hearter on its own line, linked to their profile", () => {
+  it("names each hearter on its own line as plain (unlinked) text", () => {
     const { html } = renderDigest(SAMPLE);
     expect(html).toContain("❤️ ");
-    expect(html).toContain("/f/sparkle/sample-amara");
-    expect(html).toContain("/f/sparkle/sample-kwame");
+    // Hearter names are plain bold text, not profile links.
+    expect(html).toContain("❤️ <strong>Amara Okafor</strong>");
+    expect(html).not.toContain("/f/sparkle/sample-amara");
+    expect(html).not.toContain("/f/sparkle/sample-kwame");
     // A rule separates the comment section from the ❤️ section.
     expect(html).toContain("border-top:1px solid");
   });
 
-  it("builds Reply deep-links and links usernames to profiles", () => {
+  it("builds Reply deep-links; commenters plain, byline still linked", () => {
     const { html } = renderDigest(SAMPLE);
     expect(html).toContain("?reply=garden-robin#comment-garden-robin");
     expect(html).toContain("Reply →");
-    expect(html).toContain("/f/sparkle/sample-robin");
+    // Commenter names are plain bold text, not profile links…
+    expect(html).toContain("<strong>Robin Vale</strong>");
+    expect(html).not.toContain("/f/sparkle/sample-robin");
+    // …but the topic author's byline still links to their profile.
     expect(html).toContain("/f/sparkle/sample-marcus");
   });
 

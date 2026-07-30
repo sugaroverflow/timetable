@@ -196,6 +196,12 @@ function personLink(
   return `<a href="${href}" style="color:${accent};font-weight:600;text-decoration:none;">${name}</a>`;
 }
 
+/** A member's name as plain, unlinked bold text — used for commenters and
+ * hearters, whose names appear inline in activity and don't need to link. */
+function personName(person: DigestPerson): string {
+  return `<strong>${esc(person.name ?? "Someone")}</strong>`;
+}
+
 type ThreadNode = { comment: DigestComment; isNew: boolean };
 
 /** One line in a thread: "Name: body", indented to its depth. A new comment
@@ -203,11 +209,10 @@ type ThreadNode = { comment: DigestComment; isNew: boolean };
 function threadLine(
   node: ThreadNode,
   depth: number,
-  forumSlug: string,
   path: string | null,
   accent: string,
 ): string {
-  const name = personLink(forumSlug, node.comment.author, accent);
+  const name = personName(node.comment.author);
   const color = node.isNew ? accent : E.muted;
   const bodyCls = node.isNew ? "" : ' class="em-muted"';
   const line = `<div style="padding-left:${depth * INDENT}px;margin:3px 0;white-space:pre-wrap;">${name}<span class="em-muted" style="color:${E.muted};">: </span><span${bodyCls} style="color:${color};">${esc(node.comment.body)}</span></div>`;
@@ -224,7 +229,6 @@ function threadLine(
 function renderThreadTree(
   card: DigestTopicCard,
   acts: Extract<DigestActivity, { kind: "comment" | "reply" }>[],
-  forumSlug: string,
   accent: string,
 ): string {
   const nodes = new Map<string, ThreadNode>();
@@ -248,24 +252,17 @@ function renderThreadTree(
   const walk = (id: string, depth: number): void => {
     const node = nodes.get(id);
     if (!node) return;
-    lines.push(threadLine(node, depth, forumSlug, card.path, accent));
+    lines.push(threadLine(node, depth, card.path, accent));
     for (const child of children.get(id) ?? []) walk(child, depth + 1);
   };
   for (const root of roots) walk(root, 0);
   return lines.join("");
 }
 
-/** Every hearter on their own line with a ❤️, linked to their profile. */
-function renderHearts(
-  hearters: DigestPerson[],
-  forumSlug: string,
-  accent: string,
-): string {
+/** Every hearter on their own line with a ❤️. */
+function renderHearts(hearters: DigestPerson[]): string {
   return hearters
-    .map(
-      (h) =>
-        `<div style="margin:3px 0;">❤️ ${personLink(forumSlug, h, accent)}</div>`,
-    )
+    .map((h) => `<div style="margin:3px 0;">❤️ ${personName(h)}</div>`)
     .join("");
 }
 
@@ -353,7 +350,6 @@ type Discussion = Extract<DigestActivity, { kind: "comment" | "reply" }>;
 function renderDiscussion(
   card: DigestTopicCard,
   discussion: Discussion[],
-  forumSlug: string,
   accent: string,
   hostLabel: string,
   adminLabel: string,
@@ -365,7 +361,7 @@ function renderDiscussion(
       if (acts.length === 0) return "";
       return (
         threadLabel(vis, hostLabel, adminLabel) +
-        renderThreadTree(card, acts, forumSlug, accent)
+        renderThreadTree(card, acts, accent)
       );
     })
     .filter(Boolean);
@@ -408,17 +404,10 @@ function renderCard(
   // ❤️s before comments — the same order as a topic card in the app, where
   // the actions row sits above the thread (QA 2026-07-30).
   if (heart && heart.kind === "heart") {
-    sections.push(renderHearts(heart.hearters, forumSlug, accent));
+    sections.push(renderHearts(heart.hearters));
   }
   sections.push(
-    ...renderDiscussion(
-      card,
-      discussion,
-      forumSlug,
-      accent,
-      hostLabel,
-      adminLabel,
-    ),
+    ...renderDiscussion(card, discussion, accent, hostLabel, adminLabel),
   );
   const bodyHtml = sections
     .map((s, i) => (i === 0 ? s : `${divider}${s}`))
