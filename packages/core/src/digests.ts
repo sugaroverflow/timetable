@@ -23,10 +23,75 @@ export type DigestRecipient = {
   notificationSettings: NotificationSettings;
 };
 
+/** A named member with a stable link target. The email links `userId` to
+ * their per-forum profile (the person page redirects id → slug); `image`
+ * is the per-forum avatar (null → the initials fallback). Only the topic
+ * author's avatar is currently rendered, so comment/heart authors leave
+ * `image` null. */
+export type DigestPerson = {
+  name: string | null;
+  userId: string | null;
+  image: string | null;
+};
+
+/** One comment in a thread. `id`/`parentId` let the email merge several
+ * replies into a single tree (shared ancestors shown once). */
+export type DigestComment = {
+  id: string;
+  parentId: string | null;
+  author: DigestPerson;
+  body: string;
+};
+
 /**
- * One digest email per (user, forum) — digest v2 (2026-07-29). A member of
- * three forums gets up to three emails, each branded as its forum, each
- * containing only that forum's news.
+ * Digest v3 (2026-07-30): the digest is a list of TOPIC CARDS, not
+ * per-kind sections. Each card is one topic ("Author: Title") carrying
+ * every piece of news about it — comments, replies, ❤️s, an assignment, a
+ * fresh publish, a lingering draft — aggregated and ordered most-actionable
+ * first.
+ */
+export type DigestActivity =
+  /** A comment or reply in a thread the recipient cares about (their topic,
+   * or a reply to their comment). `ancestors` is the thread above it
+   * (root → the new comment's parent) so the email can indent the tree;
+   * `replyToCommentId` deep-links the Reply button to this comment. */
+  | {
+      kind: "comment" | "reply";
+      /** Which thread this belongs to — the email labels host-only and
+       * you-and-admin threads and keeps each kind in its own tree. */
+      visibility: "public" | "host_only" | "admin_only";
+      /** The new comment itself; `comment.id` is the Reply deep-link target. */
+      comment: DigestComment;
+      /** Thread above it (root → its parent), for merging into one tree. */
+      ancestors: DigestComment[];
+      at: Date;
+    }
+  /** ❤️s on the recipient's topic — every hearter named (no cap). */
+  | { kind: "heart"; hearters: DigestPerson[]; at: Date }
+  /** A topic newly published in a forum where the recipient is an elector. */
+  | { kind: "new"; at: Date }
+  /** A topic an admin (re)assigned to the recipient. */
+  | { kind: "assignment"; at: Date }
+  /** The recipient's own still-unpublished draft — a standing reminder. */
+  | { kind: "draft"; at: Date };
+
+export type DigestTopicCard = {
+  topicId: string;
+  title: string;
+  /** The topic's host — the card head shows their avatar + "by {author}". */
+  author: DigestPerson;
+  /** The topic's markdown body — shown (truncated) on status cards
+   * (assigned / newly published / draft) so the reader sees what it is. */
+  body: string | null;
+  /** The topic's permalink; the email builds per-comment reply links on it. */
+  path: string | null;
+  activities: DigestActivity[];
+};
+
+/**
+ * One digest email per (user, forum). A member of three forums gets up to
+ * three emails, each branded as its forum, each holding only that forum's
+ * topic cards.
  */
 export type ForumDigest = {
   userId: string;
@@ -38,28 +103,11 @@ export type ForumDigest = {
   /** The forum theme's primary colour — the email's link/accent colour.
    * Null falls back to the app default. */
   accent: string | null;
-  /** Full-text comments on the recipient's topics — the LEAD section. */
-  comments: {
-    topicTitle: string;
-    by: string | null;
-    body: string;
-    path: string | null;
-  }[];
-  /** Full-text replies to the recipient's comments. */
-  replies: {
-    topicTitle: string;
-    by: string | null;
-    body: string;
-    path: string | null;
-  }[];
-  newTopics: { title: string; path: string | null }[];
-  /** ❤️ counts per topic (ambient numbers, not itemised). */
-  heartActivity: { topicTitle: string; count: number; path: string | null }[];
-  /** The recipient's own unpublished drafts — a standing reminder, shown
-   * only when the digest has other content (never the sole reason for an
-   * email). */
-  drafts: { title: string; path: string | null }[];
-  assignedTopics: { topicTitle: string; path: string | null }[];
+  /** The forum's own role labels, for the host-only / you-and-admin thread
+   * headings (defaults "Host" / "Admin"). */
+  hostLabel: string;
+  adminLabel: string;
+  topics: DigestTopicCard[];
 };
 
 function topicPath(
@@ -111,7 +159,7 @@ export async function markDigestSent(
     .where(eq(users.id, userId));
 }
 
-/** Everything the per-channel section builders need, loaded once. */
+/** Everything the per-forum builders need, loaded once. */
 type DigestContext = {
   recipient: DigestRecipient;
   forumIds: string[];
@@ -119,16 +167,15 @@ type DigestContext = {
   forumSlug: Map<string, string>;
   /** The forum theme's primary colour, for email branding. */
   accent: Map<string, string | null>;
-  /** The recipient's per-forum slug, by timetable (per-forum profiles). */
-  recipientSlugByTimetable: Map<string, string | null>;
-  /** Per-forum "seen it in the app" watermarks (2026-07-29): feed visits
-   * cover ambient heart counts; notifications-page visits cover
-   * comments/replies. New topics use topic_seen rows instead (deliberate
-   * queue reviews), not the superficial feed watermark. */
+  /** Per-forum role labels (host/admin) for thread headings. */
+  hostLabel: Map<string, string>;
+  adminLabel: Map<string, string>;
+  /** Per-forum "seen it in the app" watermarks: feed visits cover ambient
+   * ❤️ counts; notifications-page visits cover comments/replies. New topics
+   * use topic_seen rows instead (deliberate queue reviews). */
   seenFeedAt: Map<string, Date | null>;
   seenNotificationsAt: Map<string, Date | null>;
   electorTimetableIds: string[];
-  hostTimetableIds: string[];
 };
 
 /** The later of the digest window start and an in-app seen watermark. */
@@ -143,7 +190,6 @@ async function loadDigestContext(
     .select({
       timetableId: timetableMemberships.timetableId,
       roles: timetableMemberships.roles,
-      memberSlug: timetableMemberships.slug,
       lastSeenFeedAt: timetableMemberships.lastSeenFeedAt,
       lastSeenNotificationsAt: timetableMemberships.lastSeenNotificationsAt,
       name: timetables.name,
@@ -165,8 +211,17 @@ async function loadDigestContext(
         (m.settings as TimetableSettings | null)?.theme?.primary ?? null,
       ]),
     ),
-    recipientSlugByTimetable: new Map(
-      memberships.map((m) => [m.timetableId, m.memberSlug]),
+    hostLabel: new Map(
+      memberships.map((m) => [
+        m.timetableId,
+        (m.settings as TimetableSettings | null)?.roleLabels?.host ?? "Host",
+      ]),
+    ),
+    adminLabel: new Map(
+      memberships.map((m) => [
+        m.timetableId,
+        (m.settings as TimetableSettings | null)?.roleLabels?.admin ?? "Admin",
+      ]),
     ),
     seenFeedAt: new Map(
       memberships.map((m) => [m.timetableId, m.lastSeenFeedAt]),
@@ -177,26 +232,45 @@ async function loadDigestContext(
     electorTimetableIds: memberships
       .filter((m) => m.roles.includes("elector"))
       .map((m) => m.timetableId),
-    hostTimetableIds: memberships
-      .filter((m) => m.roles.includes("host"))
-      .map((m) => m.timetableId),
   };
 }
 
-type PerForum<T> = (T & { timetableId: string })[];
+/** One raw activity tagged with its topic + forum, before cards are built. */
+type RawActivity = {
+  topicId: string;
+  timetableId: string;
+  activity: DigestActivity;
+};
 
-async function newTopicRows(
+/** Topic display fields resolved once for every referenced topic. */
+type TopicMeta = {
+  timetableId: string;
+  title: string;
+  author: DigestPerson;
+  body: string | null;
+  path: string | null;
+};
+
+/** Resolve title, author (host), and permalink for every referenced topic
+ * in one query — the topic's own host membership supplies the author name,
+ * link target, and the slug the permalink needs. */
+async function resolveTopicMeta(
   ctx: DigestContext,
-  since: Date,
-): Promise<PerForum<{ title: string; path: string | null }>> {
-  if (ctx.electorTimetableIds.length === 0) return [];
+  topicIds: string[],
+): Promise<Map<string, TopicMeta>> {
+  const meta = new Map<string, TopicMeta>();
+  if (topicIds.length === 0) return meta;
   const rows = await db
     .select({
       id: topics.id,
       title: topics.title,
+      body: topics.bodyMd,
       timetableId: topics.timetableId,
-      slug: topics.slug,
+      topicSlug: topics.slug,
+      hostId: topics.hostId,
+      hostName: timetableMemberships.name,
       hostSlug: timetableMemberships.slug,
+      hostImage: timetableMemberships.image,
     })
     .from(topics)
     .leftJoin(
@@ -206,46 +280,186 @@ async function newTopicRows(
         eq(timetableMemberships.timetableId, topics.timetableId),
       ),
     )
-    .where(
-      and(
-        inArray(topics.timetableId, ctx.electorTimetableIds),
-        eq(topics.status, "published"),
-        gt(topics.publishedAt, since),
-      ),
-    );
-  if (rows.length === 0) return [];
-
-  // "Seen" for a NEW TOPIC means deliberately reviewed — a topic_seen row,
-  // written only by the queue's Next button and by hearting. A feed visit
-  // is deliberately NOT enough: scrolling All Topics is superficial, the
-  // queue is a considered read (Ed, 2026-07-29).
-  const seenRows = await db
-    .select({ topicId: topicSeen.topicId })
-    .from(topicSeen)
-    .where(
-      and(
-        eq(topicSeen.userId, ctx.recipient.id),
-        inArray(
-          topicSeen.topicId,
-          rows.map((r) => r.id),
-        ),
-      ),
-    );
-  const seen = new Set(seenRows.map((r) => r.topicId));
-
-  return rows
-    .filter((r) => !seen.has(r.id))
-    .map((r) => ({
+    .where(inArray(topics.id, topicIds));
+  for (const r of rows) {
+    meta.set(r.id, {
       timetableId: r.timetableId,
       title: r.title,
-      path: topicPath(ctx.forumSlug.get(r.timetableId), r.hostSlug, r.slug),
-    }));
+      body: r.body,
+      author: { name: r.hostName, userId: r.hostId, image: r.hostImage },
+      path: topicPath(
+        ctx.forumSlug.get(r.timetableId),
+        r.hostSlug,
+        r.topicSlug,
+      ),
+    });
+  }
+  return meta;
 }
 
-async function replyRows(
+type ThreadRow = {
+  id: string;
+  parentId: string | null;
+  timetableId: string;
+};
+
+type AncestorNode = {
+  parentId: string | null;
+  body: string;
+  author: DigestPerson;
+};
+
+/** Load every ancestor comment above the seed ids, breadth-first up the
+ * parentId links (threads are shallow). Author names resolve in the
+ * comment's own forum via the join, so cross-forum digests stay correct. */
+async function loadAncestorComments(
+  seeds: string[],
+): Promise<Map<string, AncestorNode>> {
+  const loaded = new Map<string, AncestorNode>();
+  let frontier = [...new Set(seeds)];
+  while (frontier.length > 0) {
+    const rows = await db
+      .select({
+        id: comments.id,
+        parentId: comments.parentId,
+        body: comments.body,
+        deletedAt: comments.deletedAt,
+        authorId: comments.authorId,
+        authorName: timetableMemberships.name,
+      })
+      .from(comments)
+      .innerJoin(topics, eq(topics.id, comments.topicId))
+      .leftJoin(
+        timetableMemberships,
+        and(
+          eq(timetableMemberships.userId, comments.authorId),
+          eq(timetableMemberships.timetableId, topics.timetableId),
+        ),
+      )
+      .where(inArray(comments.id, frontier));
+    const next: string[] = [];
+    for (const row of rows) {
+      loaded.set(row.id, {
+        parentId: row.parentId,
+        body: row.deletedAt ? "[comment removed]" : row.body,
+        author: { name: row.authorName, userId: row.authorId, image: null },
+      });
+      if (row.parentId && !loaded.has(row.parentId)) next.push(row.parentId);
+    }
+    frontier = next;
+  }
+  return loaded;
+}
+
+/** Walk one comment's parent links into a root→(its parent) ordered chain. */
+function chainFor(
+  parentId: string | null,
+  loaded: Map<string, AncestorNode>,
+): DigestComment[] {
+  const chain: DigestComment[] = [];
+  let cursor = parentId;
+  while (cursor) {
+    const node = loaded.get(cursor);
+    if (!node) break;
+    chain.push({
+      id: cursor,
+      parentId: node.parentId,
+      author: node.author,
+      body: node.body,
+    });
+    cursor = node.parentId;
+  }
+  return chain.reverse();
+}
+
+/** For each thread row, the ancestor chain root → its parent comment. */
+async function loadAncestorChains(
+  rows: ThreadRow[],
+): Promise<Map<string, DigestComment[]>> {
+  const seeds = rows
+    .map((r) => r.parentId)
+    .filter((id): id is string => id != null);
+  if (seeds.length === 0) return new Map(rows.map((r) => [r.id, []]));
+  const loaded = await loadAncestorComments(seeds);
+  return new Map(rows.map((r) => [r.id, chainFor(r.parentId, loaded)]));
+}
+
+/** Comments on the recipient's topics (public + their admin thread). */
+async function commentActivities(
   ctx: DigestContext,
   since: Date,
-): Promise<PerForum<ForumDigest["replies"][number]>> {
+  myTopicIds: string[],
+  timetableByTopic: Map<string, string>,
+): Promise<RawActivity[]> {
+  if (myTopicIds.length === 0) return [];
+  const rows = await db
+    .select({
+      id: comments.id,
+      parentId: comments.parentId,
+      topicId: comments.topicId,
+      authorId: comments.authorId,
+      visibility: comments.visibility,
+      by: timetableMemberships.name,
+      body: comments.body,
+      createdAt: comments.createdAt,
+    })
+    .from(comments)
+    .innerJoin(topics, eq(topics.id, comments.topicId))
+    .leftJoin(
+      timetableMemberships,
+      and(
+        eq(timetableMemberships.userId, comments.authorId),
+        eq(timetableMemberships.timetableId, topics.timetableId),
+      ),
+    )
+    .where(
+      and(
+        inArray(comments.topicId, myTopicIds),
+        gt(comments.createdAt, since),
+        // The topic owner is party to all three threads on their own topic
+        // (public, {host}-only, and the {admin} drafting thread).
+        inArray(comments.visibility, ["public", "host_only", "admin_only"]),
+        ne(comments.authorId, ctx.recipient.id),
+        isNull(comments.hiddenAt),
+        isNull(comments.deletedAt),
+      ),
+    );
+  const fresh = rows.filter((r) => {
+    const timetableId = timetableByTopic.get(r.topicId) ?? "";
+    return (
+      r.createdAt > afterSeen(since, ctx.seenNotificationsAt.get(timetableId))
+    );
+  });
+  const chains = await loadAncestorChains(
+    fresh.map((r) => ({
+      id: r.id,
+      parentId: r.parentId,
+      timetableId: timetableByTopic.get(r.topicId) ?? "",
+    })),
+  );
+  return fresh.map((r) => ({
+    topicId: r.topicId,
+    timetableId: timetableByTopic.get(r.topicId) ?? "",
+    activity: {
+      kind: "comment" as const,
+      visibility: r.visibility,
+      comment: {
+        id: r.id,
+        parentId: r.parentId,
+        author: { name: r.by, userId: r.authorId, image: null },
+        body: r.body,
+      },
+      ancestors: chains.get(r.id) ?? [],
+      at: r.createdAt,
+    },
+  }));
+}
+
+/** Replies to the recipient's comments, with ancestor context. */
+async function replyActivities(
+  ctx: DigestContext,
+  since: Date,
+): Promise<RawActivity[]> {
   const myComments = await db
     .select({ id: comments.id })
     .from(comments)
@@ -255,9 +469,12 @@ async function replyRows(
 
   const rows = await db
     .select({
-      topicTitle: topics.title,
+      id: comments.id,
+      parentId: comments.parentId,
+      topicId: comments.topicId,
       timetableId: topics.timetableId,
-      topicSlug: topics.slug,
+      authorId: comments.authorId,
+      visibility: comments.visibility,
       by: timetableMemberships.name,
       body: comments.body,
       createdAt: comments.createdAt,
@@ -280,156 +497,151 @@ async function replyRows(
         isNull(comments.deletedAt),
       ),
     );
-  return (
-    rows
-      // Replies live on the Notifications page — a visit there after the
-      // reply means it was seen in the app; don't email it.
-      .filter(
-        (r) =>
-          r.createdAt >
-          afterSeen(since, ctx.seenNotificationsAt.get(r.timetableId)),
-      )
-      .map((r) => ({
-        timetableId: r.timetableId,
-        topicTitle: r.topicTitle,
-        by: r.by,
+
+  // Replies live on the Notifications page — a visit there after the reply
+  // means it was seen in the app; don't email it.
+  const fresh = rows.filter(
+    (r) =>
+      r.createdAt >
+      afterSeen(since, ctx.seenNotificationsAt.get(r.timetableId)),
+  );
+  const chains = await loadAncestorChains(fresh);
+
+  return fresh.map((r) => ({
+    topicId: r.topicId,
+    timetableId: r.timetableId,
+    activity: {
+      kind: "reply" as const,
+      visibility: r.visibility,
+      comment: {
+        id: r.id,
+        parentId: r.parentId,
+        author: { name: r.by, userId: r.authorId, image: null },
         body: r.body,
-        path: null,
-      }))
-  );
+      },
+      ancestors: chains.get(r.id) ?? [],
+      at: r.createdAt,
+    },
+  }));
 }
 
-/** The recipient's topics across their host forums, with paths. */
-async function loadMyTopics(ctx: DigestContext) {
-  const myTopics = await db
-    .select({
-      id: topics.id,
-      title: topics.title,
-      slug: topics.slug,
-      status: topics.status,
-      timetableId: topics.timetableId,
-    })
-    .from(topics)
-    // All statuses: admin comments land on drafts/submissions too
-    // (QA #59 round 3) and should reach the owner's digest.
-    .where(eq(topics.hostId, ctx.recipient.id));
-  const pathById = new Map(
-    myTopics.map((t) => [
-      t.id,
-      topicPath(
-        ctx.forumSlug.get(t.timetableId),
-        ctx.recipientSlugByTimetable.get(t.timetableId),
-        t.slug,
-      ),
-    ]),
-  );
-  return { myTopics, pathById };
-}
-
-/** Full-text comments on the recipient's topics — digest v2's lead
- * section (Ed: "the full text of any comments on my topics"). */
-async function commentRowsOnMyTopics(
+/** ❤️s on the recipient's topics since the feed watermark — every hearter
+ * named and linked. */
+async function heartActivities(
   ctx: DigestContext,
   since: Date,
   myTopicIds: string[],
-  titleById: Map<string, string>,
-  pathById: Map<string, string | null>,
   timetableByTopic: Map<string, string>,
-): Promise<PerForum<ForumDigest["comments"][number]>> {
+): Promise<RawActivity[]> {
   if (myTopicIds.length === 0) return [];
   const rows = await db
     .select({
-      topicId: comments.topicId,
-      by: timetableMemberships.name,
-      body: comments.body,
-      createdAt: comments.createdAt,
+      topicId: hearts.topicId,
+      createdAt: hearts.createdAt,
+      userId: hearts.userId,
+      hearter: timetableMemberships.name,
     })
-    .from(comments)
-    .innerJoin(topics, eq(topics.id, comments.topicId))
+    .from(hearts)
+    .innerJoin(topics, eq(topics.id, hearts.topicId))
     .leftJoin(
       timetableMemberships,
       and(
-        eq(timetableMemberships.userId, comments.authorId),
+        eq(timetableMemberships.userId, hearts.userId),
         eq(timetableMemberships.timetableId, topics.timetableId),
       ),
     )
     .where(
-      and(
-        inArray(comments.topicId, myTopicIds),
-        gt(comments.createdAt, since),
-        // The owner sees public comments and their admin thread; the
-        // host-only thread stays out of email.
-        inArray(comments.visibility, ["public", "admin_only"]),
-        ne(comments.authorId, ctx.recipient.id),
-        isNull(comments.hiddenAt),
-        isNull(comments.deletedAt),
-      ),
-    );
-  return rows
-    .filter((r) => {
-      const timetableId = timetableByTopic.get(r.topicId) ?? "";
-      return (
-        r.createdAt > afterSeen(since, ctx.seenNotificationsAt.get(timetableId))
-      );
-    })
-    .map((r) => ({
-      timetableId: timetableByTopic.get(r.topicId) ?? "",
-      topicTitle: titleById.get(r.topicId) ?? "",
-      by: r.by,
-      body: r.body,
-      path: pathById.get(r.topicId) ?? null,
-    }));
-}
-
-/** ❤️ counts per topic since the feed watermark (ambient numbers). */
-async function heartRowsOnMyTopics(
-  ctx: DigestContext,
-  since: Date,
-  myTopicIds: string[],
-  titleById: Map<string, string>,
-  pathById: Map<string, string | null>,
-  timetableByTopic: Map<string, string>,
-): Promise<PerForum<ForumDigest["heartActivity"][number]>> {
-  if (myTopicIds.length === 0) return [];
-  const rows = await db
-    .select({ topicId: hearts.topicId, createdAt: hearts.createdAt })
-    .from(hearts)
-    .where(
       and(inArray(hearts.topicId, myTopicIds), gt(hearts.createdAt, since)),
     );
-  const counts = new Map<string, number>();
+
+  const byTopic = new Map<
+    string,
+    { hearters: DigestPerson[]; at: Date; timetableId: string }
+  >();
   for (const row of rows) {
     const timetableId = timetableByTopic.get(row.topicId) ?? "";
     const cutoff = afterSeen(since, ctx.seenFeedAt.get(timetableId));
     if (row.createdAt <= cutoff) continue;
-    counts.set(row.topicId, (counts.get(row.topicId) ?? 0) + 1);
+    const entry = byTopic.get(row.topicId) ?? {
+      hearters: [],
+      at: row.createdAt,
+      timetableId,
+    };
+    entry.hearters.push({
+      name: row.hearter,
+      userId: row.userId,
+      image: null,
+    });
+    if (row.createdAt > entry.at) entry.at = row.createdAt;
+    byTopic.set(row.topicId, entry);
   }
-  return [...counts.entries()].map(([topicId, count]) => ({
-    timetableId: timetableByTopic.get(topicId) ?? "",
-    topicTitle: titleById.get(topicId) ?? "",
-    count,
-    path: pathById.get(topicId) ?? null,
+  return [...byTopic.entries()].map(([topicId, e]) => ({
+    topicId,
+    timetableId: e.timetableId,
+    activity: { kind: "heart" as const, hearters: e.hearters, at: e.at },
   }));
 }
 
-/** Topics an admin assigned to this user ("you have a topic") — always
- * included for digest recipients; ownership changes matter regardless of
- * which channels they picked. */
-async function assignedRows(
+/** Topics newly published in the recipient's elector forums, still unseen
+ * in the queue. */
+async function newTopicActivities(
   ctx: DigestContext,
   since: Date,
-): Promise<PerForum<ForumDigest["assignedTopics"][number]>> {
+): Promise<RawActivity[]> {
+  if (ctx.electorTimetableIds.length === 0) return [];
+  const rows = await db
+    .select({
+      id: topics.id,
+      timetableId: topics.timetableId,
+      publishedAt: topics.publishedAt,
+    })
+    .from(topics)
+    .where(
+      and(
+        inArray(topics.timetableId, ctx.electorTimetableIds),
+        eq(topics.status, "published"),
+        gt(topics.publishedAt, since),
+      ),
+    );
+  if (rows.length === 0) return [];
+
+  // "Seen" for a new topic means deliberately reviewed — a topic_seen row
+  // (queue Next or hearting), never a superficial feed scroll.
+  const seenRows = await db
+    .select({ topicId: topicSeen.topicId })
+    .from(topicSeen)
+    .where(
+      and(
+        eq(topicSeen.userId, ctx.recipient.id),
+        inArray(
+          topicSeen.topicId,
+          rows.map((r) => r.id),
+        ),
+      ),
+    );
+  const seen = new Set(seenRows.map((r) => r.topicId));
+
+  return rows
+    .filter((r) => !seen.has(r.id))
+    .map((r) => ({
+      topicId: r.id,
+      timetableId: r.timetableId,
+      activity: { kind: "new" as const, at: r.publishedAt ?? since },
+    }));
+}
+
+/** Topics an admin (re)assigned to the recipient. */
+async function assignmentActivities(
+  ctx: DigestContext,
+  since: Date,
+): Promise<RawActivity[]> {
   const rows = await db
     .select({
       payload: activityEvents.payload,
       timetableId: activityEvents.timetableId,
-      topicSlug: topics.slug,
+      createdAt: activityEvents.createdAt,
     })
     .from(activityEvents)
-    .leftJoin(
-      topics,
-      sql`${topics.id}::text = ${activityEvents.payload}->>'topicId'`,
-    )
     .where(
       and(
         eq(activityEvents.action, "topic.reassign"),
@@ -437,118 +649,161 @@ async function assignedRows(
         sql`${activityEvents.payload}->>'newHostId' = ${ctx.recipient.id}`,
       ),
     );
-  return rows.map((r) => {
-    const payload = r.payload as { title?: string } | null;
-    return {
+  return rows
+    .map((r) => {
+      const payload = r.payload as { topicId?: string } | null;
+      return { topicId: payload?.topicId, r };
+    })
+    .filter((x): x is { topicId: string; r: (typeof rows)[number] } =>
+      Boolean(x.topicId),
+    )
+    .map(({ topicId, r }) => ({
+      topicId,
       timetableId: r.timetableId,
-      topicTitle: payload?.title ?? "A topic",
-      path: topicPath(
-        ctx.forumSlug.get(r.timetableId),
-        ctx.recipientSlugByTimetable.get(r.timetableId),
-        r.topicSlug,
-      ),
-    };
-  });
+      activity: { kind: "assignment" as const, at: r.createdAt },
+    }));
 }
 
-function groupByForum<T extends { timetableId: string }>(
-  rows: T[],
-): Map<string, Omit<T, "timetableId">[]> {
-  const grouped = new Map<string, Omit<T, "timetableId">[]>();
-  for (const { timetableId, ...rest } of rows) {
-    const list = grouped.get(timetableId) ?? [];
-    list.push(rest);
-    grouped.set(timetableId, list);
-  }
-  return grouped;
+/** Ranks — the coarse one groups cards (your content first, drafts last),
+ * the fine one orders activities within a single card. */
+const CARD_TIER: Record<DigestActivity["kind"], number> = {
+  reply: 0,
+  comment: 0,
+  heart: 0,
+  assignment: 1,
+  new: 2,
+  draft: 3,
+};
+const ACTIVITY_RANK: Record<DigestActivity["kind"], number> = {
+  reply: 0,
+  comment: 1,
+  heart: 2,
+  assignment: 3,
+  new: 4,
+  draft: 5,
+};
+
+function cardTier(card: DigestTopicCard): number {
+  return Math.min(...card.activities.map((a) => CARD_TIER[a.kind]));
+}
+function cardRecency(card: DigestTopicCard): number {
+  return Math.max(...card.activities.map((a) => a.at.getTime()));
 }
 
 /**
- * Digest v2 (2026-07-29): compute one digest PER FORUM the user belongs
- * to, honouring the per-forum seen watermarks. Every section is always
- * included — the only choice is whether to receive digests at all
- * (`isDigestEnabled`). Forums with no news yield no digest. Drafts are a
- * standing reminder attached to otherwise non-empty digests only.
+ * Digest v3 (2026-07-30): one digest PER FORUM, built as topic cards.
+ * Every activity is grouped under its topic, cards ordered your-content
+ * first (replies/comments/❤️s) → assignments → new topics, drafts last.
+ * Forums with no non-draft news yield no digest.
  */
 export async function computeUserForumDigests(
   recipient: DigestRecipient,
   since: Date,
 ): Promise<ForumDigest[]> {
   const ctx = await loadDigestContext(recipient);
-  const { myTopics, pathById } = await loadMyTopics(ctx);
-  const titleById = new Map(myTopics.map((t) => [t.id, t.title]));
-  const timetableByTopic = new Map(myTopics.map((t) => [t.id, t.timetableId]));
-  const activityTopicIds = myTopics.map((t) => t.id);
 
-  const [newTopics, replies, myComments, heartCounts, assigned] =
-    await Promise.all([
-      newTopicRows(ctx, since),
-      replyRows(ctx, since),
-      commentRowsOnMyTopics(
-        ctx,
-        since,
-        activityTopicIds,
-        titleById,
-        pathById,
-        timetableByTopic,
-      ),
-      heartRowsOnMyTopics(
-        ctx,
-        since,
-        activityTopicIds,
-        titleById,
-        pathById,
-        timetableByTopic,
-      ),
-      assignedRows(ctx, since),
-    ]);
-
-  const byForum = {
-    newTopics: groupByForum(newTopics),
-    replies: groupByForum(replies),
-    comments: groupByForum(myComments),
-    hearts: groupByForum(heartCounts),
-    assigned: groupByForum(assigned),
-  };
-  const drafts = groupByForum(
-    myTopics
-      .filter((t) => t.status === "unpublished")
-      .map((t) => ({
-        timetableId: t.timetableId,
-        title: t.title,
-        path: `/f/${ctx.forumSlug.get(t.timetableId) ?? ""}/my-topics`,
-      })),
-  );
-
-  return ctx.forumIds
-    .map((forumId): ForumDigest => {
-      return {
-        userId: recipient.id,
-        email: recipient.email ?? "",
-        name: recipient.name,
-        forumId,
-        forumName: ctx.forumName.get(forumId) ?? "",
-        forumSlug: ctx.forumSlug.get(forumId) ?? "",
-        accent: ctx.accent.get(forumId) ?? null,
-        comments: byForum.comments.get(forumId) ?? [],
-        replies: byForum.replies.get(forumId) ?? [],
-        newTopics: byForum.newTopics.get(forumId) ?? [],
-        heartActivity: byForum.hearts.get(forumId) ?? [],
-        drafts: drafts.get(forumId) ?? [],
-        assignedTopics: byForum.assigned.get(forumId) ?? [],
-      };
+  const myTopics = await db
+    .select({
+      id: topics.id,
+      status: topics.status,
+      timetableId: topics.timetableId,
     })
-    .filter((digest) => !isForumDigestEmpty(digest));
+    .from(topics)
+    .where(eq(topics.hostId, recipient.id));
+  const myTopicIds = myTopics.map((t) => t.id);
+  const timetableByTopic = new Map(myTopics.map((t) => [t.id, t.timetableId]));
+
+  const [commentsA, repliesA, heartsA, newA, assignedA] = await Promise.all([
+    commentActivities(ctx, since, myTopicIds, timetableByTopic),
+    replyActivities(ctx, since),
+    heartActivities(ctx, since, myTopicIds, timetableByTopic),
+    newTopicActivities(ctx, since),
+    assignmentActivities(ctx, since),
+  ]);
+
+  const draftsA: RawActivity[] = myTopics
+    .filter((t) => t.status === "unpublished")
+    .map((t) => ({
+      topicId: t.id,
+      timetableId: t.timetableId,
+      activity: { kind: "draft" as const, at: new Date(0) },
+    }));
+
+  const all = [
+    ...commentsA,
+    ...repliesA,
+    ...heartsA,
+    ...newA,
+    ...assignedA,
+    ...draftsA,
+  ];
+  const meta = await resolveTopicMeta(ctx, [
+    ...new Set(all.map((a) => a.topicId)),
+  ]);
+
+  const digests = ctx.forumIds.map((forumId): ForumDigest => {
+    const cards = buildCards(
+      all.filter((a) => a.timetableId === forumId),
+      meta,
+    );
+    return {
+      userId: recipient.id,
+      email: recipient.email ?? "",
+      name: recipient.name,
+      forumId,
+      forumName: ctx.forumName.get(forumId) ?? "",
+      forumSlug: ctx.forumSlug.get(forumId) ?? "",
+      accent: ctx.accent.get(forumId) ?? null,
+      hostLabel: ctx.hostLabel.get(forumId) ?? "Host",
+      adminLabel: ctx.adminLabel.get(forumId) ?? "Admin",
+      topics: cards,
+    };
+  });
+
+  return digests.filter((d) => !isForumDigestEmpty(d));
 }
 
-/** Empty = nothing to say. Drafts deliberately don't count: a lingering
- * draft alone must never trigger an email. */
+/** Group raw activities into ordered topic cards. */
+function buildCards(
+  raws: RawActivity[],
+  meta: Map<string, TopicMeta>,
+): DigestTopicCard[] {
+  const byTopic = new Map<string, DigestActivity[]>();
+  for (const raw of raws) {
+    const list = byTopic.get(raw.topicId) ?? [];
+    list.push(raw.activity);
+    byTopic.set(raw.topicId, list);
+  }
+
+  const cards: DigestTopicCard[] = [];
+  for (const [topicId, activities] of byTopic) {
+    const m = meta.get(topicId);
+    activities.sort(
+      (a, b) =>
+        ACTIVITY_RANK[a.kind] - ACTIVITY_RANK[b.kind] ||
+        b.at.getTime() - a.at.getTime(),
+    );
+    cards.push({
+      topicId,
+      title: m?.title ?? "A topic",
+      author: m?.author ?? { name: null, userId: null, image: null },
+      body: m?.body ?? null,
+      path: m?.path ?? null,
+      activities,
+    });
+  }
+
+  // Cards: your-content tier first, then by recency within a tier.
+  cards.sort(
+    (a, b) => cardTier(a) - cardTier(b) || cardRecency(b) - cardRecency(a),
+  );
+  return cards;
+}
+
+/** Empty = nothing but drafts. A lingering draft alone must never trigger
+ * an email. */
 export function isForumDigestEmpty(digest: ForumDigest): boolean {
-  return (
-    digest.comments.length === 0 &&
-    digest.replies.length === 0 &&
-    digest.newTopics.length === 0 &&
-    digest.heartActivity.length === 0 &&
-    digest.assignedTopics.length === 0
+  return !digest.topics.some((card) =>
+    card.activities.some((a) => a.kind !== "draft"),
   );
 }

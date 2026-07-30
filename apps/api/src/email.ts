@@ -1,4 +1,10 @@
-import type { ForumDigest } from "@timetable/core";
+import type {
+  DigestActivity,
+  DigestComment,
+  DigestPerson,
+  DigestTopicCard,
+  ForumDigest,
+} from "@timetable/core";
 
 const EMAIL_FROM = process.env.EMAIL_FROM ?? "Topic <no-reply@example.com>";
 
@@ -69,156 +75,632 @@ const E = {
   line: "#e3e6ec", // --line (approx)
   primary: "#2f54eb", // --primary
 };
+// One font family across every email (QA 2026-07-30 — "too many fonts").
 const SANS = "-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
-const SERIF = "Georgia,'Times New Roman',serif";
 
-/** Wrap a body in the branded frame: wordmark, white card, footer.
- * `footer` is already-escaped HTML (it usually carries a link). Digest v2
- * (2026-07-29): the wordmark defaults to the app but is the FORUM name for
- * forum-scoped mail, with the forum's accent as the wordmark colour. */
+// Dark-mode overrides (QA 2026-07-30). Inline styles carry the light look;
+// a <style> block flips a handful of classes for clients that honour
+// prefers-color-scheme (Apple Mail, iOS Mail, others). The accent, pills
+// and avatars stay legible on both grounds, so only surfaces/ink/rules
+// flip. Values mirror tokens.css's dark palette.
+const DARK = {
+  bg: "#14171e",
+  card: "#1d222c",
+  ink: "#e7eaf1",
+  muted: "#9aa4b2",
+  line: "#2b3240",
+};
+const DARK_STYLE =
+  `@media (prefers-color-scheme:dark){` +
+  `.em-bg{background:${DARK.bg}!important}` +
+  `.em-card{background:${DARK.card}!important;border-color:${DARK.line}!important}` +
+  `.em-ink{color:${DARK.ink}!important}` +
+  `.em-muted{color:${DARK.muted}!important}` +
+  `.em-rule{border-color:${DARK.line}!important}` +
+  `}`;
+
+/** Wrap a body in the branded frame: wordmark, content, footer. `footer`
+ * is already-escaped HTML. The wordmark carries the FORUM name in its
+ * accent colour. By default the body sits in one white card; pass
+ * `uncarded` when the body supplies its own cards (the digest's per-topic
+ * cards). */
 export function emailShell(
   body: string,
   footer: string,
-  opts: { title?: string; accent?: string | null } = {},
+  opts: { title?: string; accent?: string | null; uncarded?: boolean } = {},
 ): string {
   const title = opts.title ?? "Topic";
   const accent = opts.accent ?? E.ink;
+  const content = opts.uncarded
+    ? `<tr><td class="em-ink" style="font-family:${SANS};font-size:15px;line-height:1.55;color:${E.ink};">${body}</td></tr>`
+    : `<tr><td class="em-card em-ink" style="background:${E.card};border:1px solid ${E.line};border-radius:12px;padding:26px 28px;font-family:${SANS};font-size:15px;line-height:1.55;color:${E.ink};">${body}</td></tr>`;
   return [
-    `<!doctype html><html><body style="margin:0;padding:0;background:${E.bg};">`,
-    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${E.bg};"><tr><td align="center" style="padding:28px 12px;">`,
+    `<!doctype html><html><head>`,
+    `<meta name="color-scheme" content="light dark">`,
+    `<meta name="supported-color-schemes" content="light dark">`,
+    `<style>${DARK_STYLE}</style></head>`,
+    `<body class="em-bg" style="margin:0;padding:0;background:${E.bg};">`,
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="em-bg" style="background:${E.bg};"><tr><td align="center" style="padding:28px 12px;">`,
     `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;max-width:560px;">`,
-    `<tr><td style="padding:0 6px 10px;font-family:${SERIF};font-size:20px;font-weight:bold;color:${accent};">${esc(title)}</td></tr>`,
-    `<tr><td style="background:${E.card};border:1px solid ${E.line};border-radius:12px;padding:26px 28px;font-family:${SANS};font-size:15px;line-height:1.55;color:${E.ink};">`,
-    body,
-    `</td></tr>`,
-    `<tr><td style="padding:14px 6px;font-family:${SANS};font-size:12px;line-height:1.5;color:${E.muted};">${footer}</td></tr>`,
+    `<tr><td style="padding:0 6px 12px;font-family:${SANS};font-size:20px;font-weight:700;color:${accent};">${esc(title)}</td></tr>`,
+    content,
+    `<tr><td class="em-muted" style="padding:14px 6px;font-family:${SANS};font-size:12px;line-height:1.5;color:${E.muted};">${footer}</td></tr>`,
     `</table></td></tr></table></body></html>`,
   ].join("");
 }
 
-const sectionTitle = (label: string): string =>
-  `<h2 style="font-family:${SERIF};font-size:17px;font-weight:600;margin:20px 0 8px;color:${E.ink};">${esc(label)}</h2>`;
+const INDENT = 16; // px per thread level
 
-const item = (html: string): string => `<p style="margin:0 0 7px;">${html}</p>`;
+// Initials-avatar palette + hash — mirrors apps/web Avatar.tsx and the
+// --avatar-1…8 tokens, so an author's email avatar colour matches the app.
+const AVATAR_PALETTE = [
+  "#7048e8",
+  "#e8590c",
+  "#1098ad",
+  "#2f9e44",
+  "#c2255c",
+  "#3b5bdb",
+  "#0c8599",
+  "#5f3dc4",
+];
+function avatarColour(seed: string): string {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = (hash << 5) - hash + seed.charCodeAt(i);
+    hash |= 0;
+  }
+  return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length]!;
+}
+function initials(name: string): string {
+  return name
+    .split(" ")
+    .map((w) => w[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
 
-const dim = (text: string): string =>
-  `<span style="color:${E.muted};">${esc(text)}</span>`;
+/** The author's avatar: their photo, or a colour-hashed initials circle
+ * matching the app. (Rounds in most clients; a few — notably Outlook —
+ * ignore border-radius and show it square.) */
+function avatarCell(person: DigestPerson, size: number): string {
+  if (person.image) {
+    return `<img src="${esc(person.image)}" width="${size}" height="${size}" alt="" style="width:${size}px;height:${size}px;border-radius:${size / 2}px;object-fit:cover;display:block;">`;
+  }
+  const label = person.name ?? "?";
+  return `<div style="width:${size}px;height:${size}px;border-radius:${size / 2}px;background:${avatarColour(label)};color:#ffffff;font-weight:700;font-size:15px;text-align:center;line-height:${size}px;">${esc(initials(label))}</div>`;
+}
 
-/** Full-text quote block for comments/replies (digest v2: Ed wants the
- * whole comment readable from the inbox). */
-const quoted = (body: string): string =>
-  `<blockquote style="margin:4px 0 0;padding:6px 12px;border-left:3px solid ${E.line};color:${E.ink};white-space:pre-wrap;">${esc(body)}</blockquote>`;
+/** A comment/reply title link, or plain bold text without a path. */
+function accentLink(
+  label: string,
+  path: string | null,
+  accent: string,
+): string {
+  return path
+    ? `<a href="${esc(`${linkBase}${path}`)}" style="color:${accent};font-weight:600;text-decoration:none;">${esc(label)}</a>`
+    : `<strong>${esc(label)}</strong>`;
+}
 
-type Linker = (label: string, path: string | null) => string;
+/** A member's name linked to their per-forum profile (the person page
+ * redirects id → slug, so the userId is a valid link target). */
+function personLink(
+  forumSlug: string,
+  person: DigestPerson,
+  accent: string,
+): string {
+  const name = esc(person.name ?? "Someone");
+  if (!person.userId) return `<strong>${name}</strong>`;
+  const href = `${linkBase}/f/${esc(forumSlug)}/${esc(person.userId)}`;
+  return `<a href="${href}" style="color:${accent};font-weight:600;text-decoration:none;">${name}</a>`;
+}
 
-/** One "<Author> on <topic>" + full-text quote section (comments/replies). */
-function quotedSection(
-  title: string,
-  rows: {
-    topicTitle: string;
-    by: string | null;
-    body: string;
-    path: string | null;
-  }[],
-  link: Linker,
+type ThreadNode = { comment: DigestComment; isNew: boolean };
+
+/** One line in a thread: "Name: body", indented to its depth. A new comment
+ * wears the accent colour and gets a Reply link; ancestors are muted. */
+function threadLine(
+  node: ThreadNode,
+  depth: number,
+  forumSlug: string,
+  path: string | null,
+  accent: string,
+): string {
+  const name = personLink(forumSlug, node.comment.author, accent);
+  const color = node.isNew ? accent : E.muted;
+  const bodyCls = node.isNew ? "" : ' class="em-muted"';
+  const line = `<div style="padding-left:${depth * INDENT}px;margin:3px 0;white-space:pre-wrap;">${name}<span class="em-muted" style="color:${E.muted};">: </span><span${bodyCls} style="color:${color};">${esc(node.comment.body)}</span></div>`;
+  if (!node.isNew || !path) return line;
+  const id = node.comment.id;
+  const href = `${linkBase}${path}?reply=${encodeURIComponent(id)}#comment-${encodeURIComponent(id)}`;
+  const reply = `<div style="padding-left:${(depth + 1) * INDENT}px;margin:2px 0 0;"><a href="${esc(href)}" style="color:${accent};font-weight:600;text-decoration:none;">Reply →</a></div>`;
+  return line + reply;
+}
+
+/** Merge a card's comment/reply activities into ONE thread tree — shared
+ * ancestors collapse to a single node — then render it depth-first, so
+ * several replies to the same comment sit together under it. */
+function renderThreadTree(
+  card: DigestTopicCard,
+  acts: Extract<DigestActivity, { kind: "comment" | "reply" }>[],
+  forumSlug: string,
+  accent: string,
+): string {
+  const nodes = new Map<string, ThreadNode>();
+  for (const a of acts) {
+    for (const anc of a.ancestors) {
+      if (!nodes.has(anc.id)) nodes.set(anc.id, { comment: anc, isNew: false });
+    }
+    nodes.set(a.comment.id, { comment: a.comment, isNew: true });
+  }
+
+  const children = new Map<string, string[]>();
+  const roots: string[] = [];
+  for (const [id, { comment }] of nodes) {
+    const parent =
+      comment.parentId && nodes.has(comment.parentId) ? comment.parentId : null;
+    if (parent) children.set(parent, [...(children.get(parent) ?? []), id]);
+    else roots.push(id);
+  }
+
+  const lines: string[] = [];
+  const walk = (id: string, depth: number): void => {
+    const node = nodes.get(id);
+    if (!node) return;
+    lines.push(threadLine(node, depth, forumSlug, card.path, accent));
+    for (const child of children.get(id) ?? []) walk(child, depth + 1);
+  };
+  for (const root of roots) walk(root, 0);
+  return lines.join("");
+}
+
+/** Every hearter on their own line with a ❤️, linked to their profile. */
+function renderHearts(
+  hearters: DigestPerson[],
+  forumSlug: string,
+  accent: string,
+): string {
+  return hearters
+    .map(
+      (h) =>
+        `<div style="margin:3px 0;">❤️ ${personLink(forumSlug, h, accent)}</div>`,
+    )
+    .join("");
+}
+
+const STATUS_PILLS: Record<
+  "new" | "assignment" | "draft",
+  [string, string, string]
+> = {
+  // [label, background, text]
+  new: ["New", "#e8f6ec", "#207a32"],
+  assignment: ["Assigned to you", "#eaeefe", "#2f54eb"],
+  draft: ["Unpublished draft", "#eef0f5", "#7d8694"],
+};
+
+function statusPill(kind: "new" | "assignment" | "draft"): string {
+  const [label, bg, fg] = STATUS_PILLS[kind];
+  return `<span style="display:inline-block;background:${bg};color:${fg};font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;margin-left:6px;white-space:nowrap;vertical-align:middle;">${label}</span>`;
+}
+
+/** Markdown → plain text for the body excerpt (strip the syntax the app's
+ * editor stores; email shows text, not rendered markdown). */
+function stripMarkdown(md: string): string {
+  return md
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/[*_`#>~]/g, "")
+    .replace(/\r/g, "")
+    .replace(/\n{2,}/g, "\n")
+    .trim();
+}
+
+/** The topic body, truncated near where the app shows "Show more". */
+function bodyExcerpt(
+  body: string,
+  path: string | null,
+  accent: string,
+): string {
+  const text = stripMarkdown(body);
+  if (!text) return "";
+  const LIMIT = 280;
+  let shown = text;
+  let truncated = false;
+  if (text.length > LIMIT) {
+    shown = text.slice(0, LIMIT);
+    const space = shown.lastIndexOf(" ");
+    if (space > 200) shown = shown.slice(0, space);
+    truncated = true;
+  }
+  const more =
+    truncated && path
+      ? `… <a href="${esc(`${linkBase}${path}`)}" style="color:${accent};font-weight:600;text-decoration:none;">Show more →</a>`
+      : truncated
+        ? "…"
+        : "";
+  return `<div class="em-ink" style="white-space:pre-wrap;color:${E.ink};">${esc(shown)}${more}</div>`;
+}
+
+const divider = `<div class="em-rule" style="border-top:1px solid ${E.line};margin:12px 0;"></div>`;
+
+/** Naive plural for role labels (mirrors the web pluralLabel). */
+function pluralize(label: string): string {
+  return /[sxy]$/i.test(label) ? label : `${label}s`;
+}
+
+/** A small muted heading above a non-public comment thread. Public threads
+ * get none (regular comments need no label). */
+function threadLabel(
+  visibility: "public" | "host_only" | "admin_only",
+  hostLabel: string,
+  adminLabel: string,
+): string {
+  const text =
+    visibility === "host_only"
+      ? `${pluralize(hostLabel)} only`
+      : visibility === "admin_only"
+        ? `You and ${pluralize(adminLabel)}`
+        : "";
+  if (!text) return "";
+  return `<div class="em-muted" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:${E.muted};margin:0 0 4px;">${esc(text)}</div>`;
+}
+
+type Discussion = Extract<DigestActivity, { kind: "comment" | "reply" }>;
+
+/** Discussion split into its three threads (regular / host-only /
+ * you-and-admin), each rendered as one merged tree under its label. */
+function renderDiscussion(
+  card: DigestTopicCard,
+  discussion: Discussion[],
+  forumSlug: string,
+  accent: string,
+  hostLabel: string,
+  adminLabel: string,
 ): string[] {
-  if (rows.length === 0) return [];
-  return [
-    sectionTitle(title),
-    ...rows.map((r) =>
-      item(
-        `<strong>${esc(r.by ?? "Someone")}</strong> on ${link(r.topicTitle, r.path)}${quoted(r.body)}`,
-      ),
-    ),
-  ];
+  const order = ["public", "host_only", "admin_only"] as const;
+  return order
+    .map((vis) => {
+      const acts = discussion.filter((a) => a.visibility === vis);
+      if (acts.length === 0) return "";
+      return (
+        threadLabel(vis, hostLabel, adminLabel) +
+        renderThreadTree(card, acts, forumSlug, accent)
+      );
+    })
+    .filter(Boolean);
 }
 
-function listSection(title: string, items: string[]): string[] {
-  return items.length === 0 ? [] : [sectionTitle(title), ...items];
+/** One topic on its own card: avatar + title (+ status pills) + "by Author"
+ * byline, then a body excerpt (status cards), each comment thread (labeled
+ * when not public), and ❤️s — with a rule between every distinct section. */
+function renderCard(
+  card: DigestTopicCard,
+  forumSlug: string,
+  accent: string,
+  hostLabel: string,
+  adminLabel: string,
+): string {
+  const statuses = card.activities.filter(
+    (
+      a,
+    ): a is Extract<DigestActivity, { kind: "new" | "assignment" | "draft" }> =>
+      a.kind === "new" || a.kind === "assignment" || a.kind === "draft",
+  );
+  const discussion = card.activities.filter(
+    (a): a is Discussion => a.kind === "comment" || a.kind === "reply",
+  );
+  const heart = card.activities.find((a) => a.kind === "heart");
+  const pills = statuses.map((a) => statusPill(a.kind)).join("");
+
+  const header =
+    `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 10px;"><tr>` +
+    `<td valign="top" style="padding-right:10px;">${avatarCell(card.author, 40)}</td>` +
+    `<td valign="top">` +
+    `<div style="font-size:17px;font-weight:700;line-height:1.3;">${accentLink(card.title, card.path, accent)}${pills}</div>` +
+    `<div class="em-muted" style="color:${E.muted};font-size:13px;margin-top:2px;">by ${personLink(forumSlug, card.author, accent)}</div>` +
+    `</td></tr></table>`;
+
+  const sections: string[] = [];
+  if (statuses.length > 0 && card.body) {
+    sections.push(bodyExcerpt(card.body, card.path, accent));
+  }
+  // ❤️s before comments — the same order as a topic card in the app, where
+  // the actions row sits above the thread (QA 2026-07-30).
+  if (heart && heart.kind === "heart") {
+    sections.push(renderHearts(heart.hearters, forumSlug, accent));
+  }
+  sections.push(
+    ...renderDiscussion(
+      card,
+      discussion,
+      forumSlug,
+      accent,
+      hostLabel,
+      adminLabel,
+    ),
+  );
+  const bodyHtml = sections
+    .map((s, i) => (i === 0 ? s : `${divider}${s}`))
+    .join("");
+
+  return `<div class="em-card" style="background:${E.card};border:1px solid ${E.line};border-radius:12px;padding:16px 18px;margin:0 0 12px;">${header}<div style="margin-top:8px;">${bodyHtml}</div></div>`;
 }
 
-function digestSections(digest: ForumDigest, link: Linker): string[] {
-  return [
-    // Comments on the recipient's topics lead, full text (Ed, 2026-07-29).
-    ...quotedSection("Comments on your topics", digest.comments, link),
-    ...quotedSection("Replies to your comments", digest.replies, link),
-    ...listSection(
-      "New topics",
-      digest.newTopics.map((t) => item(link(t.title, t.path))),
-    ),
-    ...listSection(
-      "❤️ on your topics",
-      digest.heartActivity.map((a) =>
-        item(`${link(a.topicTitle, a.path)} ${dim(`+${a.count} ❤️`)}`),
-      ),
-    ),
-    ...listSection(
-      "You have a topic",
-      digest.assignedTopics.map((a) =>
-        item(`${link(a.topicTitle, a.path)} ${dim("was assigned to you")}`),
-      ),
-    ),
-    // Standing reminder, never the sole content (isForumDigestEmpty
-    // ignores drafts, so this only renders alongside real news).
-    ...listSection(
-      "Your unpublished drafts",
-      digest.drafts.map((d) => item(link(d.title, d.path))),
-    ),
-  ];
-}
-
-/** "3 comments, 2 replies" — the subject's tail. */
+/** "3 comments, 2 replies …" — the subject's tail, counted across cards. */
 function digestSummary(digest: ForumDigest): string {
+  const counts = { comment: 0, reply: 0, heart: 0, new: 0, assignment: 0 };
+  for (const card of digest.topics) {
+    for (const a of card.activities) {
+      if (a.kind in counts) counts[a.kind as keyof typeof counts] += 1;
+    }
+  }
   const bits: string[] = [];
   const n = (count: number, one: string, many: string) =>
     count > 0 && bits.push(`${count} ${count === 1 ? one : many}`);
-  n(
-    digest.comments.length,
-    "comment on your topics",
-    "comments on your topics",
-  );
-  n(digest.replies.length, "reply", "replies");
-  n(digest.newTopics.length, "new topic", "new topics");
-  n(digest.heartActivity.length, "❤️ update", "❤️ updates");
-  n(
-    digest.assignedTopics.length,
-    "topic assigned to you",
-    "topics assigned to you",
-  );
+  n(counts.comment, "comment on your topics", "comments on your topics");
+  n(counts.reply, "reply", "replies");
+  n(counts.heart, "topic with new ❤️", "topics with new ❤️");
+  n(counts.new, "new topic", "new topics");
+  n(counts.assignment, "topic assigned to you", "topics assigned to you");
   return bits.join(", ");
 }
 
-/** Digest v2 (2026-07-29): per-forum, forum-branded — the wordmark and
- * subject carry the FORUM's name, links wear its accent colour, and the
- * footer points at that forum's Notifications page. */
+/** Digest v3 (2026-07-30): per-forum, forum-branded — one card per topic,
+ * ordered your-content first. The wordmark is "{Forum} Topics", the subject
+ * "{Forum} Topics Digest", links wear the forum's accent, the footer points
+ * at that forum's Notifications page. */
 export function renderDigest(digest: ForumDigest): {
   subject: string;
   html: string;
 } {
   const accent = digest.accent ?? E.primary;
-  const link = (label: string, path: string | null): string =>
-    path
-      ? `<a href="${esc(`${linkBase}${path}`)}" style="color:${accent};">${esc(label)}</a>`
-      : esc(label);
   const summary = digestSummary(digest);
-  const greeting = digest.name ? `Hi ${esc(digest.name)},` : "Hi,";
-  const body = [
-    `<p style="margin:0;">${greeting}</p>`,
-    ...digestSections(digest, link),
-  ].join("\n");
-  const footer = `You're getting this because you switched on email digests. Adjust them any time on ${link(`your ${digest.forumName} Notifications page`, `/f/${digest.forumSlug}/notifications`)}.`;
+  const body = digest.topics
+    .map((card) =>
+      renderCard(
+        card,
+        digest.forumSlug,
+        accent,
+        digest.hostLabel,
+        digest.adminLabel,
+      ),
+    )
+    .join("\n");
+  const footer = `You're getting this because you switched on email digests. Adjust them any time on ${accentLink(`your ${digest.forumName} Notifications page`, `/f/${digest.forumSlug}/notifications`, accent)}.`;
+  const base = `${digest.forumName} Topics Digest`;
   return {
-    subject: summary
-      ? `[${digest.forumName}] Digest — ${summary}`
-      : `[${digest.forumName}] Digest`,
-    html: emailShell(body, footer, { title: digest.forumName, accent }),
+    subject: summary ? `${base} — ${summary}` : base,
+    html: emailShell(body, footer, {
+      title: `${digest.forumName} Topics`,
+      accent,
+      uncarded: true,
+    }),
   };
 }
 
-/** Example digest for the Forum Settings "Send test digest" button
- * (2026-07-29): the real renderer over invented-but-plausible items, so
- * admins can see exactly what members will receive. Topic links land on
- * the forum's All Topics page. */
+// --- Sample-digest builders (split so no one function trips the line cap) ---
+
+type SamplePath = (host: string, topic: string) => string;
+const sWho = (name: string, userId: string): DigestPerson => ({
+  name,
+  userId,
+  image: null,
+});
+const sC = (
+  id: string,
+  parentId: string | null,
+  author: DigestPerson,
+  body: string,
+): DigestComment => ({ id, parentId, author, body });
+const sAt = (iso: string): Date => new Date(iso);
+const sReply = (
+  visibility: "public" | "host_only" | "admin_only",
+  comment: DigestComment,
+  ancestors: DigestComment[],
+  iso: string,
+): DigestActivity => ({
+  kind: "reply",
+  visibility,
+  comment,
+  ancestors,
+  at: sAt(iso),
+});
+const sComment = (
+  visibility: "public" | "host_only" | "admin_only",
+  comment: DigestComment,
+  iso: string,
+): DigestActivity => ({
+  kind: "comment",
+  visibility,
+  comment,
+  ancestors: [],
+  at: sAt(iso),
+});
+
+/** Two discussion cards: a busy multi-reply thread (merged into one tree)
+ * and a reply to your comment on someone else's topic. */
+function sampleThreadCards(me: DigestPerson, p: SamplePath): DigestTopicCard[] {
+  const marcus = sWho("Marcus Webb", "sample-marcus");
+  const leila = sWho("Leila Haddad", "sample-leila");
+  const base = [
+    sC(
+      "rcv-marcus",
+      null,
+      marcus,
+      "I've sketched three options below — keen to hear which people prefer.",
+    ),
+    sC(
+      "rcv-you",
+      "rcv-marcus",
+      me,
+      "Option B seems fairest to the smaller working groups.",
+    ),
+  ];
+  const leilaReply = sC(
+    "rcv-leila",
+    "rcv-you",
+    leila,
+    "Agreed — though Option B needs a quorum rule to be safe.",
+  );
+  return [
+    {
+      topicId: "sample-rcv",
+      title: "Should we adopt ranked-choice for our elections?",
+      author: marcus,
+      body: null,
+      path: p("marcus", "ranked-choice"),
+      activities: [
+        sReply("public", leilaReply, base, "2026-07-30T10:05:00Z"),
+        sReply(
+          "public",
+          sC(
+            "rcv-daniel",
+            "rcv-you",
+            sWho("Daniel Osei", "sample-daniel"),
+            "B also handles ties better than A did last year.",
+          ),
+          base,
+          "2026-07-30T10:22:00Z",
+        ),
+        sReply(
+          "public",
+          sC(
+            "rcv-sofia",
+            "rcv-leila",
+            sWho("Sofia Russo", "sample-sofia"),
+            "A two-thirds quorum? That worked well for us last spring.",
+          ),
+          [...base, leilaReply],
+          "2026-07-30T10:40:00Z",
+        ),
+      ],
+    },
+    {
+      topicId: "sample-garden",
+      title: "A community garden for the north courtyard",
+      author: sWho("Priya Okafor", "sample-priya"),
+      body: null,
+      path: p("priya", "community-garden"),
+      activities: [
+        sReply(
+          "public",
+          sC(
+            "garden-robin",
+            "garden-you",
+            sWho("Robin Vale", "sample-robin"),
+            "Count me in — I can bring tools on the first weekend.",
+          ),
+          [
+            sC(
+              "garden-jordan",
+              null,
+              sWho("Jordan Lee", "sample-jordan"),
+              "Should we use raised beds or dig straight into the ground?",
+            ),
+            sC(
+              "garden-you",
+              "garden-jordan",
+              me,
+              "Raised beds near the wall — the soil there is thin.",
+            ),
+          ],
+          "2026-07-30T09:12:00Z",
+        ),
+      ],
+    },
+  ];
+}
+
+/** Your own topic carrying all three comment threads plus ❤️s. */
+function sampleOwnCard(me: DigestPerson, p: SamplePath): DigestTopicCard {
+  return {
+    topicId: "sample-mine",
+    title: "Rethinking the weekly assembly format",
+    author: me,
+    body: null,
+    path: p("you", "weekly-assembly"),
+    activities: [
+      sComment(
+        "public",
+        sC(
+          "assembly-sam",
+          null,
+          sWho("Sam Whitfield", "sample-sam"),
+          "This is exactly what we've needed — could we pair it with the newcomers session?",
+        ),
+        "2026-07-30T08:40:00Z",
+      ),
+      sComment(
+        "host_only",
+        sC(
+          "assembly-eli",
+          null,
+          sWho("Eli Morgan", "sample-eli"),
+          "Between us hosts — shall we trial it at the next session before proposing it more widely?",
+        ),
+        "2026-07-30T08:10:00Z",
+      ),
+      sComment(
+        "admin_only",
+        sC(
+          "assembly-fatima",
+          null,
+          sWho("Fatima Noor", "sample-fatima"),
+          "Draft note: tighten the opening paragraph before this goes to a vote.",
+        ),
+        "2026-07-30T07:58:00Z",
+      ),
+      {
+        kind: "heart",
+        hearters: [
+          sWho("Amara Okafor", "sample-amara"),
+          sWho("Tariq Hassan", "sample-tariq"),
+          sWho("Rosa Delgado", "sample-rosa"),
+          sWho("Ben Fletcher", "sample-ben"),
+          sWho("Maya Iyer", "sample-maya"),
+          sWho("Kwame Mensah", "sample-kwame"),
+        ],
+        at: sAt("2026-07-30T07:55:00Z"),
+      },
+    ],
+  };
+}
+
+/** The three status cards: assigned, newly published (long body → truncated),
+ * and your lingering draft. */
+function sampleStatusCards(me: DigestPerson, p: SamplePath): DigestTopicCard[] {
+  return [
+    {
+      topicId: "sample-assigned",
+      title: "Welcome newcomers session",
+      author: me,
+      body: "A short, warm session for people in their first month: how the forum works, how topics get proposed and chosen, and who to ask for help. Ideally run monthly, thirty minutes, with two hosts.",
+      path: p("you", "welcome-newcomers"),
+      activities: [{ kind: "assignment", at: sAt("2026-07-29T18:20:00Z") }],
+    },
+    {
+      topicId: "sample-new",
+      title: "Open data standards for local councils",
+      author: sWho("Hana Kim", "sample-hana"),
+      body: "Councils publish the same kinds of data — budgets, planning applications, service performance — in wildly different shapes, which makes it almost impossible to compare across areas or build tools that work in more than one place. This topic proposes we back a small, shared schema for the handful of datasets that matter most, starting with spending over £500 and planning decisions, and that we lobby for it to be adopted as a default export from the common case-management systems. There's prior art in the national spending standard we can borrow from rather than invent.",
+      path: p("hana", "open-data-standards"),
+      activities: [{ kind: "new", at: sAt("2026-07-29T16:00:00Z") }],
+    },
+    {
+      topicId: "sample-draft",
+      title: "Half-finished idea about peer mentoring",
+      author: me,
+      body: "Pair each new member with someone a few months ahead of them — not a mentor exactly, just a first point of contact. Still need to work out how we match people and how light-touch to keep it.",
+      path: p("you", "peer-mentoring"),
+      activities: [{ kind: "draft", at: sAt("2026-07-20T10:00:00Z") }],
+    },
+  ];
+}
+
+/** Example digest for the Forum Settings "Send test digest" button — the
+ * real renderer over invented-but-plausible cards, one of every activity
+ * type, already in display order (your content first, drafts last). */
 export function sampleDigest(args: {
   email: string;
   name: string | null;
@@ -227,38 +709,24 @@ export function sampleDigest(args: {
   forumSlug: string;
   accent?: string | null;
 }): ForumDigest {
-  const path = `/f/${args.forumSlug}/topics`;
+  const me = sWho(args.name ?? "You", "sample-you");
+  const p: SamplePath = (host, topic) =>
+    `/f/${args.forumSlug}/${host}/${topic}`;
   return {
-    userId: "sample",
+    userId: "sample-you",
     email: args.email,
     name: args.name,
     forumId: args.forumId,
     forumName: args.forumName,
     forumSlug: args.forumSlug,
     accent: args.accent ?? null,
-    comments: [
-      {
-        topicTitle: "Your example topic",
-        by: "Sam Example",
-        body: "This is exactly the kind of thing we should be doing more of. I especially like the second half — could we pair it with the newcomers session?",
-        path,
-      },
+    hostLabel: "Host",
+    adminLabel: "Admin",
+    topics: [
+      ...sampleThreadCards(me, p),
+      sampleOwnCard(me, p),
+      ...sampleStatusCards(me, p),
     ],
-    replies: [
-      {
-        topicTitle: "A community garden for the north courtyard",
-        by: "Robin Example",
-        body: "Count me in — I can bring tools on the first weekend.",
-        path,
-      },
-    ],
-    newTopics: [
-      { title: "A community garden for the north courtyard", path },
-      { title: "Rethinking the weekly assembly format", path },
-    ],
-    heartActivity: [{ topicTitle: "Your example topic", count: 3, path }],
-    drafts: [{ title: "Half-finished idea about mentoring", path }],
-    assignedTopics: [{ topicTitle: "Welcome newcomers session", path }],
   };
 }
 
