@@ -23,49 +23,47 @@ export type DigestRecipient = {
   notificationSettings: NotificationSettings;
 };
 
+/** A named member with a stable link target. The email links `userId` to
+ * their per-forum profile (the person page redirects id → slug). */
+export type DigestPerson = { name: string | null; userId: string | null };
+
+/** One comment in a thread, for the ancestor context above a new comment. */
+export type DigestComment = { author: DigestPerson; body: string };
+
 /**
  * Digest v3 (2026-07-30): the digest is a list of TOPIC CARDS, not
  * per-kind sections. Each card is one topic ("Author: Title") carrying
  * every piece of news about it — comments, replies, ❤️s, an assignment, a
- * fresh publish, a lingering draft — aggregated together and ordered so
- * the most actionable cards come first.
+ * fresh publish, a lingering draft — aggregated and ordered most-actionable
+ * first.
  */
 export type DigestActivity =
-  /** A comment on the recipient's topic. `replyToCommentId` deep-links the
-   * email's Reply button to that comment's composer. */
+  /** A comment or reply in a thread the recipient cares about (their topic,
+   * or a reply to their comment). `ancestors` is the thread above it
+   * (root → the new comment's parent) so the email can indent the tree;
+   * `replyToCommentId` deep-links the Reply button to this comment. */
   | {
-      kind: "comment";
-      by: string | null;
+      kind: "comment" | "reply";
+      author: DigestPerson;
       body: string;
+      ancestors: DigestComment[];
       replyToCommentId: string;
       at: Date;
     }
-  /** A reply to one of the recipient's comments, with the full ancestor
-   * chain (topic root → the recipient's comment) for context. */
-  | {
-      kind: "reply";
-      by: string | null;
-      body: string;
-      ancestors: { by: string | null; body: string }[];
-      replyToCommentId: string;
-      at: Date;
-    }
-  /** ❤️s on the recipient's topic since they last looked — every hearter
-   * named (Ed: no cap, the individuals matter). */
-  | { kind: "heart"; hearters: string[]; at: Date }
+  /** ❤️s on the recipient's topic — every hearter named (no cap). */
+  | { kind: "heart"; hearters: DigestPerson[]; at: Date }
   /** A topic newly published in a forum where the recipient is an elector. */
   | { kind: "new"; at: Date }
   /** A topic an admin (re)assigned to the recipient. */
   | { kind: "assignment"; at: Date }
-  /** The recipient's own still-unpublished draft — a standing reminder,
-   * never the sole reason for an email. */
+  /** The recipient's own still-unpublished draft — a standing reminder. */
   | { kind: "draft"; at: Date };
 
 export type DigestTopicCard = {
   topicId: string;
   title: string;
-  /** The topic's host — rendered "Author: Title" like the Analysis table. */
-  author: string | null;
+  /** The topic's host — rendered "Author: Title", linked to their profile. */
+  author: DigestPerson;
   /** The topic's permalink; the email builds per-comment reply links on it. */
   path: string | null;
   activities: DigestActivity[];
@@ -210,13 +208,13 @@ type RawActivity = {
 type TopicMeta = {
   timetableId: string;
   title: string;
-  author: string | null;
+  author: DigestPerson;
   path: string | null;
 };
 
 /** Resolve title, author (host), and permalink for every referenced topic
- * in one query — the topic's own host membership supplies both the author
- * name and the slug the permalink needs. */
+ * in one query — the topic's own host membership supplies the author name,
+ * link target, and the slug the permalink needs. */
 async function resolveTopicMeta(
   ctx: DigestContext,
   topicIds: string[],
@@ -229,6 +227,7 @@ async function resolveTopicMeta(
       title: topics.title,
       timetableId: topics.timetableId,
       topicSlug: topics.slug,
+      hostId: topics.hostId,
       hostName: timetableMemberships.name,
       hostSlug: timetableMemberships.slug,
     })
@@ -245,7 +244,7 @@ async function resolveTopicMeta(
     meta.set(r.id, {
       timetableId: r.timetableId,
       title: r.title,
-      author: r.hostName,
+      author: { name: r.hostName, userId: r.hostId },
       path: topicPath(
         ctx.forumSlug.get(r.timetableId),
         r.hostSlug,
@@ -254,6 +253,88 @@ async function resolveTopicMeta(
     });
   }
   return meta;
+}
+
+type ThreadRow = {
+  id: string;
+  parentId: string | null;
+  timetableId: string;
+};
+
+type AncestorNode = {
+  parentId: string | null;
+  body: string;
+  author: DigestPerson;
+};
+
+/** Load every ancestor comment above the seed ids, breadth-first up the
+ * parentId links (threads are shallow). Author names resolve in the
+ * comment's own forum via the join, so cross-forum digests stay correct. */
+async function loadAncestorComments(
+  seeds: string[],
+): Promise<Map<string, AncestorNode>> {
+  const loaded = new Map<string, AncestorNode>();
+  let frontier = [...new Set(seeds)];
+  while (frontier.length > 0) {
+    const rows = await db
+      .select({
+        id: comments.id,
+        parentId: comments.parentId,
+        body: comments.body,
+        deletedAt: comments.deletedAt,
+        authorId: comments.authorId,
+        authorName: timetableMemberships.name,
+      })
+      .from(comments)
+      .innerJoin(topics, eq(topics.id, comments.topicId))
+      .leftJoin(
+        timetableMemberships,
+        and(
+          eq(timetableMemberships.userId, comments.authorId),
+          eq(timetableMemberships.timetableId, topics.timetableId),
+        ),
+      )
+      .where(inArray(comments.id, frontier));
+    const next: string[] = [];
+    for (const row of rows) {
+      loaded.set(row.id, {
+        parentId: row.parentId,
+        body: row.deletedAt ? "[comment removed]" : row.body,
+        author: { name: row.authorName, userId: row.authorId },
+      });
+      if (row.parentId && !loaded.has(row.parentId)) next.push(row.parentId);
+    }
+    frontier = next;
+  }
+  return loaded;
+}
+
+/** Walk one comment's parent links into a root→(its parent) ordered chain. */
+function chainFor(
+  parentId: string | null,
+  loaded: Map<string, AncestorNode>,
+): DigestComment[] {
+  const chain: DigestComment[] = [];
+  let cursor = parentId;
+  while (cursor) {
+    const node = loaded.get(cursor);
+    if (!node) break;
+    chain.push({ author: node.author, body: node.body });
+    cursor = node.parentId;
+  }
+  return chain.reverse();
+}
+
+/** For each thread row, the ancestor chain root → its parent comment. */
+async function loadAncestorChains(
+  rows: ThreadRow[],
+): Promise<Map<string, DigestComment[]>> {
+  const seeds = rows
+    .map((r) => r.parentId)
+    .filter((id): id is string => id != null);
+  if (seeds.length === 0) return new Map(rows.map((r) => [r.id, []]));
+  const loaded = await loadAncestorComments(seeds);
+  return new Map(rows.map((r) => [r.id, chainFor(r.parentId, loaded)]));
 }
 
 /** Comments on the recipient's topics (public + their admin thread). */
@@ -267,7 +348,9 @@ async function commentActivities(
   const rows = await db
     .select({
       id: comments.id,
+      parentId: comments.parentId,
       topicId: comments.topicId,
+      authorId: comments.authorId,
       by: timetableMemberships.name,
       body: comments.body,
       createdAt: comments.createdAt,
@@ -293,122 +376,31 @@ async function commentActivities(
         isNull(comments.deletedAt),
       ),
     );
-  return rows
-    .filter((r) => {
-      const timetableId = timetableByTopic.get(r.topicId) ?? "";
-      return (
-        r.createdAt > afterSeen(since, ctx.seenNotificationsAt.get(timetableId))
-      );
-    })
-    .map((r) => ({
-      topicId: r.topicId,
-      timetableId: timetableByTopic.get(r.topicId) ?? "",
-      activity: {
-        kind: "comment" as const,
-        by: r.by,
-        body: r.body,
-        replyToCommentId: r.id,
-        at: r.createdAt,
-      },
-    }));
-}
-
-type AncestorNode = {
-  parentId: string | null;
-  body: string;
-  authorId: string;
-};
-
-/** Load every ancestor comment above the seed ids, breadth-first up the
- * parentId links (threads are shallow, so a handful of round-trips). */
-async function loadAncestorComments(
-  seeds: string[],
-): Promise<Map<string, AncestorNode>> {
-  const loaded = new Map<string, AncestorNode>();
-  let frontier = [...new Set(seeds)];
-  while (frontier.length > 0) {
-    const rows = await db
-      .select({
-        id: comments.id,
-        parentId: comments.parentId,
-        body: comments.body,
-        authorId: comments.authorId,
-        deletedAt: comments.deletedAt,
-      })
-      .from(comments)
-      .where(inArray(comments.id, frontier));
-    const next: string[] = [];
-    for (const row of rows) {
-      loaded.set(row.id, {
-        parentId: row.parentId,
-        body: row.deletedAt ? "[comment removed]" : row.body,
-        authorId: row.authorId,
-      });
-      if (row.parentId && !loaded.has(row.parentId)) next.push(row.parentId);
-    }
-    frontier = next;
-  }
-  return loaded;
-}
-
-/** Walk one reply's parent links into a root→(your comment) ordered chain. */
-function chainFor(
-  parentId: string | null,
-  loaded: Map<string, AncestorNode>,
-  names: Map<string, string | null>,
-): { by: string | null; body: string }[] {
-  const chain: { by: string | null; body: string }[] = [];
-  let cursor = parentId;
-  while (cursor) {
-    const node = loaded.get(cursor);
-    if (!node) break;
-    chain.push({ by: names.get(node.authorId) ?? null, body: node.body });
-    cursor = node.parentId;
-  }
-  return chain.reverse();
-}
-
-/** For each reply, the ancestor chain topic-root → the recipient's comment. */
-async function loadAncestorChains(
-  replies: { id: string; parentId: string | null; timetableId: string }[],
-): Promise<Map<string, { by: string | null; body: string }[]>> {
-  const seeds = replies
-    .map((r) => r.parentId)
-    .filter((id): id is string => id != null);
-  if (seeds.length === 0) {
-    return new Map(replies.map((r) => [r.id, []]));
-  }
-  const loaded = await loadAncestorComments(seeds);
-  const names = await loadMemberNames(
-    [...loaded.values()].map((c) => c.authorId),
-    replies[0]?.timetableId,
-  );
-  return new Map(
-    replies.map((r) => [r.id, chainFor(r.parentId, loaded, names)]),
-  );
-}
-
-/** author → membership name within one forum (ancestor authors). */
-async function loadMemberNames(
-  authorIds: string[],
-  timetableId: string | undefined,
-): Promise<Map<string, string | null>> {
-  const map = new Map<string, string | null>();
-  if (authorIds.length === 0 || !timetableId) return map;
-  const rows = await db
-    .select({
-      userId: timetableMemberships.userId,
-      name: timetableMemberships.name,
-    })
-    .from(timetableMemberships)
-    .where(
-      and(
-        eq(timetableMemberships.timetableId, timetableId),
-        inArray(timetableMemberships.userId, [...new Set(authorIds)]),
-      ),
+  const fresh = rows.filter((r) => {
+    const timetableId = timetableByTopic.get(r.topicId) ?? "";
+    return (
+      r.createdAt > afterSeen(since, ctx.seenNotificationsAt.get(timetableId))
     );
-  for (const r of rows) map.set(r.userId, r.name);
-  return map;
+  });
+  const chains = await loadAncestorChains(
+    fresh.map((r) => ({
+      id: r.id,
+      parentId: r.parentId,
+      timetableId: timetableByTopic.get(r.topicId) ?? "",
+    })),
+  );
+  return fresh.map((r) => ({
+    topicId: r.topicId,
+    timetableId: timetableByTopic.get(r.topicId) ?? "",
+    activity: {
+      kind: "comment" as const,
+      author: { name: r.by, userId: r.authorId },
+      body: r.body,
+      ancestors: chains.get(r.id) ?? [],
+      replyToCommentId: r.id,
+      at: r.createdAt,
+    },
+  }));
 }
 
 /** Replies to the recipient's comments, with ancestor context. */
@@ -429,6 +421,7 @@ async function replyActivities(
       parentId: comments.parentId,
       topicId: comments.topicId,
       timetableId: topics.timetableId,
+      authorId: comments.authorId,
       by: timetableMemberships.name,
       body: comments.body,
       createdAt: comments.createdAt,
@@ -466,7 +459,7 @@ async function replyActivities(
     timetableId: r.timetableId,
     activity: {
       kind: "reply" as const,
-      by: r.by,
+      author: { name: r.by, userId: r.authorId },
       body: r.body,
       ancestors: chains.get(r.id) ?? [],
       replyToCommentId: r.id,
@@ -476,7 +469,7 @@ async function replyActivities(
 }
 
 /** ❤️s on the recipient's topics since the feed watermark — every hearter
- * named. */
+ * named and linked. */
 async function heartActivities(
   ctx: DigestContext,
   since: Date,
@@ -488,6 +481,7 @@ async function heartActivities(
     .select({
       topicId: hearts.topicId,
       createdAt: hearts.createdAt,
+      userId: hearts.userId,
       hearter: timetableMemberships.name,
     })
     .from(hearts)
@@ -505,7 +499,7 @@ async function heartActivities(
 
   const byTopic = new Map<
     string,
-    { hearters: string[]; at: Date; timetableId: string }
+    { hearters: DigestPerson[]; at: Date; timetableId: string }
   >();
   for (const row of rows) {
     const timetableId = timetableByTopic.get(row.topicId) ?? "";
@@ -516,18 +510,14 @@ async function heartActivities(
       at: row.createdAt,
       timetableId,
     };
-    entry.hearters.push(row.hearter ?? "Someone");
+    entry.hearters.push({ name: row.hearter, userId: row.userId });
     if (row.createdAt > entry.at) entry.at = row.createdAt;
     byTopic.set(row.topicId, entry);
   }
   return [...byTopic.entries()].map(([topicId, e]) => ({
     topicId,
     timetableId: e.timetableId,
-    activity: {
-      kind: "heart" as const,
-      hearters: e.hearters,
-      at: e.at,
-    },
+    activity: { kind: "heart" as const, hearters: e.hearters, at: e.at },
   }));
 }
 
@@ -575,10 +565,7 @@ async function newTopicActivities(
     .map((r) => ({
       topicId: r.id,
       timetableId: r.timetableId,
-      activity: {
-        kind: "new" as const,
-        at: r.publishedAt ?? since,
-      },
+      activity: { kind: "new" as const, at: r.publishedAt ?? since },
     }));
 }
 
@@ -644,7 +631,7 @@ function cardRecency(card: DigestTopicCard): number {
 
 /**
  * Digest v3 (2026-07-30): one digest PER FORUM, built as topic cards.
- * Every activity is grouped under its topic, cards are ordered your-content
+ * Every activity is grouped under its topic, cards ordered your-content
  * first (replies/comments/❤️s) → assignments → new topics, drafts last.
  * Forums with no non-draft news yield no digest.
  */
@@ -736,7 +723,7 @@ function buildCards(
     cards.push({
       topicId,
       title: m?.title ?? "A topic",
-      author: m?.author ?? null,
+      author: m?.author ?? { name: null, userId: null },
       path: m?.path ?? null,
       activities,
     });

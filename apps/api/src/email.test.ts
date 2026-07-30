@@ -13,43 +13,51 @@ const SAMPLE = sampleDigest({
 });
 
 describe("renderDigest (v3, topic cards)", () => {
-  it("subjects as [Forum] Digest with the count summary", () => {
-    const { subject } = renderDigest(SAMPLE);
-    expect(subject).toMatch(/^\[Sparkle Bureaucracy\] Digest — /);
+  it("subjects and brands as '{Forum} Topics Digest'", () => {
+    const { subject, html } = renderDigest(SAMPLE);
+    expect(subject).toMatch(/^Sparkle Bureaucracy Topics Digest — /);
     expect(subject).toContain("1 comment on your topics");
     expect(subject).toContain("1 reply");
-    expect(subject).toContain("1 new topic");
+    // Wordmark is "{Forum} Topics", in the forum's accent.
+    expect(html).toContain(">Sparkle Bureaucracy Topics</td>");
+    expect(html).toContain("#1f7a4d");
+    // No greeting.
+    expect(html).not.toContain("Hi Ada");
   });
 
-  it("brands the shell as the forum and orders your-content first", () => {
+  it("orders your-content first and gives each topic its own card", () => {
     const { html } = renderDigest(SAMPLE);
-    expect(html).toContain("<!doctype html>");
-    expect(html).toContain(">Sparkle Bureaucracy</td>");
-    expect(html).toContain("#1f7a4d");
-    // Your-content cards (reply/comment/heart) come before the new topic.
-    const replyAt = html.indexOf("replied to your comment");
+    const replyAt = html.indexOf("Count me in");
     const newAt = html.indexOf("Newly published");
     expect(replyAt).toBeGreaterThan(-1);
     expect(newAt).toBeGreaterThan(-1);
     expect(replyAt).toBeLessThan(newAt);
-    // "Author: Title" heading + footer to THIS forum's notifications.
-    expect(html).toContain("Priya Okafor: ");
-    expect(html).toContain("/f/sparkle/notifications");
+    // One bordered card per topic (5 sample topics).
+    const cards = html.split("border-radius:12px").length - 1;
+    expect(cards).toBeGreaterThanOrEqual(5);
   });
 
-  it("names every hearter (no cap) and builds Reply deep-links", () => {
+  it("names each hearter on its own line, linked to their profile", () => {
     const { html } = renderDigest(SAMPLE);
-    expect(html).toContain("Amara Okafor");
-    expect(html).toContain("Kwame Mensah");
-    // Reply link is the topic permalink with the ?reply anchor.
+    expect(html).toContain("❤️ ");
+    expect(html).toContain("/f/sparkle/sample-amara");
+    expect(html).toContain("/f/sparkle/sample-kwame");
+  });
+
+  it("threads a reply with its full ancestor chain and a Reply link", () => {
+    const { html } = renderDigest(SAMPLE);
+    expect(html).toContain("Should we use raised beds");
+    expect(html).toContain("Raised beds near the wall");
+    // Indented leaves: the reply sits deeper than its ancestors.
+    expect(html).toContain("padding-left:32px");
     expect(html).toContain("?reply=sample-comment-1#comment-sample-comment-1");
     expect(html).toContain("Reply →");
   });
 
-  it("shows the full ancestor chain above a reply", () => {
+  it("links usernames to profile pages", () => {
     const { html } = renderDigest(SAMPLE);
-    expect(html).toContain("Should we use raised beds");
-    expect(html).toContain("Raised beds near the wall");
+    expect(html).toContain("/f/sparkle/sample-robin");
+    expect(html).toContain("/f/sparkle/sample-priya");
   });
 
   it("escapes user-controlled text", () => {
@@ -59,19 +67,20 @@ describe("renderDigest (v3, topic cards)", () => {
         {
           topicId: "x",
           title: "<script>alert(1)</script>",
-          author: "<b>Eve</b>",
+          author: { name: "<b>Eve</b>", userId: "u1" },
           path: null,
           activities: [
             {
               kind: "comment",
-              by: "<i>Mallory</i>",
+              author: { name: "<i>Mallory</i>", userId: "u2" },
               body: "<img src=x onerror=alert(1)>",
+              ancestors: [],
               replyToCommentId: "c1",
               at: new Date("2026-07-30T00:00:00Z"),
             },
             {
               kind: "heart",
-              hearters: ["<u>Trudy</u>"],
+              hearters: [{ name: "<u>Trudy</u>", userId: "u3" }],
               at: new Date("2026-07-30T00:00:00Z"),
             },
           ],

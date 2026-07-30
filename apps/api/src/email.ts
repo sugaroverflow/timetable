@@ -1,5 +1,6 @@
 import type {
   DigestActivity,
+  DigestPerson,
   DigestTopicCard,
   ForumDigest,
 } from "@timetable/core";
@@ -73,118 +74,170 @@ const E = {
   line: "#e3e6ec", // --line (approx)
   primary: "#2f54eb", // --primary
 };
+// One font family across every email (QA 2026-07-30 — "too many fonts").
 const SANS = "-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
-const SERIF = "Georgia,'Times New Roman',serif";
 
-/** Wrap a body in the branded frame: wordmark, white card, footer.
- * `footer` is already-escaped HTML (it usually carries a link). Digest v2
- * (2026-07-29): the wordmark defaults to the app but is the FORUM name for
- * forum-scoped mail, with the forum's accent as the wordmark colour. */
+/** Wrap a body in the branded frame: wordmark, content, footer. `footer`
+ * is already-escaped HTML. The wordmark carries the FORUM name in its
+ * accent colour. By default the body sits in one white card; pass
+ * `uncarded` when the body supplies its own cards (the digest's per-topic
+ * cards). */
 export function emailShell(
   body: string,
   footer: string,
-  opts: { title?: string; accent?: string | null } = {},
+  opts: { title?: string; accent?: string | null; uncarded?: boolean } = {},
 ): string {
   const title = opts.title ?? "Topic";
   const accent = opts.accent ?? E.ink;
+  const content = opts.uncarded
+    ? `<tr><td style="font-family:${SANS};font-size:15px;line-height:1.55;color:${E.ink};">${body}</td></tr>`
+    : `<tr><td style="background:${E.card};border:1px solid ${E.line};border-radius:12px;padding:26px 28px;font-family:${SANS};font-size:15px;line-height:1.55;color:${E.ink};">${body}</td></tr>`;
   return [
     `<!doctype html><html><body style="margin:0;padding:0;background:${E.bg};">`,
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${E.bg};"><tr><td align="center" style="padding:28px 12px;">`,
     `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;max-width:560px;">`,
-    `<tr><td style="padding:0 6px 10px;font-family:${SERIF};font-size:20px;font-weight:bold;color:${accent};">${esc(title)}</td></tr>`,
-    `<tr><td style="background:${E.card};border:1px solid ${E.line};border-radius:12px;padding:26px 28px;font-family:${SANS};font-size:15px;line-height:1.55;color:${E.ink};">`,
-    body,
-    `</td></tr>`,
+    `<tr><td style="padding:0 6px 12px;font-family:${SANS};font-size:20px;font-weight:700;color:${accent};">${esc(title)}</td></tr>`,
+    content,
     `<tr><td style="padding:14px 6px;font-family:${SANS};font-size:12px;line-height:1.5;color:${E.muted};">${footer}</td></tr>`,
     `</table></td></tr></table></body></html>`,
   ].join("");
 }
 
-const item = (html: string): string => `<p style="margin:0 0 7px;">${html}</p>`;
+const INDENT = 16; // px per thread level
 
-const dim = (text: string): string =>
-  `<span style="color:${E.muted};">${esc(text)}</span>`;
-
-/** Full-text quote block for comments/replies (Ed wants the whole comment
- * readable from the inbox). */
-const quoted = (body: string): string =>
-  `<blockquote style="margin:4px 0 0;padding:6px 12px;border-left:3px solid ${E.line};color:${E.ink};white-space:pre-wrap;">${esc(body)}</blockquote>`;
-
+/** A comment/reply title link, or plain bold text without a path. */
 function accentLink(
   label: string,
   path: string | null,
   accent: string,
 ): string {
   return path
-    ? `<a href="${esc(`${linkBase}${path}`)}" style="color:${accent};font-weight:600;">${esc(label)}</a>`
+    ? `<a href="${esc(`${linkBase}${path}`)}" style="color:${accent};font-weight:600;text-decoration:none;">${esc(label)}</a>`
     : `<strong>${esc(label)}</strong>`;
 }
 
-/** A "Reply →" deep-link to the composer for one comment (digest v3): the
- * topic permalink with the ?reply anchor the permalink page consumes. */
-function replyLink(
+/** A member's name linked to their per-forum profile (the person page
+ * redirects id → slug, so the userId is a valid link target). */
+function personLink(
+  forumSlug: string,
+  person: DigestPerson,
+  accent: string,
+): string {
+  const name = esc(person.name ?? "Someone");
+  if (!person.userId) return `<strong>${name}</strong>`;
+  const href = `${linkBase}/f/${esc(forumSlug)}/${esc(person.userId)}`;
+  return `<a href="${href}" style="color:${accent};font-weight:600;text-decoration:none;">${name}</a>`;
+}
+
+/** One line in a thread: "Name: body", indented to its depth. The new
+ * comment's body wears the accent colour so it stands out; ancestor context
+ * is muted. */
+function threadLine(
+  depth: number,
+  nameHtml: string,
+  body: string,
+  isNew: boolean,
+  accent: string,
+): string {
+  const color = isNew ? accent : E.muted;
+  return `<div style="padding-left:${depth * INDENT}px;margin:3px 0;white-space:pre-wrap;">${nameHtml}<span style="color:${E.muted};">: </span><span style="color:${color};">${esc(body)}</span></div>`;
+}
+
+/** The Reply → leaf beneath a comment, at the next indent level. */
+function replyLeaf(
+  depth: number,
   path: string | null,
   commentId: string,
   accent: string,
 ): string {
   if (!path) return "";
   const href = `${linkBase}${path}?reply=${encodeURIComponent(commentId)}#comment-${encodeURIComponent(commentId)}`;
-  return ` <a href="${esc(href)}" style="color:${accent};font-weight:600;">Reply →</a>`;
+  return `<div style="padding-left:${depth * INDENT}px;margin:2px 0 0;"><a href="${esc(href)}" style="color:${accent};font-weight:600;text-decoration:none;">Reply →</a></div>`;
 }
 
-/** The ancestor chain above a reply (topic root → your comment), quoted as
- * dim context so you can see what's being replied to. */
-function ancestors(chain: { by: string | null; body: string }[]): string {
-  if (chain.length === 0) return "";
-  const lines = chain
+/** A comment/reply rendered as an indented thread: ancestors (muted) →
+ * the new comment (accent body) → the Reply link leaf. */
+function renderThread(
+  card: DigestTopicCard,
+  a: Extract<DigestActivity, { kind: "comment" | "reply" }>,
+  forumSlug: string,
+  accent: string,
+): string {
+  const lines = a.ancestors.map((anc, i) =>
+    threadLine(
+      i,
+      personLink(forumSlug, anc.author, accent),
+      anc.body,
+      false,
+      accent,
+    ),
+  );
+  const depth = a.ancestors.length;
+  lines.push(
+    threadLine(
+      depth,
+      personLink(forumSlug, a.author, accent),
+      a.body,
+      true,
+      accent,
+    ),
+  );
+  lines.push(replyLeaf(depth + 1, card.path, a.replyToCommentId, accent));
+  return lines.join("");
+}
+
+/** Every hearter on their own line with a ❤️, linked to their profile. */
+function renderHearts(
+  hearters: DigestPerson[],
+  forumSlug: string,
+  accent: string,
+): string {
+  return hearters
     .map(
-      (a) =>
-        `<div style="margin:2px 0;"><strong>${esc(a.by ?? "Someone")}:</strong> ${esc(a.body)}</div>`,
+      (h) =>
+        `<div style="margin:3px 0;">❤️ ${personLink(forumSlug, h, accent)}</div>`,
     )
     .join("");
-  return `<div style="margin:2px 0 5px;padding-left:10px;border-left:2px solid ${E.line};color:${E.muted};font-size:13px;">${lines}</div>`;
 }
 
-/** "Author: Title" — the card heading (mirrors the Analysis table). */
-function cardHeader(card: DigestTopicCard, accent: string): string {
-  const prefix = card.author
-    ? `<span style="color:${E.muted};">${esc(card.author)}: </span>`
-    : "";
-  return `<div style="margin:22px 0 4px;font-family:${SERIF};font-size:16px;">${prefix}${accentLink(card.title, card.path, accent)}</div>`;
-}
+const note = (text: string): string =>
+  `<div style="color:${E.muted};margin:3px 0;">${esc(text)}</div>`;
 
 function renderActivity(
   card: DigestTopicCard,
   a: DigestActivity,
+  forumSlug: string,
   accent: string,
 ): string {
   switch (a.kind) {
     case "comment":
-      return item(
-        `<strong>${esc(a.by ?? "Someone")}</strong> commented:${quoted(a.body)}${replyLink(card.path, a.replyToCommentId, accent)}`,
-      );
     case "reply":
-      return item(
-        `${ancestors(a.ancestors)}<strong>${esc(a.by ?? "Someone")}</strong> replied to your comment:${quoted(a.body)}${replyLink(card.path, a.replyToCommentId, accent)}`,
-      );
+      return renderThread(card, a, forumSlug, accent);
     case "heart":
-      return item(
-        `${dim(`❤️ from `)}<span style="color:${E.ink};">${esc(a.hearters.join(", "))}</span>`,
-      );
+      return renderHearts(a.hearters, forumSlug, accent);
     case "new":
-      return item(dim("Newly published — take a look."));
+      return note("Newly published — take a look.");
     case "assignment":
-      return item(dim("This topic was assigned to you."));
+      return note("This topic was assigned to you.");
     case "draft":
-      return item(dim("Still an unpublished draft."));
+      return note("Still an unpublished draft.");
   }
 }
 
-function digestCards(digest: ForumDigest, accent: string): string[] {
-  return digest.topics.flatMap((card) => [
-    cardHeader(card, accent),
-    ...card.activities.map((a) => renderActivity(card, a, accent)),
-  ]);
+/** One topic on its own card: "Author: Title" then its activities. */
+function renderCard(
+  card: DigestTopicCard,
+  forumSlug: string,
+  accent: string,
+): string {
+  const header = `<div style="font-size:16px;margin:0 0 8px;">${personLink(forumSlug, card.author, accent)}<span style="color:${E.muted};">: </span>${accentLink(card.title, card.path, accent)}</div>`;
+  const activities = card.activities
+    .map(
+      (a) =>
+        `<div style="margin:8px 0 0;">${renderActivity(card, a, forumSlug, accent)}</div>`,
+    )
+    .join("");
+  return `<div style="background:${E.card};border:1px solid ${E.line};border-radius:12px;padding:16px 18px;margin:0 0 12px;">${header}${activities}</div>`;
 }
 
 /** "3 comments, 2 replies …" — the subject's tail, counted across cards. */
@@ -207,26 +260,27 @@ function digestSummary(digest: ForumDigest): string {
 }
 
 /** Digest v3 (2026-07-30): per-forum, forum-branded — one card per topic,
- * ordered your-content first. The wordmark and subject carry the FORUM's
- * name, links wear its accent colour, the footer points at that forum's
- * Notifications page. */
+ * ordered your-content first. The wordmark is "{Forum} Topics", the subject
+ * "{Forum} Topics Digest", links wear the forum's accent, the footer points
+ * at that forum's Notifications page. */
 export function renderDigest(digest: ForumDigest): {
   subject: string;
   html: string;
 } {
   const accent = digest.accent ?? E.primary;
   const summary = digestSummary(digest);
-  const greeting = digest.name ? `Hi ${esc(digest.name)},` : "Hi,";
-  const body = [
-    `<p style="margin:0;">${greeting}</p>`,
-    ...digestCards(digest, accent),
-  ].join("\n");
+  const body = digest.topics
+    .map((card) => renderCard(card, digest.forumSlug, accent))
+    .join("\n");
   const footer = `You're getting this because you switched on email digests. Adjust them any time on ${accentLink(`your ${digest.forumName} Notifications page`, `/f/${digest.forumSlug}/notifications`, accent)}.`;
+  const base = `${digest.forumName} Topics Digest`;
   return {
-    subject: summary
-      ? `[${digest.forumName}] Digest — ${summary}`
-      : `[${digest.forumName}] Digest`,
-    html: emailShell(body, footer, { title: digest.forumName, accent }),
+    subject: summary ? `${base} — ${summary}` : base,
+    html: emailShell(body, footer, {
+      title: `${digest.forumName} Topics`,
+      accent,
+      uncarded: true,
+    }),
   };
 }
 
@@ -241,12 +295,16 @@ export function sampleDigest(args: {
   forumSlug: string;
   accent?: string | null;
 }): ForumDigest {
-  const name = args.name ?? "you";
+  const me: DigestPerson = { name: args.name ?? "You", userId: "sample-you" };
+  const who = (name: string, userId: string): DigestPerson => ({
+    name,
+    userId,
+  });
   const p = (host: string, topic: string) =>
     `/f/${args.forumSlug}/${host}/${topic}`;
   const t = (iso: string) => new Date(iso);
   return {
-    userId: "sample",
+    userId: "sample-you",
     email: args.email,
     name: args.name,
     forumId: args.forumId,
@@ -259,20 +317,20 @@ export function sampleDigest(args: {
       {
         topicId: "sample-garden",
         title: "A community garden for the north courtyard",
-        author: "Priya Okafor",
+        author: who("Priya Okafor", "sample-priya"),
         path: p("priya", "community-garden"),
         activities: [
           {
             kind: "reply",
-            by: "Robin Vale",
+            author: who("Robin Vale", "sample-robin"),
             body: "Count me in — I can bring tools on the first weekend.",
             ancestors: [
               {
-                by: "Jordan Lee",
+                author: who("Jordan Lee", "sample-jordan"),
                 body: "Should we use raised beds or dig straight into the ground?",
               },
               {
-                by: name,
+                author: me,
                 body: "Raised beds near the wall — the soil there is thin.",
               },
             ],
@@ -286,25 +344,26 @@ export function sampleDigest(args: {
       {
         topicId: "sample-mine",
         title: "Rethinking the weekly assembly format",
-        author: name,
+        author: me,
         path: p("you", "weekly-assembly"),
         activities: [
           {
             kind: "comment",
-            by: "Sam Whitfield",
+            author: who("Sam Whitfield", "sample-sam"),
             body: "This is exactly what we've needed — could we pair it with the newcomers session?",
+            ancestors: [],
             replyToCommentId: "sample-comment-1",
             at: t("2026-07-30T08:40:00Z"),
           },
           {
             kind: "heart",
             hearters: [
-              "Amara Okafor",
-              "Tariq Hassan",
-              "Rosa Delgado",
-              "Ben Fletcher",
-              "Maya Iyer",
-              "Kwame Mensah",
+              who("Amara Okafor", "sample-amara"),
+              who("Tariq Hassan", "sample-tariq"),
+              who("Rosa Delgado", "sample-rosa"),
+              who("Ben Fletcher", "sample-ben"),
+              who("Maya Iyer", "sample-maya"),
+              who("Kwame Mensah", "sample-kwame"),
             ],
             at: t("2026-07-30T07:55:00Z"),
           },
@@ -314,7 +373,7 @@ export function sampleDigest(args: {
       {
         topicId: "sample-assigned",
         title: "Welcome newcomers session",
-        author: name,
+        author: me,
         path: p("you", "welcome-newcomers"),
         activities: [{ kind: "assignment", at: t("2026-07-29T18:20:00Z") }],
       },
@@ -322,7 +381,7 @@ export function sampleDigest(args: {
       {
         topicId: "sample-new",
         title: "Open data standards for local councils",
-        author: "Hana Kim",
+        author: who("Hana Kim", "sample-hana"),
         path: p("hana", "open-data-standards"),
         activities: [{ kind: "new", at: t("2026-07-29T16:00:00Z") }],
       },
@@ -330,7 +389,7 @@ export function sampleDigest(args: {
       {
         topicId: "sample-draft",
         title: "Half-finished idea about peer mentoring",
-        author: name,
+        author: me,
         path: p("you", "peer-mentoring"),
         activities: [{ kind: "draft", at: t("2026-07-20T10:00:00Z") }],
       },
