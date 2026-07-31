@@ -1,6 +1,6 @@
 import { and, eq, gt, inArray, isNull, ne, sql } from "drizzle-orm";
 
-import { isDigestEnabled } from "@timetable/shared";
+import { isCalendarEnabled, isDigestEnabled } from "@timetable/shared";
 
 import type { NotificationSettings, TimetableSettings } from "@timetable/db";
 import {
@@ -14,6 +14,8 @@ import {
   topicSeen,
   users,
 } from "@timetable/db";
+
+import { listUpcomingSessions, type DigestSession } from "./calendar";
 
 export type DigestRecipient = {
   id: string;
@@ -75,6 +77,11 @@ export type DigestActivity =
   /** The recipient's own still-unpublished draft — a standing reminder. */
   | { kind: "draft"; at: Date };
 
+/** A session line in the digest's calendar sections. `isNew` marks
+ * confirmed/proposed changes since the last digest, so a weekly email reads
+ * as news, not a repeated wall of the same listings. */
+export type DigestSessionLine = DigestSession & { isNew: boolean };
+
 export type DigestTopicCard = {
   topicId: string;
   title: string;
@@ -108,6 +115,11 @@ export type ForumDigest = {
   hostLabel: string;
   adminLabel: string;
   topics: DigestTopicCard[];
+  /** "Coming up": upcoming CONFIRMED sessions (calendar-enabled forums). */
+  upcoming: DigestSessionLine[];
+  /** "Can you make it?": upcoming PROPOSED sessions for topics this
+   * recipient ❤️'d — the moment they're motivated to upgrade a 🟡. */
+  availabilityAsks: DigestSessionLine[];
 };
 
 function topicPath(
@@ -176,6 +188,8 @@ type DigestContext = {
   seenFeedAt: Map<string, Date | null>;
   seenNotificationsAt: Map<string, Date | null>;
   electorTimetableIds: string[];
+  /** Forums with the calendar feature switched on (calendar v2). */
+  calendarTimetableIds: string[];
 };
 
 /** The later of the digest window start and an in-app seen watermark. */
@@ -232,7 +246,68 @@ async function loadDigestContext(
     electorTimetableIds: memberships
       .filter((m) => m.roles.includes("elector"))
       .map((m) => m.timetableId),
+    calendarTimetableIds: memberships
+      .filter((m) =>
+        isCalendarEnabled((m.settings as TimetableSettings | null) ?? {}),
+      )
+      .map((m) => m.timetableId),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Calendar sections (calendar v2)
+// ---------------------------------------------------------------------------
+
+/** How far ahead the digest looks for sessions. */
+const SESSION_HORIZON_DAYS = 14;
+
+/** Upcoming confirmed sessions ("Coming up") and proposed sessions for
+ * topics the recipient ❤️'d ("Can you make it?"), across the recipient's
+ * calendar-enabled forums. `isNew` = session changed since the window
+ * start, so only genuinely fresh sessions can trigger an email by
+ * themselves. */
+async function loadSessionSections(
+  ctx: DigestContext,
+  since: Date,
+  now: Date,
+): Promise<{
+  upcoming: DigestSessionLine[];
+  asks: DigestSessionLine[];
+}> {
+  if (ctx.calendarTimetableIds.length === 0) return { upcoming: [], asks: [] };
+  const horizon = {
+    from: now,
+    to: new Date(now.getTime() + SESSION_HORIZON_DAYS * 24 * 60 * 60 * 1000),
+  };
+  const [confirmed, proposed] = await Promise.all([
+    listUpcomingSessions(ctx.calendarTimetableIds, "confirmed", horizon),
+    listUpcomingSessions(ctx.calendarTimetableIds, "proposed", horizon),
+  ]);
+
+  const upcoming = confirmed.map((s) => ({ ...s, isNew: s.updatedAt > since }));
+
+  // Asks go only to electors who ❤️'d the session's topic — the people
+  // whose availability the host is actually waiting on.
+  let asks: DigestSessionLine[] = [];
+  if (proposed.length > 0) {
+    const heartRows = await db
+      .select({ topicId: hearts.topicId })
+      .from(hearts)
+      .where(
+        and(
+          eq(hearts.userId, ctx.recipient.id),
+          inArray(
+            hearts.topicId,
+            proposed.map((s) => s.topicId),
+          ),
+        ),
+      );
+    const heartedTopicIds = new Set(heartRows.map((r) => r.topicId));
+    asks = proposed
+      .filter((s) => heartedTopicIds.has(s.topicId))
+      .map((s) => ({ ...s, isNew: s.updatedAt > since }));
+  }
+  return { upcoming, asks };
 }
 
 /** One raw activity tagged with its topic + forum, before cards are built. */
@@ -699,8 +774,10 @@ function cardRecency(card: DigestTopicCard): number {
 export async function computeUserForumDigests(
   recipient: DigestRecipient,
   since: Date,
+  now: Date = new Date(),
 ): Promise<ForumDigest[]> {
   const ctx = await loadDigestContext(recipient);
+  const sessions = await loadSessionSections(ctx, since, now);
 
   const myTopics = await db
     .select({
@@ -757,6 +834,8 @@ export async function computeUserForumDigests(
       hostLabel: ctx.hostLabel.get(forumId) ?? "Host",
       adminLabel: ctx.adminLabel.get(forumId) ?? "Admin",
       topics: cards,
+      upcoming: sessions.upcoming.filter((s) => s.timetableId === forumId),
+      availabilityAsks: sessions.asks.filter((s) => s.timetableId === forumId),
     };
   });
 
@@ -800,10 +879,16 @@ function buildCards(
   return cards;
 }
 
-/** Empty = nothing but drafts. A lingering draft alone must never trigger
- * an email. */
+/** Empty = nothing but drafts and already-seen session listings. A
+ * lingering draft alone must never trigger an email, and neither may a
+ * standing "Coming up" list with nothing new in it — only a session
+ * confirmed/proposed since the last digest counts as news. */
 export function isForumDigestEmpty(digest: ForumDigest): boolean {
-  return !digest.topics.some((card) =>
+  const topicNews = digest.topics.some((card) =>
     card.activities.some((a) => a.kind !== "draft"),
   );
+  const sessionNews =
+    digest.upcoming.some((s) => s.isNew) ||
+    digest.availabilityAsks.some((s) => s.isNew);
+  return !topicNews && !sessionNews;
 }

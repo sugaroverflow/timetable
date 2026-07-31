@@ -113,7 +113,12 @@ Codex/agent workflows are separate from the app runtime.
   Edit profile action stack)
 - settings (timetable profile + theme sections, hearts cutoff, invites)
 - user profile (name, avatar, markdown bio, digest preferences)
-- availability calendar (route live; nav link removed pending #55)
+- Calendar (v2, 2026-07-31; feature-flagged per forum via
+  `settings.calendar.enabled` — nav link and page exist only when on):
+  month-grouped slot rows with a topic lens, per-elector avatar groups
+  (host/admin), elector weekly-pattern grid, admin pattern×terms setup with
+  client-side slot generation, host off-piste proposals, session
+  pencil/confirm controls, claim comments with frozen availability snapshots
 - Analysis page (`/f/[slug]/analysis`): topics analysis table with ❤️ and 💬
   normalisations, per-table host filters, elector activity table with
   per-row topic folds, admin-only host activity table
@@ -211,8 +216,9 @@ Main queries include:
 - `notifications` / `notificationsUnread`
 - `myFeedLastSeenAt`
 - `forumHosts`
-- `calendar`
+- `calendar` (audience lens + `includePast`; per-elector rows host/admin-only)
 - `slotComments`
+- `myAvailabilityPattern`
 - `dashboard`
 - `myIcsToken`
 - `timetableRouteByDomain`
@@ -237,10 +243,19 @@ Main mutations cover:
   (`updateMemberBio`)
 - timetable profile and settings, including validated theme JSON
 - feed and notification watermarks (`markFeedSeen`, `markNotificationsSeen`)
-- slot creation, weekly repeat creation, editing, deletion
-- availability and weekday availability
-- slot comments
-- slot topic tagging
+- slot bulk creation (`createTimeslots`, idempotent pattern×terms
+  generation), host off-piste proposals (`proposeSlot`), editing, deletion
+- per-slot availability (`setAvailability`) and the weekly template
+  (`setMyAvailabilityPattern`); effective state resolves explicit → pattern
+  cell (via the slot's `cellKey`) → yellow
+- slot comments, optionally as session claims (`topicId` + a
+  server-computed, frozen 🟢🟡🔴 snapshot of that topic's hearters)
+- the session lifecycle (`setSlotSession`: topic + `empty`/`proposed`/
+  `confirmed` + URL), gated by the forum's confirm policy and the
+  never-displace rule (`canTouchSlotSession`)
+- topic publishing by the owning host when
+  `settings.topics.hostsPublishDirectly` is on (same `moderateTopic`
+  mutation; admin review becomes post-hoc)
 
 Hearts, comments, invites, and first sign-ins are logged as activity events
 alongside moderation and lifecycle actions.
@@ -276,14 +291,20 @@ Core tables:
 - `hearts`
 - `comments`
 - `activity_events`
-- `timeslots`
-- `availability`
-- `slot_comments`
-- `slot_topics`
+- `timeslots` (calendar v2: + `status`, singular `topic_id`, `url`,
+  `created_by_id`, `cell_key` — the pattern-cell provenance for inference;
+  the `slot_topics` m2m was dropped, simultaneous sessions are separate
+  slots)
+- `availability` (explicit per-slot answers)
+- `availability_patterns` (one row per forum+user; jsonb cell → state map)
+- `slot_comments` (+ optional claim: `topic_id` and frozen
+  green/yellow/red counts)
 - `api_rate_limit_buckets`
 
 Notable columns: `timetables.settings` is a JSON blob holding role labels,
-theme (colours, fonts, dark palette), icon/cover URLs, and digest defaults;
+theme (colours, fonts, dark palette), icon/cover URLs, digest defaults, the
+calendar group (enabled flag, confirm policy, locations, pattern cells,
+terms), and the topics policy (`hostsPublishDirectly`);
 `timetables.heartsCountFrom` is the heart-count cutoff; `topics.slug` +
 `timetable_memberships.slug` power permalinks (member profiles are
 per-forum); `topics.contentUpdatedAt` tracks content edits

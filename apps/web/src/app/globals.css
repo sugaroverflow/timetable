@@ -1443,6 +1443,32 @@ textarea {
   flex-wrap: wrap;
 }
 
+/* Calendar v2 — table page */
+/* Overlapping audience-avatar strip; one strip per 🟢/🟡/🔴 group. */
+.cal-avatars {
+  display: inline-flex;
+  align-items: center;
+}
+.cal-avatars .avatar {
+  margin-left: -6px;
+  box-shadow: 0 0 0 2px var(--card);
+}
+.cal-avatars .avatar:first-child {
+  margin-left: 0;
+}
+/* A past slot stays readable but visibly archived. */
+.cal-past {
+  opacity: 0.6;
+}
+/* Frozen availability snapshot on a session-claim comment. */
+.cal-claim {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--line);
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
 /* Host insights panel — collapsible vote breakdown */
 /* The ❤️-breakdown disclosure triangle (topic cards + Analysis rows). */
 .breakdown-caret {

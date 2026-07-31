@@ -4,6 +4,7 @@ import { isAdmin, type Role } from "@timetable/shared";
 
 import Link from "next/link";
 
+import { CalendarSettingsForm } from "@/components/CalendarSettingsForm";
 import { EmailDigestForm } from "@/components/EmailDigestForm";
 import { HeartsCutoffForm } from "@/components/HeartsCutoffForm";
 import { InviteForm } from "@/components/InviteForm";
@@ -11,6 +12,7 @@ import { SettingsForm, type SettingsValues } from "@/components/SettingsForm";
 import { TimetableProfileForm } from "@/components/TimetableProfileForm";
 import { gqlFetch } from "@/lib/graphql";
 import { displayRolesFromCookies } from "@/lib/previewRoles.server";
+import { roleLabel, type TimetableSettings } from "@/lib/timetableSettings";
 
 export default async function SettingsPage({
   params,
@@ -65,6 +67,16 @@ export default async function SettingsPage({
       </div>
 
       <HeartsCutoffForm slug={slug} current={first.timetable.heartsCountFrom} />
+
+      <CalendarSettingsForm
+        slug={slug}
+        current={(settings as TimetableSettings).calendar ?? {}}
+        hostsPublishDirectly={Boolean(
+          (settings as TimetableSettings).topics?.hostsPublishDirectly,
+        )}
+        hostLabel={roleLabel(settings.roleLabels, "host")}
+        adminLabel={roleLabel(settings.roleLabels, "admin")}
+      />
 
       <EmailDigestForm slug={slug} digestDefaults={settings.digestDefaults} />
 

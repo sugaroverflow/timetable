@@ -60,3 +60,15 @@ export const availabilityStateEnum = pgEnum("availability_state", [
   "yellow",
   "red",
 ]);
+
+/** Session lifecycle of a timeslot (calendar v2, 2026-07-31):
+ * - empty: on the grid, no session ("open" in the UI)
+ * - proposed: a topic is pencilled in and under discussion — covers both an
+ *   admin/host pencilling an existing slot and a host's off-piste slot
+ * - confirmed: the session is happening; `url` points at the real event page.
+ * Booking/publishing itself happens elsewhere — this is coordination state. */
+export const slotStatusEnum = pgEnum("slot_status", [
+  "empty",
+  "proposed",
+  "confirmed",
+]);

@@ -28,6 +28,7 @@ import {
   forbidden,
   loadTimetableAndViewer,
   notFound,
+  parseCalendarJson,
   parseThemeJson,
   readTimetable,
 } from "./guards";
@@ -258,6 +259,11 @@ builder.mutationFields((t) => ({
       /** Digests are all-or-nothing (2026-07-29): the default for new
        * members is just on or off. */
       digestEnabled: t.arg.boolean({ required: false }),
+      /** Calendar feature settings (calendar v2) — JSON, validated
+       * server-side, shallow-merged over the stored calendar group. */
+      calendarJson: t.arg.string({ required: false }),
+      /** Hosts publish their own topics without admin review. */
+      hostsPublishDirectly: t.arg.boolean({ required: false }),
     },
     // eslint-disable-next-line complexity, sonarjs/cognitive-complexity -- audit debt (2026-07-22): 13-arg settings-patch assembly; decomposition queued
     resolve: async (_p, args, ctx) => {
@@ -328,6 +334,19 @@ builder.mutationFields((t) => ({
         patch.digestDefaults = {
           ...(current.digestDefaults ?? {}),
           digestEnabled: args.digestEnabled,
+        };
+      }
+
+      if (args.calendarJson != null) {
+        const parsed = parseCalendarJson(args.calendarJson);
+        if (!parsed) badRequest("Invalid calendar settings");
+        patch.calendar = { ...(current.calendar ?? {}), ...parsed };
+      }
+
+      if (args.hostsPublishDirectly != null) {
+        patch.topics = {
+          ...(current.topics ?? {}),
+          hostsPublishDirectly: args.hostsPublishDirectly,
         };
       }
 

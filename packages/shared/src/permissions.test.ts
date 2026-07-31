@@ -2,15 +2,21 @@ import { describe, expect, it } from "vitest";
 
 import {
   ANONYMOUS,
+  calendarConfirmPolicy,
   canComment,
+  canConfirmSession,
   canEditSettings,
   canEditTopic,
   canHeart,
   canModerate,
+  canProposeSession,
+  canPublishTopicDirectly,
   canReadTimetable,
   canSeeComments,
   canSeePersonProfile,
+  canTouchSlotSession,
   canUseQueue,
+  isCalendarEnabled,
   ownsTopicAsHost,
   type Viewer,
 } from "./permissions";
@@ -107,5 +113,60 @@ describe("canEditTopic", () => {
   it("ownsTopicAsHost is false for admin overrides (they get logged)", () => {
     expect(ownsTopicAsHost(ADMIN, "h1")).toBe(false);
     expect(ownsTopicAsHost(HOST, "h1")).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Calendar v2: settings-dependent permissions
+// ---------------------------------------------------------------------------
+
+describe("calendar session permissions", () => {
+  const ADMIN: Viewer = { userId: "a1", roles: ["admin"] };
+  const HOST: Viewer = { userId: "h1", roles: ["host"] };
+  const ELECTOR: Viewer = { userId: "e1", roles: ["elector"] };
+
+  it("isCalendarEnabled defaults off and follows the flag", () => {
+    expect(isCalendarEnabled({})).toBe(false);
+    expect(isCalendarEnabled({ calendar: {} })).toBe(false);
+    expect(isCalendarEnabled({ calendar: { enabled: true } })).toBe(true);
+    expect(isCalendarEnabled({ calendar: { enabled: false } })).toBe(false);
+  });
+
+  it("confirm policy defaults to hosts_propose", () => {
+    expect(calendarConfirmPolicy({})).toBe("hosts_propose");
+    expect(
+      calendarConfirmPolicy({ calendar: { confirmPolicy: "admins" } }),
+    ).toBe("admins");
+  });
+
+  it("proposing follows the policy ladder; admins always may", () => {
+    expect(canProposeSession(ADMIN, "admins")).toBe(true);
+    expect(canProposeSession(HOST, "admins")).toBe(false);
+    expect(canProposeSession(HOST, "hosts_propose")).toBe(true);
+    expect(canProposeSession(HOST, "hosts_confirm")).toBe(true);
+    expect(canProposeSession(ELECTOR, "hosts_confirm")).toBe(false);
+  });
+
+  it("confirming needs hosts_confirm for hosts; admins always may", () => {
+    expect(canConfirmSession(ADMIN, "admins")).toBe(true);
+    expect(canConfirmSession(HOST, "hosts_propose")).toBe(false);
+    expect(canConfirmSession(HOST, "hosts_confirm")).toBe(true);
+    expect(canConfirmSession(ELECTOR, "hosts_confirm")).toBe(false);
+  });
+
+  it("never-displace: hosts touch only open slots or their own session", () => {
+    expect(canTouchSlotSession(HOST, null)).toBe(true);
+    expect(canTouchSlotSession(HOST, "h1")).toBe(true);
+    expect(canTouchSlotSession(HOST, "other-host")).toBe(false);
+    expect(canTouchSlotSession(ADMIN, "other-host")).toBe(true);
+  });
+
+  it("direct topic publishing needs the forum opt-in AND ownership", () => {
+    const on = { topics: { hostsPublishDirectly: true } };
+    expect(canPublishTopicDirectly(HOST, on, "h1")).toBe(true);
+    expect(canPublishTopicDirectly(HOST, on, "other")).toBe(false);
+    expect(canPublishTopicDirectly(HOST, {}, "h1")).toBe(false);
+    // Admins go through canModerate instead — this helper is host-only.
+    expect(canPublishTopicDirectly(ADMIN, on, "someone")).toBe(false);
   });
 });

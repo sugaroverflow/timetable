@@ -5,7 +5,6 @@ import {
   comments,
   db,
   hearts,
-  slotTopics,
   timeslots,
   timetableMemberships,
   topics,
@@ -102,12 +101,6 @@ export type DashboardData = {
     title: string;
     slug: string | null;
     hostSlug: string | null;
-  }[];
-  conflicts: {
-    slotId: string;
-    startsAt: Date;
-    location: string;
-    topics: { id: string; title: string }[];
   }[];
 };
 
@@ -584,38 +577,20 @@ function buildElectorActivity(args: {
     .sort(compareElectorActivity);
 }
 
-type SlotTagRow = {
-  slotId: string;
-  topicId: string;
-  title: string;
-  hostId: string;
-  startsAt: Date;
-  location: string;
-};
-
-/** Topic↔slot tags for this timetable, with slot metadata for conflicts. */
-async function loadSlotTagRows(timetableId: string): Promise<SlotTagRow[]> {
-  return db
-    .select({
-      slotId: slotTopics.slotId,
-      topicId: slotTopics.topicId,
-      title: topics.title,
-      hostId: topics.hostId,
-      startsAt: timeslots.startsAt,
-      location: timeslots.location,
-    })
-    .from(slotTopics)
-    .innerJoin(timeslots, eq(timeslots.id, slotTopics.slotId))
-    .innerJoin(topics, eq(topics.id, slotTopics.topicId))
-    .where(eq(timeslots.timetableId, timetableId));
-}
-
-/** Published topics not tagged into any slot. */
-function findUnallocated(
+/** Published topics with no session pencilled into any slot. (Calendar v2:
+ * a slot carries one topic on timeslots.topicId; the conflicts table died
+ * with the m2m — competing claims are conversation, not data.) */
+async function findUnallocated(
+  timetableId: string,
   feed: FeedTopic[],
-  tagRows: SlotTagRow[],
-): DashboardData["unallocatedTopics"] {
-  const taggedTopicIds = new Set(tagRows.map((r) => r.topicId));
+): Promise<DashboardData["unallocatedTopics"]> {
+  const tagRows = await db
+    .select({ topicId: timeslots.topicId })
+    .from(timeslots)
+    .where(eq(timeslots.timetableId, timetableId));
+  const taggedTopicIds = new Set(
+    tagRows.map((r) => r.topicId).filter((id): id is string => id !== null),
+  );
   return feed
     .filter((t) => !taggedTopicIds.has(t.id))
     .map((t) => ({
@@ -623,47 +598,6 @@ function findUnallocated(
       title: t.title,
       slug: t.slug,
       hostSlug: t.hostSlug,
-    }));
-}
-
-/** Slots with more than one tagged topic = conflicts. */
-function findConflicts(
-  tagRows: SlotTagRow[],
-  hostId?: string,
-): DashboardData["conflicts"] {
-  const bySlot = new Map<
-    string,
-    {
-      slotId: string;
-      startsAt: Date;
-      location: string;
-      topics: { id: string; title: string; hostId: string }[];
-    }
-  >();
-  for (const r of tagRows) {
-    const entry = bySlot.get(r.slotId) ?? {
-      slotId: r.slotId,
-      startsAt: r.startsAt,
-      location: r.location,
-      topics: [],
-    };
-    entry.topics.push({ id: r.topicId, title: r.title, hostId: r.hostId });
-    bySlot.set(r.slotId, entry);
-  }
-  return Array.from(bySlot.values())
-    .filter(
-      (s) =>
-        s.topics.length > 1 &&
-        (!hostId || s.topics.some((topic) => topic.hostId === hostId)),
-    )
-    .map((slot) => ({
-      slotId: slot.slotId,
-      startsAt: slot.startsAt,
-      location: slot.location,
-      topics: slot.topics.map((topic) => ({
-        id: topic.id,
-        title: topic.title,
-      })),
     }));
 }
 
@@ -739,9 +673,7 @@ export async function getDashboard(
     commentsByAuthor: hostCommentStats,
   });
 
-  const tagRows = await loadSlotTagRows(timetableId);
-  const unallocatedTopics = findUnallocated(feed, tagRows);
-  const conflicts = findConflicts(tagRows, opts.hostId);
+  const unallocatedTopics = await findUnallocated(timetableId, feed);
 
   return {
     topicCounts,
@@ -753,6 +685,5 @@ export async function getDashboard(
     hostActivity,
     electorActivity,
     unallocatedTopics,
-    conflicts,
   };
 }

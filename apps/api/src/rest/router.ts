@@ -41,6 +41,7 @@ import {
   canProposeTopics,
   createTimetableSchema,
   inviteSchema,
+  isCalendarEnabled,
   normalizeEmail,
   updateMemberEmailSchema,
   updateMemberRolesSchema,
@@ -835,6 +836,12 @@ restRouter.get(
     const readable = await getReadableTimetable(userId, idOrSlug);
     if (!readable) {
       res.status(404).json({ error: "Not found" });
+      return;
+    }
+    // The whole calendar feature sits behind the forum-level flag; a feed
+    // for a switched-off calendar 404s (toggling back on restores it).
+    if (!isCalendarEnabled(readable.timetable.settings)) {
+      res.status(404).json({ error: "Calendar not enabled" });
       return;
     }
 

@@ -1,4 +1,4 @@
-import type { ForumDigest } from "@timetable/core";
+import { isForumDigestEmpty, type ForumDigest } from "@timetable/core";
 import { describe, expect, it } from "vitest";
 
 import { renderDigest, sampleDigest } from "./email";
@@ -126,5 +126,48 @@ describe("renderDigest (v3, topic cards)", () => {
     expect(html).not.toContain("<b>Eve</b>");
     expect(html).not.toContain("<svg onload");
     expect(html).not.toContain("<u>Trudy</u>");
+  });
+});
+
+describe("renderDigest calendar sections (calendar v2)", () => {
+  it("leads with Coming up and the availability ask, before topic cards", () => {
+    const { html } = renderDigest(SAMPLE);
+    const comingUp = html.indexOf("Coming up");
+    const ask = html.indexOf("Can you make it?");
+    const firstTopicCard = html.indexOf("sketched three options");
+    expect(comingUp).toBeGreaterThan(-1);
+    expect(ask).toBeGreaterThan(comingUp);
+    expect(firstTopicCard).toBeGreaterThan(ask);
+  });
+
+  it("counts fresh sessions into the subject", () => {
+    const { subject } = renderDigest(SAMPLE);
+    expect(subject).toContain("1 session confirmed");
+    expect(subject).toContain("1 session wants your availability");
+  });
+
+  it("links sessions to their event URL, else the forum calendar", () => {
+    const withUrl: ForumDigest = {
+      ...SAMPLE,
+      upcoming: [{ ...SAMPLE.upcoming[0]!, url: "https://lu.ma/xyz" }],
+    };
+    expect(renderDigest(withUrl).html).toContain('href="https://lu.ma/xyz"');
+    // The sample sessions carry no URL → they point at the calendar page.
+    expect(renderDigest(SAMPLE).html).toContain("/f/sparkle/calendar");
+  });
+
+  it("stale session listings alone never make a digest non-empty", () => {
+    const staleOnly: ForumDigest = {
+      ...SAMPLE,
+      topics: [],
+      upcoming: SAMPLE.upcoming.map((s) => ({ ...s, isNew: false })),
+      availabilityAsks: [],
+    };
+    expect(isForumDigestEmpty(staleOnly)).toBe(true);
+    const freshConfirm: ForumDigest = {
+      ...staleOnly,
+      upcoming: SAMPLE.upcoming.map((s) => ({ ...s, isNew: true })),
+    };
+    expect(isForumDigestEmpty(freshConfirm)).toBe(false);
   });
 });

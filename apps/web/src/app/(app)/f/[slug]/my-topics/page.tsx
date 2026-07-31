@@ -99,6 +99,9 @@ export default async function MyTopicsPage({
                 adminLabel={adminLabel}
                 isAdmin={admin}
                 hosts={admin ? data.timetableHosts : []}
+                canPublishDirectly={Boolean(
+                  settings.topics?.hostsPublishDirectly,
+                )}
               />
             ))}
           </ul>

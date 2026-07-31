@@ -105,6 +105,69 @@ export type ThemeSettings = {
   };
 };
 
+/** Who may pencil/confirm sessions into timeslots (calendar v2):
+ * - admins: hosts discuss only; admins set topic/status
+ * - hosts_propose (default): hosts pencil their own topic onto an empty slot
+ *   and create off-piste proposed slots; confirming needs an admin
+ * - hosts_confirm: full self-service (unconference mode); admins keep
+ *   override. A host can only ever act on their own topic and never
+ *   displace another host's — that invariant holds at every level. */
+export const CONFIRM_POLICIES = [
+  "admins",
+  "hosts_propose",
+  "hosts_confirm",
+] as const;
+export type ConfirmPolicy = (typeof CONFIRM_POLICIES)[number];
+
+/** One weekly time cell of the forum's slot pattern. `weekday` uses
+ * Date.getDay numbering (0=Sun…6=Sat); times are "HH:MM" on the forum's
+ * local clock. The cell key "{weekday}-{start}" links generated slots and
+ * elector pattern answers back to it. */
+export type CalendarPatternCell = {
+  weekday: number;
+  start: string;
+  end: string;
+};
+
+export function patternCellKey(cell: {
+  weekday: number;
+  start: string;
+}): string {
+  return `${cell.weekday}-${cell.start}`;
+}
+
+/** A named date range slots are generated for (a term, or an event
+ * weekend). Dates are inclusive "YYYY-MM-DD". */
+export type CalendarTerm = {
+  name: string;
+  start: string;
+  end: string;
+};
+
+/** The Calendar feature's per-forum settings (user-facing name "Calendar";
+ * this key avoids colliding with the timetable-means-forum internal naming).
+ * `enabled` defaults off — the whole feature (nav link, page, API surface,
+ * ICS) sits behind it. Toggling off hides, never deletes. */
+export type CalendarSettings = {
+  enabled?: boolean;
+  confirmPolicy?: ConfirmPolicy;
+  /** Preset locations offered when creating/proposing slots (free text
+   * stays allowed). */
+  locations?: string[];
+  /** The weekly pattern slots are generated from — also exactly the grid
+   * electors paint their availability on. */
+  patternCells?: CalendarPatternCell[];
+  /** Date ranges the pattern applies to; pattern × terms = the slot grid. */
+  terms?: CalendarTerm[];
+};
+
+/** Topic-lifecycle settings: whether hosts publish their own topics
+ * directly (admin review becomes after-the-fact oversight) or submit for
+ * review (the default). */
+export type TopicSettings = {
+  hostsPublishDirectly?: boolean;
+};
+
 /** Per-timetable settings persisted as JSON: custom role labels, theme
  * colors, default digest options, etc. */
 export type TimetableSettings = {
@@ -120,4 +183,8 @@ export type TimetableSettings = {
   iconEmoji?: string | null;
   /** Digest settings seeded onto new members who haven't customized theirs. */
   digestDefaults?: NotificationSettings;
+  /** Calendar feature (off unless enabled). */
+  calendar?: CalendarSettings;
+  /** Topic-lifecycle policy. */
+  topics?: TopicSettings;
 };

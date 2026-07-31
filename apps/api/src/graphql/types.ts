@@ -102,12 +102,3 @@ CommentType.implement({
     replies: t.field({ type: [CommentType], resolve: (c) => c.replies }),
   }),
 });
-
-export const SlotTagType = builder
-  .objectRef<{ id: string; title: string }>("SlotTag")
-  .implement({
-    fields: (t) => ({
-      id: t.exposeID("id"),
-      title: t.exposeString("title"),
-    }),
-  });

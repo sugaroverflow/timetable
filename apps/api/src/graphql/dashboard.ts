@@ -13,7 +13,7 @@ import {
   readTimetable,
   requireUser,
 } from "./guards";
-import { SlotTagType, TimetableType, WeightedHeartType } from "./types";
+import { TimetableType, WeightedHeartType } from "./types";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -81,17 +81,6 @@ const UnallocatedTopicType = builder
     }),
   });
 
-const ConflictSlotType = builder
-  .objectRef<DashboardData["conflicts"][number]>("ConflictSlot")
-  .implement({
-    fields: (t) => ({
-      slotId: t.exposeID("slotId"),
-      location: t.exposeString("location"),
-      startsAt: t.string({ resolve: (c) => c.startsAt.toISOString() }),
-      topics: t.field({ type: [SlotTagType], resolve: (c) => c.topics }),
-    }),
-  });
-
 const ElectorHeartedTopicType = builder
   .objectRef<
     DashboardData["electorActivity"][number]["heartedTopics"][number]
@@ -152,10 +141,6 @@ const DashboardType = builder.objectRef<DashboardData>("Dashboard").implement({
     unallocatedTopics: t.field({
       type: [UnallocatedTopicType],
       resolve: (d) => d.unallocatedTopics,
-    }),
-    conflicts: t.field({
-      type: [ConflictSlotType],
-      resolve: (d) => d.conflicts,
     }),
     electorActivity: t.field({
       type: [ElectorActivityType],

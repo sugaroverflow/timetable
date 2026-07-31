@@ -7,7 +7,12 @@ export * from "./rate-limits";
 
 import { users } from "./auth";
 import { apiRateLimitBuckets } from "./rate-limits";
-import { availability, slotComments, slotTopics, timeslots } from "./calendar";
+import {
+  availability,
+  availabilityPatterns,
+  slotComments,
+  timeslots,
+} from "./calendar";
 import {
   timetableInvites,
   timetableMemberships,
@@ -44,16 +49,17 @@ export type NewActivityEvent = typeof activityEvents.$inferInsert;
 
 export type Timeslot = typeof timeslots.$inferSelect;
 export type NewTimeslot = typeof timeslots.$inferInsert;
+export type SlotStatus = Timeslot["status"];
 
 export type Availability = typeof availability.$inferSelect;
 export type NewAvailability = typeof availability.$inferInsert;
 export type AvailabilityState = Availability["state"];
 
+export type AvailabilityPattern = typeof availabilityPatterns.$inferSelect;
+export type NewAvailabilityPattern = typeof availabilityPatterns.$inferInsert;
+
 export type SlotComment = typeof slotComments.$inferSelect;
 export type NewSlotComment = typeof slotComments.$inferInsert;
-
-export type SlotTopic = typeof slotTopics.$inferSelect;
-export type NewSlotTopic = typeof slotTopics.$inferInsert;
 
 export type ApiRateLimitBucket = typeof apiRateLimitBuckets.$inferSelect;
 export type NewApiRateLimitBucket = typeof apiRateLimitBuckets.$inferInsert;

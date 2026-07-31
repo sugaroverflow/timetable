@@ -9892,7 +9892,9 @@ Date: 2026-10-05
 Start: 10:00
 End: 12:00
 Location: Classroom
-Topics: topic-the-nature-of-voting, topic-demography-voting-and-numbers
+Topics: topic-the-nature-of-voting
+Status: confirmed
+Url: https://lu.ma/sample-nature-of-voting
 
 Availability:
 | Person label | State |
@@ -9906,7 +9908,7 @@ Availability:
 
 Discussion:
 - Author: admin-edwin
-  Text: Booking this for the voting double-header — Nature of Voting first, then Demography.
+  Text: Confirmed for The Nature of Voting — event page is up on Luma.
 
 ### Slot: slot-tue
 Date: 2026-10-06

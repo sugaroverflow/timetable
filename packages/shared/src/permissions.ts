@@ -6,6 +6,7 @@ import {
   type Privacy,
   type Role,
 } from "./roles";
+import type { ConfirmPolicy, TimetableSettings } from "./settings";
 
 /**
  * The acting user evaluated in the context of a single timetable. `userId` is
@@ -125,6 +126,73 @@ export function canEditTopic(viewer: Viewer, topicHostId: string): boolean {
 
 export function canModerate(viewer: Viewer): boolean {
   return isAdmin(viewer.roles);
+}
+
+// ---------------------------------------------------------------------------
+// Settings-dependent permissions (calendar v2, 2026-07-31). These are the
+// first checks that need the forum's parsed settings alongside the viewer —
+// keep them here rather than scattering settings reads through resolvers.
+// ---------------------------------------------------------------------------
+
+/** The whole Calendar feature sits behind this flag (default off). */
+export function isCalendarEnabled(settings: TimetableSettings): boolean {
+  return Boolean(settings.calendar?.enabled);
+}
+
+export function calendarConfirmPolicy(
+  settings: TimetableSettings,
+): ConfirmPolicy {
+  return settings.calendar?.confirmPolicy ?? "hosts_propose";
+}
+
+/** Admin-only calendar management: the slot grid (pattern × terms,
+ * edit/delete slots) and clearing/overriding any session. */
+export function canManageCalendar(viewer: Viewer): boolean {
+  return isAdmin(viewer.roles);
+}
+
+/** Pencil a topic onto a slot (status → proposed), including creating an
+ * off-piste proposed slot at a new time. */
+export function canProposeSession(
+  viewer: Viewer,
+  policy: ConfirmPolicy,
+): boolean {
+  if (isAdmin(viewer.roles)) return true;
+  return isHost(viewer.roles) && policy !== "admins";
+}
+
+/** Confirm a session (status → confirmed). */
+export function canConfirmSession(
+  viewer: Viewer,
+  policy: ConfirmPolicy,
+): boolean {
+  if (isAdmin(viewer.roles)) return true;
+  return isHost(viewer.roles) && policy === "hosts_confirm";
+}
+
+/** The never-displace invariant: a host may only touch a slot's session
+ * when the slot is empty or already carries THEIR topic — another host's
+ * pencilled/confirmed topic is read-only to them at every policy level.
+ * Admins can act on anything. */
+export function canTouchSlotSession(
+  viewer: Viewer,
+  currentTopicHostId: string | null,
+): boolean {
+  if (isAdmin(viewer.roles)) return true;
+  return currentTopicHostId === null || currentTopicHostId === viewer.userId;
+}
+
+/** Host publishing their own topic without admin review — only when the
+ * forum opted in. Admin publishes go through canModerate as before. */
+export function canPublishTopicDirectly(
+  viewer: Viewer,
+  settings: TimetableSettings,
+  topicHostId: string,
+): boolean {
+  return (
+    Boolean(settings.topics?.hostsPublishDirectly) &&
+    ownsTopicAsHost(viewer, topicHostId)
+  );
 }
 
 export function canManageMembers(viewer: Viewer): boolean {
