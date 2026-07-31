@@ -1444,6 +1444,38 @@ textarea {
 }
 
 /* Calendar v2 — table page */
+/* Compact slot table (QA 2026-07-31 — one row per slot, Analysis-style). */
+.cal-table td {
+  vertical-align: middle;
+}
+.cal-caret-cell {
+  width: 1%;
+  padding-right: 0;
+}
+/* Session pills may be long — let this one cell wrap. */
+.cal-table td.cal-session-cell {
+  white-space: normal;
+}
+.cal-month-row td {
+  background: var(--bg);
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: var(--fw-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+/* The fold under a slot row (matches .elector-hearts-row). */
+.cal-detail-row td {
+  background: var(--bg);
+  white-space: normal;
+}
+/* Emoji-only availability segments for table cells. */
+.avseg-compact button {
+  padding: 3px 7px;
+  font-size: 12px;
+  line-height: 1;
+}
+
 /* Overlapping audience-avatar strip; one strip per 🟢/🟡/🔴 group. */
 .cal-avatars {
   display: inline-flex;
