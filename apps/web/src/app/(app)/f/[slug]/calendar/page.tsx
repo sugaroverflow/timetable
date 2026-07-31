@@ -15,7 +15,7 @@ import {
 
 import { env } from "@/env";
 import { AudienceFilter } from "@/components/AudienceFilter";
-import { CalendarRow } from "@/components/CalendarRow";
+import { CalendarTable } from "@/components/CalendarTable";
 import { CalendarSetup } from "@/components/CalendarSetup";
 import { EmptyState } from "@/components/EmptyState";
 import { LocationFilter } from "@/components/LocationFilter";
@@ -140,29 +140,8 @@ function AudienceCount({ calendar }: { calendar: CalendarSlot[] }) {
   );
 }
 
-function monthLabel(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
-    month: "long",
-    year: "numeric",
-  });
-}
-
 function isPast(slot: CalendarSlot): boolean {
   return new Date(slot.endsAt).getTime() < Date.now();
-}
-
-/** Slots in ascending order, split under month headings. */
-function groupByMonth(
-  slots: CalendarSlot[],
-): { label: string; slots: CalendarSlot[] }[] {
-  const groups: { label: string; slots: CalendarSlot[] }[] = [];
-  for (const slot of slots) {
-    const label = monthLabel(slot.startsAt);
-    const last = groups.at(-1);
-    if (last && last.label === label) last.slots.push(slot);
-    else groups.push({ label, slots: [slot] });
-  }
-  return groups;
 }
 
 function buildPerms(
@@ -257,7 +236,7 @@ function CalendarEmpty({
   );
 }
 
-/** Legend + month-grouped rows (or the empty state). */
+/** Legend + the slot table (or the empty state). */
 function CalendarBody({
   visibleSlots,
   anySlots,
@@ -277,23 +256,12 @@ function CalendarBody({
   return (
     <div className="stack" style={{ gap: "var(--space-2)" }}>
       <Legend />
-      {groupByMonth(visibleSlots).map((group) => (
-        <section key={group.label} className="stack" style={{ gap: 8 }}>
-          <h3 className="section-title">{group.label}</h3>
-          <ul className="list">
-            {group.slots.map((slot) => (
-              <CalendarRow
-                key={slot.id}
-                slot={slot}
-                perms={perms}
-                claimTopics={claimTopics}
-                adminLabel={adminLabel}
-                past={isPast(slot)}
-              />
-            ))}
-          </ul>
-        </section>
-      ))}
+      <CalendarTable
+        rows={visibleSlots.map((slot) => ({ slot, past: isPast(slot) }))}
+        perms={perms}
+        claimTopics={claimTopics}
+        adminLabel={adminLabel}
+      />
     </div>
   );
 }

@@ -1,14 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Collapsible } from "@base-ui/react/collapsible";
-import {
-  ChevronDown,
-  ChevronRight,
-  ExternalLink,
-  MapPin,
-  Send,
-} from "lucide-react";
+import { Fragment, useState } from "react";
+import { ChevronDown, ChevronRight, ExternalLink, Send } from "lucide-react";
 
 import type {
   CalendarPerms,
@@ -48,18 +41,16 @@ type SlotComment = {
   createdAt: string;
 };
 
-function formatWeekday(iso: string): string {
-  return new Date(iso)
-    .toLocaleString(undefined, { weekday: "short" })
-    .toUpperCase();
-}
-function formatDay(iso: string): string {
-  return String(new Date(iso).getDate());
-}
-function formatMonth(iso: string): string {
-  return new Date(iso)
-    .toLocaleString(undefined, { month: "short" })
-    .toUpperCase();
+/** A slot plus its server-computed pastness (kept out of render for the
+ * react purity rule). */
+export type CalendarTableRow = { slot: CalendarSlot; past: boolean };
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
 }
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, {
@@ -67,20 +58,29 @@ function formatTime(iso: string): string {
     minute: "2-digit",
   });
 }
+function monthLabel(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, {
+    month: "long",
+    year: "numeric",
+  });
+}
 
 function pct(n: number, total: number): string {
   return total > 0 ? `${(n / total) * 100}%` : "0%";
 }
 
-function countsLine(counts: { green: number; yellow: number; red: number }) {
-  return (
-    <span className="faint" style={{ fontSize: 12, whiteSpace: "nowrap" }}>
-      {"🟢"} {counts.green} · {"🟡"} {counts.yellow} · {"🔴"} {counts.red}
-    </span>
-  );
+/** Bar length scales with the audience size (px per elector, clamped), so
+ * switching the topic lens visibly shrinks/grows the bar with the group. */
+function barWidth(total: number): number {
+  if (total === 0) return 24;
+  return Math.max(36, Math.min(total * 9, 240));
 }
 
-/** Status + topic as one glanceable pill row ("what's happening here"). */
+function countsTitle(c: { green: number; yellow: number; red: number }) {
+  return `🟢 ${c.green} · 🟡 ${c.yellow} · 🔴 ${c.red}`;
+}
+
+/** Status + topic as one glanceable pill ("what's happening here"). */
 function SessionBadge({ slot }: { slot: CalendarSlot }) {
   if (!slot.topic) {
     return (
@@ -105,8 +105,10 @@ function SessionBadge({ slot }: { slot: CalendarSlot }) {
           rel="noopener noreferrer"
           className="row"
           style={{ gap: 4, fontSize: 13 }}
+          title="Event page"
+          aria-label="Event page"
         >
-          Event page <ExternalLink size={13} aria-hidden />
+          <ExternalLink size={13} aria-hidden />
         </a>
       ) : null}
     </span>
@@ -417,7 +419,7 @@ function CommentRow({ comment }: { comment: SlotComment }) {
 }
 
 /** The discussion thread + claim composer (host/admin only). Comments are
- * fetched by the row when the panel opens and reloaded after a post. */
+ * fetched by the row when it unfolds and reloaded after a post. */
 function DiscussionPanel({
   slot,
   claimTopics,
@@ -518,102 +520,59 @@ function DiscussionPanel({
   );
 }
 
-/** Date block + time/location/session on the left, the viewer's own
- * availability control on the right. */
-function RowHeader({
+/** The fold under a slot row: avatars by state, discussion, controls. */
+function SlotDetail({
   slot,
   perms,
-  past,
+  claimTopics,
+  adminLabel,
+  comments,
+  onReload,
 }: {
   slot: CalendarSlot;
   perms: CalendarPerms;
-  past: boolean;
+  claimTopics: TopicOption[];
+  adminLabel: string;
+  comments: SlotComment[] | null;
+  onReload: () => Promise<void>;
 }) {
   return (
-    <div
-      className="row wrap"
-      style={{ justifyContent: "space-between", alignItems: "flex-start" }}
-    >
-      <div className="row" style={{ gap: 14, alignItems: "flex-start" }}>
-        <div className="slot-date">
-          <div className="d-wd">{formatWeekday(slot.startsAt)}</div>
-          <div className="d-day">{formatDay(slot.startsAt)}</div>
-          <div className="d-mo">{formatMonth(slot.startsAt)}</div>
-        </div>
-        <div className="stack" style={{ gap: 4 }}>
-          <div className="slot-when">
-            {formatTime(slot.startsAt)}–{formatTime(slot.endsAt)}
-          </div>
-          {slot.location ? (
-            <div className="faint" style={{ fontSize: 13 }}>
-              <MapPin size={14} aria-hidden /> {slot.location}
-            </div>
-          ) : null}
-          <SessionBadge slot={slot} />
-        </div>
-      </div>
-      {perms.canSetAvailability && !past ? (
-        <span
-          className="stack"
-          style={{ gap: "var(--space-1)", alignItems: "flex-end" }}
-        >
-          <span className="faint" style={{ fontSize: 11, fontWeight: 600 }}>
-            Your availability
-          </span>
-          <AvailabilityControl slotId={slot.id} state={slot.viewerState} />
-        </span>
+    <div className="stack" style={{ gap: 10 }}>
+      {slot.perUser && slot.perUser.length > 0 ? (
+        <AvatarGroups perUser={slot.perUser} />
+      ) : null}
+      <DiscussionPanel
+        slot={slot}
+        claimTopics={claimTopics}
+        comments={comments}
+        onReload={onReload}
+      />
+      <SessionControls slot={slot} perms={perms} claimTopics={claimTopics} />
+      {perms.canAdmin ? (
+        <AdminSlotControls slot={slot} label={adminLabel} />
       ) : null}
     </div>
   );
 }
 
-/** Aggregate bar + counts, plus per-elector avatars for hosts/admins. */
-function RowAvailability({
+function SlotTableRow({
   slot,
-  perms,
-}: {
-  slot: CalendarSlot;
-  perms: CalendarPerms;
-}) {
-  const total = slot.counts.green + slot.counts.yellow + slot.counts.red;
-  return (
-    <>
-      <div className="row wrap" style={{ gap: "var(--space-2)" }}>
-        <span className="avail-bar" style={{ width: 160 }}>
-          <span
-            className="g"
-            style={{ width: pct(slot.counts.green, total) }}
-          />
-          <span
-            className="y"
-            style={{ width: pct(slot.counts.yellow, total) }}
-          />
-          <span className="r" style={{ width: pct(slot.counts.red, total) }} />
-        </span>
-        {countsLine(slot.counts)}
-      </div>
-      {perms.canSeeHostOnly && slot.perUser && slot.perUser.length > 0 ? (
-        <AvatarGroups perUser={slot.perUser} />
-      ) : null}
-    </>
-  );
-}
-
-export function CalendarRow({
-  slot,
+  past,
   perms,
   claimTopics,
-  adminLabel = "Admin",
-  past = false,
+  adminLabel,
+  columns,
 }: {
   slot: CalendarSlot;
+  past: boolean;
   perms: CalendarPerms;
   claimTopics: TopicOption[];
-  adminLabel?: string;
-  past?: boolean;
+  adminLabel: string;
+  columns: number;
 }) {
   const [open, setOpen] = useState(false);
   const [comments, setComments] = useState<SlotComment[] | null>(null);
+  const total = slot.counts.green + slot.counts.yellow + slot.counts.red;
   const canExpand = perms.canSeeHostOnly || perms.canAdmin;
 
   async function loadComments() {
@@ -628,53 +587,152 @@ export function CalendarRow({
     }
   }
 
-  async function handleOpenChange(next: boolean) {
+  async function toggle() {
+    const next = !open;
     setOpen(next);
     if (next && comments === null) await loadComments();
   }
 
   return (
-    <li className={`card stack${past ? " cal-past" : ""}`}>
-      <RowHeader slot={slot} perms={perms} past={past} />
-      <RowAvailability slot={slot} perms={perms} />
-
-      {canExpand ? (
-        <Collapsible.Root
-          open={open}
-          onOpenChange={(next) => void handleOpenChange(next)}
-        >
-          <Collapsible.Trigger className="slot-expand">
-            {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}{" "}
-            {expandLabel(open, slot.commentCount)}
-          </Collapsible.Trigger>
-          <Collapsible.Panel>
-            {open ? (
-              <div className="stack" style={{ gap: 10 }}>
-                <DiscussionPanel
-                  slot={slot}
-                  claimTopics={claimTopics}
-                  comments={comments}
-                  onReload={loadComments}
-                />
-                <SessionControls
-                  slot={slot}
-                  perms={perms}
-                  claimTopics={claimTopics}
-                />
-                {perms.canAdmin ? (
-                  <AdminSlotControls slot={slot} label={adminLabel} />
-                ) : null}
-              </div>
-            ) : null}
-          </Collapsible.Panel>
-        </Collapsible.Root>
+    <Fragment>
+      <tr className={past ? "cal-past" : undefined}>
+        <td className="cal-caret-cell">
+          {canExpand ? (
+            <span className="row" style={{ gap: 2, alignItems: "center" }}>
+              <button
+                type="button"
+                className="breakdown-caret"
+                aria-expanded={open}
+                aria-label={open ? "Hide details" : "Show details"}
+                title={open ? "Hide details" : "Show details"}
+                onClick={() => void toggle()}
+              >
+                {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+              </button>
+              {slot.commentCount > 0 ? (
+                <span className="faint" style={{ fontSize: 11 }}>
+                  💬{slot.commentCount}
+                </span>
+              ) : null}
+            </span>
+          ) : null}
+        </td>
+        <td>
+          <strong>{formatDate(slot.startsAt)}</strong>{" "}
+          <span>
+            {formatTime(slot.startsAt)}–{formatTime(slot.endsAt)}
+          </span>
+          {slot.location ? (
+            <div className="faint" style={{ fontSize: 12 }}>
+              {slot.location}
+            </div>
+          ) : null}
+        </td>
+        <td title={countsTitle(slot.counts)}>
+          <span className="avail-bar" style={{ width: barWidth(total) }}>
+            <span
+              className="g"
+              style={{ width: pct(slot.counts.green, total) }}
+            />
+            <span
+              className="y"
+              style={{ width: pct(slot.counts.yellow, total) }}
+            />
+            <span
+              className="r"
+              style={{ width: pct(slot.counts.red, total) }}
+            />
+          </span>
+        </td>
+        {perms.canSetAvailability ? (
+          <td>
+            {past ? null : (
+              <AvailabilityControl
+                slotId={slot.id}
+                state={slot.viewerState}
+                compact
+              />
+            )}
+          </td>
+        ) : null}
+        <td className="cal-session-cell">
+          <SessionBadge slot={slot} />
+        </td>
+      </tr>
+      {open ? (
+        <tr className="cal-detail-row">
+          <td colSpan={columns}>
+            <SlotDetail
+              slot={slot}
+              perms={perms}
+              claimTopics={claimTopics}
+              adminLabel={adminLabel}
+              comments={comments}
+              onReload={loadComments}
+            />
+          </td>
+        </tr>
       ) : null}
-    </li>
+    </Fragment>
   );
 }
 
-function expandLabel(open: boolean, commentCount: number): string {
-  const label = open ? "Hide discussion" : "Discussion & host chat";
-  if (commentCount === 0) return label;
-  return `${label} · ${commentCount} message${commentCount === 1 ? "" : "s"}`;
+/**
+ * The calendar as a compact table (QA 2026-07-31 — replaced one card per
+ * slot): caret column folds open into avatars/discussion/controls, the
+ * availability bar's LENGTH tracks the audience size so lens switches are
+ * visible, and month headings ride as divider rows.
+ */
+export function CalendarTable({
+  rows,
+  perms,
+  claimTopics,
+  adminLabel = "Admin",
+}: {
+  rows: CalendarTableRow[];
+  perms: CalendarPerms;
+  claimTopics: TopicOption[];
+  adminLabel?: string;
+}) {
+  const columns = perms.canSetAvailability ? 5 : 4;
+
+  return (
+    <div className="table-wrap">
+      <table className="data-table cal-table">
+        <thead>
+          <tr>
+            <th aria-label="Details" />
+            <th>When</th>
+            <th>Availability</th>
+            {perms.canSetAvailability ? <th>You</th> : null}
+            <th>Session</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(({ slot, past }, i) => {
+            const month = monthLabel(slot.startsAt);
+            const divider =
+              i === 0 || month !== monthLabel(rows[i - 1]!.slot.startsAt);
+            return (
+              <Fragment key={slot.id}>
+                {divider ? (
+                  <tr className="cal-month-row">
+                    <td colSpan={columns}>{month}</td>
+                  </tr>
+                ) : null}
+                <SlotTableRow
+                  slot={slot}
+                  past={past}
+                  perms={perms}
+                  claimTopics={claimTopics}
+                  adminLabel={adminLabel}
+                  columns={columns}
+                />
+              </Fragment>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
 }
