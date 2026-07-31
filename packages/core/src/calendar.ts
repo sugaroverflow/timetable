@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
 
 import {
   availability,
@@ -150,7 +150,10 @@ export async function listSlots(
     .where(
       and(
         eq(timeslots.timetableId, timetableId),
-        opts.includePast ? undefined : sql`${timeslots.endsAt} >= ${now}`,
+        // gte, not a raw sql template: template params bypass the column's
+        // Date mapping and threw at runtime on hosted Postgres (dev QA
+        // 2026-07-31).
+        opts.includePast ? undefined : gte(timeslots.endsAt, now),
       ),
     )
     .orderBy(asc(timeslots.startsAt));
@@ -675,8 +678,8 @@ export async function listUpcomingSessions(
         inArray(timeslots.timetableId, timetableIds),
         eq(timeslots.status, status),
         isNotNull(timeslots.topicId),
-        sql`${timeslots.startsAt} >= ${horizon.from}`,
-        sql`${timeslots.startsAt} <= ${horizon.to}`,
+        gte(timeslots.startsAt, horizon.from),
+        lte(timeslots.startsAt, horizon.to),
       ),
     )
     .orderBy(asc(timeslots.startsAt));
