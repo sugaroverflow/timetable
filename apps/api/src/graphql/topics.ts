@@ -35,6 +35,7 @@ import {
   canUseQueue,
   canModerate,
   canProposeTopics,
+  canPublishTopicDirectly,
   canSeeComments,
   canSeeHostOnly,
   isAdmin,
@@ -646,10 +647,20 @@ builder.mutationFields((t) => ({
     resolve: async (_p, args, ctx) => {
       const user = await requireUser(ctx);
       const { topic, viewer } = await loadTopicAndViewer(ctx, args.topicId);
-      if (!canModerate(viewer)) forbidden("Admins only");
       const action = args.action;
       if (action !== "publish" && action !== "reject") {
         throw new GraphQLError("Invalid review action");
+      }
+      if (!canModerate(viewer)) {
+        // Hosts may publish (never reject) their own topic directly when
+        // the forum opted in — admin review becomes after-the-fact
+        // oversight; the publish is still activity-logged.
+        const timetable = await getTimetableById(topic.timetableId);
+        const direct =
+          action === "publish" &&
+          timetable &&
+          canPublishTopicDirectly(viewer, timetable.settings, topic.hostId);
+        if (!direct) forbidden("Admins only");
       }
       const updated = await moderateTopic(
         topic,

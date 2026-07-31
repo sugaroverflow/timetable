@@ -3,24 +3,43 @@ import { GraphQLError } from "graphql";
 import {
   addSlotComment,
   buildCalendar,
+  computeSlotCounts,
   createSlots,
   deleteSlot,
   getAudienceElectorIds,
-  getUserById,
+  getAvailabilityPattern,
+  getTopicById,
   listSlotComments,
+  proposeSlot,
   setAvailability,
-  setWeekdayAvailability,
-  tagSlotTopic,
-  untagSlotTopic,
+  setAvailabilityPattern,
+  setSlotSession,
   updateSlot,
   type CalendarSlot,
+  type PatternCells,
+  type SlotInput,
 } from "@timetable/core";
-import type { AvailabilityState } from "@timetable/db";
-import { canSeeHostOnly, isAdmin, isElector } from "@timetable/shared";
+import type {
+  AvailabilityState,
+  SlotStatus,
+  TimetableSettings,
+} from "@timetable/db";
+import {
+  calendarConfirmPolicy,
+  canConfirmSession,
+  canManageCalendar,
+  canProposeSession,
+  canSeeHostOnly,
+  canTouchSlotSession,
+  isCalendarEnabled,
+  isElector,
+  type Viewer,
+} from "@timetable/shared";
 
 import { assertActionLimit } from "../http/action-limits";
 import { builder } from "./builder";
 import {
+  badRequest,
   forbidden,
   loadSlotAndViewer,
   loadTimetableAndViewer,
@@ -29,7 +48,118 @@ import {
   readTimetable,
   requireUser,
 } from "./guards";
-import { SlotTagType, TimetableType } from "./types";
+import { TimetableType } from "./types";
+
+// ---------------------------------------------------------------------------
+// Gating + argument parsing
+// ---------------------------------------------------------------------------
+
+/** Every calendar read/write sits behind the forum-level flag. */
+function requireCalendarEnabled(settings: TimetableSettings): void {
+  if (!isCalendarEnabled(settings)) {
+    forbidden("The calendar is not enabled for this forum");
+  }
+}
+
+const AVAILABILITY_STATES = new Set(["green", "yellow", "red"]);
+
+function parseState(raw: string): AvailabilityState {
+  if (!AVAILABILITY_STATES.has(raw)) {
+    throw new GraphQLError("Invalid availability state");
+  }
+  return raw as AvailabilityState;
+}
+
+/** "{weekday}-{HH:MM}" — weekday 0-6, 24h time. */
+const CELL_KEY = /^[0-6]-([01]\d|2[0-3]):[0-5]\d$/;
+
+/** Validate an elector's pattern grid: sane keys, known states, capped. */
+function parsePatternCells(raw: string): PatternCells {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    badRequest("Invalid pattern JSON");
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    badRequest("Pattern must be an object of cell → state");
+  }
+  const entries = Object.entries(parsed as Record<string, unknown>);
+  if (entries.length > 200) badRequest("Too many pattern cells");
+  const cells: PatternCells = {};
+  for (const [key, value] of entries) {
+    if (!CELL_KEY.test(key)) badRequest(`Invalid pattern cell key "${key}"`);
+    if (typeof value !== "string" || !AVAILABILITY_STATES.has(value)) {
+      badRequest(`Invalid state for pattern cell "${key}"`);
+    }
+    cells[key] = value as AvailabilityState;
+  }
+  return cells;
+}
+
+type SlotInputJson = {
+  startsAt?: unknown;
+  endsAt?: unknown;
+  location?: unknown;
+  cellKey?: unknown;
+};
+
+/** Validate the admin bulk-create payload (pattern × terms generation and
+ * single hand-added slots both arrive here as JSON). */
+function parseSlotInputs(raw: string): SlotInput[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    badRequest("Invalid slots JSON");
+  }
+  if (!Array.isArray(parsed)) badRequest("Slots must be an array");
+  if (parsed.length === 0) badRequest("No slots to create");
+  if (parsed.length > 500) badRequest("Too many slots in one request");
+  return parsed.map((item: SlotInputJson, i) => {
+    const startsAt = new Date(String(item.startsAt ?? ""));
+    const endsAt = new Date(String(item.endsAt ?? ""));
+    if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) {
+      badRequest(`Slot ${i}: startsAt/endsAt must be ISO date-times`);
+    }
+    if (endsAt.getTime() <= startsAt.getTime()) {
+      badRequest(`Slot ${i}: endsAt must be after startsAt`);
+    }
+    const cellKey =
+      typeof item.cellKey === "string" && CELL_KEY.test(item.cellKey)
+        ? item.cellKey
+        : null;
+    return {
+      startsAt,
+      endsAt,
+      location: typeof item.location === "string" ? item.location : "",
+      cellKey,
+    };
+  });
+}
+
+function parseSessionStatus(raw: string | null | undefined): SlotStatus {
+  if (raw == null || raw === "proposed") return "proposed";
+  if (raw === "confirmed") return "confirmed";
+  throw new GraphQLError("Invalid session status");
+}
+
+/** A session URL must be absolute http(s), and short enough to be sane. */
+function parseSessionUrl(raw: string | null | undefined): string {
+  const trimmed = (raw ?? "").trim();
+  if (!trimmed) return "";
+  if (trimmed.length > 2000) badRequest("URL too long");
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    badRequest("Session URL must be a valid absolute URL");
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    badRequest("Session URL must be http(s)");
+  }
+  return trimmed;
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -55,13 +185,25 @@ const SlotAvailabilityType = builder
   .objectRef<{
     userId: string;
     name: string | null;
+    image: string | null;
     state: string;
   }>("SlotAvailability")
   .implement({
     fields: (t) => ({
       userId: t.exposeID("userId"),
       name: t.exposeString("name", { nullable: true }),
+      image: t.exposeString("image", { nullable: true }),
       state: t.exposeString("state"),
+    }),
+  });
+
+const SlotTopicType = builder
+  .objectRef<{ id: string; title: string; hostId: string }>("SlotTopic")
+  .implement({
+    fields: (t) => ({
+      id: t.exposeID("id"),
+      title: t.exposeString("title"),
+      hostId: t.exposeID("hostId"),
     }),
   });
 
@@ -71,9 +213,16 @@ const TimeslotType = builder.objectRef<GqlSlot>("Timeslot").implement({
     startsAt: t.string({ resolve: (s) => s.startsAt.toISOString() }),
     endsAt: t.string({ resolve: (s) => s.endsAt.toISOString() }),
     location: t.exposeString("location"),
+    status: t.exposeString("status"),
+    url: t.exposeString("url"),
+    cellKey: t.exposeString("cellKey", { nullable: true }),
     commentCount: t.exposeInt("commentCount"),
     viewerState: t.exposeString("viewerState", { nullable: true }),
-    topics: t.field({ type: [SlotTagType], resolve: (s) => s.topics }),
+    topic: t.field({
+      type: SlotTopicType,
+      nullable: true,
+      resolve: (s) => s.topic,
+    }),
     counts: t.field({ type: AvailabilityCountsType, resolve: (s) => s.counts }),
     // Per-elector availability is host/admin-only.
     perUser: t.field({
@@ -91,6 +240,9 @@ const SlotCommentType = builder
     authorName: string | null;
     authorImage: string | null;
     body: string;
+    topicId: string | null;
+    topicTitle: string | null;
+    counts: { green: number; yellow: number; red: number } | null;
     createdAt: Date;
   }>("SlotComment")
   .implement({
@@ -100,6 +252,13 @@ const SlotCommentType = builder
       authorName: t.exposeString("authorName", { nullable: true }),
       authorImage: t.exposeString("authorImage", { nullable: true }),
       body: t.exposeString("body"),
+      topicId: t.exposeID("topicId", { nullable: true }),
+      topicTitle: t.exposeString("topicTitle", { nullable: true }),
+      counts: t.field({
+        type: AvailabilityCountsType,
+        nullable: true,
+        resolve: (c) => c.counts,
+      }),
       createdAt: t.string({ resolve: (c) => c.createdAt.toISOString() }),
     }),
   });
@@ -109,16 +268,19 @@ const SlotCommentType = builder
 // ---------------------------------------------------------------------------
 
 builder.queryFields((t) => ({
-  /** The availability calendar for a timetable (role-aware). */
+  /** The availability calendar for a timetable (role-aware). Empty when the
+   * forum hasn't enabled the calendar. */
   calendar: t.field({
     type: [TimeslotType],
     args: {
       idOrSlug: t.arg.string({ required: true }),
       audience: t.arg.string({ required: false }),
+      includePast: t.arg.boolean({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
       const readable = await readTimetable(ctx, args.idOrSlug);
       if (!readable) return [];
+      if (!isCalendarEnabled(readable.timetable.settings)) return [];
       const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
       const hostOnly = canSeeHostOnly(viewer);
       const audience = parseAudience(args.audience, ctx.user?.id ?? null);
@@ -130,6 +292,7 @@ builder.queryFields((t) => ({
         readable.timetable.id,
         audienceIds,
         ctx.user?.id ?? null,
+        { includePast: args.includePast ?? false },
       );
       return slots.map((s) => ({ ...s, canSeeHostOnly: hostOnly }));
     },
@@ -140,71 +303,106 @@ builder.queryFields((t) => ({
     type: [SlotCommentType],
     args: { slotId: t.arg.string({ required: true }) },
     resolve: async (_p, args, ctx) => {
-      const { viewer } = await loadSlotAndViewer(ctx, args.slotId);
+      const { viewer, timetable } = await loadSlotAndViewer(ctx, args.slotId);
+      if (!isCalendarEnabled(timetable.settings)) return [];
       if (!canSeeHostOnly(viewer)) return [];
       return listSlotComments(args.slotId);
+    },
+  }),
+
+  /** The viewer's weekly availability template, as a JSON cell → state map. */
+  myAvailabilityPattern: t.string({
+    nullable: true,
+    args: { idOrSlug: t.arg.string({ required: true }) },
+    resolve: async (_p, args, ctx) => {
+      if (!ctx.user) return null;
+      const readable = await readTimetable(ctx, args.idOrSlug);
+      if (!readable) return null;
+      if (!isCalendarEnabled(readable.timetable.settings)) return null;
+      const cells = await getAvailabilityPattern(
+        readable.timetable.id,
+        ctx.user.id,
+      );
+      return JSON.stringify(cells);
     },
   }),
 }));
 
 // ---------------------------------------------------------------------------
-// Mutations
+// Slot grid mutations (admin) + host off-piste proposals
 // ---------------------------------------------------------------------------
 
 builder.mutationFields((t) => ({
-  /** Admin: create a single timeslot. */
-  createTimeslot: t.field({
-    type: TimetableType,
+  /** Admin: bulk-create slots (pattern × terms generation, or one slot).
+   * Exact duplicates are skipped, so regeneration is idempotent. */
+  createTimeslots: t.field({
+    type: "Int",
     args: {
       idOrSlug: t.arg.string({ required: true }),
-      startsAt: t.arg.string({ required: true }),
-      endsAt: t.arg.string({ required: true }),
-      location: t.arg.string({ required: false }),
+      slotsJson: t.arg.string({ required: true }),
     },
     resolve: async (_p, args, ctx) => {
-      const { readable } = await loadTimetableAndViewer(ctx, args.idOrSlug);
-      if (!isAdmin(readable.roles)) forbidden("Admins only");
-      await createSlots(readable.timetable.id, [
-        {
-          startsAt: new Date(args.startsAt),
-          endsAt: new Date(args.endsAt),
-          location: args.location ?? "",
-        },
-      ]);
-      return { ...readable.timetable, viewerRoles: readable.roles as string[] };
+      const { readable, viewer } = await loadTimetableAndViewer(
+        ctx,
+        args.idOrSlug,
+      );
+      requireCalendarEnabled(readable.timetable.settings);
+      if (!canManageCalendar(viewer)) forbidden("Admins only");
+      const inputs = parseSlotInputs(args.slotsJson);
+      const created = await createSlots(readable.timetable.id, inputs);
+      return created.length;
     },
   }),
 
-  /** Admin: create N weekly-repeating timeslots from a starting slot. */
-  createWeeklyTimeslots: t.field({
+  /** Host (policy-gated) or admin: propose an off-piste slot for a topic —
+   * born `proposed`, collecting availability from day one. */
+  proposeSlot: t.field({
     type: TimetableType,
     args: {
       idOrSlug: t.arg.string({ required: true }),
       startsAt: t.arg.string({ required: true }),
       endsAt: t.arg.string({ required: true }),
       location: t.arg.string({ required: false }),
-      count: t.arg.int({ required: true }),
+      topicId: t.arg.string({ required: true }),
     },
     resolve: async (_p, args, ctx) => {
-      const { readable } = await loadTimetableAndViewer(ctx, args.idOrSlug);
-      if (!isAdmin(readable.roles)) forbidden("Admins only");
-      const start = new Date(args.startsAt);
-      const end = new Date(args.endsAt);
-      const week = 7 * 24 * 60 * 60 * 1000;
-      const n = Math.max(1, Math.min(args.count, 52));
-      const inputs = Array.from({ length: n }, (_v, i) => ({
-        startsAt: new Date(start.getTime() + i * week),
-        endsAt: new Date(end.getTime() + i * week),
+      const { user, readable, viewer } = await loadTimetableAndViewer(
+        ctx,
+        args.idOrSlug,
+      );
+      requireCalendarEnabled(readable.timetable.settings);
+      const policy = calendarConfirmPolicy(readable.timetable.settings);
+      if (!canProposeSession(viewer, policy)) {
+        forbidden("Slot proposals are admin-only in this forum");
+      }
+      await assertOwnTopicInTimetable(
+        viewer,
+        args.topicId,
+        readable.timetable.id,
+      );
+      const [startsAt, endsAt] = [
+        new Date(args.startsAt),
+        new Date(args.endsAt),
+      ];
+      if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) {
+        badRequest("startsAt/endsAt must be ISO date-times");
+      }
+      if (endsAt.getTime() <= startsAt.getTime()) {
+        badRequest("endsAt must be after startsAt");
+      }
+      await proposeSlot(readable.timetable.id, user.id, {
+        startsAt,
+        endsAt,
         location: args.location ?? "",
-      }));
-      await createSlots(readable.timetable.id, inputs);
+        topicId: args.topicId,
+      });
       return { ...readable.timetable, viewerRoles: readable.roles as string[] };
     },
   }),
 
-  /** Admin: update a timeslot. */
+  /** Admin: update a timeslot's time/location. */
   updateTimeslot: t.field({
-    type: TimetableType,
+    type: "Boolean",
     args: {
       slotId: t.arg.string({ required: true }),
       startsAt: t.arg.string({ required: false }),
@@ -212,16 +410,19 @@ builder.mutationFields((t) => ({
       location: t.arg.string({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
-      const { slot, viewer } = await loadSlotAndViewer(ctx, args.slotId);
-      if (!isAdmin(viewer.roles)) forbidden("Admins only");
+      await requireUser(ctx);
+      const { slot, viewer, timetable } = await loadSlotAndViewer(
+        ctx,
+        args.slotId,
+      );
+      requireCalendarEnabled(timetable.settings);
+      if (!canManageCalendar(viewer)) forbidden("Admins only");
       await updateSlot(slot.id, {
         startsAt: args.startsAt ? new Date(args.startsAt) : undefined,
         endsAt: args.endsAt ? new Date(args.endsAt) : undefined,
         location: args.location ?? undefined,
       });
-      const readable = await readTimetable(ctx, slot.timetableId);
-      if (!readable) notFound("Forum not found");
-      return { ...readable.timetable, viewerRoles: readable.roles as string[] };
+      return true;
     },
   }),
 
@@ -230,16 +431,105 @@ builder.mutationFields((t) => ({
     type: "Boolean",
     args: { slotId: t.arg.string({ required: true }) },
     resolve: async (_p, args, ctx) => {
-      const { slot, viewer } = await loadSlotAndViewer(ctx, args.slotId);
-      if (!isAdmin(viewer.roles)) forbidden("Admins only");
+      await requireUser(ctx);
+      const { slot, viewer, timetable } = await loadSlotAndViewer(
+        ctx,
+        args.slotId,
+      );
+      requireCalendarEnabled(timetable.settings);
+      if (!canManageCalendar(viewer)) forbidden("Admins only");
       await deleteSlot(slot.id);
       return true;
     },
   }),
 }));
 
+// ---------------------------------------------------------------------------
+// Session lifecycle
+// ---------------------------------------------------------------------------
+
+/** Hosts act only on their own topics; admins on any topic in the forum.
+ * Every path also pins the topic to the slot's timetable so a foreign
+ * topic id can't be attached. */
+async function assertOwnTopicInTimetable(
+  viewer: Viewer,
+  topicId: string,
+  timetableId: string,
+) {
+  const topic = await getTopicById(topicId);
+  if (!topic || topic.timetableId !== timetableId) {
+    notFound("Topic not found in this forum");
+  }
+  if (!canManageCalendar(viewer) && topic.hostId !== viewer.userId) {
+    forbidden("You can only pencil in your own topics");
+  }
+  return topic;
+}
+
 builder.mutationFields((t) => ({
-  /** Elector: set availability for one slot. */
+  /** Set (or clear, with topicId: null) a slot's session — topic, status,
+   * URL. Who may do what depends on the forum's confirm policy; a host can
+   * never displace another host's session. */
+  setSlotSession: t.field({
+    type: "Boolean",
+    args: {
+      slotId: t.arg.string({ required: true }),
+      topicId: t.arg.string({ required: false }),
+      status: t.arg.string({ required: false }),
+      url: t.arg.string({ required: false }),
+    },
+    resolve: async (_p, args, ctx) => {
+      await requireUser(ctx);
+      const { slot, viewer, timetable } = await loadSlotAndViewer(
+        ctx,
+        args.slotId,
+      );
+      requireCalendarEnabled(timetable.settings);
+      const policy = calendarConfirmPolicy(timetable.settings);
+
+      const currentTopic = slot.topicId
+        ? await getTopicById(slot.topicId)
+        : null;
+      if (!canTouchSlotSession(viewer, currentTopic?.hostId ?? null)) {
+        forbidden("Another host's session is pencilled into this slot");
+      }
+
+      if (args.topicId == null) {
+        // Clearing back to empty ("un-pencil"): admins, or the host whose
+        // own session it is (canTouchSlotSession above already pinned that).
+        if (!canProposeSession(viewer, policy)) forbidden();
+        await setSlotSession(slot.id, { topicId: null });
+        return true;
+      }
+
+      const status = parseSessionStatus(args.status);
+      const gate =
+        status === "confirmed" ? canConfirmSession : canProposeSession;
+      if (!gate(viewer, policy)) {
+        forbidden(
+          status === "confirmed"
+            ? "Confirming sessions is admin-only in this forum"
+            : "Pencilling sessions is admin-only in this forum",
+        );
+      }
+      await assertOwnTopicInTimetable(viewer, args.topicId, timetable.id);
+      await setSlotSession(slot.id, {
+        topicId: args.topicId,
+        status,
+        url: parseSessionUrl(args.url),
+      });
+      return true;
+    },
+  }),
+}));
+
+// ---------------------------------------------------------------------------
+// Availability + discussion
+// ---------------------------------------------------------------------------
+
+builder.mutationFields((t) => ({
+  /** Elector: set availability for one slot (an explicit answer — it beats
+   * the pattern layer for that slot). */
   setAvailability: t.field({
     type: "Boolean",
     args: {
@@ -248,98 +538,80 @@ builder.mutationFields((t) => ({
     },
     resolve: async (_p, args, ctx) => {
       const user = await requireUser(ctx);
-      const { slot, viewer } = await loadSlotAndViewer(ctx, args.slotId);
+      const { slot, viewer, timetable } = await loadSlotAndViewer(
+        ctx,
+        args.slotId,
+      );
+      requireCalendarEnabled(timetable.settings);
       if (!isElector(viewer.roles)) forbidden("Electors only");
-      const state = args.state as AvailabilityState;
-      if (state !== "green" && state !== "yellow" && state !== "red") {
-        throw new GraphQLError("Invalid availability state");
-      }
-      await setAvailability(slot.id, user.id, state);
+      await setAvailability(slot.id, user.id, parseState(args.state));
       return true;
     },
   }),
 
-  /** Elector: set availability for every slot on a weekday (0=Sun..6=Sat). */
-  setWeekdayAvailability: t.field({
-    type: "Int",
+  /** Elector: replace their weekly availability template. */
+  setMyAvailabilityPattern: t.field({
+    type: "Boolean",
     args: {
       idOrSlug: t.arg.string({ required: true }),
-      weekday: t.arg.int({ required: true }),
-      state: t.arg.string({ required: true }),
+      cellsJson: t.arg.string({ required: true }),
     },
     resolve: async (_p, args, ctx) => {
       const { user, readable } = await loadTimetableAndViewer(
         ctx,
         args.idOrSlug,
       );
+      requireCalendarEnabled(readable.timetable.settings);
       if (!isElector(readable.roles)) forbidden("Electors only");
-      const state = args.state as AvailabilityState;
-      if (state !== "green" && state !== "yellow" && state !== "red") {
-        throw new GraphQLError("Invalid availability state");
-      }
-      return setWeekdayAvailability(
-        readable.timetable.id,
-        user.id,
-        args.weekday,
-        state,
-      );
+      const cells = parsePatternCells(args.cellsJson);
+      await setAvailabilityPattern(readable.timetable.id, user.id, cells);
+      return true;
     },
   }),
 
-  /** Host/admin: post to a slot discussion. */
+  /** Host/admin: post to a slot discussion — optionally as a session claim
+   * carrying a topic and the availability snapshot the server computes for
+   * that topic's hearters at this moment. */
   addSlotComment: t.field({
     type: SlotCommentType,
     args: {
       slotId: t.arg.string({ required: true }),
       body: t.arg.string({ required: true }),
+      topicId: t.arg.string({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
       const user = await requireUser(ctx);
-      const { slot, viewer } = await loadSlotAndViewer(ctx, args.slotId);
+      const { slot, viewer, timetable } = await loadSlotAndViewer(
+        ctx,
+        args.slotId,
+      );
+      requireCalendarEnabled(timetable.settings);
       if (!canSeeHostOnly(viewer)) forbidden("Hosts/admins only");
       const body = args.body.trim();
       if (!body) throw new GraphQLError("Comment cannot be empty");
       await assertActionLimit(user.id, "comment");
-      const comment = await addSlotComment(slot.id, user.id, body);
-      const author = await getUserById(user.id);
-      return {
-        id: comment.id,
-        authorId: comment.authorId,
-        authorName: author?.name ?? null,
-        authorImage: author?.image ?? null,
-        body: comment.body,
-        createdAt: comment.createdAt,
-      };
-    },
-  }),
 
-  /** Admin: tag a slot with a topic. */
-  tagSlotTopic: t.field({
-    type: "Boolean",
-    args: {
-      slotId: t.arg.string({ required: true }),
-      topicId: t.arg.string({ required: true }),
-    },
-    resolve: async (_p, args, ctx) => {
-      const { slot, viewer } = await loadSlotAndViewer(ctx, args.slotId);
-      if (!isAdmin(viewer.roles)) forbidden("Admins only");
-      await tagSlotTopic(slot.id, args.topicId);
-      return true;
-    },
-  }),
+      let claim: Parameters<typeof addSlotComment>[3];
+      if (args.topicId) {
+        const topic = await getTopicById(args.topicId);
+        if (!topic || topic.timetableId !== timetable.id) {
+          notFound("Topic not found in this forum");
+        }
+        const hearters = await getAudienceElectorIds(timetable.id, {
+          kind: "hearted_topic",
+          topicId: topic.id,
+        });
+        claim = {
+          topicId: topic.id,
+          counts: await computeSlotCounts(slot, hearters),
+        };
+      }
 
-  /** Admin: remove a topic tag from a slot. */
-  untagSlotTopic: t.field({
-    type: "Boolean",
-    args: {
-      slotId: t.arg.string({ required: true }),
-      topicId: t.arg.string({ required: true }),
-    },
-    resolve: async (_p, args, ctx) => {
-      const { slot, viewer } = await loadSlotAndViewer(ctx, args.slotId);
-      if (!isAdmin(viewer.roles)) forbidden("Admins only");
-      await untagSlotTopic(slot.id, args.topicId);
-      return true;
+      const comment = await addSlotComment(slot.id, user.id, body, claim);
+      const thread = await listSlotComments(slot.id);
+      const view = thread.find((c) => c.id === comment.id);
+      if (!view) notFound("Comment not found");
+      return view;
     },
   }),
 }));

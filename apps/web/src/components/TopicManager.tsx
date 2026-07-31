@@ -17,6 +17,7 @@ import { useGqlAction } from "@/lib/useGqlAction";
 const SUBMIT = `mutation($id: String!){ submitTopic(topicId: $id){ id } }`;
 const UNPUBLISH = `mutation($id: String!){ unpublishTopic(topicId: $id){ id } }`;
 const DELETE = `mutation($id: String!){ deleteTopic(topicId: $id) }`;
+const PUBLISH = `mutation($id: String!){ moderateTopic(topicId: $id, action: "publish"){ id } }`;
 
 /** Two-step red Delete for a host's own not-yet-published topic (launch QA
  * 2026-07-29) — same confirm pattern as PersonAdminPanel's remove. */
@@ -77,12 +78,14 @@ function ManageControls({
   adminLabel,
   isAdmin,
   hosts,
+  canPublishDirectly,
 }: {
   topic: ManagedTopic;
   slug: string;
   adminLabel: string;
   isAdmin: boolean;
   hosts: { id: string; name: string | null }[];
+  canPublishDirectly: boolean;
 }) {
   const { run: runAction, busy } = useGqlAction();
   // Editing lives on the surrounding TopicEditScope: the form replaces the
@@ -120,31 +123,12 @@ function ManageControls({
 
   return (
     <div className="row wrap divider-top" style={{ paddingTop: 10 }}>
-      {topic.status === "unpublished" && (
-        <button
-          className="btn btn-primary"
-          type="button"
-          disabled={busy}
-          onClick={() => run(SUBMIT, { id: topic.id }, "Submitted for review")}
-        >
-          Submit for review
-        </button>
-      )}
-      {topic.status === "published" && (
-        <button
-          className="btn"
-          type="button"
-          disabled={busy}
-          onClick={() => run(UNPUBLISH, { id: topic.id }, "Topic unpublished")}
-        >
-          Unpublish
-        </button>
-      )}
-      {topic.status === "submitted" && (
-        <span className="faint" style={{ fontSize: 13 }}>
-          Pending review…
-        </span>
-      )}
+      <StatusAction
+        topic={topic}
+        busy={busy}
+        run={run}
+        canPublishDirectly={canPublishDirectly}
+      />
       <button
         className="btn btn-ghost"
         type="button"
@@ -163,6 +147,74 @@ function ManageControls({
   );
 }
 
+/** The one status-changing action a host sees: Publish (when the forum lets
+ * hosts publish directly — calendar-v2 PR), Submit for review, Unpublish, or
+ * the pending note. */
+function StatusAction({
+  topic,
+  busy,
+  run,
+  canPublishDirectly,
+}: {
+  topic: ManagedTopic;
+  busy: boolean;
+  run: (q: string, v: Record<string, unknown>, s: string) => void;
+  canPublishDirectly: boolean;
+}) {
+  if (topic.status === "published") {
+    return (
+      <button
+        className="btn"
+        type="button"
+        disabled={busy}
+        onClick={() => run(UNPUBLISH, { id: topic.id }, "Topic unpublished")}
+      >
+        Unpublish
+      </button>
+    );
+  }
+  if (topic.status === "archived") return null;
+  if (canPublishDirectly) {
+    return (
+      <button
+        className="btn btn-primary"
+        type="button"
+        disabled={busy}
+        onClick={() => run(PUBLISH, { id: topic.id }, "Topic published")}
+      >
+        Publish
+      </button>
+    );
+  }
+  if (topic.status === "unpublished") {
+    return (
+      <button
+        className="btn btn-primary"
+        type="button"
+        disabled={busy}
+        onClick={() => run(SUBMIT, { id: topic.id }, "Submitted for review")}
+      >
+        Submit for review
+      </button>
+    );
+  }
+  return (
+    <span className="faint" style={{ fontSize: 13 }}>
+      Pending review…
+    </span>
+  );
+}
+
+function permalinkFor(topic: ManagedTopic, slug: string): string | null {
+  if (topic.status !== "published") return null;
+  return topicPath(
+    slug,
+    topic.hostSlug ?? null,
+    topic.slug ?? null,
+    topic.hostId,
+  );
+}
+
 /** A topic on My Topics — renders like a feed card (cover, description,
  * comments, {host}-only thread; QA #59) with the manage controls below. */
 export function TopicManager({
@@ -173,6 +225,7 @@ export function TopicManager({
   adminLabel,
   isAdmin,
   hosts,
+  canPublishDirectly = false,
 }: {
   topic: ManagedTopic;
   slug: string;
@@ -181,16 +234,9 @@ export function TopicManager({
   adminLabel: string;
   isAdmin: boolean;
   hosts: { id: string; name: string | null }[];
+  canPublishDirectly?: boolean;
 }) {
-  const permalink =
-    topic.status === "published"
-      ? topicPath(
-          slug,
-          topic.hostSlug ?? null,
-          topic.slug ?? null,
-          topic.hostId,
-        )
-      : null;
+  const permalink = permalinkFor(topic, slug);
   const publicComments = topic.comments ?? [];
   const hostComments = topic.hostOnlyComments ?? [];
 
@@ -278,6 +324,7 @@ export function TopicManager({
           adminLabel={adminLabel}
           isAdmin={isAdmin}
           hosts={hosts}
+          canPublishDirectly={canPublishDirectly}
         />
       </TopicEditScope>
     </li>

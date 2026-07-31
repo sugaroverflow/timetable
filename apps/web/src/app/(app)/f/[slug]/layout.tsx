@@ -234,6 +234,7 @@ function SideNav({
   elector,
   hostOrAdmin,
   admin,
+  calendarOn,
   unread,
   queueNeverSeen,
   pendingCount,
@@ -244,6 +245,7 @@ function SideNav({
   elector: boolean;
   hostOrAdmin: boolean;
   admin: boolean;
+  calendarOn: boolean;
   unread: number;
   queueNeverSeen: number;
   pendingCount: number;
@@ -266,6 +268,9 @@ function SideNav({
           <Heart size={14} fill="currentColor" aria-hidden /> Topics
         </NavLink>
       )}
+      {/* Calendar v2 (closes #55): the link exists only when the forum has
+          switched the feature on. */}
+      {calendarOn && <NavLink href={`${base}/calendar`}>Calendar</NavLink>}
       {isMember && <NotificationsNavLink base={base} unread={unread} />}
       {/* People shows for every viewer who can read the forum — the API
           filters the list to the profiles their access allows (all members
@@ -341,6 +346,7 @@ export default async function TimetableLayout({
             elector={isElector(roles)}
             hostOrAdmin={isHost(roles) || isAdmin(roles)}
             admin={isAdmin(roles)}
+            calendarOn={Boolean(settings.calendar?.enabled)}
             unread={unread}
             queueNeverSeen={queueNeverSeen}
             pendingCount={pendingCount}

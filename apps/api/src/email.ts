@@ -2,6 +2,7 @@ import type {
   DigestActivity,
   DigestComment,
   DigestPerson,
+  DigestSessionLine,
   DigestTopicCard,
   ForumDigest,
 } from "@timetable/core";
@@ -416,6 +417,69 @@ function renderCard(
   return `<div class="em-card" style="background:${E.card};border:1px solid ${E.line};border-radius:12px;padding:16px 18px;margin:0 0 12px;">${header}<div style="margin-top:8px;">${bodyHtml}</div></div>`;
 }
 
+// ---------------------------------------------------------------------------
+// Calendar sections (calendar v2): "Coming up" (confirmed sessions) and
+// "Can you make it?" (proposed sessions for topics the recipient ❤️'d).
+// ---------------------------------------------------------------------------
+
+/** "Tue 12 Aug, 19:00–21:00" — formatted in UTC (slots are stored UTC and
+ * forums have no timezone setting yet; the app renders viewer-local). */
+function sessionWhen(s: DigestSessionLine): string {
+  const day = s.startsAt.toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
+  const time = (d: Date) =>
+    d.toLocaleTimeString("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "UTC",
+    });
+  return `${day}, ${time(s.startsAt)}–${time(s.endsAt)}`;
+}
+
+const NEW_PILL = `<span style="display:inline-block;background:#e8f6ec;color:#207a32;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;margin-left:6px;white-space:nowrap;vertical-align:middle;">New</span>`;
+
+/** One session line: bold linked topic (its URL when published elsewhere,
+ * the forum calendar otherwise), then when/where. */
+function sessionLine(
+  s: DigestSessionLine,
+  forumSlug: string,
+  accent: string,
+): string {
+  const href = s.url || `${linkBase}/f/${forumSlug}/calendar`;
+  const where = s.location ? ` · ${esc(s.location)}` : "";
+  return (
+    `<div style="margin:6px 0;">` +
+    `<a href="${esc(href)}" style="color:${accent};font-weight:600;text-decoration:none;">${esc(s.topicTitle)}</a>` +
+    `${s.isNew ? NEW_PILL : ""}` +
+    `<div class="em-muted" style="color:${E.muted};font-size:13px;">${esc(sessionWhen(s))}${where}</div>` +
+    `</div>`
+  );
+}
+
+/** A calendar section as its own card, matching the topic-card frame. */
+function renderSessionCard(
+  heading: string,
+  intro: string,
+  sessions: DigestSessionLine[],
+  forumSlug: string,
+  accent: string,
+): string {
+  if (sessions.length === 0) return "";
+  const lines = sessions.map((s) => sessionLine(s, forumSlug, accent)).join("");
+  return (
+    `<div class="em-card" style="background:${E.card};border:1px solid ${E.line};border-radius:12px;padding:16px 18px;margin:0 0 12px;">` +
+    `<div style="font-size:17px;font-weight:700;line-height:1.3;">${esc(heading)}</div>` +
+    (intro
+      ? `<div class="em-muted" style="color:${E.muted};font-size:13px;margin-top:2px;">${esc(intro)}</div>`
+      : "") +
+    `<div style="margin-top:8px;">${lines}</div></div>`
+  );
+}
+
 /** "3 comments, 2 replies …" — the subject's tail, counted across cards. */
 function digestSummary(digest: ForumDigest): string {
   const counts = { comment: 0, reply: 0, heart: 0, new: 0, assignment: 0 };
@@ -432,6 +496,14 @@ function digestSummary(digest: ForumDigest): string {
   n(counts.heart, "topic with new ❤️", "topics with new ❤️");
   n(counts.new, "new topic", "new topics");
   n(counts.assignment, "topic assigned to you", "topics assigned to you");
+  const confirmedNew = digest.upcoming.filter((s) => s.isNew).length;
+  const asksNew = digest.availabilityAsks.filter((s) => s.isNew).length;
+  n(confirmedNew, "session confirmed", "sessions confirmed");
+  n(
+    asksNew,
+    "session wants your availability",
+    "sessions want your availability",
+  );
   return bits.join(", ");
 }
 
@@ -445,8 +517,24 @@ export function renderDigest(digest: ForumDigest): {
 } {
   const accent = digest.accent ?? E.primary;
   const summary = digestSummary(digest);
-  const body = digest.topics
-    .map((card) =>
+  // Sessions lead: "Coming up" is the highest-value content, and the
+  // availability ask is the digest's one direct call to action.
+  const body = [
+    renderSessionCard(
+      "📅 Coming up",
+      "",
+      digest.upcoming,
+      digest.forumSlug,
+      accent,
+    ),
+    renderSessionCard(
+      "Can you make it?",
+      "Sessions proposed for topics you ❤️'d — share your availability.",
+      digest.availabilityAsks,
+      digest.forumSlug,
+      accent,
+    ),
+    ...digest.topics.map((card) =>
       renderCard(
         card,
         digest.forumSlug,
@@ -454,7 +542,9 @@ export function renderDigest(digest: ForumDigest): {
         digest.hostLabel,
         digest.adminLabel,
       ),
-    )
+    ),
+  ]
+    .filter(Boolean)
     .join("\n");
   const footer = `You're getting this because you switched on email digests. Adjust them any time on ${accentLink(`your ${digest.forumName} Notifications page`, `/f/${digest.forumSlug}/notifications`, accent)}.`;
   const base = `${digest.forumName} Topics Digest`;
@@ -715,6 +805,34 @@ export function sampleDigest(args: {
       ...sampleThreadCards(me, p),
       sampleOwnCard(me, p),
       ...sampleStatusCards(me, p),
+    ],
+    upcoming: [
+      {
+        slotId: "sample-slot-confirmed",
+        startsAt: sAt("2026-08-04T18:00:00Z"),
+        endsAt: sAt("2026-08-04T20:00:00Z"),
+        location: "Classroom",
+        url: "",
+        topicId: "sample-rcv",
+        topicTitle: "Should we adopt ranked-choice for our elections?",
+        timetableId: args.forumId,
+        updatedAt: sAt("2026-07-30T09:00:00Z"),
+        isNew: true,
+      },
+    ],
+    availabilityAsks: [
+      {
+        slotId: "sample-slot-proposed",
+        startsAt: sAt("2026-08-08T09:00:00Z"),
+        endsAt: sAt("2026-08-08T10:30:00Z"),
+        location: "The Park",
+        url: "",
+        topicId: "sample-garden",
+        topicTitle: "A community garden for the north courtyard",
+        timetableId: args.forumId,
+        updatedAt: sAt("2026-07-30T11:00:00Z"),
+        isNew: true,
+      },
     ],
   };
 }

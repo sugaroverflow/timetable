@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { ASSIGNABLE_ROLES, PRIVACY_LEVELS, ROLES } from "./roles";
+import { CONFIRM_POLICIES } from "./settings";
 
 const roleEnum = z.enum(ROLES);
 const assignableRoleEnum = z.enum(ASSIGNABLE_ROLES);
@@ -64,3 +65,44 @@ export const updateProfileSchema = z.object({
   image: z.string().url().optional(),
 });
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+
+/** "HH:MM", 24-hour. */
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+/** "YYYY-MM-DD" (string comparison then orders correctly). */
+const YMD = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Admin-editable calendar settings (calendar v2). Unknown keys are
+ * rejected; the API shallow-merges a validated patch over the stored
+ * calendar group. */
+export const calendarSettingsSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    confirmPolicy: z.enum(CONFIRM_POLICIES).optional(),
+    locations: z.array(z.string().max(80)).max(50).optional(),
+    patternCells: z
+      .array(
+        z
+          .object({
+            weekday: z.number().int().min(0).max(6),
+            start: z.string().regex(HHMM),
+            end: z.string().regex(HHMM),
+          })
+          .refine((c) => c.end > c.start, "end must be after start"),
+      )
+      .max(50)
+      .optional(),
+    terms: z
+      .array(
+        z
+          .object({
+            name: z.string().max(60),
+            start: z.string().regex(YMD),
+            end: z.string().regex(YMD),
+          })
+          .refine((t) => t.end >= t.start, "end must not precede start"),
+      )
+      .max(24)
+      .optional(),
+  })
+  .strict();
+export type CalendarSettingsInput = z.infer<typeof calendarSettingsSchema>;

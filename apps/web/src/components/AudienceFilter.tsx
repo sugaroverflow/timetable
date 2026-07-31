@@ -17,7 +17,7 @@ export function AudienceFilter({
 
   return (
     <SelectMinimal
-      aria-label="Audience"
+      aria-label="Topic lens"
       value={value}
       onChange={(e) => {
         // "all" is the default: it rides as no param at all.
@@ -26,10 +26,10 @@ export function AudienceFilter({
       }}
     >
       <option value="all">All electors</option>
-      {isHost ? <option value="hearted_mine">Hearted my topics</option> : null}
+      {isHost ? <option value="hearted_mine">❤️ my topics</option> : null}
       {topics.map((tp) => (
         <option key={tp.id} value={`hearted_topic:${tp.id}`}>
-          Hearted: {tp.title}
+          ❤️ {tp.title}
         </option>
       ))}
     </SelectMinimal>

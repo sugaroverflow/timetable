@@ -12,11 +12,13 @@ import {
 import type { TimetableSettings } from "@timetable/db";
 import {
   BRAND_FONT_KEYS,
+  calendarSettingsSchema,
   canManageMembers,
   canModerate,
   isAdmin,
   isHost,
   THEME_FONT_KEYS,
+  type CalendarSettings,
 } from "@timetable/shared";
 
 import type { SessionUser } from "../auth/clerk";
@@ -110,10 +112,11 @@ export async function loadSlotAndViewer(ctx: ApiContext, slotId: string) {
   if (!slot) notFound("Timeslot not found");
   const viewer = await ctx.getViewer(slot.timetableId);
   const timetable = await getTimetableById(slot.timetableId);
-  if (timetable?.privacy === "deactivated" && !canModerate(viewer)) {
+  if (!timetable) notFound("Forum not found");
+  if (timetable.privacy === "deactivated" && !canModerate(viewer)) {
     forbidden("Forum is deactivated");
   }
-  return { slot, viewer };
+  return { slot, viewer, timetable };
 }
 
 // ---------------------------------------------------------------------------
@@ -166,6 +169,34 @@ const HEX_COLOUR = /^#[0-9a-fA-F]{6}$/;
  * stored (and later injected into the SSR theme <style> tag). */
 export const colour = (v: unknown): string | undefined =>
   typeof v === "string" && HEX_COLOUR.test(v) ? v : undefined;
+
+// ---------------------------------------------------------------------------
+// Calendar settings validation (calendar v2)
+// ---------------------------------------------------------------------------
+
+/** Validate a client-sent calendar settings object (schema lives in
+ * @timetable/shared): known keys only, policy from the canonical list,
+ * capped collections. Returns null when invalid. */
+export function parseCalendarJson(raw: string): CalendarSettings | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  const result = calendarSettingsSchema.safeParse(parsed);
+  if (!result.success) return null;
+  const settings: CalendarSettings = { ...result.data };
+  if (settings.locations) {
+    settings.locations = settings.locations
+      .map((l) => l.trim())
+      .filter(Boolean);
+  }
+  if (settings.terms) {
+    settings.terms = settings.terms.map((t) => ({ ...t, name: t.name.trim() }));
+  }
+  return settings;
+}
 
 /** Validate a client-sent theme (QA #59): known keys only, colours must be
  * #rrggbb, font from the curated list. Returns null when invalid. */

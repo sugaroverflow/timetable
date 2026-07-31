@@ -1,21 +1,22 @@
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 
 import {
   availability,
+  availabilityPatterns,
   db,
   hearts,
   slotComments,
-  slotTopics,
   timeslots,
   timetableMemberships,
   topics,
   type AvailabilityState,
   type SlotComment,
+  type SlotStatus,
   type Timeslot,
 } from "@timetable/db";
 
 // --------------------------------------------------------------------------
-// Slot CRUD (admin)
+// Slot CRUD
 // --------------------------------------------------------------------------
 
 export async function getSlotById(slotId: string): Promise<Timeslot | null> {
@@ -31,24 +32,65 @@ export type SlotInput = {
   startsAt: Date;
   endsAt: Date;
   location?: string;
+  /** Pattern-cell provenance "{weekday}-{HH:MM}" for generated slots. */
+  cellKey?: string | null;
 };
 
+/** Admin bulk-create (single slots and pattern × terms generation both land
+ * here). Exact duplicates — same start/end/location — are skipped so
+ * re-running "Generate slots" after adding a term is idempotent. */
 export async function createSlots(
   timetableId: string,
   inputs: SlotInput[],
 ): Promise<Timeslot[]> {
   if (inputs.length === 0) return [];
+  const existing = await listSlots(timetableId, { includePast: true });
+  const seen = new Set(
+    existing.map(
+      (s) => `${s.startsAt.getTime()}|${s.endsAt.getTime()}|${s.location}`,
+    ),
+  );
+  const fresh = inputs.filter(
+    (s) =>
+      !seen.has(
+        `${s.startsAt.getTime()}|${s.endsAt.getTime()}|${s.location ?? ""}`,
+      ),
+  );
+  if (fresh.length === 0) return [];
   return db
     .insert(timeslots)
     .values(
-      inputs.map((s) => ({
+      fresh.map((s) => ({
         timetableId,
         startsAt: s.startsAt,
         endsAt: s.endsAt,
         location: s.location ?? "",
+        cellKey: s.cellKey ?? null,
       })),
     )
     .returning();
+}
+
+/** A host's off-piste slot: born `proposed` with their topic attached. */
+export async function proposeSlot(
+  timetableId: string,
+  createdById: string,
+  input: SlotInput & { topicId: string },
+): Promise<Timeslot> {
+  const [slot] = await db
+    .insert(timeslots)
+    .values({
+      timetableId,
+      startsAt: input.startsAt,
+      endsAt: input.endsAt,
+      location: input.location ?? "",
+      status: "proposed",
+      topicId: input.topicId,
+      createdById,
+    })
+    .returning();
+  if (!slot) throw new Error("Failed to propose slot");
+  return slot;
 }
 
 export async function updateSlot(
@@ -68,15 +110,49 @@ export async function updateSlot(
   return updated ?? null;
 }
 
+/** Set a slot's session: topic + status + url together. `topicId: null`
+ * clears the session back to empty (url cleared too). Permission rules
+ * (confirm policy, never-displace) live in the resolver. */
+export async function setSlotSession(
+  slotId: string,
+  session: {
+    topicId: string | null;
+    status?: SlotStatus;
+    url?: string;
+  },
+): Promise<Timeslot | null> {
+  const clearing = session.topicId === null;
+  const [updated] = await db
+    .update(timeslots)
+    .set({
+      topicId: session.topicId,
+      status: clearing ? "empty" : (session.status ?? "proposed"),
+      url: clearing ? "" : (session.url ?? ""),
+      updatedAt: new Date(),
+    })
+    .where(eq(timeslots.id, slotId))
+    .returning();
+  return updated ?? null;
+}
+
 export async function deleteSlot(slotId: string): Promise<void> {
   await db.delete(timeslots).where(eq(timeslots.id, slotId));
 }
 
-export async function listSlots(timetableId: string): Promise<Timeslot[]> {
+export async function listSlots(
+  timetableId: string,
+  opts: { includePast?: boolean; now?: Date } = {},
+): Promise<Timeslot[]> {
+  const now = opts.now ?? new Date();
   return db
     .select()
     .from(timeslots)
-    .where(eq(timeslots.timetableId, timetableId))
+    .where(
+      and(
+        eq(timeslots.timetableId, timetableId),
+        opts.includePast ? undefined : sql`${timeslots.endsAt} >= ${now}`,
+      ),
+    )
     .orderBy(asc(timeslots.startsAt));
 }
 
@@ -85,39 +161,33 @@ export type IcsSlot = {
   startsAt: Date;
   endsAt: Date;
   location: string;
-  topicTitles: string[];
+  status: SlotStatus;
+  url: string;
+  topicTitle: string | null;
 };
 
-/** Slots with their tagged topic titles, for the ICS calendar feed. */
+/** Slots with their session, for the ICS calendar feed (upcoming + past —
+ * calendar apps handle history themselves). */
 export async function getSlotsForIcs(timetableId: string): Promise<IcsSlot[]> {
-  const slots = await listSlots(timetableId);
-  if (slots.length === 0) return [];
-  const slotIds = slots.map((s) => s.id);
-
-  const tagRows = await db
-    .select({ slotId: slotTopics.slotId, title: topics.title })
-    .from(slotTopics)
-    .innerJoin(topics, eq(topics.id, slotTopics.topicId))
-    .where(inArray(slotTopics.slotId, slotIds));
-
-  const titlesBySlot = new Map<string, string[]>();
-  for (const r of tagRows) {
-    const list = titlesBySlot.get(r.slotId) ?? [];
-    list.push(r.title);
-    titlesBySlot.set(r.slotId, list);
-  }
-
-  return slots.map((s) => ({
-    id: s.id,
-    startsAt: s.startsAt,
-    endsAt: s.endsAt,
-    location: s.location,
-    topicTitles: titlesBySlot.get(s.id) ?? [],
-  }));
+  const rows = await db
+    .select({
+      id: timeslots.id,
+      startsAt: timeslots.startsAt,
+      endsAt: timeslots.endsAt,
+      location: timeslots.location,
+      status: timeslots.status,
+      url: timeslots.url,
+      topicTitle: topics.title,
+    })
+    .from(timeslots)
+    .leftJoin(topics, eq(topics.id, timeslots.topicId))
+    .where(eq(timeslots.timetableId, timetableId))
+    .orderBy(asc(timeslots.startsAt));
+  return rows;
 }
 
 // --------------------------------------------------------------------------
-// Availability (elector)
+// Availability: explicit per-slot answers + the weekly pattern
 // --------------------------------------------------------------------------
 
 export async function setAvailability(
@@ -134,35 +204,118 @@ export async function setAvailability(
     });
 }
 
-/** Set availability for every slot on a given UTC weekday (0=Sun..6=Sat). */
-export async function setWeekdayAvailability(
+export type PatternCells = Record<string, AvailabilityState>;
+
+export async function getAvailabilityPattern(
   timetableId: string,
   userId: string,
-  weekday: number,
-  state: AvailabilityState,
-): Promise<number> {
-  const slots = await listSlots(timetableId);
-  const matching = slots.filter((s) => s.startsAt.getUTCDay() === weekday);
-  for (const slot of matching) {
-    await setAvailability(slot.id, userId, state);
+): Promise<PatternCells> {
+  const [row] = await db
+    .select({ cells: availabilityPatterns.cells })
+    .from(availabilityPatterns)
+    .where(
+      and(
+        eq(availabilityPatterns.timetableId, timetableId),
+        eq(availabilityPatterns.userId, userId),
+      ),
+    )
+    .limit(1);
+  return row?.cells ?? {};
+}
+
+/** Replace the elector's whole weekly template (the grid saves atomically). */
+export async function setAvailabilityPattern(
+  timetableId: string,
+  userId: string,
+  cells: PatternCells,
+): Promise<void> {
+  await db
+    .insert(availabilityPatterns)
+    .values({ timetableId, userId, cells })
+    .onConflictDoUpdate({
+      target: [availabilityPatterns.timetableId, availabilityPatterns.userId],
+      set: { cells, updatedAt: new Date() },
+    });
+}
+
+/** Effective availability resolution (calendar v2): explicit answer on the
+ * slot → the elector's pattern cell (generated slots only) → yellow.
+ * "We use whatever availability information you share." */
+export function resolveState(
+  explicit: AvailabilityState | undefined,
+  cellKey: string | null,
+  pattern: PatternCells | undefined,
+): AvailabilityState {
+  if (explicit) return explicit;
+  if (cellKey && pattern) {
+    const fromPattern = pattern[cellKey];
+    if (fromPattern) return fromPattern;
   }
-  return matching.length;
+  return "yellow";
+}
+
+async function loadPatternsByUser(
+  timetableId: string,
+  userIds: string[],
+): Promise<Map<string, PatternCells>> {
+  if (userIds.length === 0) return new Map();
+  const rows = await db
+    .select({
+      userId: availabilityPatterns.userId,
+      cells: availabilityPatterns.cells,
+    })
+    .from(availabilityPatterns)
+    .where(
+      and(
+        eq(availabilityPatterns.timetableId, timetableId),
+        inArray(availabilityPatterns.userId, userIds),
+      ),
+    );
+  return new Map(rows.map((r) => [r.userId, r.cells]));
+}
+
+export type SlotCounts = { green: number; yellow: number; red: number };
+
+/** Green/yellow/red counts for one slot across `audienceIds`, with pattern
+ * inference — the snapshot attached to a session-claim comment. */
+export async function computeSlotCounts(
+  slot: Timeslot,
+  audienceIds: string[],
+): Promise<SlotCounts> {
+  const counts: SlotCounts = { green: 0, yellow: 0, red: 0 };
+  if (audienceIds.length === 0) return counts;
+  const availRows = await db
+    .select({ userId: availability.userId, state: availability.state })
+    .from(availability)
+    .where(eq(availability.slotId, slot.id));
+  const explicit = new Map(availRows.map((r) => [r.userId, r.state]));
+  const patterns = await loadPatternsByUser(slot.timetableId, audienceIds);
+  for (const uid of audienceIds) {
+    counts[resolveState(explicit.get(uid), slot.cellKey, patterns.get(uid))] +=
+      1;
+  }
+  return counts;
 }
 
 // --------------------------------------------------------------------------
-// Slot discussion (host/admin) and topic tagging
+// Slot discussion (host/admin)
 // --------------------------------------------------------------------------
 
-export async function listSlotComments(slotId: string): Promise<
-  {
-    id: string;
-    authorId: string;
-    authorName: string | null;
-    authorImage: string | null;
-    body: string;
-    createdAt: Date;
-  }[]
-> {
+export type SlotCommentView = {
+  id: string;
+  authorId: string;
+  authorName: string | null;
+  authorImage: string | null;
+  body: string;
+  topicId: string | null;
+  topicTitle: string | null;
+  counts: SlotCounts | null;
+  createdAt: Date;
+};
+
+export async function listSlotComments(
+  slotId: string,
+): Promise<SlotCommentView[]> {
   // Author profile from their membership in the slot's timetable
   // (per-forum profiles); left join tolerates ex-members.
   const rows = await db
@@ -172,6 +325,11 @@ export async function listSlotComments(slotId: string): Promise<
       authorName: timetableMemberships.name,
       authorImage: timetableMemberships.image,
       body: slotComments.body,
+      topicId: slotComments.topicId,
+      topicTitle: topics.title,
+      greenCount: slotComments.greenCount,
+      yellowCount: slotComments.yellowCount,
+      redCount: slotComments.redCount,
       createdAt: slotComments.createdAt,
     })
     .from(slotComments)
@@ -183,52 +341,49 @@ export async function listSlotComments(slotId: string): Promise<
         eq(timetableMemberships.timetableId, timeslots.timetableId),
       ),
     )
+    .leftJoin(topics, eq(topics.id, slotComments.topicId))
     .where(eq(slotComments.slotId, slotId))
     .orderBy(asc(slotComments.createdAt));
-  return rows;
+  return rows.map((r) => ({
+    id: r.id,
+    authorId: r.authorId,
+    authorName: r.authorName,
+    authorImage: r.authorImage,
+    body: r.body,
+    topicId: r.topicId,
+    topicTitle: r.topicTitle,
+    counts:
+      r.greenCount != null && r.yellowCount != null && r.redCount != null
+        ? { green: r.greenCount, yellow: r.yellowCount, red: r.redCount }
+        : null,
+    createdAt: r.createdAt,
+  }));
 }
 
 export async function addSlotComment(
   slotId: string,
   authorId: string,
   body: string,
+  claim?: { topicId: string; counts: SlotCounts },
 ): Promise<SlotComment> {
   const [comment] = await db
     .insert(slotComments)
-    .values({ slotId, authorId, body })
+    .values({
+      slotId,
+      authorId,
+      body,
+      ...(claim
+        ? {
+            topicId: claim.topicId,
+            greenCount: claim.counts.green,
+            yellowCount: claim.counts.yellow,
+            redCount: claim.counts.red,
+          }
+        : {}),
+    })
     .returning();
   if (!comment) throw new Error("Failed to add slot comment");
   return comment;
-}
-
-export async function tagSlotTopic(
-  slotId: string,
-  topicId: string,
-): Promise<void> {
-  // The topic and slot must belong to the same timetable.
-  const [slot] = await db
-    .select({ timetableId: timeslots.timetableId })
-    .from(timeslots)
-    .where(eq(timeslots.id, slotId))
-    .limit(1);
-  const [topic] = await db
-    .select({ timetableId: topics.timetableId })
-    .from(topics)
-    .where(eq(topics.id, topicId))
-    .limit(1);
-  if (!slot || !topic || slot.timetableId !== topic.timetableId) {
-    throw new Error("Topic and slot must belong to the same timetable");
-  }
-  await db.insert(slotTopics).values({ slotId, topicId }).onConflictDoNothing();
-}
-
-export async function untagSlotTopic(
-  slotId: string,
-  topicId: string,
-): Promise<void> {
-  await db
-    .delete(slotTopics)
-    .where(and(eq(slotTopics.slotId, slotId), eq(slotTopics.topicId, topicId)));
 }
 
 // --------------------------------------------------------------------------
@@ -293,25 +448,37 @@ export type CalendarSlot = {
   startsAt: Date;
   endsAt: Date;
   location: string;
-  topics: { id: string; title: string }[];
+  status: SlotStatus;
+  url: string;
+  cellKey: string | null;
+  createdById: string | null;
+  topic: { id: string; title: string; hostId: string } | null;
   viewerState: AvailabilityState | null;
-  counts: { green: number; yellow: number; red: number };
-  perUser: { userId: string; name: string | null; state: AvailabilityState }[];
+  counts: SlotCounts;
+  perUser: {
+    userId: string;
+    name: string | null;
+    image: string | null;
+    state: AvailabilityState;
+  }[];
   commentCount: number;
 };
 
-/**
- * Build the calendar for a timetable. Aggregate counts and per-user rows are
- * limited to `audienceIds` (the resolved audience). `perUser` should only be
- * surfaced to hosts/admins by the caller.
- */
-export async function buildCalendar(
+type SlotRelatedRows = {
+  availRows: { slotId: string; userId: string; state: AvailabilityState }[];
+  audienceProfiles: Map<string, { name: string | null; image: string | null }>;
+  patterns: Map<string, PatternCells>;
+  viewerPattern: PatternCells | undefined;
+  topicsById: Map<string, { id: string; title: string; hostId: string }>;
+  commentCountBySlot: Map<string, number>;
+};
+
+async function loadSlotRelatedRows(
   timetableId: string,
+  slots: Timeslot[],
   audienceIds: string[],
   viewerUserId: string | null,
-): Promise<CalendarSlot[]> {
-  const slots = await listSlots(timetableId);
-  if (slots.length === 0) return [];
+): Promise<SlotRelatedRows> {
   const slotIds = slots.map((s) => s.id);
 
   const availRows = await db
@@ -323,13 +490,18 @@ export async function buildCalendar(
     .from(availability)
     .where(inArray(availability.slotId, slotIds));
 
-  // Names for the whole audience (including electors who never saved a row).
-  const audienceNameById = new Map<string, string | null>();
+  // Profiles for the whole audience (including electors who never saved a
+  // row) — the host view shows avatars, so image comes along with name.
+  const audienceProfiles = new Map<
+    string,
+    { name: string | null; image: string | null }
+  >();
   if (audienceIds.length > 0) {
-    const nameRows = await db
+    const profileRows = await db
       .select({
         id: timetableMemberships.userId,
         name: timetableMemberships.name,
+        image: timetableMemberships.image,
       })
       .from(timetableMemberships)
       .where(
@@ -338,18 +510,30 @@ export async function buildCalendar(
           inArray(timetableMemberships.userId, audienceIds),
         ),
       );
-    for (const u of nameRows) audienceNameById.set(u.id, u.name);
+    for (const u of profileRows) {
+      audienceProfiles.set(u.id, { name: u.name, image: u.image });
+    }
   }
 
-  const tagRows = await db
-    .select({
-      slotId: slotTopics.slotId,
-      topicId: slotTopics.topicId,
-      title: topics.title,
-    })
-    .from(slotTopics)
-    .innerJoin(topics, eq(topics.id, slotTopics.topicId))
-    .where(inArray(slotTopics.slotId, slotIds));
+  const patternUserIds = [
+    ...new Set([...audienceIds, ...(viewerUserId ? [viewerUserId] : [])]),
+  ];
+  const patterns = await loadPatternsByUser(timetableId, patternUserIds);
+
+  const topicIds = [
+    ...new Set(slots.map((s) => s.topicId).filter((id): id is string => !!id)),
+  ];
+  const topicsById = new Map<
+    string,
+    { id: string; title: string; hostId: string }
+  >();
+  if (topicIds.length > 0) {
+    const topicRows = await db
+      .select({ id: topics.id, title: topics.title, hostId: topics.hostId })
+      .from(topics)
+      .where(inArray(topics.id, topicIds));
+    for (const t of topicRows) topicsById.set(t.id, t);
+  }
 
   const commentRows = await db
     .select({
@@ -360,36 +544,67 @@ export async function buildCalendar(
     .where(inArray(slotComments.slotId, slotIds))
     .groupBy(slotComments.slotId);
 
-  const tagsBySlot = new Map<string, { id: string; title: string }[]>();
-  for (const t of tagRows) {
-    const list = tagsBySlot.get(t.slotId) ?? [];
-    list.push({ id: t.topicId, title: t.title });
-    tagsBySlot.set(t.slotId, list);
-  }
+  return {
+    availRows,
+    audienceProfiles,
+    patterns,
+    viewerPattern: viewerUserId ? patterns.get(viewerUserId) : undefined,
+    topicsById,
+    commentCountBySlot: new Map(commentRows.map((c) => [c.slotId, c.n])),
+  };
+}
 
-  const commentCountBySlot = new Map<string, number>();
-  for (const c of commentRows) commentCountBySlot.set(c.slotId, c.n);
+/**
+ * Build the calendar for a timetable. Aggregate counts and per-user rows are
+ * limited to `audienceIds` (the resolved audience) and resolve through the
+ * pattern layer. `perUser` should only be surfaced to hosts/admins by the
+ * caller.
+ */
+export async function buildCalendar(
+  timetableId: string,
+  audienceIds: string[],
+  viewerUserId: string | null,
+  opts: { includePast?: boolean } = {},
+): Promise<CalendarSlot[]> {
+  const slots = await listSlots(timetableId, {
+    includePast: opts.includePast,
+  });
+  if (slots.length === 0) return [];
+  const related = await loadSlotRelatedRows(
+    timetableId,
+    slots,
+    audienceIds,
+    viewerUserId,
+  );
 
   return slots.map((slot) => {
-    const stateByUser = new Map<string, AvailabilityState>();
-    for (const r of availRows) {
-      if (r.slotId === slot.id) stateByUser.set(r.userId, r.state);
+    const explicitByUser = new Map<string, AvailabilityState>();
+    for (const r of related.availRows) {
+      if (r.slotId === slot.id) explicitByUser.set(r.userId, r.state);
     }
 
     const viewerState = viewerUserId
-      ? (stateByUser.get(viewerUserId) ?? null)
+      ? resolveState(
+          explicitByUser.get(viewerUserId),
+          slot.cellKey,
+          related.viewerPattern,
+        )
       : null;
 
-    // Availability defaults to yellow, so audience electors without a saved
-    // row still count as yellow.
-    const counts = { green: 0, yellow: 0, red: 0 };
+    const counts: SlotCounts = { green: 0, yellow: 0, red: 0 };
     const perUser: CalendarSlot["perUser"] = [];
     for (const uid of audienceIds) {
-      const state = stateByUser.get(uid) ?? "yellow";
+      const state = resolveState(
+        explicitByUser.get(uid),
+        slot.cellKey,
+        related.patterns.get(uid),
+      );
       counts[state] += 1;
+      const profile = related.audienceProfiles.get(uid);
       perUser.push({
         userId: uid,
-        name: audienceNameById.get(uid) ?? null,
+        name: profile?.name ?? null,
+        image: profile?.image ?? null,
         state,
       });
     }
@@ -399,11 +614,71 @@ export async function buildCalendar(
       startsAt: slot.startsAt,
       endsAt: slot.endsAt,
       location: slot.location,
-      topics: tagsBySlot.get(slot.id) ?? [],
+      status: slot.status,
+      url: slot.url,
+      cellKey: slot.cellKey,
+      createdById: slot.createdById,
+      topic: slot.topicId
+        ? (related.topicsById.get(slot.topicId) ?? null)
+        : null,
       viewerState,
       counts,
       perUser,
-      commentCount: commentCountBySlot.get(slot.id) ?? 0,
+      commentCount: related.commentCountBySlot.get(slot.id) ?? 0,
     };
   });
+}
+
+// --------------------------------------------------------------------------
+// Digest feeds (calendar v2): upcoming confirmed sessions + availability
+// asks for proposed sessions.
+// --------------------------------------------------------------------------
+
+export type DigestSession = {
+  slotId: string;
+  startsAt: Date;
+  endsAt: Date;
+  location: string;
+  url: string;
+  topicId: string;
+  topicTitle: string;
+  timetableId: string;
+  /** Last session change — the digest's "new since last digest" signal. */
+  updatedAt: Date;
+};
+
+/** Upcoming sessions with a topic in the given forums, one horizon for the
+ * digest: confirmed → "Coming up", proposed → "Can you make it?" (the
+ * caller filters the latter to topics the recipient hearted). */
+export async function listUpcomingSessions(
+  timetableIds: string[],
+  status: SlotStatus,
+  horizon: { from: Date; to: Date },
+): Promise<DigestSession[]> {
+  if (timetableIds.length === 0) return [];
+  const rows = await db
+    .select({
+      slotId: timeslots.id,
+      startsAt: timeslots.startsAt,
+      endsAt: timeslots.endsAt,
+      location: timeslots.location,
+      url: timeslots.url,
+      topicId: timeslots.topicId,
+      topicTitle: topics.title,
+      timetableId: timeslots.timetableId,
+      updatedAt: timeslots.updatedAt,
+    })
+    .from(timeslots)
+    .innerJoin(topics, eq(topics.id, timeslots.topicId))
+    .where(
+      and(
+        inArray(timeslots.timetableId, timetableIds),
+        eq(timeslots.status, status),
+        isNotNull(timeslots.topicId),
+        sql`${timeslots.startsAt} >= ${horizon.from}`,
+        sql`${timeslots.startsAt} <= ${horizon.to}`,
+      ),
+    )
+    .orderBy(asc(timeslots.startsAt));
+  return rows.filter((r): r is DigestSession => r.topicId !== null);
 }

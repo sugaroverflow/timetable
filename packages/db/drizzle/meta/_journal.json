@@ -169,6 +169,20 @@
       "when": 1785318615760,
       "tag": "0023_famous_ravenous",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1785454542612,
+      "tag": "0024_curved_big_bertha",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1785454554433,
+      "tag": "0025_talented_hulk",
+      "breakpoints": true
     }
   ]
 }

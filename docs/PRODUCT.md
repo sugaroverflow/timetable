@@ -20,9 +20,9 @@ Roles are scoped to timetable membership:
 | Role | Can |
 | --- | --- |
 | Owner | Everything an admin can do, plus protected ownership of the timetable |
-| Admin | Moderate topics, create topics and reassign their owner, see every host's submitted topics, hide comments, manage members and their bios from the People page, edit settings and theme, set the hearts cutoff, create slots, tag topics to slots, view the dashboard |
-| Host | Propose and submit topics (rich-text editor), edit their own topics from the feed, see weighted-heart breakdowns, use host-only threads, join slot discussions, view the dashboard |
-| Elector | Read published topics, heart and comment on them, collect "My hearted topics", set availability |
+| Admin | Moderate topics, create topics and reassign their owner, see every host's submitted topics, hide comments, manage members and their bios from the People page, edit settings and theme, set the hearts cutoff, set up the calendar schedule and pencil/confirm sessions, view the dashboard |
+| Host | Propose and submit topics (rich-text editor), edit their own topics from the feed, see weighted-heart breakdowns, use host-only threads, join slot discussions, pencil in / propose / confirm sessions per the forum's calendar policy, view the dashboard |
+| Elector | Read published topics, heart and comment on them, collect "My hearted topics", share availability (weekly pattern + per-slot answers) |
 
 Each timetable can rename its roles (e.g. Admin → Dean, Host → Faculty,
 Elector → Fellowship Candidate); the custom labels are used throughout the UI.
@@ -83,28 +83,54 @@ label, and an admin-only drafting thread (visible to admins and the topic's
 owner only, never rendered in the feed) where pre-publish feedback lives.
 Comments support @mentions, which notify the mentioned member.
 
-## Availability Calendar
+## Calendar
 
-The calendar is currently unlinked from navigation (re-adding it is tracked in
-issue #55); the routes, API, and ICS feed remain fully functional.
+The calendar (v2, 2026-07-31; closes #55) helps hosts find times their people
+can make and see what's already spoken for. It is **off by default** — a forum
+switches it on in Forum Settings, which adds the Calendar nav link and page.
+Turning it off hides everything again; nothing is deleted. Booking/publishing
+of sessions deliberately happens elsewhere (Luma, an event page…) — the
+calendar coordinates and then points at the result via a per-slot URL.
 
-Admins create one-off or weekly repeating timeslots. Electors mark each slot as:
+**Schedule = pattern × terms.** Admins define weekly time cells ("Tue and Thu
+19:00–21:00") and named date ranges ("Michaelmas, 29 Sep–12 Dec"); slots are
+generated from the cross product (idempotently — regeneration skips existing
+slots). One-off slots can still be added by hand. A weekend unconference is
+the same model with hourly cells and a two-day range.
 
-- `green`: available
-- `yellow`: maybe
-- `red`: cannot attend
+**Elector availability is layered** — "we use whatever availability
+information you share":
 
-Unset availability defaults to `yellow` when aggregating audience counts.
-Electors can also apply a weekday pattern across all matching slots.
+1. an explicit 🟢🟡🔴 answer on a slot
+2. their weekly pattern — a grid of exactly the admin's schedule cells,
+   painted once and inherited by every generated slot
+3. nothing shared → 🟡 (maybe)
 
-Hosts and admins can filter availability audiences:
+**Sessions.** Each slot carries at most one topic plus a status: `empty`
+(open) → `proposed` (pencilled in, under discussion) → `confirmed` (happening;
+URL points at the real event page). Who may pencil/confirm is a forum setting:
+admins only / hosts propose, admins confirm (default) / hosts confirm
+themselves (unconference mode). A host can only ever act on their own topic
+and never displace another host's session — collisions stay conversations.
+Hosts can also propose off-piste slots at any time/location; those are born
+`proposed` and collect availability immediately.
 
-- all electors
-- electors who hearted my topics
-- electors who hearted a specific topic
+**Host view.** A topic lens filters every slot's counts and per-elector
+avatars (grouped 🟢→🟡→🔴, host/admin-only) to the electors who ❤️'d that
+topic. Slot discussions ("host chat") support claim comments that attach a
+topic plus a frozen server-computed availability snapshot ("I'd like this
+slot for Yoga · 4🟢 8🟡 2🔴") — a record of what the claim was based on.
 
-Slots support host/admin discussion and can be tagged with topics. A slot tagged
-with multiple topics appears as a conflict in dashboard analytics.
+Past slots are archived out of the default view ("Show past" reveals them).
+The ICS feed maps proposed/confirmed onto RFC 5545 `STATUS:TENTATIVE`/
+`CONFIRMED` and carries the session URL; it 404s while the calendar is
+disabled. Digests gain a "📅 Coming up" section (confirmed sessions, new ones
+marked) and a "Can you make it?" section (proposed sessions for topics the
+recipient ❤️'d); stale listings alone never trigger an email.
+
+Relatedly, a forum can let **hosts publish topics without admin review**
+(Forum Settings) — review becomes after-the-fact oversight and every publish
+is activity-logged.
 
 ## Admin And Settings
 
@@ -233,11 +259,12 @@ Before opening to real users:
 - Email digest is the only email channel; Slack, push, and others are not started. No immediate email on topic reassignment yet (#57).
 - The in-app notifications pane has no per-item read state or mark-all-read.
 - The activity feed is refresh-based, not live (#58).
-- The availability calendar is unlinked from navigation pending re-add (#55).
-- Calendar sync is one-way ICS export only.
+- Calendar sync is one-way ICS export only. Importing electors' personal calendars (a secret ICS URL fetched server-side, deriving busy/free per slot as a layer between explicit answers and the pattern) is the designed next step, not started.
+- Calendar times have no forum-timezone setting: slot generation runs on the admin's browser clock, the app renders viewer-local, and digest emails format in UTC — fine while forums are single-timezone, wrong the day one isn't.
+- Calendar slot actions (pencil/confirm/propose) are not in the activity log yet.
 - Feed pagination is offset-based behind infinite scroll; cursor pagination is a future scalability item.
 - The product's emails have not been designed yet — the digest and invite templates are provisional; email design is an open todo.
-- The timeslots/availability calendar is unreleased and unfinished (#55); finishing it, and then adding its data to the API/export surface, is an open todo — the data export and API page deliberately exclude timeslot data until then.
+- The data export and API page still exclude timeslot/availability data; now that the calendar has shipped (v2, 2026-07-31), adding it to the export surface is an open todo.
 - A full copy review is an open todo: read every user-facing string in one pass and check the tone matches across the product (per-surface copy has accreted PR by PR). Includes applying the "❤️ instead of 'heart'" and no-social-media-language conventions everywhere.
 
 **Testing gaps**

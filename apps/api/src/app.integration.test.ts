@@ -883,8 +883,29 @@ describe("createApiApp", () => {
     });
   });
 
-  it("serves readable ICS calendars with calendar headers and slot content", async () => {
+  it("404s the ICS feed when the forum has not enabled the calendar", async () => {
     const timetable = timetableFixture();
+    vi.mocked(core.getReadableTimetable).mockResolvedValue({
+      timetable,
+      roles: [],
+    } satisfies ReadableTimetable);
+
+    await withTestServer(async (baseUrl) => {
+      const res = await fetch(
+        `${baseUrl}/api/forums/public-calendar/calendar.ics`,
+      );
+      expect(res.status).toBe(404);
+      await expect(res.json()).resolves.toEqual({
+        error: "Calendar not enabled",
+      });
+      expect(core.getSlotsForIcs).not.toHaveBeenCalled();
+    });
+  });
+
+  it("serves readable ICS calendars with calendar headers and slot content", async () => {
+    const timetable = timetableFixture({
+      settings: { calendar: { enabled: true } },
+    });
     const readable = { timetable, roles: [] } satisfies ReadableTimetable;
     const slots: IcsSlot[] = [
       {
@@ -892,7 +913,9 @@ describe("createApiApp", () => {
         startsAt: new Date("2026-02-01T10:00:00.000Z"),
         endsAt: new Date("2026-02-01T11:00:00.000Z"),
         location: "Main Hall",
-        topicTitles: ["Opening Session"],
+        status: "confirmed",
+        url: "https://lu.ma/opening-session",
+        topicTitle: "Opening Session",
       },
     ];
 
@@ -914,6 +937,8 @@ describe("createApiApp", () => {
       expect(body).toContain("X-WR-CALNAME:Public Calendar");
       expect(body).toContain("SUMMARY:Opening Session");
       expect(body).toContain("LOCATION:Main Hall");
+      expect(body).toContain("STATUS:CONFIRMED");
+      expect(body).toContain("URL:https://lu.ma/opening-session");
       expect(core.getSlotsForIcs).toHaveBeenCalledWith(timetable.id);
     });
   });

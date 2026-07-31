@@ -11,10 +11,10 @@ import * as schema from "./schema";
 import {
   activityEvents,
   availability,
+  availabilityPatterns,
   comments,
   hearts,
   slotComments,
-  slotTopics,
   timetableMemberships,
   timetables,
   timeslots,
@@ -24,15 +24,16 @@ import {
   type CommentVisibility,
   type NewActivityEvent,
   type NewAvailability,
+  type NewAvailabilityPattern,
   type NewComment,
   type NewHeart,
   type NewSlotComment,
-  type NewSlotTopic,
   type NewTimetable,
   type NewTimetableMembership,
   type NewTopic,
   type NewTimeslot,
   type NewUser,
+  type SlotStatus,
   type TopicStatus,
 } from "./schema";
 
@@ -84,7 +85,13 @@ type SlotFixture = {
   startTime: string; // HH:MM
   endTime: string; // HH:MM
   location: string;
+  /** The slot's session topic (calendar v2: one topic per slot; the first
+   * listed tag wins if a fixture still lists several). */
   topicTags: string[];
+  /** Session status; defaults to proposed when a topic is set, empty
+   * otherwise. */
+  status: SlotStatus | null;
+  url: string;
   availability: SlotAvailability[];
   discussion: SlotDiscussionEntry[];
 };
@@ -97,9 +104,9 @@ const ACTIVITY_TIME = new Date("2026-06-22T09:00:00.000Z");
 const RESET_DATABASE_TABLES = [
   "api_rate_limit_buckets",
   "activity_events",
-  "slot_topics",
   "slot_comments",
   "availability",
+  "availability_patterns",
   "timeslots",
   "comments",
   "hearts",
@@ -620,6 +627,10 @@ function parseSlotBlock(slotBlock: string): SlotFixture {
     .split(",")
     .map((t) => t.trim())
     .filter(Boolean);
+  const statusRaw = fieldFromBlock(rest, "Status").trim();
+  if (statusRaw && statusRaw !== "proposed" && statusRaw !== "confirmed") {
+    throw new Error(`Invalid slot status "${statusRaw}" for slot "${label}"`);
+  }
 
   return {
     label,
@@ -628,6 +639,8 @@ function parseSlotBlock(slotBlock: string): SlotFixture {
     endTime,
     location,
     topicTags,
+    status: (statusRaw as SlotStatus) || null,
+    url: fieldFromBlock(rest, "Url").trim(),
     availability: parseSlotAvailability(rest, label),
     discussion: parseSlotDiscussion(rest),
   };
@@ -902,7 +915,7 @@ function buildRows(fixture: Fixture): {
   timeslotRows: NewTimeslot[];
   availabilityRows: NewAvailability[];
   slotCommentRows: NewSlotComment[];
-  slotTopicRows: NewSlotTopic[];
+  patternRows: NewAvailabilityPattern[];
 } {
   const timetableId = stableUuid("timetable", fixture.timetable.slug);
   const owner = fixture.people.find((person) => person.roles.includes("owner"));
@@ -949,7 +962,12 @@ function buildRows(fixture: Fixture): {
     name: fixture.timetable.name,
     privacy: fixture.timetable.privacy,
     customDomain: null,
-    settings: { roleLabels: fixture.timetable.roleLabels },
+    settings: {
+      roleLabels: fixture.timetable.roleLabels,
+      // Calendar v2 switched on for the seeded forum so the feature is
+      // immediately QA-able, with a pattern derived from the slot fixtures.
+      calendar: buildCalendarSeedSettings(fixture.slots),
+    },
     ownerId,
     createdAt: BASE_TIME,
     updatedAt: BASE_TIME,
@@ -1009,7 +1027,7 @@ function buildRows(fixture: Fixture): {
     commentIds,
   );
 
-  const { timeslotRows, availabilityRows, slotCommentRows, slotTopicRows } =
+  const { timeslotRows, availabilityRows, slotCommentRows, patternRows } =
     buildSlotRows(fixture, timetableId, userIds, topicIds);
 
   return {
@@ -1025,7 +1043,7 @@ function buildRows(fixture: Fixture): {
     timeslotRows,
     availabilityRows,
     slotCommentRows,
-    slotTopicRows,
+    patternRows,
   };
 }
 
@@ -1184,6 +1202,80 @@ function buildActivityRows(
   return rows;
 }
 
+/** Pattern-cell key for a fixture slot ("{weekday}-{HH:MM}", UTC). */
+function slotCellKey(slot: SlotFixture): string {
+  const weekday = new Date(`${slot.date}T00:00:00.000Z`).getUTCDay();
+  return `${weekday}-${slot.startTime}`;
+}
+
+/** Calendar settings for the seeded forum, derived from the slot fixtures:
+ * enabled, hosts-may-propose, the distinct weekly cells as the pattern, one
+ * term spanning the fixture dates, and the fixture locations as presets. */
+function buildCalendarSeedSettings(
+  slots: SlotFixture[],
+): NonNullable<NewTimetable["settings"]>["calendar"] {
+  if (slots.length === 0) return { enabled: true };
+  const cells = new Map<
+    string,
+    { weekday: number; start: string; end: string }
+  >();
+  const locations = new Set<string>();
+  const dates: string[] = [];
+  for (const slot of slots) {
+    const weekday = new Date(`${slot.date}T00:00:00.000Z`).getUTCDay();
+    cells.set(slotCellKey(slot), {
+      weekday,
+      start: slot.startTime,
+      end: slot.endTime,
+    });
+    if (slot.location) locations.add(slot.location);
+    dates.push(slot.date);
+  }
+  dates.sort();
+  return {
+    enabled: true,
+    confirmPolicy: "hosts_propose",
+    locations: [...locations].sort(),
+    patternCells: [...cells.values()].sort(
+      (a, b) => a.weekday - b.weekday || a.start.localeCompare(b.start),
+    ),
+    terms: [{ name: "Autumn term", start: dates[0]!, end: dates.at(-1)! }],
+  };
+}
+
+/** A couple of standing weekly patterns so inference shows up in dev: one
+ * elector who never answered slots explicitly but painted the grid. */
+function buildPatternRows(
+  fixture: Fixture,
+  timetableId: string,
+  userIds: Map<string, string>,
+): NewAvailabilityPattern[] {
+  const cellKeys = [...new Set(fixture.slots.map(slotCellKey))];
+  if (cellKeys.length === 0) return [];
+  const paint = (state: AvailabilityState) =>
+    Object.fromEntries(cellKeys.map((k) => [k, state]));
+  const rows: NewAvailabilityPattern[] = [];
+  const grace = userIds.get("elector-grace");
+  if (grace) {
+    rows.push({
+      timetableId,
+      userId: grace,
+      cells: paint("green"),
+      updatedAt: BASE_TIME,
+    });
+  }
+  const oscar = userIds.get("elector-oscar");
+  if (oscar) {
+    rows.push({
+      timetableId,
+      userId: oscar,
+      cells: paint("red"),
+      updatedAt: BASE_TIME,
+    });
+  }
+  return rows;
+}
+
 function buildSlotRows(
   fixture: Fixture,
   timetableId: string,
@@ -1193,17 +1285,18 @@ function buildSlotRows(
   timeslotRows: NewTimeslot[];
   availabilityRows: NewAvailability[];
   slotCommentRows: NewSlotComment[];
-  slotTopicRows: NewSlotTopic[];
+  patternRows: NewAvailabilityPattern[];
 } {
   const timeslotRows: NewTimeslot[] = [];
   const availabilityRows: NewAvailability[] = [];
   const slotCommentRows: NewSlotComment[] = [];
-  const slotTopicRows: NewSlotTopic[] = [];
 
   for (const slot of fixture.slots) {
     const slotId = stableUuid("slot", slot.label);
     const startsAt = new Date(`${slot.date}T${slot.startTime}:00.000Z`);
     const endsAt = new Date(`${slot.date}T${slot.endTime}:00.000Z`);
+    const topicTag = slot.topicTags[0];
+    const topicId = topicTag ? (topicIds.get(topicTag) ?? null) : null;
 
     timeslotRows.push({
       id: slotId,
@@ -1211,6 +1304,10 @@ function buildSlotRows(
       startsAt,
       endsAt,
       location: slot.location,
+      topicId,
+      status: topicId ? (slot.status ?? "proposed") : "empty",
+      url: slot.url,
+      cellKey: slotCellKey(slot),
       createdAt: BASE_TIME,
       updatedAt: BASE_TIME,
     });
@@ -1235,14 +1332,14 @@ function buildSlotRows(
         createdAt: BASE_TIME,
       });
     }
-
-    for (const tag of slot.topicTags) {
-      const topicId = topicIds.get(tag) ?? "";
-      slotTopicRows.push({ slotId, topicId, createdAt: BASE_TIME });
-    }
   }
 
-  return { timeslotRows, availabilityRows, slotCommentRows, slotTopicRows };
+  return {
+    timeslotRows,
+    availabilityRows,
+    slotCommentRows,
+    patternRows: buildPatternRows(fixture, timetableId, userIds),
+  };
 }
 
 function createSeedDb(databaseUrl: string) {
@@ -1349,8 +1446,8 @@ async function insertFixtureRows(
   if (rows.slotCommentRows.length > 0) {
     await tx.insert(slotComments).values(rows.slotCommentRows);
   }
-  if (rows.slotTopicRows.length > 0) {
-    await tx.insert(slotTopics).values(rows.slotTopicRows);
+  if (rows.patternRows.length > 0) {
+    await tx.insert(availabilityPatterns).values(rows.patternRows);
   }
 }
 
