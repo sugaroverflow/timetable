@@ -228,6 +228,7 @@ function CalendarEmpty({
 
 /** Legend + the slot table (or the empty state). */
 function CalendarBody({
+  slug,
   visibleSlots,
   anySlots,
   perms,
@@ -236,6 +237,7 @@ function CalendarBody({
   past,
   base,
 }: {
+  slug: string;
   visibleSlots: CalendarSlot[];
   anySlots: boolean;
   perms: CalendarPerms;
@@ -251,6 +253,7 @@ function CalendarBody({
     <div className="stack" style={{ gap: "var(--space-2)" }}>
       <CalendarTable
         rows={visibleSlots.map((slot) => ({ slot, past: isPast(slot) }))}
+        slug={slug}
         perms={perms}
         claimTopics={claimTopics}
         adminLabel={adminLabel}
@@ -380,6 +383,7 @@ export default async function CalendarPage({
       />
 
       <CalendarBody
+        slug={slug}
         visibleSlots={visibleSlots}
         anySlots={data.calendar.length > 0}
         perms={perms}

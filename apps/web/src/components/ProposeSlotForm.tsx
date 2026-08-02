@@ -59,16 +59,17 @@ export function ProposeSlotForm({
     );
   }
 
-  // Hidden behind one big button, same reveal-in-place rule as
-  // "Create New Topic" (QA 2026-08-02).
+  // Hidden behind a plain left-aligned button (QA 2026-08-02 round 4),
+  // same reveal-in-place rule as "Create New Topic".
   if (!open) {
     return (
       <button
         type="button"
-        className="btn btn-primary btn-create"
+        className="btn btn-primary"
+        style={{ alignSelf: "flex-start" }}
         onClick={() => setOpen(true)}
       >
-        <Plus size={20} aria-hidden /> Propose a different time
+        <Plus size={16} aria-hidden /> Propose a different time
       </button>
     );
   }
