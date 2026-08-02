@@ -1452,6 +1452,34 @@ textarea {
   width: 1%;
   padding-right: 0;
 }
+/* Speech-bubble discussion button (QA 2026-08-02): the count sits inside
+   the bubble; an empty bubble means no messages yet. */
+.cal-comment-btn {
+  position: relative;
+  display: inline-flex;
+  padding: 3px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.cal-comment-btn:hover,
+.cal-comment-btn[aria-expanded="true"] {
+  color: var(--ink);
+}
+.cal-comment-count {
+  position: absolute;
+  top: calc(50% - 1px);
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 9px;
+  font-weight: var(--fw-bold);
+  line-height: 1;
+}
+/* Thicker rule between Sunday and Monday (QA 2026-08-02). */
+.cal-table tr.cal-week-start td {
+  border-top-width: 3px;
+}
 /* Session pills may be long — let this one cell wrap. */
 .cal-table td.cal-session-cell {
   white-space: normal;

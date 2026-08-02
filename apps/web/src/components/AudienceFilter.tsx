@@ -4,16 +4,35 @@ import { SelectMinimal } from "@/components/SelectMinimal";
 import type { TopicOption } from "@/lib/calendarTypes";
 import { useSetSearchParam } from "@/lib/useSearchParamNav";
 
+/** The calendar's topic lens. Hosts see only their own topics (the caller
+ * passes them pre-filtered); admins see every topic, grouped by host
+ * (QA 2026-08-02). */
 export function AudienceFilter({
   value,
   isHost,
+  admin,
   topics,
 }: {
   value: string;
   isHost: boolean;
+  admin: boolean;
   topics: TopicOption[];
 }) {
   const setParam = useSetSearchParam();
+
+  const groups = new Map<string, TopicOption[]>();
+  if (admin) {
+    for (const topic of topics) {
+      const host = topic.hostName ?? "Unknown host";
+      groups.set(host, [...(groups.get(host) ?? []), topic]);
+    }
+  }
+
+  const option = (tp: TopicOption) => (
+    <option key={tp.id} value={`hearted_topic:${tp.id}`}>
+      ❤️ {tp.title}
+    </option>
+  );
 
   return (
     <SelectMinimal
@@ -27,11 +46,15 @@ export function AudienceFilter({
     >
       <option value="all">All electors</option>
       {isHost ? <option value="hearted_mine">❤️ my topics</option> : null}
-      {topics.map((tp) => (
-        <option key={tp.id} value={`hearted_topic:${tp.id}`}>
-          ❤️ {tp.title}
-        </option>
-      ))}
+      {admin
+        ? [...groups.keys()]
+            .sort((a, b) => a.localeCompare(b))
+            .map((host) => (
+              <optgroup key={host} label={host}>
+                {(groups.get(host) ?? []).map(option)}
+              </optgroup>
+            ))
+        : topics.map(option)}
     </SelectMinimal>
   );
 }
