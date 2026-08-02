@@ -11,6 +11,7 @@ import {
   type CalendarTerm,
 } from "@timetable/shared";
 
+import { pluralLabel } from "@/lib/timetableSettings";
 import { useGqlAction } from "@/lib/useGqlAction";
 
 const SAVE_AND_NOOP = `mutation($s: String!, $cal: String!) {
@@ -185,9 +186,11 @@ function AddTermForm({ onAdd }: { onAdd: (term: CalendarTerm) => void }) {
 export function CalendarSetup({
   slug,
   current,
+  adminLabel = "Admin",
 }: {
   slug: string;
   current: CalendarSettings;
+  adminLabel?: string;
 }) {
   const { run, busy } = useGqlAction();
   const [open, setOpen] = useState(false);
@@ -228,9 +231,13 @@ export function CalendarSetup({
   return (
     <Collapsible.Root open={open} onOpenChange={setOpen}>
       <div className="card stack" style={{ gap: 10 }}>
-        <Collapsible.Trigger className="slot-expand">
-          {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />} Set up
-          the schedule
+        {/* Section-title heading like the Analysis table cards, no rule
+            above it (QA 2026-08-02). */}
+        <Collapsible.Trigger className="cal-section-toggle">
+          {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+          <span className="section-title">
+            Set up the schedule ({pluralLabel(adminLabel)} only)
+          </span>
         </Collapsible.Trigger>
         <Collapsible.Panel>
           <div className="stack" style={{ gap: 12 }}>

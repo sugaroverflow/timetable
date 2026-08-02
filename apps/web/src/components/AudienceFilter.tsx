@@ -30,7 +30,8 @@ export function AudienceFilter({
 
   const option = (tp: TopicOption) => (
     <option key={tp.id} value={`hearted_topic:${tp.id}`}>
-      ❤️ {tp.title}
+      {tp.title}
+      {tp.heartCount != null ? ` (${tp.heartCount} ❤️s)` : ""}
     </option>
   );
 

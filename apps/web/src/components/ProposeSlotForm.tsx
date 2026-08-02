@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Collapsible } from "@base-ui/react/collapsible";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { Plus } from "lucide-react";
 
 import type { TopicOption } from "@/lib/calendarTypes";
 import { useGqlAction } from "@/lib/useGqlAction";
@@ -60,73 +59,86 @@ export function ProposeSlotForm({
     );
   }
 
+  // Hidden behind one big button, same reveal-in-place rule as
+  // "Create New Topic" (QA 2026-08-02).
+  if (!open) {
+    return (
+      <button
+        type="button"
+        className="btn btn-primary btn-create"
+        onClick={() => setOpen(true)}
+      >
+        <Plus size={20} aria-hidden /> Propose a different time
+      </button>
+    );
+  }
+
   return (
-    <Collapsible.Root open={open} onOpenChange={setOpen}>
-      <div className="card stack" style={{ gap: 10 }}>
-        <Collapsible.Trigger className="slot-expand">
-          {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}{" "}
-          Propose a different time
-        </Collapsible.Trigger>
-        <Collapsible.Panel>
-          <form onSubmit={submit} className="stack" style={{ gap: 8 }}>
-            <p className="faint" style={{ margin: 0, fontSize: 12 }}>
-              Off the usual grid — breakfast, a full day, the park. It appears
-              as a pencilled slot and starts collecting availability right away.
-            </p>
-            <div className="row wrap" style={{ gap: 8 }}>
-              <select
-                aria-label="Topic"
-                value={topicId}
-                onChange={(e) => setTopicId(e.target.value)}
-                style={{ width: "auto" }}
-              >
-                <option value="">Topic…</option>
-                {topics.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.title}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="datetime-local"
-                aria-label="Start"
-                value={start}
-                onChange={(e) => setStart(e.target.value)}
-                style={{ width: "auto" }}
-              />
-              <input
-                type="datetime-local"
-                aria-label="End"
-                value={end}
-                onChange={(e) => setEnd(e.target.value)}
-                style={{ width: "auto" }}
-              />
-              <input
-                aria-label="Location"
-                placeholder="Location"
-                list="cal-locations"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                style={{ width: 160 }}
-              />
-              {locations.length > 0 ? (
-                <datalist id="cal-locations">
-                  {locations.map((loc) => (
-                    <option key={loc} value={loc} />
-                  ))}
-                </datalist>
-              ) : null}
-              <button
-                className="btn btn-primary"
-                type="submit"
-                disabled={busy || !start || !end || !topicId}
-              >
-                Propose
-              </button>
-            </div>
-          </form>
-        </Collapsible.Panel>
-      </div>
-    </Collapsible.Root>
+    <div className="card stack" style={{ gap: 10 }}>
+      <form onSubmit={submit} className="stack" style={{ gap: 8 }}>
+        <p className="faint" style={{ margin: 0, fontSize: 12 }}>
+          Off the usual grid — breakfast, a full day, the park. It appears as a
+          pencilled slot and starts collecting availability right away.
+        </p>
+        <div className="row wrap" style={{ gap: 8 }}>
+          <select
+            aria-label="Topic"
+            value={topicId}
+            onChange={(e) => setTopicId(e.target.value)}
+            style={{ width: "auto" }}
+          >
+            <option value="">Topic…</option>
+            {topics.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.title}
+              </option>
+            ))}
+          </select>
+          <input
+            type="datetime-local"
+            aria-label="Start"
+            value={start}
+            onChange={(e) => setStart(e.target.value)}
+            style={{ width: "auto" }}
+          />
+          <input
+            type="datetime-local"
+            aria-label="End"
+            value={end}
+            onChange={(e) => setEnd(e.target.value)}
+            style={{ width: "auto" }}
+          />
+          <input
+            aria-label="Location"
+            placeholder="Location"
+            list="cal-locations"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            style={{ width: 160 }}
+          />
+          {locations.length > 0 ? (
+            <datalist id="cal-locations">
+              {locations.map((loc) => (
+                <option key={loc} value={loc} />
+              ))}
+            </datalist>
+          ) : null}
+          <button
+            className="btn btn-primary"
+            type="submit"
+            disabled={busy || !start || !end || !topicId}
+          >
+            Propose
+          </button>
+          <button
+            className="btn btn-ghost"
+            type="button"
+            onClick={() => setOpen(false)}
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
