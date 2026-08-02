@@ -54,17 +54,20 @@ type SlotComment = {
  * react purity rule). */
 export type CalendarTableRow = { slot: CalendarSlot; past: boolean };
 
+// "Fri 9 Oct" / "14:00" — en-GB pinned for day-before-month and 24h time
+// (QA 2026-08-02; the viewer's own locale gave "Fri, Oct 9 02:00 PM").
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
+  return new Date(iso).toLocaleDateString("en-GB", {
     weekday: "short",
     day: "numeric",
     month: "short",
   });
 }
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString(undefined, {
+  return new Date(iso).toLocaleTimeString("en-GB", {
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
   });
 }
 function monthLabel(iso: string): string {
@@ -615,18 +618,17 @@ function SlotDetail({
   );
 }
 
+/** "**Fri 9 Oct** Terrace" over "14:00 – 16:00" (QA 2026-08-02). */
 function WhenCell({ slot }: { slot: CalendarSlot }) {
   return (
     <td className="cal-when-cell">
-      <strong>{formatDate(slot.startsAt)}</strong>{" "}
-      <span>
-        {formatTime(slot.startsAt)}–{formatTime(slot.endsAt)}
-      </span>
-      {slot.location ? (
-        <div className="faint" style={{ fontSize: 12 }}>
-          {slot.location}
-        </div>
-      ) : null}
+      <div>
+        <strong>{formatDate(slot.startsAt)}</strong>
+        {slot.location ? <> {slot.location}</> : null}
+      </div>
+      <div className="faint" style={{ fontSize: 12 }}>
+        {formatTime(slot.startsAt)} – {formatTime(slot.endsAt)}
+      </div>
     </td>
   );
 }
