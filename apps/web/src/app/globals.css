@@ -1509,13 +1509,16 @@ textarea {
   height: 38px;
   border-radius: 999px;
 }
+/* Avatars spread EVENLY along the meter (QA 2026-08-03): segment width is
+   proportional to its headcount, so space-evenly inside each segment =
+   uniform spacing across the whole bar, with the green/yellow/red ground
+   showing between faces. */
 .avail-meter .avail-meter-seg {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-evenly;
   height: 100%;
   overflow: hidden;
-  padding: 0 2px;
 }
 .avail-meter .avatar {
   width: 17px;
@@ -1526,10 +1529,6 @@ textarea {
 }
 .avail-meter .cal-person-link {
   flex: none;
-  margin-left: -4px;
-}
-.avail-meter .cal-person-link:first-child {
-  margin-left: 0;
 }
 .cal-person-link {
   display: inline-flex;
