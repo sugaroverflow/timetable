@@ -170,32 +170,34 @@ function AvailabilityMeter({
   );
 }
 
-/** Status + topic as one glanceable pill; blank when nothing's planned
- * (QA 2026-08-02 — "Open" read as noise). */
-function SessionBadge({ slot }: { slot: CalendarSlot }) {
+/** "Author: **Topic**" as regular text plus a status pill — "pencilled",
+ * or a clickable "register" pill to the event page when confirmed
+ * (QA 2026-08-03). Blank when nothing's planned. */
+function SessionLine({ slot }: { slot: CalendarSlot }) {
   if (!slot.topic) return null;
+  const confirmed = slot.status === "confirmed";
   return (
-    <div className="row wrap" style={{ gap: 6 }}>
-      <span
-        className={`pill ${slot.status === "confirmed" ? "pill-host" : ""}`}
-        title={slot.status === "confirmed" ? "Confirmed" : "Pencilled in"}
-      >
-        {slot.status === "confirmed" ? "Confirmed" : "✎ Pencilled"}:{" "}
-        {slot.topic.title}
+    <div className="row wrap" style={{ gap: 8, alignItems: "center" }}>
+      <span style={{ fontSize: 13 }}>
+        {slot.topic.hostName ?? "…"}: <strong>{slot.topic.title}</strong>
       </span>
-      {slot.url ? (
+      {!confirmed ? (
+        <span className="pill" title="Pencilled in — under discussion">
+          ✎ pencilled
+        </span>
+      ) : slot.url ? (
         <a
+          className="pill pill-host"
           href={slot.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="row"
-          style={{ gap: 4, fontSize: 13 }}
-          title="Event page"
-          aria-label="Event page"
+          title="Register on the event page"
         >
-          <ExternalLink size={13} aria-hidden />
+          register <ExternalLink size={12} aria-hidden />
         </a>
-      ) : null}
+      ) : (
+        <span className="pill pill-host">confirmed</span>
+      )}
     </div>
   );
 }
@@ -487,27 +489,20 @@ function CommentRow({ comment, slug }: { comment: SlotComment; slug: string }) {
 function DiscussionPanel({
   slot,
   slug,
-  claimTopics,
+  lensTopic,
   comments,
   onReload,
 }: {
   slot: CalendarSlot;
   slug: string;
-  claimTopics: TopicOption[];
+  /** The page's active topic lens — posting attaches it + the snapshot;
+   * "All electors" (null) posts a plain comment (QA 2026-08-03). */
+  lensTopic: TopicOption | null;
   comments: SlotComment[] | null;
   onReload: () => Promise<void>;
 }) {
   const { run, busy } = useGqlAction();
   const [body, setBody] = useState("");
-  const [claimTopicId, setClaimTopicId] = useState("");
-
-  function selectClaim(topicId: string) {
-    setClaimTopicId(topicId);
-    const topic = claimTopics.find((t) => t.id === topicId);
-    if (topic && !body.trim()) {
-      setBody(`I'd like to book this for a session on ${topic.title}.`);
-    }
-  }
 
   function post(e: React.FormEvent) {
     e.preventDefault();
@@ -515,12 +510,11 @@ function DiscussionPanel({
     if (!text) return;
     void run(
       ADD_COMMENT,
-      { id: slot.id, body: text, topic: claimTopicId || null },
+      { id: slot.id, body: text, topic: lensTopic?.id ?? null },
       {
         errorFallback: "Could not post",
         onSuccess: async () => {
           setBody("");
-          setClaimTopicId("");
           await onReload();
         },
       },
@@ -556,27 +550,11 @@ function DiscussionPanel({
             <Send size={16} aria-hidden />
           </button>
         </div>
-        {claimTopics.length > 0 ? (
-          <div className="row wrap" style={{ gap: 6 }}>
-            <select
-              aria-label="Attach a topic claim"
-              value={claimTopicId}
-              onChange={(e) => selectClaim(e.target.value)}
-              style={{ width: "auto", fontSize: 12 }}
-            >
-              <option value="">No topic attached</option>
-              {claimTopics.map((t) => (
-                <option key={t.id} value={t.id}>
-                  Claim for: {t.title}
-                </option>
-              ))}
-            </select>
-            {claimTopicId ? (
-              <span className="faint" style={{ fontSize: 12 }}>
-                The current 🟢🟡🔴 counts for this topic’s ❤️s will be attached.
-              </span>
-            ) : null}
-          </div>
+        {lensTopic ? (
+          <span className="faint" style={{ fontSize: 12 }}>
+            Posting attaches <strong>{lensTopic.title}</strong> with its current
+            🟢🟡🔴 counts.
+          </span>
         ) : null}
       </form>
     </div>
@@ -589,6 +567,7 @@ function SlotDetail({
   slug,
   perms,
   claimTopics,
+  lensTopic,
   adminLabel,
   comments,
   onReload,
@@ -597,6 +576,7 @@ function SlotDetail({
   slug: string;
   perms: CalendarPerms;
   claimTopics: TopicOption[];
+  lensTopic: TopicOption | null;
   adminLabel: string;
   comments: SlotComment[] | null;
   onReload: () => Promise<void>;
@@ -606,7 +586,7 @@ function SlotDetail({
       <DiscussionPanel
         slot={slot}
         slug={slug}
-        claimTopics={claimTopics}
+        lensTopic={lensTopic}
         comments={comments}
         onReload={onReload}
       />
@@ -681,6 +661,7 @@ function SlotTableRow({
   slug,
   perms,
   claimTopics,
+  lensTopic,
   adminLabel,
   columns,
 }: {
@@ -691,6 +672,7 @@ function SlotTableRow({
   slug: string;
   perms: CalendarPerms;
   claimTopics: TopicOption[];
+  lensTopic: TopicOption | null;
   adminLabel: string;
   columns: number;
 }) {
@@ -734,28 +716,34 @@ function SlotTableRow({
         <WhenCell slot={slot} />
         <MeterAndYouCells slot={slot} past={past} perms={perms} slug={slug} />
       </tr>
-      {/* Pencilled/confirmed pill on its own line under the row
-          (QA 2026-08-02 round 4) — visually part of the same slot block. */}
+      {/* "Author: Topic" + status pill on its own line under the row
+          (QA 2026-08-03) — visually part of the same slot block. */}
       {slot.topic ? (
         <tr className={`cal-session-row${past ? " cal-past" : ""}`}>
           <td />
           <td colSpan={columns - 1}>
-            <SessionBadge slot={slot} />
+            <SessionLine slot={slot} />
           </td>
         </tr>
       ) : null}
+      {/* Fold indented to the when-column with a hierarchy line on the
+          left (QA 2026-08-03). */}
       {open ? (
         <tr className="cal-detail-row">
-          <td colSpan={columns}>
-            <SlotDetail
-              slot={slot}
-              slug={slug}
-              perms={perms}
-              claimTopics={claimTopics}
-              adminLabel={adminLabel}
-              comments={comments}
-              onReload={loadComments}
-            />
+          <td />
+          <td colSpan={columns - 1}>
+            <div className="cal-fold">
+              <SlotDetail
+                slot={slot}
+                slug={slug}
+                perms={perms}
+                claimTopics={claimTopics}
+                lensTopic={lensTopic}
+                adminLabel={adminLabel}
+                comments={comments}
+                onReload={loadComments}
+              />
+            </div>
           </td>
         </tr>
       ) : null}
@@ -774,6 +762,7 @@ export function CalendarTable({
   slug,
   perms,
   claimTopics,
+  lensTopic,
   adminLabel = "Admin",
   showingPast,
   base,
@@ -782,6 +771,7 @@ export function CalendarTable({
   slug: string;
   perms: CalendarPerms;
   claimTopics: TopicOption[];
+  lensTopic: TopicOption | null;
   adminLabel?: string;
   showingPast: boolean;
   base: string;
@@ -789,40 +779,32 @@ export function CalendarTable({
   const columns =
     2 + (perms.canSeeHostOnly ? 1 : 0) + (perms.canSetAvailability ? 1 : 0);
 
+  const pastToggle = (
+    <Link
+      className="topic-body-toggle"
+      href={showingPast ? `${base}/calendar` : `${base}/calendar?past=1`}
+    >
+      {showingPast ? (
+        <>
+          <ChevronUp size={14} aria-hidden /> Hide past
+        </>
+      ) : (
+        <>
+          <ChevronDown size={14} aria-hidden /> Show past
+        </>
+      )}
+    </Link>
+  );
+
   return (
     <div className="card">
+      <h3 className="section-title" style={{ marginBottom: 8 }}>
+        Calendar
+      </h3>
       <div className="table-wrap">
+        {/* No header row (QA 2026-08-03) — the columns explain themselves. */}
         <table className="data-table cal-table">
-          <thead>
-            <tr>
-              <th aria-label="Discussion" />
-              <th>When</th>
-              {/* Group availability is host/admin-only (QA 2026-08-02). */}
-              {perms.canSeeHostOnly ? <th>Availability</th> : null}
-              {perms.canSetAvailability ? <th>You</th> : null}
-            </tr>
-          </thead>
           <tbody>
-            <tr className="cal-past-row">
-              <td colSpan={columns}>
-                <Link
-                  className="topic-body-toggle"
-                  href={
-                    showingPast ? `${base}/calendar` : `${base}/calendar?past=1`
-                  }
-                >
-                  {showingPast ? (
-                    <>
-                      <ChevronUp size={14} aria-hidden /> Hide past
-                    </>
-                  ) : (
-                    <>
-                      <ChevronDown size={14} aria-hidden /> Show past
-                    </>
-                  )}
-                </Link>
-              </td>
-            </tr>
             {rows.map(({ slot, past }, i) => {
               const month = monthLabel(slot.startsAt);
               const divider =
@@ -837,7 +819,14 @@ export function CalendarTable({
                 <Fragment key={slot.id}>
                   {divider ? (
                     <tr className="cal-month-row">
-                      <td colSpan={columns}>{month}</td>
+                      <td colSpan={columns}>
+                        <span className="cal-month-inner">
+                          {month}
+                          {/* The past toggle rides in the FIRST month
+                              break (QA 2026-08-03). */}
+                          {i === 0 ? pastToggle : null}
+                        </span>
+                      </td>
                     </tr>
                   ) : null}
                   <SlotTableRow
@@ -847,6 +836,7 @@ export function CalendarTable({
                     slug={slug}
                     perms={perms}
                     claimTopics={claimTopics}
+                    lensTopic={lensTopic}
                     adminLabel={adminLabel}
                     columns={columns}
                   />

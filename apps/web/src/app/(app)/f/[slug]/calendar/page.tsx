@@ -42,7 +42,7 @@ type Data = {
 
 const SLOT_FIELDS = `
   id startsAt endsAt location status url cellKey commentCount viewerState
-  topic { id title hostId }
+  topic { id title hostId hostName }
   counts { green yellow red }
   perUser { userId name image state }
 `;
@@ -112,26 +112,23 @@ function CalendarToolbar({
       {locations.length > 0 ? (
         <LocationFilter value={location ?? ""} locations={locations} />
       ) : null}
-      <span className="spacer" />
-      {perms.canSeeHostOnly ? <AudienceCount calendar={calendar} /> : null}
     </div>
-  );
-}
-
-/** Every slot carries the full audience in perUser (host/admin only), so
- * the audience size is the same across slots. */
-function AudienceCount({ calendar }: { calendar: CalendarSlot[] }) {
-  const audienceCount = calendar[0]?.perUser?.length ?? null;
-  if (audienceCount === null) return null;
-  return (
-    <span className="faint" style={{ fontSize: 12 }}>
-      {audienceCount} elector{audienceCount === 1 ? "" : "s"} in view
-    </span>
   );
 }
 
 function isPast(slot: CalendarSlot): boolean {
   return new Date(slot.endsAt).getTime() < Date.now();
+}
+
+/** The active lens topic (from ?audience=hearted_topic:<id>), or null for
+ * "All electors" — it doubles as the comment attachment (QA 2026-08-03). */
+function findLensTopic(
+  audience: string | undefined,
+  topicFeed: TopicOption[],
+): TopicOption | null {
+  if (!audience?.startsWith("hearted_topic:")) return null;
+  const id = audience.slice("hearted_topic:".length);
+  return topicFeed.find((t) => t.id === id) ?? null;
 }
 
 function buildPerms(
@@ -233,6 +230,7 @@ function CalendarBody({
   anySlots,
   perms,
   claimTopics,
+  lensTopic,
   adminLabel,
   past,
   base,
@@ -242,6 +240,7 @@ function CalendarBody({
   anySlots: boolean;
   perms: CalendarPerms;
   claimTopics: TopicOption[];
+  lensTopic: TopicOption | null;
   adminLabel: string;
   past: boolean;
   base: string;
@@ -256,6 +255,7 @@ function CalendarBody({
         slug={slug}
         perms={perms}
         claimTopics={claimTopics}
+        lensTopic={lensTopic}
         adminLabel={adminLabel}
         showingPast={past}
         base={base}
@@ -346,6 +346,8 @@ export default async function CalendarPage({
     ? data.topicFeed
     : data.topicFeed.filter((t) => t.hostId === viewerId);
 
+  const lensTopic = findLensTopic(audience, data.topicFeed);
+
   const visibleSlots = location
     ? data.calendar.filter((s) => s.location === location)
     : data.calendar;
@@ -388,6 +390,7 @@ export default async function CalendarPage({
         anySlots={data.calendar.length > 0}
         perms={perms}
         claimTopics={claimTopics}
+        lensTopic={lensTopic}
         adminLabel={adminLabel}
         past={past}
         base={base}

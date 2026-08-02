@@ -198,12 +198,18 @@ const SlotAvailabilityType = builder
   });
 
 const SlotTopicType = builder
-  .objectRef<{ id: string; title: string; hostId: string }>("SlotTopic")
+  .objectRef<{
+    id: string;
+    title: string;
+    hostId: string;
+    hostName: string | null;
+  }>("SlotTopic")
   .implement({
     fields: (t) => ({
       id: t.exposeID("id"),
       title: t.exposeString("title"),
       hostId: t.exposeID("hostId"),
+      hostName: t.exposeString("hostName", { nullable: true }),
     }),
   });
 
