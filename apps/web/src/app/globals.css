@@ -1505,7 +1505,8 @@ textarea {
 .avail-meter {
   width: 100%;
   min-width: 160px;
-  height: 24px;
+  /* As tall as the two-line when/where block beside it (QA 2026-08-03). */
+  height: 38px;
   border-radius: 999px;
 }
 .avail-meter .avail-meter-seg {
@@ -1533,11 +1534,6 @@ textarea {
 .cal-person-link {
   display: inline-flex;
 }
-/* "Show past" rides as the table's first full-width row, styled like the
-   long-text Show more control (QA 2026-08-02). */
-.cal-past-row td {
-  text-align: center;
-}
 .cal-past-row .topic-body-toggle {
   margin-top: 0;
 }
@@ -1558,18 +1554,38 @@ textarea {
   margin: 0;
 }
 /* Divider/utility rows sit on the card surface, not the page background
-   (QA 2026-08-02 round 4). */
+   (QA 2026-08-02 round 4). Month text in the primary colour, with the
+   past toggle riding in the FIRST month break (QA 2026-08-03). */
 .cal-month-row td {
-  color: var(--muted);
+  color: var(--primary);
   font-size: var(--text-xs);
   font-weight: var(--fw-bold);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-/* The fold under a slot row: card surface, no rule above it. */
+.cal-month-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.cal-month-inner .topic-body-toggle {
+  margin-top: 0;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.cal-table tbody tr:first-child td {
+  border-top: 0;
+}
+/* The fold under a slot row: card surface, no rule above it, indented to
+   the when-column with a hierarchy line on the left (QA 2026-08-03). */
 .cal-detail-row td {
   border-top: 0;
   white-space: normal;
+}
+.cal-fold {
+  border-left: 2px solid var(--line);
+  padding-left: 14px;
 }
 .cal-detail-row .host-thread {
   border-top: 0;

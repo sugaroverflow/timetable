@@ -10,7 +10,12 @@ export type CalendarSlot = {
   status: SlotStatus;
   url: string;
   cellKey: string | null;
-  topic: { id: string; title: string; hostId: string } | null;
+  topic: {
+    id: string;
+    title: string;
+    hostId: string;
+    hostName: string | null;
+  } | null;
   viewerState: AvailabilityState | null;
   counts: { green: number; yellow: number; red: number };
   perUser:

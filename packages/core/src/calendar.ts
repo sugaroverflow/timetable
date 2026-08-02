@@ -455,7 +455,12 @@ export type CalendarSlot = {
   url: string;
   cellKey: string | null;
   createdById: string | null;
-  topic: { id: string; title: string; hostId: string } | null;
+  topic: {
+    id: string;
+    title: string;
+    hostId: string;
+    hostName: string | null;
+  } | null;
   viewerState: AvailabilityState | null;
   counts: SlotCounts;
   perUser: {
@@ -472,7 +477,10 @@ type SlotRelatedRows = {
   audienceProfiles: Map<string, { name: string | null; image: string | null }>;
   patterns: Map<string, PatternCells>;
   viewerPattern: PatternCells | undefined;
-  topicsById: Map<string, { id: string; title: string; hostId: string }>;
+  topicsById: Map<
+    string,
+    { id: string; title: string; hostId: string; hostName: string | null }
+  >;
   commentCountBySlot: Map<string, number>;
 };
 
@@ -528,12 +536,26 @@ async function loadSlotRelatedRows(
   ];
   const topicsById = new Map<
     string,
-    { id: string; title: string; hostId: string }
+    { id: string; title: string; hostId: string; hostName: string | null }
   >();
   if (topicIds.length > 0) {
+    // Host name from their per-forum membership profile (session lines
+    // read "Author: Topic" — QA 2026-08-03).
     const topicRows = await db
-      .select({ id: topics.id, title: topics.title, hostId: topics.hostId })
+      .select({
+        id: topics.id,
+        title: topics.title,
+        hostId: topics.hostId,
+        hostName: timetableMemberships.name,
+      })
       .from(topics)
+      .leftJoin(
+        timetableMemberships,
+        and(
+          eq(timetableMemberships.userId, topics.hostId),
+          eq(timetableMemberships.timetableId, timetableId),
+        ),
+      )
       .where(inArray(topics.id, topicIds));
     for (const t of topicRows) topicsById.set(t.id, t);
   }
