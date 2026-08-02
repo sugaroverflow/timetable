@@ -24,7 +24,12 @@ export type CalendarSlot = {
   commentCount: number;
 };
 
-export type TopicOption = { id: string; title: string; hostId: string };
+export type TopicOption = {
+  id: string;
+  title: string;
+  hostId: string;
+  hostName?: string | null;
+};
 
 /** What the viewer may do on the calendar page — resolved server-side from
  * roles + the forum's confirm policy and threaded through the row UI. */

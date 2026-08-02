@@ -51,7 +51,7 @@ const QUERY = `
   query Calendar($s: String!, $audience: String, $past: Boolean) {
     timetable: forum(idOrSlug: $s) { viewerRoles settings }
     calendar(idOrSlug: $s, audience: $audience, includePast: $past) { ${SLOT_FIELDS} }
-    topicFeed(idOrSlug: $s) { id title hostId }
+    topicFeed(idOrSlug: $s) { id title hostId hostName }
   }
 `;
 
@@ -60,7 +60,7 @@ const QUERY_AUTHED = `
     timetable: forum(idOrSlug: $s) { viewerRoles settings }
     me { id }
     calendar(idOrSlug: $s, audience: $audience, includePast: $past) { ${SLOT_FIELDS} }
-    topicFeed(idOrSlug: $s) { id title hostId }
+    topicFeed(idOrSlug: $s) { id title hostId hostName }
     myIcsToken
     myAvailabilityPattern(idOrSlug: $s)
   }
@@ -99,13 +99,16 @@ function CalendarToolbar({
   ].sort();
 
   return (
-    <div className="toolbar">
+    // Flush floating filter bar, same treatment as the All Topics toolbar
+    // (QA 2026-08-02) — sits directly above the table.
+    <div className="toolbar feed-toolbar">
       {perms.canSeeHostOnly ? (
         <>
           <label>Topic</label>
           <AudienceFilter
             value={audience ?? "all"}
             isHost={hostView}
+            admin={perms.canAdmin}
             topics={topics}
           />
         </>
@@ -255,13 +258,13 @@ function CalendarBody({
   }
   return (
     <div className="stack" style={{ gap: "var(--space-2)" }}>
-      <Legend />
       <CalendarTable
         rows={visibleSlots.map((slot) => ({ slot, past: isPast(slot) }))}
         perms={perms}
         claimTopics={claimTopics}
         adminLabel={adminLabel}
       />
+      <Legend />
     </div>
   );
 }
@@ -337,7 +340,8 @@ export default async function CalendarPage({
   const adminLabel = roleLabel(settings.roleLabels, "admin");
   const calendarSettings = settings.calendar ?? {};
 
-  // Hosts pencil/claim their own published topics; admins any topic.
+  // Hosts pencil/claim/filter by their own published topics; admins see
+  // every topic (the lens groups them by host — QA 2026-08-02).
   const claimTopics = perms.canAdmin
     ? data.topicFeed
     : data.topicFeed.filter((t) => t.hostId === viewerId);
@@ -352,9 +356,17 @@ export default async function CalendarPage({
         <h2 className="page-title">Calendar</h2>
       </div>
 
+      <CalendarCards
+        slug={slug}
+        perms={perms}
+        calendar={calendarSettings}
+        myPattern={parsePattern(data.myAvailabilityPattern)}
+        claimTopics={claimTopics}
+      />
+
       <CalendarToolbar
         calendar={data.calendar}
-        topics={data.topicFeed}
+        topics={claimTopics}
         perms={perms}
         hostView={isHost(roles)}
         audience={audience}
@@ -362,14 +374,6 @@ export default async function CalendarPage({
         past={past}
         icsUrl={buildIcsUrl(slug, data.myIcsToken)}
         base={base}
-      />
-
-      <CalendarCards
-        slug={slug}
-        perms={perms}
-        calendar={calendarSettings}
-        myPattern={parsePattern(data.myAvailabilityPattern)}
-        claimTopics={claimTopics}
       />
 
       <CalendarBody

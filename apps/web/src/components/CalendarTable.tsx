@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useState } from "react";
-import { ChevronDown, ChevronRight, ExternalLink, Send } from "lucide-react";
+import { ExternalLink, MessageCircle, Send } from "lucide-react";
 
 import type {
   CalendarPerms,
@@ -65,6 +65,13 @@ function monthLabel(iso: string): string {
   });
 }
 
+/** The Monday starting this slot's week (viewer-local) — week-divider key. */
+function weekKey(iso: string): string {
+  const d = new Date(iso);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return d.toDateString();
+}
+
 function pct(n: number, total: number): string {
   return total > 0 ? `${(n / total) * 100}%` : "0%";
 }
@@ -80,15 +87,60 @@ function countsTitle(c: { green: number; yellow: number; red: number }) {
   return `🟢 ${c.green} · 🟡 ${c.yellow} · 🔴 ${c.red}`;
 }
 
-/** Status + topic as one glanceable pill ("what's happening here"). */
+/** Speech-bubble discussion button (QA 2026-08-02): count inside the
+ * bubble, empty bubble when there are no messages yet. */
+function CommentButton({
+  slot,
+  open,
+  onToggle,
+}: {
+  slot: CalendarSlot;
+  open: boolean;
+  onToggle: () => Promise<void>;
+}) {
+  return (
+    <button
+      type="button"
+      className="cal-comment-btn"
+      aria-expanded={open}
+      aria-label={
+        slot.commentCount > 0
+          ? `Discussion (${slot.commentCount} messages)`
+          : "Discussion"
+      }
+      title={open ? "Hide discussion" : "Discussion"}
+      onClick={() => void onToggle()}
+    >
+      <MessageCircle size={22} aria-hidden />
+      {slot.commentCount > 0 ? (
+        <span className="cal-comment-count">
+          {slot.commentCount > 99 ? "99" : slot.commentCount}
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
+/** Aggregate bar whose length tracks the audience size. */
+function AvailabilityBar({
+  counts,
+}: {
+  counts: { green: number; yellow: number; red: number };
+}) {
+  const total = counts.green + counts.yellow + counts.red;
+  return (
+    <span className="avail-bar" style={{ width: barWidth(total) }}>
+      <span className="g" style={{ width: pct(counts.green, total) }} />
+      <span className="y" style={{ width: pct(counts.yellow, total) }} />
+      <span className="r" style={{ width: pct(counts.red, total) }} />
+    </span>
+  );
+}
+
+/** Status + topic as one glanceable pill; blank when nothing's planned
+ * (QA 2026-08-02 — "Open" read as noise). */
 function SessionBadge({ slot }: { slot: CalendarSlot }) {
-  if (!slot.topic) {
-    return (
-      <span className="faint" style={{ fontSize: 13 }}>
-        Open
-      </span>
-    );
-  }
+  if (!slot.topic) return null;
   return (
     <span className="row wrap" style={{ gap: 6 }}>
       <span
@@ -558,6 +610,7 @@ function SlotDetail({
 function SlotTableRow({
   slot,
   past,
+  weekStart,
   perms,
   claimTopics,
   adminLabel,
@@ -565,6 +618,8 @@ function SlotTableRow({
 }: {
   slot: CalendarSlot;
   past: boolean;
+  /** True when this slot starts a new (Mon-first) week — thicker rule. */
+  weekStart: boolean;
   perms: CalendarPerms;
   claimTopics: TopicOption[];
   adminLabel: string;
@@ -572,7 +627,6 @@ function SlotTableRow({
 }) {
   const [open, setOpen] = useState(false);
   const [comments, setComments] = useState<SlotComment[] | null>(null);
-  const total = slot.counts.green + slot.counts.yellow + slot.counts.red;
   const canExpand = perms.canSeeHostOnly || perms.canAdmin;
 
   async function loadComments() {
@@ -593,28 +647,19 @@ function SlotTableRow({
     if (next && comments === null) await loadComments();
   }
 
+  const rowClasses = [
+    past ? "cal-past" : null,
+    weekStart ? "cal-week-start" : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <Fragment>
-      <tr className={past ? "cal-past" : undefined}>
+      <tr className={rowClasses || undefined}>
         <td className="cal-caret-cell">
           {canExpand ? (
-            <span className="row" style={{ gap: 2, alignItems: "center" }}>
-              <button
-                type="button"
-                className="breakdown-caret"
-                aria-expanded={open}
-                aria-label={open ? "Hide details" : "Show details"}
-                title={open ? "Hide details" : "Show details"}
-                onClick={() => void toggle()}
-              >
-                {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-              </button>
-              {slot.commentCount > 0 ? (
-                <span className="faint" style={{ fontSize: 11 }}>
-                  💬{slot.commentCount}
-                </span>
-              ) : null}
-            </span>
+            <CommentButton slot={slot} open={open} onToggle={toggle} />
           ) : null}
         </td>
         <td>
@@ -629,20 +674,7 @@ function SlotTableRow({
           ) : null}
         </td>
         <td title={countsTitle(slot.counts)}>
-          <span className="avail-bar" style={{ width: barWidth(total) }}>
-            <span
-              className="g"
-              style={{ width: pct(slot.counts.green, total) }}
-            />
-            <span
-              className="y"
-              style={{ width: pct(slot.counts.yellow, total) }}
-            />
-            <span
-              className="r"
-              style={{ width: pct(slot.counts.red, total) }}
-            />
-          </span>
+          <AvailabilityBar counts={slot.counts} />
         </td>
         {perms.canSetAvailability ? (
           <td>
@@ -713,6 +745,12 @@ export function CalendarTable({
             const month = monthLabel(slot.startsAt);
             const divider =
               i === 0 || month !== monthLabel(rows[i - 1]!.slot.startsAt);
+            // Thicker rule between Sunday and Monday (QA 2026-08-02) —
+            // skipped when a month heading already breaks the run.
+            const weekStart =
+              !divider &&
+              i > 0 &&
+              weekKey(slot.startsAt) !== weekKey(rows[i - 1]!.slot.startsAt);
             return (
               <Fragment key={slot.id}>
                 {divider ? (
@@ -723,6 +761,7 @@ export function CalendarTable({
                 <SlotTableRow
                   slot={slot}
                   past={past}
+                  weekStart={weekStart}
                   perms={perms}
                   claimTopics={claimTopics}
                   adminLabel={adminLabel}
