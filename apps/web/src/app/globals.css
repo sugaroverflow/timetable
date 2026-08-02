@@ -1452,20 +1452,28 @@ textarea {
   width: 1%;
   padding-right: 0;
 }
-/* Speech-bubble discussion button (QA 2026-08-02): the count sits inside
-   the bubble; an empty bubble means no messages yet. */
+/* Speech-bubble discussion button (QA 2026-08-02): primary-filled bubble,
+   the count inside in the card colour; the no-messages bubble is washed
+   out. */
 .cal-comment-btn {
   position: relative;
   display: inline-flex;
   padding: 3px;
   border: none;
   background: none;
-  color: var(--muted);
+  color: var(--primary);
   cursor: pointer;
+}
+.cal-comment-btn svg {
+  fill: currentColor;
+}
+.cal-comment-btn.cal-comment-empty {
+  opacity: 0.35;
 }
 .cal-comment-btn:hover,
 .cal-comment-btn[aria-expanded="true"] {
-  color: var(--ink);
+  opacity: 1;
+  color: var(--primary);
 }
 .cal-comment-count {
   position: absolute;
@@ -1475,10 +1483,12 @@ textarea {
   font-size: 9px;
   font-weight: var(--fw-bold);
   line-height: 1;
+  color: var(--card);
 }
-/* Thicker rule between Sunday and Monday (QA 2026-08-02). */
+/* Thicker PRIMARY rule between Sunday and Monday (QA 2026-08-02 r4). */
 .cal-table tr.cal-week-start td {
   border-top-width: 3px;
+  border-top-color: var(--primary);
 }
 /* When/where + the session pill underneath — pills may be long, so this
    cell wraps. */
@@ -1487,9 +1497,15 @@ textarea {
   min-width: 180px;
 }
 /* Availability meter with avatars inside their 🟢/🟡/🔴 stretch
-   (QA 2026-08-02). Builds on .avail-bar's segment colours. */
+   (QA 2026-08-02). Fills its column — the audience is the same on every
+   row of a view, so length carries no information. */
+.cal-table td.cal-avail-cell {
+  width: 55%;
+}
 .avail-meter {
-  height: 32px;
+  width: 100%;
+  min-width: 160px;
+  height: 24px;
   border-radius: 999px;
 }
 .avail-meter .avail-meter-seg {
@@ -1501,17 +1517,25 @@ textarea {
   padding: 0 2px;
 }
 .avail-meter .avatar {
+  width: 17px;
+  height: 17px;
+  font-size: 7px;
   flex: none;
-  margin-left: -6px;
-  box-shadow: 0 0 0 1.5px rgb(255 255 255 / 55%);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 55%);
 }
-.avail-meter .avatar:first-child {
+.avail-meter .cal-person-link {
+  flex: none;
+  margin-left: -4px;
+}
+.avail-meter .cal-person-link:first-child {
   margin-left: 0;
+}
+.cal-person-link {
+  display: inline-flex;
 }
 /* "Show past" rides as the table's first full-width row, styled like the
    long-text Show more control (QA 2026-08-02). */
 .cal-past-row td {
-  background: var(--bg);
   text-align: center;
 }
 .cal-past-row .topic-body-toggle {
@@ -1533,18 +1557,29 @@ textarea {
 .cal-section-toggle .section-title {
   margin: 0;
 }
+/* Divider/utility rows sit on the card surface, not the page background
+   (QA 2026-08-02 round 4). */
 .cal-month-row td {
-  background: var(--bg);
   color: var(--muted);
   font-size: var(--text-xs);
   font-weight: var(--fw-bold);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-/* The fold under a slot row (matches .elector-hearts-row). */
+/* The fold under a slot row: card surface, no rule above it. */
 .cal-detail-row td {
-  background: var(--bg);
+  border-top: 0;
   white-space: normal;
+}
+.cal-detail-row .host-thread {
+  border-top: 0;
+  margin-top: 0;
+  padding-top: 0;
+}
+/* The session pill's own line, part of the same slot block. */
+.cal-session-row td {
+  border-top: 0;
+  padding-top: 0;
 }
 /* Emoji-only availability segments for table cells. */
 .avseg-compact button {

@@ -20,6 +20,7 @@ import { useGqlAction } from "@/lib/useGqlAction";
 
 import { Avatar } from "./Avatar";
 import { AvailabilityControl } from "./AvailabilityControl";
+import { GrowingTextarea } from "./GrowingTextarea";
 
 const SET_SESSION = `mutation($slot: String!, $topic: String, $status: String, $url: String) {
   setSlotSession(slotId: $slot, topicId: $topic, status: $status, url: $url)
@@ -30,7 +31,7 @@ const UPDATE_SLOT = `mutation($slot: String!, $a: String, $b: String, $loc: Stri
 const DELETE_SLOT = `mutation($slot: String!) { deleteTimeslot(slotId: $slot) }`;
 const COMMENTS_QUERY = `query($id: String!) {
   slotComments(slotId: $id) {
-    id authorName authorImage body topicTitle createdAt
+    id authorId authorName authorImage body topicTitle createdAt
     counts { green yellow red }
   }
 }`;
@@ -40,6 +41,7 @@ const ADD_COMMENT = `mutation($id: String!, $body: String!, $topic: String) {
 
 type SlotComment = {
   id: string;
+  authorId: string;
   authorName: string | null;
   authorImage: string | null;
   body: string;
@@ -101,7 +103,7 @@ function CommentButton({
   return (
     <button
       type="button"
-      className="cal-comment-btn"
+      className={`cal-comment-btn${slot.commentCount === 0 ? " cal-comment-empty" : ""}`}
       aria-expanded={open}
       aria-label={
         slot.commentCount > 0
@@ -122,26 +124,23 @@ function CommentButton({
 }
 
 /** Availability meter with the electors' avatars INSIDE their segment
- * (QA 2026-08-02): 🟢 people on the green stretch, and so on. Length still
- * tracks the audience size; hover an avatar for the name. */
+ * (QA 2026-08-02): 🟢 people on the green stretch, and so on. The audience
+ * is the same on every row of a view, so the meter always fills its column
+ * width; avatars link to the person's page. */
 function AvailabilityMeter({
   perUser,
   counts,
+  slug,
 }: {
   perUser: NonNullable<CalendarSlot["perUser"]>;
   counts: { green: number; yellow: number; red: number };
+  slug: string;
 }) {
   const total = perUser.length;
   if (total === 0) return null;
   const states = ["green", "yellow", "red"] as const;
-  // ~20px per person: 26px avatars overlapping 6px inside each segment.
-  const width = Math.max(48, Math.min(total * 20, 440));
   return (
-    <span
-      className="avail-bar avail-meter"
-      style={{ width }}
-      title={countsTitle(counts)}
-    >
+    <span className="avail-bar avail-meter" title={countsTitle(counts)}>
       {states.map((state) => {
         const people = perUser.filter((u) => u.state === state);
         if (people.length === 0) return null;
@@ -152,7 +151,14 @@ function AvailabilityMeter({
             style={{ width: pct(people.length, total) }}
           >
             {people.map((u) => (
-              <Avatar key={u.userId} name={u.name} image={u.image} small />
+              <Link
+                key={u.userId}
+                href={`/f/${slug}/${u.userId}`}
+                className="cal-person-link"
+                aria-label={u.name ?? "Member"}
+              >
+                <Avatar name={u.name} image={u.image} small />
+              </Link>
             ))}
           </span>
         );
@@ -166,7 +172,7 @@ function AvailabilityMeter({
 function SessionBadge({ slot }: { slot: CalendarSlot }) {
   if (!slot.topic) return null;
   return (
-    <div className="row wrap" style={{ gap: 6, marginTop: 4 }}>
+    <div className="row wrap" style={{ gap: 6 }}>
       <span
         className={`pill ${slot.status === "confirmed" ? "pill-host" : ""}`}
         title={slot.status === "confirmed" ? "Confirmed" : "Pencilled in"}
@@ -444,13 +450,19 @@ function AdminSlotControls({
   );
 }
 
-/** One comment; a session claim renders its topic + frozen snapshot chip. */
-function CommentRow({ comment }: { comment: SlotComment }) {
+/** One comment; a session claim renders its topic + frozen snapshot chip.
+ * Avatar and name link to the author's person page. */
+function CommentRow({ comment, slug }: { comment: SlotComment; slug: string }) {
+  const personHref = `/f/${slug}/${comment.authorId}`;
   return (
     <div className="hc">
-      <Avatar name={comment.authorName} image={comment.authorImage} small />
+      <Link href={personHref} className="cal-person-link">
+        <Avatar name={comment.authorName} image={comment.authorImage} small />
+      </Link>
       <div>
-        <div className="hc-name">{comment.authorName ?? "Someone"}</div>
+        <div className="hc-name">
+          <Link href={personHref}>{comment.authorName ?? "Someone"}</Link>
+        </div>
         <div className="hc-bubble">
           {comment.body}
           {comment.topicTitle ? (
@@ -471,11 +483,13 @@ function CommentRow({ comment }: { comment: SlotComment }) {
  * fetched by the row when it unfolds and reloaded after a post. */
 function DiscussionPanel({
   slot,
+  slug,
   claimTopics,
   comments,
   onReload,
 }: {
   slot: CalendarSlot;
+  slug: string;
   claimTopics: TopicOption[];
   comments: SlotComment[] | null;
   onReload: () => Promise<void>;
@@ -513,37 +527,34 @@ function DiscussionPanel({
   return (
     <div className="host-thread">
       {comments?.map((c) => (
-        <CommentRow key={c.id} comment={c} />
+        <CommentRow key={c.id} comment={c} slug={slug} />
       ))}
       {comments && comments.length === 0 ? (
         <div className="faint" style={{ fontSize: 12, padding: "4px 0" }}>
           No messages yet.
         </div>
       ) : null}
+      {/* Same composer shape as everywhere else (QA 2026-08-02). */}
       <form onSubmit={post} className="stack" style={{ gap: 6 }}>
-        <div className="hc" style={{ alignItems: "flex-start" }}>
-          <Avatar name={null} small />
-          <div style={{ flex: 1, display: "flex", gap: 8 }}>
-            <textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              placeholder="Add to the discussion…"
-              aria-label="Slot message"
-              style={{ flex: 1, minHeight: 38 }}
-            />
-            <button
-              className="btn btn-primary btn-send"
-              type="submit"
-              disabled={busy}
-              aria-label="Send message"
-              title="Send"
-            >
-              <Send size={16} aria-hidden />
-            </button>
-          </div>
+        <div className="inline-form" style={{ marginTop: 4 }}>
+          <GrowingTextarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder="Add to the discussion…"
+            aria-label="Slot message"
+          />
+          <button
+            className="btn btn-primary btn-send"
+            type="submit"
+            disabled={busy}
+            aria-label="Send message"
+            title="Send"
+          >
+            <Send size={16} aria-hidden />
+          </button>
         </div>
         {claimTopics.length > 0 ? (
-          <div className="row wrap" style={{ gap: 6, paddingLeft: 34 }}>
+          <div className="row wrap" style={{ gap: 6 }}>
             <select
               aria-label="Attach a topic claim"
               value={claimTopicId}
@@ -572,6 +583,7 @@ function DiscussionPanel({
 /** The fold under a slot row: avatars by state, discussion, controls. */
 function SlotDetail({
   slot,
+  slug,
   perms,
   claimTopics,
   adminLabel,
@@ -579,6 +591,7 @@ function SlotDetail({
   onReload,
 }: {
   slot: CalendarSlot;
+  slug: string;
   perms: CalendarPerms;
   claimTopics: TopicOption[];
   adminLabel: string;
@@ -589,6 +602,7 @@ function SlotDetail({
     <div className="stack" style={{ gap: 10 }}>
       <DiscussionPanel
         slot={slot}
+        slug={slug}
         claimTopics={claimTopics}
         comments={comments}
         onReload={onReload}
@@ -601,10 +615,68 @@ function SlotDetail({
   );
 }
 
+function WhenCell({ slot }: { slot: CalendarSlot }) {
+  return (
+    <td className="cal-when-cell">
+      <strong>{formatDate(slot.startsAt)}</strong>{" "}
+      <span>
+        {formatTime(slot.startsAt)}–{formatTime(slot.endsAt)}
+      </span>
+      {slot.location ? (
+        <div className="faint" style={{ fontSize: 12 }}>
+          {slot.location}
+        </div>
+      ) : null}
+    </td>
+  );
+}
+
+/** The role-gated right-hand cells: group meter (host/admin), own
+ * availability toggle (elector). */
+function MeterAndYouCells({
+  slot,
+  past,
+  perms,
+  slug,
+}: {
+  slot: CalendarSlot;
+  past: boolean;
+  perms: CalendarPerms;
+  slug: string;
+}) {
+  return (
+    <>
+      {perms.canSeeHostOnly ? (
+        <td className="cal-avail-cell">
+          {slot.perUser ? (
+            <AvailabilityMeter
+              perUser={slot.perUser}
+              counts={slot.counts}
+              slug={slug}
+            />
+          ) : null}
+        </td>
+      ) : null}
+      {perms.canSetAvailability ? (
+        <td>
+          {past ? null : (
+            <AvailabilityControl
+              slotId={slot.id}
+              state={slot.viewerState}
+              compact
+            />
+          )}
+        </td>
+      ) : null}
+    </>
+  );
+}
+
 function SlotTableRow({
   slot,
   past,
   weekStart,
+  slug,
   perms,
   claimTopics,
   adminLabel,
@@ -614,6 +686,7 @@ function SlotTableRow({
   past: boolean;
   /** True when this slot starts a new (Mon-first) week — thicker rule. */
   weekStart: boolean;
+  slug: string;
   perms: CalendarPerms;
   claimTopics: TopicOption[];
   adminLabel: string;
@@ -656,44 +729,25 @@ function SlotTableRow({
             <CommentButton slot={slot} open={open} onToggle={toggle} />
           ) : null}
         </td>
-        <td className="cal-when-cell">
-          <strong>{formatDate(slot.startsAt)}</strong>{" "}
-          <span>
-            {formatTime(slot.startsAt)}–{formatTime(slot.endsAt)}
-          </span>
-          {slot.location ? (
-            <div className="faint" style={{ fontSize: 12 }}>
-              {slot.location}
-            </div>
-          ) : null}
-          {/* Pencilled/confirmed pill rides under the when/where instead
-              of its own column (QA 2026-08-02). */}
-          <SessionBadge slot={slot} />
-        </td>
-        {perms.canSeeHostOnly ? (
-          <td>
-            {slot.perUser ? (
-              <AvailabilityMeter perUser={slot.perUser} counts={slot.counts} />
-            ) : null}
-          </td>
-        ) : null}
-        {perms.canSetAvailability ? (
-          <td>
-            {past ? null : (
-              <AvailabilityControl
-                slotId={slot.id}
-                state={slot.viewerState}
-                compact
-              />
-            )}
-          </td>
-        ) : null}
+        <WhenCell slot={slot} />
+        <MeterAndYouCells slot={slot} past={past} perms={perms} slug={slug} />
       </tr>
+      {/* Pencilled/confirmed pill on its own line under the row
+          (QA 2026-08-02 round 4) — visually part of the same slot block. */}
+      {slot.topic ? (
+        <tr className={`cal-session-row${past ? " cal-past" : ""}`}>
+          <td />
+          <td colSpan={columns - 1}>
+            <SessionBadge slot={slot} />
+          </td>
+        </tr>
+      ) : null}
       {open ? (
         <tr className="cal-detail-row">
           <td colSpan={columns}>
             <SlotDetail
               slot={slot}
+              slug={slug}
               perms={perms}
               claimTopics={claimTopics}
               adminLabel={adminLabel}
@@ -709,12 +763,13 @@ function SlotTableRow({
 
 /**
  * The calendar as a compact table (QA 2026-07-31 — replaced one card per
- * slot): caret column folds open into avatars/discussion/controls, the
- * availability bar's LENGTH tracks the audience size so lens switches are
- * visible, and month headings ride as divider rows.
+ * slot): the 💬 bubble folds a row open into discussion/controls, the
+ * full-width availability meter carries avatars inside their 🟢🟡🔴
+ * segment, and month headings ride as divider rows.
  */
 export function CalendarTable({
   rows,
+  slug,
   perms,
   claimTopics,
   adminLabel = "Admin",
@@ -722,6 +777,7 @@ export function CalendarTable({
   base,
 }: {
   rows: CalendarTableRow[];
+  slug: string;
   perms: CalendarPerms;
   claimTopics: TopicOption[];
   adminLabel?: string;
@@ -786,6 +842,7 @@ export function CalendarTable({
                     slot={slot}
                     past={past}
                     weekStart={weekStart}
+                    slug={slug}
                     perms={perms}
                     claimTopics={claimTopics}
                     adminLabel={adminLabel}
