@@ -29,6 +29,7 @@ export type TopicOption = {
   title: string;
   hostId: string;
   hostName?: string | null;
+  heartCount?: number;
 };
 
 /** What the viewer may do on the calendar page — resolved server-side from

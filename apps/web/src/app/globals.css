@@ -1480,9 +1480,58 @@ textarea {
 .cal-table tr.cal-week-start td {
   border-top-width: 3px;
 }
-/* Session pills may be long — let this one cell wrap. */
-.cal-table td.cal-session-cell {
+/* When/where + the session pill underneath — pills may be long, so this
+   cell wraps. */
+.cal-table td.cal-when-cell {
   white-space: normal;
+  min-width: 180px;
+}
+/* Availability meter with avatars inside their 🟢/🟡/🔴 stretch
+   (QA 2026-08-02). Builds on .avail-bar's segment colours. */
+.avail-meter {
+  height: 32px;
+  border-radius: 999px;
+}
+.avail-meter .avail-meter-seg {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  overflow: hidden;
+  padding: 0 2px;
+}
+.avail-meter .avatar {
+  flex: none;
+  margin-left: -6px;
+  box-shadow: 0 0 0 1.5px rgb(255 255 255 / 55%);
+}
+.avail-meter .avatar:first-child {
+  margin-left: 0;
+}
+/* "Show past" rides as the table's first full-width row, styled like the
+   long-text Show more control (QA 2026-08-02). */
+.cal-past-row td {
+  background: var(--bg);
+  text-align: center;
+}
+.cal-past-row .topic-body-toggle {
+  margin-top: 0;
+}
+/* Collapsible section heading (schedule setup) — the Analysis card
+   heading, made pressable; no rule above it. */
+.cal-section-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+.cal-section-toggle .section-title {
+  margin: 0;
 }
 .cal-month-row td {
   background: var(--bg);

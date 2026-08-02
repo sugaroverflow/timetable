@@ -51,7 +51,7 @@ const QUERY = `
   query Calendar($s: String!, $audience: String, $past: Boolean) {
     timetable: forum(idOrSlug: $s) { viewerRoles settings }
     calendar(idOrSlug: $s, audience: $audience, includePast: $past) { ${SLOT_FIELDS} }
-    topicFeed(idOrSlug: $s) { id title hostId hostName }
+    topicFeed(idOrSlug: $s) { id title hostId hostName heartCount }
   }
 `;
 
@@ -60,7 +60,7 @@ const QUERY_AUTHED = `
     timetable: forum(idOrSlug: $s) { viewerRoles settings }
     me { id }
     calendar(idOrSlug: $s, audience: $audience, includePast: $past) { ${SLOT_FIELDS} }
-    topicFeed(idOrSlug: $s) { id title hostId hostName }
+    topicFeed(idOrSlug: $s) { id title hostId hostName heartCount }
     myIcsToken
     myAvailabilityPattern(idOrSlug: $s)
   }
@@ -80,9 +80,6 @@ function CalendarToolbar({
   hostView,
   audience,
   location,
-  past,
-  icsUrl,
-  base,
 }: {
   calendar: CalendarSlot[];
   topics: TopicOption[];
@@ -90,13 +87,12 @@ function CalendarToolbar({
   hostView: boolean;
   audience?: string;
   location?: string;
-  past: boolean;
-  icsUrl: string;
-  base: string;
 }) {
   const locations = [
     ...new Set(calendar.map((s) => s.location).filter(Boolean)),
   ].sort();
+
+  if (!perms.canSeeHostOnly && locations.length === 0) return null;
 
   return (
     // Flush floating filter bar, same treatment as the All Topics toolbar
@@ -118,15 +114,6 @@ function CalendarToolbar({
       ) : null}
       <span className="spacer" />
       {perms.canSeeHostOnly ? <AudienceCount calendar={calendar} /> : null}
-      <Link
-        className="btn btn-ghost"
-        href={past ? `${base}/calendar` : `${base}/calendar?past=1`}
-      >
-        {past ? "Hide past" : "Show past"}
-      </Link>
-      <a className="btn btn-ghost" href={icsUrl}>
-        Subscribe (ICS)
-      </a>
     </div>
   );
 }
@@ -246,12 +233,16 @@ function CalendarBody({
   perms,
   claimTopics,
   adminLabel,
+  past,
+  base,
 }: {
   visibleSlots: CalendarSlot[];
   anySlots: boolean;
   perms: CalendarPerms;
   claimTopics: TopicOption[];
   adminLabel: string;
+  past: boolean;
+  base: string;
 }) {
   if (visibleSlots.length === 0) {
     return <CalendarEmpty anySlots={anySlots} canAdmin={perms.canAdmin} />;
@@ -263,8 +254,10 @@ function CalendarBody({
         perms={perms}
         claimTopics={claimTopics}
         adminLabel={adminLabel}
+        showingPast={past}
+        base={base}
       />
-      <Legend />
+      {perms.canSeeHostOnly || perms.canSetAvailability ? <Legend /> : null}
     </div>
   );
 }
@@ -276,16 +269,20 @@ function CalendarCards({
   calendar,
   myPattern,
   claimTopics,
+  adminLabel,
 }: {
   slug: string;
   perms: CalendarPerms;
   calendar: NonNullable<ReturnType<typeof parseTimetableSettings>["calendar"]>;
   myPattern: Record<string, AvailabilityState>;
   claimTopics: TopicOption[];
+  adminLabel: string;
 }) {
   return (
     <>
-      {perms.canAdmin ? <CalendarSetup slug={slug} current={calendar} /> : null}
+      {perms.canAdmin ? (
+        <CalendarSetup slug={slug} current={calendar} adminLabel={adminLabel} />
+      ) : null}
       {perms.canSetAvailability && (calendar.patternCells?.length ?? 0) > 0 ? (
         <PatternGrid
           slug={slug}
@@ -352,8 +349,16 @@ export default async function CalendarPage({
 
   return (
     <div className="stack">
-      <div className="page-head">
-        <h2 className="page-title">Calendar</h2>
+      <div
+        className="page-head row wrap"
+        style={{ justifyContent: "space-between", alignItems: "center" }}
+      >
+        <h2 className="page-title" style={{ margin: 0 }}>
+          Calendar
+        </h2>
+        <a className="btn btn-ghost" href={buildIcsUrl(slug, data.myIcsToken)}>
+          Subscribe (ICS)
+        </a>
       </div>
 
       <CalendarCards
@@ -362,6 +367,7 @@ export default async function CalendarPage({
         calendar={calendarSettings}
         myPattern={parsePattern(data.myAvailabilityPattern)}
         claimTopics={claimTopics}
+        adminLabel={adminLabel}
       />
 
       <CalendarToolbar
@@ -371,9 +377,6 @@ export default async function CalendarPage({
         hostView={isHost(roles)}
         audience={audience}
         location={location}
-        past={past}
-        icsUrl={buildIcsUrl(slug, data.myIcsToken)}
-        base={base}
       />
 
       <CalendarBody
@@ -382,6 +385,8 @@ export default async function CalendarPage({
         perms={perms}
         claimTopics={claimTopics}
         adminLabel={adminLabel}
+        past={past}
+        base={base}
       />
     </div>
   );

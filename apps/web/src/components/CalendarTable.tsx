@@ -1,7 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { Fragment, useState } from "react";
-import { ExternalLink, MessageCircle, Send } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  ExternalLink,
+  MessageCircle,
+  Send,
+} from "lucide-react";
 
 import type {
   CalendarPerms,
@@ -76,13 +83,6 @@ function pct(n: number, total: number): string {
   return total > 0 ? `${(n / total) * 100}%` : "0%";
 }
 
-/** Bar length scales with the audience size (px per elector, clamped), so
- * switching the topic lens visibly shrinks/grows the bar with the group. */
-function barWidth(total: number): number {
-  if (total === 0) return 24;
-  return Math.max(36, Math.min(total * 9, 240));
-}
-
 function countsTitle(c: { green: number; yellow: number; red: number }) {
   return `🟢 ${c.green} · 🟡 ${c.yellow} · 🔴 ${c.red}`;
 }
@@ -121,18 +121,42 @@ function CommentButton({
   );
 }
 
-/** Aggregate bar whose length tracks the audience size. */
-function AvailabilityBar({
+/** Availability meter with the electors' avatars INSIDE their segment
+ * (QA 2026-08-02): 🟢 people on the green stretch, and so on. Length still
+ * tracks the audience size; hover an avatar for the name. */
+function AvailabilityMeter({
+  perUser,
   counts,
 }: {
+  perUser: NonNullable<CalendarSlot["perUser"]>;
   counts: { green: number; yellow: number; red: number };
 }) {
-  const total = counts.green + counts.yellow + counts.red;
+  const total = perUser.length;
+  if (total === 0) return null;
+  const states = ["green", "yellow", "red"] as const;
+  // ~20px per person: 26px avatars overlapping 6px inside each segment.
+  const width = Math.max(48, Math.min(total * 20, 440));
   return (
-    <span className="avail-bar" style={{ width: barWidth(total) }}>
-      <span className="g" style={{ width: pct(counts.green, total) }} />
-      <span className="y" style={{ width: pct(counts.yellow, total) }} />
-      <span className="r" style={{ width: pct(counts.red, total) }} />
+    <span
+      className="avail-bar avail-meter"
+      style={{ width }}
+      title={countsTitle(counts)}
+    >
+      {states.map((state) => {
+        const people = perUser.filter((u) => u.state === state);
+        if (people.length === 0) return null;
+        return (
+          <span
+            key={state}
+            className={`avail-meter-seg ${state[0]}`}
+            style={{ width: pct(people.length, total) }}
+          >
+            {people.map((u) => (
+              <Avatar key={u.userId} name={u.name} image={u.image} small />
+            ))}
+          </span>
+        );
+      })}
     </span>
   );
 }
@@ -142,7 +166,7 @@ function AvailabilityBar({
 function SessionBadge({ slot }: { slot: CalendarSlot }) {
   if (!slot.topic) return null;
   return (
-    <span className="row wrap" style={{ gap: 6 }}>
+    <div className="row wrap" style={{ gap: 6, marginTop: 4 }}>
       <span
         className={`pill ${slot.status === "confirmed" ? "pill-host" : ""}`}
         title={slot.status === "confirmed" ? "Confirmed" : "Pencilled in"}
@@ -163,33 +187,6 @@ function SessionBadge({ slot }: { slot: CalendarSlot }) {
           <ExternalLink size={13} aria-hidden />
         </a>
       ) : null}
-    </span>
-  );
-}
-
-/** Host/admin view: audience avatars grouped 🟢 → 🟡 → 🔴. */
-function AvatarGroups({
-  perUser,
-}: {
-  perUser: NonNullable<CalendarSlot["perUser"]>;
-}) {
-  const states = ["green", "yellow", "red"] as const;
-  return (
-    <div className="row wrap" style={{ gap: 10 }}>
-      {states.map((state) => {
-        const people = perUser.filter((u) => u.state === state);
-        if (people.length === 0) return null;
-        return (
-          <span key={state} className="row" style={{ gap: 2 }}>
-            <span className={`dot ${state}`} aria-label={state} />
-            <span className="cal-avatars">
-              {people.map((u) => (
-                <Avatar key={u.userId} name={u.name} image={u.image} small />
-              ))}
-            </span>
-          </span>
-        );
-      })}
     </div>
   );
 }
@@ -590,9 +587,6 @@ function SlotDetail({
 }) {
   return (
     <div className="stack" style={{ gap: 10 }}>
-      {slot.perUser && slot.perUser.length > 0 ? (
-        <AvatarGroups perUser={slot.perUser} />
-      ) : null}
       <DiscussionPanel
         slot={slot}
         claimTopics={claimTopics}
@@ -662,7 +656,7 @@ function SlotTableRow({
             <CommentButton slot={slot} open={open} onToggle={toggle} />
           ) : null}
         </td>
-        <td>
+        <td className="cal-when-cell">
           <strong>{formatDate(slot.startsAt)}</strong>{" "}
           <span>
             {formatTime(slot.startsAt)}–{formatTime(slot.endsAt)}
@@ -672,10 +666,17 @@ function SlotTableRow({
               {slot.location}
             </div>
           ) : null}
+          {/* Pencilled/confirmed pill rides under the when/where instead
+              of its own column (QA 2026-08-02). */}
+          <SessionBadge slot={slot} />
         </td>
-        <td title={countsTitle(slot.counts)}>
-          <AvailabilityBar counts={slot.counts} />
-        </td>
+        {perms.canSeeHostOnly ? (
+          <td>
+            {slot.perUser ? (
+              <AvailabilityMeter perUser={slot.perUser} counts={slot.counts} />
+            ) : null}
+          </td>
+        ) : null}
         {perms.canSetAvailability ? (
           <td>
             {past ? null : (
@@ -687,9 +688,6 @@ function SlotTableRow({
             )}
           </td>
         ) : null}
-        <td className="cal-session-cell">
-          <SessionBadge slot={slot} />
-        </td>
       </tr>
       {open ? (
         <tr className="cal-detail-row">
@@ -720,58 +718,85 @@ export function CalendarTable({
   perms,
   claimTopics,
   adminLabel = "Admin",
+  showingPast,
+  base,
 }: {
   rows: CalendarTableRow[];
   perms: CalendarPerms;
   claimTopics: TopicOption[];
   adminLabel?: string;
+  showingPast: boolean;
+  base: string;
 }) {
-  const columns = perms.canSetAvailability ? 5 : 4;
+  const columns =
+    2 + (perms.canSeeHostOnly ? 1 : 0) + (perms.canSetAvailability ? 1 : 0);
 
   return (
-    <div className="table-wrap">
-      <table className="data-table cal-table">
-        <thead>
-          <tr>
-            <th aria-label="Details" />
-            <th>When</th>
-            <th>Availability</th>
-            {perms.canSetAvailability ? <th>You</th> : null}
-            <th>Session</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map(({ slot, past }, i) => {
-            const month = monthLabel(slot.startsAt);
-            const divider =
-              i === 0 || month !== monthLabel(rows[i - 1]!.slot.startsAt);
-            // Thicker rule between Sunday and Monday (QA 2026-08-02) —
-            // skipped when a month heading already breaks the run.
-            const weekStart =
-              !divider &&
-              i > 0 &&
-              weekKey(slot.startsAt) !== weekKey(rows[i - 1]!.slot.startsAt);
-            return (
-              <Fragment key={slot.id}>
-                {divider ? (
-                  <tr className="cal-month-row">
-                    <td colSpan={columns}>{month}</td>
-                  </tr>
-                ) : null}
-                <SlotTableRow
-                  slot={slot}
-                  past={past}
-                  weekStart={weekStart}
-                  perms={perms}
-                  claimTopics={claimTopics}
-                  adminLabel={adminLabel}
-                  columns={columns}
-                />
-              </Fragment>
-            );
-          })}
-        </tbody>
-      </table>
+    <div className="card">
+      <div className="table-wrap">
+        <table className="data-table cal-table">
+          <thead>
+            <tr>
+              <th aria-label="Discussion" />
+              <th>When</th>
+              {/* Group availability is host/admin-only (QA 2026-08-02). */}
+              {perms.canSeeHostOnly ? <th>Availability</th> : null}
+              {perms.canSetAvailability ? <th>You</th> : null}
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="cal-past-row">
+              <td colSpan={columns}>
+                <Link
+                  className="topic-body-toggle"
+                  href={
+                    showingPast ? `${base}/calendar` : `${base}/calendar?past=1`
+                  }
+                >
+                  {showingPast ? (
+                    <>
+                      <ChevronUp size={14} aria-hidden /> Hide past
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown size={14} aria-hidden /> Show past
+                    </>
+                  )}
+                </Link>
+              </td>
+            </tr>
+            {rows.map(({ slot, past }, i) => {
+              const month = monthLabel(slot.startsAt);
+              const divider =
+                i === 0 || month !== monthLabel(rows[i - 1]!.slot.startsAt);
+              // Thicker rule between Sunday and Monday (QA 2026-08-02) —
+              // skipped when a month heading already breaks the run.
+              const weekStart =
+                !divider &&
+                i > 0 &&
+                weekKey(slot.startsAt) !== weekKey(rows[i - 1]!.slot.startsAt);
+              return (
+                <Fragment key={slot.id}>
+                  {divider ? (
+                    <tr className="cal-month-row">
+                      <td colSpan={columns}>{month}</td>
+                    </tr>
+                  ) : null}
+                  <SlotTableRow
+                    slot={slot}
+                    past={past}
+                    weekStart={weekStart}
+                    perms={perms}
+                    claimTopics={claimTopics}
+                    adminLabel={adminLabel}
+                    columns={columns}
+                  />
+                </Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
