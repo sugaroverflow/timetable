@@ -183,6 +183,13 @@
       "when": 1785454554433,
       "tag": "0025_talented_hulk",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1785717206508,
+      "tag": "0026_daily_moonstone",
+      "breakpoints": true
     }
   ]
 }

@@ -1622,6 +1622,10 @@ textarea {
 .cal-past {
   opacity: 0.6;
 }
+/* Hidden slot comment (admins only see these) — faded like elsewhere. */
+.cal-comment-hidden .hc-bubble {
+  opacity: 0.5;
+}
 /* Frozen availability snapshot on a session-claim comment. */
 .cal-claim {
   margin-top: 6px;

@@ -6,15 +6,19 @@ import {
   computeSlotCounts,
   createSlots,
   deleteSlot,
+  deleteSlotComment,
   getAudienceElectorIds,
   getAvailabilityPattern,
+  getSlotCommentById,
   getTopicById,
   listSlotComments,
   proposeSlot,
   setAvailability,
   setAvailabilityPattern,
+  setSlotCommentHidden,
   setSlotSession,
   updateSlot,
+  updateSlotComment,
   type CalendarSlot,
   type PatternCells,
   type SlotInput,
@@ -251,6 +255,8 @@ const SlotCommentType = builder
     topicId: string | null;
     topicTitle: string | null;
     counts: { green: number; yellow: number; red: number } | null;
+    editedAt: Date | null;
+    hidden: boolean;
     createdAt: Date;
   }>("SlotComment")
   .implement({
@@ -267,6 +273,11 @@ const SlotCommentType = builder
         nullable: true,
         resolve: (c) => c.counts,
       }),
+      editedAt: t.string({
+        nullable: true,
+        resolve: (c) => c.editedAt?.toISOString() ?? null,
+      }),
+      hidden: t.exposeBoolean("hidden"),
       createdAt: t.string({ resolve: (c) => c.createdAt.toISOString() }),
     }),
   });
@@ -306,7 +317,7 @@ builder.queryFields((t) => ({
     },
   }),
 
-  /** Slot discussion thread (host/admin only). */
+  /** Slot discussion thread (host/admin only; admins also see hidden). */
   slotComments: t.field({
     type: [SlotCommentType],
     args: { slotId: t.arg.string({ required: true }) },
@@ -314,7 +325,9 @@ builder.queryFields((t) => ({
       const { viewer, timetable } = await loadSlotAndViewer(ctx, args.slotId);
       if (!isCalendarEnabled(timetable.settings)) return [];
       if (!canSeeHostOnly(viewer)) return [];
-      return listSlotComments(args.slotId);
+      return listSlotComments(args.slotId, {
+        includeHidden: canManageCalendar(viewer),
+      });
     },
   }),
 
@@ -620,6 +633,73 @@ builder.mutationFields((t) => ({
       const view = thread.find((c) => c.id === comment.id);
       if (!view) notFound("Comment not found");
       return view;
+    },
+  }),
+}));
+
+// ---------------------------------------------------------------------------
+// Slot-comment edit / delete / hide (QA 2026-08-03) — mirroring topic
+// comments: authors edit and hard-delete their own (the thread is flat, no
+// reply structure to preserve); admins hide/unhide.
+// ---------------------------------------------------------------------------
+
+/** Load a slot comment plus its slot/viewer/timetable, calendar-gated. */
+async function loadCommentContext(
+  ctx: Parameters<typeof loadSlotAndViewer>[0],
+  commentId: string,
+) {
+  const comment = await getSlotCommentById(commentId);
+  if (!comment) notFound("Comment not found");
+  const loaded = await loadSlotAndViewer(ctx, comment.slotId);
+  requireCalendarEnabled(loaded.timetable.settings);
+  return { comment, ...loaded };
+}
+
+builder.mutationFields((t) => ({
+  /** Author: edit their own slot comment. */
+  updateSlotComment: t.field({
+    type: "Boolean",
+    args: {
+      commentId: t.arg.string({ required: true }),
+      body: t.arg.string({ required: true }),
+    },
+    resolve: async (_p, args, ctx) => {
+      const user = await requireUser(ctx);
+      const { comment } = await loadCommentContext(ctx, args.commentId);
+      if (comment.authorId !== user.id) forbidden("Not your comment");
+      const body = args.body.trim();
+      if (!body) throw new GraphQLError("Comment cannot be empty");
+      await updateSlotComment(comment.id, body);
+      return true;
+    },
+  }),
+
+  /** Author: delete their own slot comment. */
+  deleteSlotComment: t.field({
+    type: "Boolean",
+    args: { commentId: t.arg.string({ required: true }) },
+    resolve: async (_p, args, ctx) => {
+      const user = await requireUser(ctx);
+      const { comment } = await loadCommentContext(ctx, args.commentId);
+      if (comment.authorId !== user.id) forbidden("Not your comment");
+      await deleteSlotComment(comment.id);
+      return true;
+    },
+  }),
+
+  /** Admin: hide/unhide a slot comment. */
+  hideSlotComment: t.field({
+    type: "Boolean",
+    args: {
+      commentId: t.arg.string({ required: true }),
+      hidden: t.arg.boolean({ required: true }),
+    },
+    resolve: async (_p, args, ctx) => {
+      const user = await requireUser(ctx);
+      const { comment, viewer } = await loadCommentContext(ctx, args.commentId);
+      if (!canManageCalendar(viewer)) forbidden("Admins only");
+      await setSlotCommentHidden(comment.id, args.hidden, user.id);
+      return true;
     },
   }),
 }));

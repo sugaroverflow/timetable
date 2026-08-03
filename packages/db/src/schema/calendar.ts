@@ -105,6 +105,13 @@ export const slotComments = pgTable(
     greenCount: integer(),
     yellowCount: integer(),
     redCount: integer(),
+    /** Set on author edits only — drives the "(edited)" marker. */
+    editedAt: timestamp({ withTimezone: true }),
+    /** Admin moderation, mirroring topic comments (QA 2026-08-03). Hidden
+     * comments stay visible to admins; authors hard-delete instead (the
+     * thread is flat, so there's no reply structure to preserve). */
+    hiddenAt: timestamp({ withTimezone: true }),
+    hiddenByUserId: text().references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("slot_comments_slot_idx").on(t.slotId)],

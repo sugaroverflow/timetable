@@ -1,4 +1,14 @@
-import { and, asc, eq, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  lte,
+  sql,
+} from "drizzle-orm";
 
 import {
   availability,
@@ -313,11 +323,14 @@ export type SlotCommentView = {
   topicId: string | null;
   topicTitle: string | null;
   counts: SlotCounts | null;
+  editedAt: Date | null;
+  hidden: boolean;
   createdAt: Date;
 };
 
 export async function listSlotComments(
   slotId: string,
+  opts: { includeHidden?: boolean } = {},
 ): Promise<SlotCommentView[]> {
   // Author profile from their membership in the slot's timetable
   // (per-forum profiles); left join tolerates ex-members.
@@ -333,6 +346,8 @@ export async function listSlotComments(
       greenCount: slotComments.greenCount,
       yellowCount: slotComments.yellowCount,
       redCount: slotComments.redCount,
+      editedAt: slotComments.editedAt,
+      hiddenAt: slotComments.hiddenAt,
       createdAt: slotComments.createdAt,
     })
     .from(slotComments)
@@ -345,7 +360,12 @@ export async function listSlotComments(
       ),
     )
     .leftJoin(topics, eq(topics.id, slotComments.topicId))
-    .where(eq(slotComments.slotId, slotId))
+    .where(
+      and(
+        eq(slotComments.slotId, slotId),
+        opts.includeHidden ? undefined : isNull(slotComments.hiddenAt),
+      ),
+    )
     .orderBy(asc(slotComments.createdAt));
   return rows.map((r) => ({
     id: r.id,
@@ -359,8 +379,54 @@ export async function listSlotComments(
       r.greenCount != null && r.yellowCount != null && r.redCount != null
         ? { green: r.greenCount, yellow: r.yellowCount, red: r.redCount }
         : null,
+    editedAt: r.editedAt,
+    hidden: r.hiddenAt != null,
     createdAt: r.createdAt,
   }));
+}
+
+export async function getSlotCommentById(
+  commentId: string,
+): Promise<SlotComment | null> {
+  const [comment] = await db
+    .select()
+    .from(slotComments)
+    .where(eq(slotComments.id, commentId))
+    .limit(1);
+  return comment ?? null;
+}
+
+/** Author edit: new body + the "(edited)" watermark. */
+export async function updateSlotComment(
+  commentId: string,
+  body: string,
+): Promise<void> {
+  await db
+    .update(slotComments)
+    .set({ body, editedAt: new Date() })
+    .where(eq(slotComments.id, commentId));
+}
+
+/** Author delete — hard: the thread is flat, so there is no reply
+ * structure to tombstone for (unlike topic comments). */
+export async function deleteSlotComment(commentId: string): Promise<void> {
+  await db.delete(slotComments).where(eq(slotComments.id, commentId));
+}
+
+/** Admin moderation, mirroring topic comments' hide/unhide. */
+export async function setSlotCommentHidden(
+  commentId: string,
+  hidden: boolean,
+  byUserId: string,
+): Promise<void> {
+  await db
+    .update(slotComments)
+    .set(
+      hidden
+        ? { hiddenAt: new Date(), hiddenByUserId: byUserId }
+        : { hiddenAt: null, hiddenByUserId: null },
+    )
+    .where(eq(slotComments.id, commentId));
 }
 
 export async function addSlotComment(
@@ -574,13 +640,17 @@ async function loadSlotRelatedRows(
     for (const t of topicRows) topicsById.set(t.id, t);
   }
 
+  // Hidden comments stay out of the badge count (admins still see them
+  // inside the fold).
   const commentRows = await db
     .select({
       slotId: slotComments.slotId,
       n: sql<number>`count(*)::int`,
     })
     .from(slotComments)
-    .where(inArray(slotComments.slotId, slotIds))
+    .where(
+      and(inArray(slotComments.slotId, slotIds), isNull(slotComments.hiddenAt)),
+    )
     .groupBy(slotComments.slotId);
 
   return {
