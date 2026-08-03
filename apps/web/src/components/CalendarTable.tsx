@@ -9,6 +9,7 @@ import type {
   CalendarSlot,
   TopicOption,
 } from "@/lib/calendarTypes";
+import type { RoleLabels } from "@/lib/timetableSettings";
 
 import { Avatar } from "./Avatar";
 import { AvailabilityControl } from "./AvailabilityControl";
@@ -149,6 +150,7 @@ function SlotDetail({
   lensTopic,
   adminLabel,
   officeHoursLabel,
+  roleLabels,
   comments,
   onReload,
 }: {
@@ -159,6 +161,7 @@ function SlotDetail({
   lensTopic: TopicOption | null;
   adminLabel: string;
   officeHoursLabel: string;
+  roleLabels?: RoleLabels;
   comments: SlotComment[] | null;
   onReload: () => Promise<void>;
 }) {
@@ -170,6 +173,7 @@ function SlotDetail({
         perms={perms}
         lensTopic={lensTopic}
         comments={comments}
+        roleLabels={roleLabels}
         onReload={onReload}
       />
       <SessionControls
@@ -251,6 +255,7 @@ function SlotTableRow({
   lensTopic,
   adminLabel,
   officeHoursLabel,
+  roleLabels,
   columns,
 }: {
   slot: CalendarSlot;
@@ -263,6 +268,7 @@ function SlotTableRow({
   lensTopic: TopicOption | null;
   adminLabel: string;
   officeHoursLabel: string;
+  roleLabels?: RoleLabels;
   columns: number;
 }) {
   const [open, setOpen] = useState(false);
@@ -330,6 +336,7 @@ function SlotTableRow({
                 lensTopic={lensTopic}
                 adminLabel={adminLabel}
                 officeHoursLabel={officeHoursLabel}
+                roleLabels={roleLabels}
                 comments={comments}
                 onReload={loadComments}
               />
@@ -355,6 +362,7 @@ export function CalendarTable({
   lensTopic,
   adminLabel = "Admin",
   officeHoursLabel = "Office hours",
+  roleLabels,
   showingPast,
   base,
 }: {
@@ -365,6 +373,8 @@ export function CalendarTable({
   lensTopic: TopicOption | null;
   adminLabel?: string;
   officeHoursLabel?: string;
+  /** Forum role labels for the discussion authors' role pills. */
+  roleLabels?: RoleLabels;
   showingPast: boolean;
   base: string;
 }) {
@@ -431,6 +441,7 @@ export function CalendarTable({
                     lensTopic={lensTopic}
                     adminLabel={adminLabel}
                     officeHoursLabel={officeHoursLabel}
+                    roleLabels={roleLabels}
                     columns={columns}
                   />
                 </Fragment>

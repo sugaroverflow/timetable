@@ -131,7 +131,10 @@ function NotificationCard({
         </PersonChip>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 14 }}>
-            <b>{n.authorName ?? "Someone"}</b> {KIND_VERBS[n.kind]}{" "}
+            <PersonChip slug={slug} userId={n.authorId}>
+              <b>{n.authorName ?? "Someone"}</b>
+            </PersonChip>{" "}
+            {KIND_VERBS[n.kind]}{" "}
             {href ? <Link href={href}>{n.topicTitle}</Link> : n.topicTitle}
           </div>
           {detail ? (

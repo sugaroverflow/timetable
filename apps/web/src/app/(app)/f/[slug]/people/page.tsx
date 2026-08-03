@@ -9,6 +9,7 @@ import { CollapsibleTopicBody } from "@/components/CollapsibleTopicBody";
 import { EmptyState } from "@/components/EmptyState";
 import { InviteSendButton } from "@/components/InviteSendButton";
 import { PersonAdminPanel } from "@/components/PersonAdminPanel";
+import { PersonChip } from "@/components/PersonChip";
 import { RolePills } from "@/components/RolePills";
 import { UserPreviewStart } from "@/components/UserPreview";
 import { gqlFetch } from "@/lib/graphql";
@@ -150,13 +151,17 @@ function PersonCard({
   canEdit: boolean;
   roleLabels?: RoleLabels;
 }) {
-  const hasTopics = person.publishedTopics.length > 0;
   const canPreview = canEdit && person.userId !== meId;
   const canManage = canEdit && member != null;
   return (
     <li className="card stack">
       <div className="person-head">
-        <Avatar name={person.name} image={person.image} xlarge />
+        {/* Photo and name both click through to the person's page (links
+            pass 2026-08-03 — the name used to go to their filtered feed,
+            and only when they had topics). */}
+        <PersonChip slug={slug} userId={person.userId}>
+          <Avatar name={person.name} image={person.image} xlarge />
+        </PersonChip>
         {person.userId === meId ? (
           // The viewer's own card: straight to the profile editor
           // (QA 2026-07-29).
@@ -170,16 +175,9 @@ function PersonCard({
         {/* Name with its role pills on the same line, to the right
             (QA 2026-07-30). */}
         <div className="person-head-titles">
-          {hasTopics ? (
-            <Link
-              className="person-name-link"
-              href={`/f/${slug}/topics?host=${person.userId}`}
-            >
-              <strong>{person.name ?? "Member"}</strong>
-            </Link>
-          ) : (
+          <PersonChip slug={slug} userId={person.userId}>
             <strong>{person.name ?? "Member"}</strong>
-          )}
+          </PersonChip>
           <RolePills roles={person.roles} labels={roleLabels} />
         </div>
       </div>

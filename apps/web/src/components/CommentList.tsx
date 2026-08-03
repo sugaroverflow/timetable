@@ -4,12 +4,14 @@ import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import type { FeedComment } from "@/lib/feedTypes";
+import type { RoleLabels } from "@/lib/timetableSettings";
 
 import { Avatar } from "./Avatar";
 import { CommentActions } from "./CommentActions";
 import { CommentBody } from "./CommentBody";
 import { CommentEditForm } from "./CommentEditForm";
 import { PersonChip } from "./PersonChip";
+import { PrimaryRolePill } from "./RolePills";
 
 const VISIBLE_TOP_LEVEL = 3;
 
@@ -37,11 +39,13 @@ function subtreeContains(comments: FeedComment[], id: string | null): boolean {
 function CommentBubble({
   comment,
   slug,
+  roleLabels,
   editing,
   onEditDone,
 }: {
   comment: FeedComment;
   slug?: string;
+  roleLabels?: RoleLabels;
   editing: boolean;
   onEditDone(): void;
 }) {
@@ -57,6 +61,9 @@ function CommentBubble({
           (comment.authorName ?? "Someone")
         )}
       </span>
+      {/* Who's talking, at a glance: the author's role in this forum
+          (mixed host/elector threads read ambiguously without it). */}
+      <PrimaryRolePill roles={comment.authorRoles} labels={roleLabels} />
       {visibilityPill ? (
         <span
           className={visibilityPill.className}
@@ -100,12 +107,14 @@ function CommentItem({
   canModerate,
   viewerId,
   slug,
+  roleLabels,
 }: {
   comment: FeedComment;
   canReply: boolean;
   canModerate: boolean;
   viewerId: string | null;
   slug?: string;
+  roleLabels?: RoleLabels;
 }) {
   const replies = comment.replies ?? [];
   const searchParams = useSearchParams();
@@ -121,11 +130,19 @@ function CommentItem({
       id={`comment-${comment.id}`}
       className={`comment ${comment.hidden ? "hidden" : ""}`}
     >
-      <Avatar
-        name={comment.deleted ? null : comment.authorName}
-        image={comment.authorImage}
-        small
-      />
+      {/* The avatar clicks through to the author's page, like the name
+          (mobile+links pass 2026-08-03); tombstones have no author. */}
+      {slug && !comment.deleted ? (
+        <PersonChip slug={slug} userId={comment.authorId}>
+          <Avatar name={comment.authorName} image={comment.authorImage} small />
+        </PersonChip>
+      ) : (
+        <Avatar
+          name={comment.deleted ? null : comment.authorName}
+          image={comment.authorImage}
+          small
+        />
+      )}
       <div className="comment-main">
         {comment.deleted ? (
           // Author-deleted tombstone: only present at all because replies
@@ -139,6 +156,7 @@ function CommentItem({
           <CommentBubble
             comment={comment}
             slug={slug}
+            roleLabels={roleLabels}
             editing={editing}
             onEditDone={() => setEditing(false)}
           />
@@ -164,6 +182,7 @@ function CommentItem({
                   canModerate={canModerate}
                   viewerId={viewerId}
                   slug={slug}
+                  roleLabels={roleLabels}
                 />
               ))}
             </div>
@@ -188,6 +207,7 @@ export function CommentList({
   canModerate,
   viewerId = null,
   slug,
+  roleLabels,
 }: {
   comments: FeedComment[];
   canReply: boolean;
@@ -195,6 +215,8 @@ export function CommentList({
   /** Enables Edit/Delete on the viewer's own comments (QA 2026-07-29). */
   viewerId?: string | null;
   slug?: string;
+  /** The forum's role labels, for the author role pills. */
+  roleLabels?: RoleLabels;
 }) {
   const searchParams = useSearchParams();
   const [showAll, setShowAll] = useState(() =>
@@ -221,6 +243,7 @@ export function CommentList({
           canModerate={canModerate}
           viewerId={viewerId}
           slug={slug}
+          roleLabels={roleLabels}
         />
       ))}
       {hiddenCount > 0 ? (

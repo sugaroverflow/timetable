@@ -10,6 +10,7 @@ import { ActorFilter } from "@/components/ActorFilter";
 import { Avatar } from "@/components/Avatar";
 import { EmptyState } from "@/components/EmptyState";
 import { PersonChip } from "@/components/PersonChip";
+import { PrimaryRolePill } from "@/components/RolePills";
 import { ACTION_LABELS } from "@/lib/activityLabels";
 import type { ActivityEvent } from "@/lib/feedTypes";
 import { gqlFetch } from "@/lib/graphql";
@@ -177,7 +178,6 @@ function TimelineItem({
   roleLabels?: RoleLabels;
   adminLabel: string;
 }) {
-  const actorRole = actorPrimaryRole(event.actorRoles);
   return (
     <div className={`tl-item${actionClass(event.action)}`}>
       <div className="tl-when">
@@ -194,14 +194,7 @@ function TimelineItem({
           <ChipWrap slug={slug} actorId={event.actorId}>
             <b>{event.actorName ?? "Someone"}</b>
           </ChipWrap>
-          {actorRole ? (
-            <span
-              className={`pill pill-${actorRole}`}
-              style={{ marginLeft: 6, fontSize: 10 }}
-            >
-              {roleLabel(roleLabels, actorRole)}
-            </span>
-          ) : null}{" "}
+          <PrimaryRolePill roles={event.actorRoles} labels={roleLabels} />{" "}
           {describe(event)}
           <InvitedSuffix event={event} roleLabels={roleLabels} />
           <TopicSuffix event={event} slug={slug} />

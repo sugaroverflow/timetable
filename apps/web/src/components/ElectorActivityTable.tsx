@@ -7,6 +7,7 @@ import { Avatar } from "@/components/Avatar";
 import { BreakdownCaret } from "@/components/BreakdownPanel";
 import { SortHeader } from "@/components/SortHeader";
 import { formatExactTime } from "@/lib/dates";
+import { personPath } from "@/lib/personPath";
 import { relativeTime } from "@/lib/relativeTime";
 import { topicPath } from "@/lib/topicPath";
 
@@ -105,7 +106,11 @@ function HeartedTopicsTable({
           return (
             <tr key={t.topicId}>
               <td>{href ? <Link href={href}>{t.title}</Link> : t.title}</td>
-              <td>{t.hostName ?? hostLabel}</td>
+              <td>
+                <Link href={personPath(slug, t.hostSlug ?? t.hostId)}>
+                  {t.hostName ?? hostLabel}
+                </Link>
+              </td>
               <td className="mono">{t.commentCount}</td>
             </tr>
           );
@@ -133,12 +138,19 @@ function ElectorRowItem({
         <td>
           <span className="row" style={{ gap: 6, alignItems: "center" }}>
             <BreakdownCaret open={open} onToggle={() => setOpen(!open)} />
-            <Avatar
-              small
-              name={elector.electorName}
-              image={elector.electorImage}
-            />
-            <strong>{elector.electorName ?? electorLabel}</strong>
+            {/* Avatar + name click through to the elector's page
+                (links pass 2026-08-03). */}
+            <Link
+              className="person-trigger"
+              href={personPath(slug, elector.electorId)}
+            >
+              <Avatar
+                small
+                name={elector.electorName}
+                image={elector.electorImage}
+              />
+              <strong>{elector.electorName ?? electorLabel}</strong>
+            </Link>
           </span>
         </td>
         <td className="mono">{elector.heartCount}</td>

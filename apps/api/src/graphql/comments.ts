@@ -4,17 +4,89 @@ import {
   addComment,
   addReply,
   getCommentById,
+  getTopicById,
   getUserById,
+  getViewerRoles,
   setCommentHidden,
   softDeleteComment,
   updateCommentBody,
+  type CommentNode,
 } from "@timetable/core";
-import { canComment, canModerate, canSeeHostOnly } from "@timetable/shared";
+import type { Comment } from "@timetable/db";
+import {
+  canComment,
+  canModerate,
+  canSeeHostOnly,
+  type Viewer,
+} from "@timetable/shared";
 
 import { assertActionLimit } from "../http/action-limits";
 import { builder } from "./builder";
 import { forbidden, loadTopicAndViewer, notFound, requireUser } from "./guards";
 import { CommentType } from "./types";
+
+type CommentVisibility = Comment["visibility"];
+
+/** The per-visibility permission ladder shared by addComment and
+ * replyToComment (2026-08-03 — was duplicated inline in both resolvers
+ * behind complexity disables):
+ * - admin_only (the drafting thread): admins + the topic's owner
+ * - host_only: hosts/admins
+ * - public: any commenting member, and only on published topics */
+function assertMayComment(
+  viewer: Viewer,
+  topic: { hostId: string; status: string },
+  userId: string,
+  visibility: CommentVisibility,
+): void {
+  if (visibility === "admin_only") {
+    if (!canModerate(viewer) && topic.hostId !== userId) {
+      forbidden("Admins and the topic owner only");
+    }
+  } else if (visibility === "host_only") {
+    if (!canSeeHostOnly(viewer)) forbidden("Hosts/admins only");
+  } else {
+    if (!canComment(viewer)) forbidden("Members only");
+    if (topic.status !== "published") {
+      forbidden("This topic isn't open for comments yet");
+    }
+  }
+}
+
+function requireBody(raw: string): string {
+  const body = raw.trim();
+  if (!body) throw new GraphQLError("Comment cannot be empty");
+  return body;
+}
+
+/** One mutation-payload builder for every comment mutation (they used to
+ * hand-assemble this object four times). Resolves the author's display
+ * fields + forum roles; the web client only selects `id` and refreshes,
+ * so these lookups are the payload's whole cost. */
+async function commentNode(
+  row: Comment,
+  timetableId: string | null,
+): Promise<CommentNode> {
+  const author = await getUserById(row.authorId);
+  const authorRoles = timetableId
+    ? await getViewerRoles(row.authorId, timetableId)
+    : [];
+  return {
+    id: row.id,
+    parentId: row.parentId,
+    authorId: row.authorId,
+    authorName: author?.name ?? null,
+    authorImage: author?.image ?? null,
+    authorRoles,
+    body: row.body,
+    visibility: row.visibility,
+    hidden: row.hiddenAt !== null,
+    deleted: row.deletedAt !== null,
+    editedAt: row.editedAt,
+    createdAt: row.createdAt,
+    replies: [],
+  };
+}
 
 builder.mutationFields((t) => ({
   addComment: t.field({
@@ -24,50 +96,20 @@ builder.mutationFields((t) => ({
       body: t.arg.string({ required: true }),
       visibility: t.arg.string({ required: false }),
     },
-    // eslint-disable-next-line complexity, sonarjs/cognitive-complexity -- audit debt (2026-07-22): the per-visibility permission ladder; decomposition queued
     resolve: async (_p, args, ctx) => {
       const user = await requireUser(ctx);
       const { topic, viewer } = await loadTopicAndViewer(ctx, args.topicId);
-      const visibility =
+      const visibility: CommentVisibility =
         args.visibility === "host_only"
           ? "host_only"
           : args.visibility === "admin_only"
             ? "admin_only"
             : "public";
-      if (visibility === "admin_only") {
-        // The drafting thread: admins and the topic's owner only
-        // (QA #59 round 3).
-        if (!canModerate(viewer) && topic.hostId !== user.id) {
-          forbidden("Admins and the topic owner only");
-        }
-      } else if (visibility === "host_only") {
-        if (!canSeeHostOnly(viewer)) forbidden("Hosts/admins only");
-      } else {
-        if (!canComment(viewer)) forbidden("Members only");
-        // Public comments are only allowed on published topics.
-        if (topic.status !== "published") {
-          forbidden("This topic isn't open for comments yet");
-        }
-      }
-      const body = args.body.trim();
-      if (!body) throw new GraphQLError("Comment cannot be empty");
+      assertMayComment(viewer, topic, user.id, visibility);
+      const body = requireBody(args.body);
       await assertActionLimit(user.id, "comment");
       const comment = await addComment(topic.id, user.id, body, visibility);
-      const author = await getUserById(user.id);
-      return {
-        id: comment.id,
-        parentId: comment.parentId,
-        authorId: comment.authorId,
-        authorName: author?.name ?? null,
-        authorImage: author?.image ?? null,
-        body: comment.body,
-        visibility: comment.visibility,
-        hidden: false,
-        deleted: false,
-        editedAt: null,
-        createdAt: comment.createdAt,
-        replies: [],
-      };
+      return commentNode(comment, topic.timetableId);
     },
   }),
 
@@ -77,42 +119,16 @@ builder.mutationFields((t) => ({
       commentId: t.arg.string({ required: true }),
       body: t.arg.string({ required: true }),
     },
-    // eslint-disable-next-line complexity -- audit debt (2026-07-22): the per-visibility permission ladder; decomposition queued
     resolve: async (_p, args, ctx) => {
       const user = await requireUser(ctx);
       const parent = await getCommentById(args.commentId);
       if (!parent) notFound("Comment not found");
       const { topic, viewer } = await loadTopicAndViewer(ctx, parent.topicId);
-      if (parent.visibility === "admin_only") {
-        if (!canModerate(viewer) && topic.hostId !== user.id) {
-          forbidden("Admins and the topic owner only");
-        }
-      } else if (parent.visibility === "host_only") {
-        if (!canSeeHostOnly(viewer)) forbidden("Hosts/admins only");
-      } else if (!canComment(viewer)) {
-        forbidden("Members only");
-      } else if (topic.status !== "published") {
-        forbidden("This topic isn't open for comments yet");
-      }
-      const body = args.body.trim();
-      if (!body) throw new GraphQLError("Reply cannot be empty");
+      assertMayComment(viewer, topic, user.id, parent.visibility);
+      const body = requireBody(args.body);
       await assertActionLimit(user.id, "comment");
       const reply = await addReply(parent, user.id, body);
-      const author = await getUserById(user.id);
-      return {
-        id: reply.id,
-        parentId: reply.parentId,
-        authorId: reply.authorId,
-        authorName: author?.name ?? null,
-        authorImage: author?.image ?? null,
-        body: reply.body,
-        visibility: reply.visibility,
-        hidden: false,
-        deleted: false,
-        editedAt: null,
-        createdAt: reply.createdAt,
-        replies: [],
-      };
+      return commentNode(reply, topic.timetableId);
     },
   }),
 
@@ -126,25 +142,11 @@ builder.mutationFields((t) => ({
       const user = await requireUser(ctx);
       const parent = await getCommentById(args.commentId);
       if (!parent) notFound("Comment not found");
-      const { viewer } = await loadTopicAndViewer(ctx, parent.topicId);
+      const { topic, viewer } = await loadTopicAndViewer(ctx, parent.topicId);
       if (!canModerate(viewer)) forbidden("Admins only");
       const updated = await setCommentHidden(parent.id, args.hidden, user.id);
       if (!updated) notFound("Comment not found");
-      const author = await getUserById(updated.authorId);
-      return {
-        id: updated.id,
-        parentId: updated.parentId,
-        authorId: updated.authorId,
-        authorName: author?.name ?? null,
-        authorImage: author?.image ?? null,
-        body: updated.body,
-        visibility: updated.visibility,
-        hidden: updated.hiddenAt !== null,
-        deleted: updated.deletedAt !== null,
-        editedAt: updated.editedAt,
-        createdAt: updated.createdAt,
-        replies: [],
-      };
+      return commentNode(updated, topic.timetableId);
     },
   }),
 }));
@@ -167,25 +169,14 @@ builder.mutationFields((t) => ({
       if (existing.authorId !== user.id) {
         forbidden("You can only edit your own comments");
       }
-      const body = args.body.trim();
-      if (!body) throw new GraphQLError("Comment cannot be empty");
+      const body = requireBody(args.body);
       const updated = await updateCommentBody(existing.id, body);
       if (!updated) notFound("Comment not found");
-      const author = await getUserById(updated.authorId);
-      return {
-        id: updated.id,
-        parentId: updated.parentId,
-        authorId: updated.authorId,
-        authorName: author?.name ?? null,
-        authorImage: author?.image ?? null,
-        body: updated.body,
-        visibility: updated.visibility,
-        hidden: updated.hiddenAt !== null,
-        deleted: false,
-        editedAt: updated.editedAt,
-        createdAt: updated.createdAt,
-        replies: [],
-      };
+      // Deliberately no loadTopicAndViewer: editing your own comment needs
+      // no topic guards — the payload alone wants the forum id (for roles),
+      // and a missing topic just blanks them instead of failing the edit.
+      const topic = await getTopicById(updated.topicId);
+      return commentNode(updated, topic?.timetableId ?? null);
     },
   }),
 

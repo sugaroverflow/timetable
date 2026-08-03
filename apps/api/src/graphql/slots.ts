@@ -271,6 +271,7 @@ const SlotCommentType = builder
     authorId: string;
     authorName: string | null;
     authorImage: string | null;
+    authorRoles: string[];
     body: string;
     topicId: string | null;
     topicTitle: string | null;
@@ -285,6 +286,7 @@ const SlotCommentType = builder
       authorId: t.exposeID("authorId"),
       authorName: t.exposeString("authorName", { nullable: true }),
       authorImage: t.exposeString("authorImage", { nullable: true }),
+      authorRoles: t.exposeStringList("authorRoles"),
       body: t.exposeString("body"),
       topicId: t.exposeID("topicId", { nullable: true }),
       topicTitle: t.exposeString("topicTitle", { nullable: true }),

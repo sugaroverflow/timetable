@@ -10,14 +10,16 @@ import type {
   TopicOption,
 } from "@/lib/calendarTypes";
 import { clientGql } from "@/lib/clientGraphql";
+import type { RoleLabels } from "@/lib/timetableSettings";
 import { useGqlAction } from "@/lib/useGqlAction";
 
 import { Avatar } from "./Avatar";
 import { GrowingTextarea } from "./GrowingTextarea";
+import { PrimaryRolePill } from "./RolePills";
 
 const COMMENTS_QUERY = `query($id: String!) {
   slotComments(slotId: $id) {
-    id authorId authorName authorImage body topicTitle editedAt hidden createdAt
+    id authorId authorName authorImage authorRoles body topicTitle editedAt hidden createdAt
     counts { green yellow red }
   }
 }`;
@@ -37,6 +39,7 @@ export type SlotComment = {
   authorId: string;
   authorName: string | null;
   authorImage: string | null;
+  authorRoles: string[];
   body: string;
   topicTitle: string | null;
   counts: { green: number; yellow: number; red: number } | null;
@@ -178,12 +181,14 @@ function CommentRow({
   slug,
   viewerId,
   canModerate,
+  roleLabels,
   onChanged,
 }: {
   comment: SlotComment;
   slug: string;
   viewerId: string | null;
   canModerate: boolean;
+  roleLabels?: RoleLabels;
   onChanged: () => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
@@ -198,6 +203,7 @@ function CommentRow({
       <div style={{ flex: 1 }}>
         <div className="hc-name">
           <Link href={personHref}>{comment.authorName ?? "Someone"}</Link>
+          <PrimaryRolePill roles={comment.authorRoles} labels={roleLabels} />
           {comment.editedAt ? (
             <span className="faint" style={{ fontWeight: 400 }}>
               {" "}
@@ -252,6 +258,7 @@ export function DiscussionPanel({
   perms,
   lensTopic,
   comments,
+  roleLabels,
   onReload,
 }: {
   slot: CalendarSlot;
@@ -261,6 +268,7 @@ export function DiscussionPanel({
    * "All electors" (null) posts a plain comment (QA 2026-08-03). */
   lensTopic: TopicOption | null;
   comments: SlotComment[] | null;
+  roleLabels?: RoleLabels;
   onReload: () => Promise<void>;
 }) {
   const { run, busy } = useGqlAction();
@@ -292,6 +300,7 @@ export function DiscussionPanel({
           slug={slug}
           viewerId={perms.viewerId}
           canModerate={perms.canAdmin}
+          roleLabels={roleLabels}
           onChanged={onReload}
         />
       ))}

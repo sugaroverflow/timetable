@@ -91,7 +91,13 @@ function LeaderboardRow({
       <div className="row" style={{ justifyContent: "space-between" }}>
         <span className="row" style={{ gap: 6, alignItems: "center" }}>
           <BreakdownCaret open={open} onToggle={() => setOpen(!open)} />
-          <Avatar small name={entry.hostName} image={entry.hostImage} />
+          {/* The avatar clicks through like the name (links pass 2026-08-03). */}
+          <Link
+            className="person-trigger"
+            href={personPath(slug, entry.hostSlug ?? entry.hostId)}
+          >
+            <Avatar small name={entry.hostName} image={entry.hostImage} />
+          </Link>
           <span>
             <Link href={personPath(slug, entry.hostSlug ?? entry.hostId)}>
               {entry.hostName ?? hostLabel}:
