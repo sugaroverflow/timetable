@@ -201,6 +201,7 @@ const SlotTopicType = builder
   .objectRef<{
     id: string;
     title: string;
+    topicSlug: string | null;
     hostId: string;
     hostName: string | null;
   }>("SlotTopic")
@@ -208,6 +209,7 @@ const SlotTopicType = builder
     fields: (t) => ({
       id: t.exposeID("id"),
       title: t.exposeString("title"),
+      topicSlug: t.exposeString("topicSlug", { nullable: true }),
       hostId: t.exposeID("hostId"),
       hostName: t.exposeString("hostName", { nullable: true }),
     }),

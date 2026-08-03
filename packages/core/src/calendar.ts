@@ -458,6 +458,7 @@ export type CalendarSlot = {
   topic: {
     id: string;
     title: string;
+    topicSlug: string | null;
     hostId: string;
     hostName: string | null;
   } | null;
@@ -479,7 +480,13 @@ type SlotRelatedRows = {
   viewerPattern: PatternCells | undefined;
   topicsById: Map<
     string,
-    { id: string; title: string; hostId: string; hostName: string | null }
+    {
+      id: string;
+      title: string;
+      topicSlug: string | null;
+      hostId: string;
+      hostName: string | null;
+    }
   >;
   commentCountBySlot: Map<string, number>;
 };
@@ -536,15 +543,22 @@ async function loadSlotRelatedRows(
   ];
   const topicsById = new Map<
     string,
-    { id: string; title: string; hostId: string; hostName: string | null }
+    {
+      id: string;
+      title: string;
+      topicSlug: string | null;
+      hostId: string;
+      hostName: string | null;
+    }
   >();
   if (topicIds.length > 0) {
     // Host name from their per-forum membership profile (session lines
-    // read "Author: Topic" — QA 2026-08-03).
+    // read "Author: Topic" — QA 2026-08-03); slug for the permalink.
     const topicRows = await db
       .select({
         id: topics.id,
         title: topics.title,
+        topicSlug: topics.slug,
         hostId: topics.hostId,
         hostName: timetableMemberships.name,
       })

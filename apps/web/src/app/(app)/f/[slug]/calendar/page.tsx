@@ -42,7 +42,7 @@ type Data = {
 
 const SLOT_FIELDS = `
   id startsAt endsAt location status url cellKey commentCount viewerState
-  topic { id title hostId hostName }
+  topic { id title topicSlug hostId hostName }
   counts { green yellow red }
   perUser { userId name image state }
 `;
@@ -99,15 +99,12 @@ function CalendarToolbar({
     // (QA 2026-08-02) — sits directly above the table.
     <div className="toolbar feed-toolbar">
       {perms.canSeeHostOnly ? (
-        <>
-          <label>Topic</label>
-          <AudienceFilter
-            value={audience ?? "all"}
-            isHost={hostView}
-            admin={perms.canAdmin}
-            topics={topics}
-          />
-        </>
+        <AudienceFilter
+          value={audience ?? "all"}
+          isHost={hostView}
+          admin={perms.canAdmin}
+          topics={topics}
+        />
       ) : null}
       {locations.length > 0 ? (
         <LocationFilter value={location ?? ""} locations={locations} />

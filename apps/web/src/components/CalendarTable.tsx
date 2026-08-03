@@ -16,6 +16,7 @@ import type {
   TopicOption,
 } from "@/lib/calendarTypes";
 import { clientGql } from "@/lib/clientGraphql";
+import { topicPath } from "@/lib/topicPath";
 import { useGqlAction } from "@/lib/useGqlAction";
 
 import { Avatar } from "./Avatar";
@@ -170,16 +171,32 @@ function AvailabilityMeter({
   );
 }
 
-/** "Author: **Topic**" as regular text plus a status pill — "pencilled",
- * or a clickable "register" pill to the event page when confirmed
- * (QA 2026-08-03). Blank when nothing's planned. */
-function SessionLine({ slot }: { slot: CalendarSlot }) {
+/** "Author: **Topic**" — both linked to their pages — plus a status pill:
+ * "pencilled", or a clickable "register" pill to the event page when
+ * confirmed (QA 2026-08-03). Blank when nothing's planned. */
+function SessionLine({ slot, slug }: { slot: CalendarSlot; slug: string }) {
   if (!slot.topic) return null;
   const confirmed = slot.status === "confirmed";
+  const permalink = topicPath(
+    slug,
+    null,
+    slot.topic.topicSlug,
+    slot.topic.hostId,
+  );
   return (
     <div className="row wrap" style={{ gap: 8, alignItems: "center" }}>
       <span style={{ fontSize: 13 }}>
-        {slot.topic.hostName ?? "…"}: <strong>{slot.topic.title}</strong>
+        <Link href={`/f/${slug}/${slot.topic.hostId}`}>
+          {slot.topic.hostName ?? "…"}
+        </Link>
+        :{" "}
+        {permalink ? (
+          <Link href={permalink}>
+            <strong>{slot.topic.title}</strong>
+          </Link>
+        ) : (
+          <strong>{slot.topic.title}</strong>
+        )}
       </span>
       {!confirmed ? (
         <span className="pill" title="Pencilled in — under discussion">
@@ -202,17 +219,33 @@ function SessionLine({ slot }: { slot: CalendarSlot }) {
   );
 }
 
-/** "Pencil in a topic…" for an open slot. */
+/** "Pencil in a topic…" for an open slot — hosts see their own topics,
+ * admins every topic grouped by author (QA 2026-08-03). */
 function PencilInControl({
   slot,
   claimTopics,
+  admin,
 }: {
   slot: CalendarSlot;
   claimTopics: TopicOption[];
+  admin: boolean;
 }) {
   const { run, busy } = useGqlAction();
   const [topicId, setTopicId] = useState("");
   if (claimTopics.length === 0) return null;
+
+  const groups = new Map<string, TopicOption[]>();
+  if (admin) {
+    for (const topic of claimTopics) {
+      const host = topic.hostName ?? "Unknown host";
+      groups.set(host, [...(groups.get(host) ?? []), topic]);
+    }
+  }
+  const option = (t: TopicOption) => (
+    <option key={t.id} value={t.id}>
+      {t.title}
+    </option>
+  );
 
   return (
     <div className="row wrap" style={{ gap: 8 }}>
@@ -223,11 +256,15 @@ function PencilInControl({
         style={{ width: "auto" }}
       >
         <option value="">Pencil in a topic…</option>
-        {claimTopics.map((t) => (
-          <option key={t.id} value={t.id}>
-            {t.title}
-          </option>
-        ))}
+        {admin
+          ? [...groups.keys()]
+              .sort((a, b) => a.localeCompare(b))
+              .map((host) => (
+                <optgroup key={host} label={host}>
+                  {(groups.get(host) ?? []).map(option)}
+                </optgroup>
+              ))
+          : claimTopics.map(option)}
       </select>
       <button
         type="button"
@@ -350,7 +387,11 @@ function SessionControls({
   return slot.topic ? (
     <ActiveSessionControls slot={slot} topic={slot.topic} perms={perms} />
   ) : (
-    <PencilInControl slot={slot} claimTopics={claimTopics} />
+    <PencilInControl
+      slot={slot}
+      claimTopics={claimTopics}
+      admin={perms.canAdmin}
+    />
   );
 }
 
@@ -722,7 +763,7 @@ function SlotTableRow({
         <tr className={`cal-session-row${past ? " cal-past" : ""}`}>
           <td />
           <td colSpan={columns - 1}>
-            <SessionLine slot={slot} />
+            <SessionLine slot={slot} slug={slug} />
           </td>
         </tr>
       ) : null}

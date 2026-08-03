@@ -1490,17 +1490,16 @@ textarea {
   border-top-width: 3px;
   border-top-color: var(--primary);
 }
-/* When/where + the session pill underneath — pills may be long, so this
-   cell wraps. */
+/* When/where takes only the width it needs; the availability meter's
+   column absorbs everything left over (QA 2026-08-03). */
 .cal-table td.cal-when-cell {
-  white-space: normal;
-  min-width: 180px;
+  white-space: nowrap;
 }
 /* Availability meter with avatars inside their 🟢/🟡/🔴 stretch
    (QA 2026-08-02). Fills its column — the audience is the same on every
    row of a view, so length carries no information. */
 .cal-table td.cal-avail-cell {
-  width: 55%;
+  width: 100%;
 }
 .avail-meter {
   width: 100%;
@@ -1585,6 +1584,10 @@ textarea {
 .cal-fold {
   border-left: 2px solid var(--line);
   padding-left: 14px;
+  /* The fold's composer/thread must never widen the table: inline-size
+     containment zeroes its intrinsic width, so it fits the columns the
+     visible rows negotiated (QA 2026-08-03 — unfold overflowed). */
+  contain: inline-size;
 }
 .cal-detail-row .host-thread {
   border-top: 0;

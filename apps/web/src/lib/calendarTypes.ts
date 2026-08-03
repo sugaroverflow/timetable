@@ -13,6 +13,7 @@ export type CalendarSlot = {
   topic: {
     id: string;
     title: string;
+    topicSlug: string | null;
     hostId: string;
     hostName: string | null;
   } | null;
