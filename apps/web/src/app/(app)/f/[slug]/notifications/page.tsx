@@ -19,7 +19,13 @@ import { topicPath } from "@/lib/topicPath";
 
 type Notification = {
   commentId: string;
-  kind: "reply" | "comment" | "mention";
+  kind:
+    | "reply"
+    | "comment"
+    | "mention"
+    | "session_pencilled"
+    | "session_confirmed"
+    | "session_cleared";
   authorId: string;
   authorName: string | null;
   authorImage: string | null;
@@ -49,6 +55,61 @@ const QUERY = `
   }
 `;
 
+const KIND_VERBS: Record<Notification["kind"], string> = {
+  reply: "replied to your comment on",
+  mention: "mentioned you on",
+  comment: "commented on",
+  // Calendar v2 (QA 2026-08-03): session events for topics you ❤️'d.
+  session_pencilled: "pencilled in a session for",
+  session_confirmed: "confirmed a session for",
+  session_cleared: "cleared a pencilled session for",
+};
+
+function isSessionKind(kind: Notification["kind"]): boolean {
+  return kind.startsWith("session_");
+}
+
+/** For session notifications, body carries the slot's startsAt ISO. */
+function sessionWhen(iso: string): string | null {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const day = d.toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+  const time = d.toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  return `${day}, ${time}`;
+}
+
+/** Link targets per kind. Comment kinds deep-link the topic permalink —
+ * which renders every comment tier the viewer may see, including the
+ * drafting thread for the topic's owner and admins (QA 2026-07-28) — with
+ * the thread's list page as fallback. Session kinds link to the calendar. */
+function cardLinks(
+  n: Notification,
+  slug: string,
+  viewerIsAdmin: boolean,
+): { href: string | null; replyHref: string | null } {
+  if (isSessionKind(n.kind)) {
+    return { href: `/f/${slug}/calendar`, replyHref: null };
+  }
+  const base =
+    topicPath(slug, n.topicHostSlug, n.topicSlug) ??
+    (n.visibility === "admin_only"
+      ? `/f/${slug}/${viewerIsAdmin ? "pending" : "my-topics"}`
+      : null);
+  if (!base) return { href: null, replyHref: null };
+  return {
+    href: `${base}#comment-${n.commentId}`,
+    replyHref: `${base}?reply=${n.commentId}#comment-${n.commentId}`,
+  };
+}
+
 function NotificationCard({
   n,
   slug,
@@ -58,19 +119,10 @@ function NotificationCard({
   slug: string;
   viewerIsAdmin: boolean;
 }) {
-  // The permalink renders every comment tier the viewer may see —
-  // including the drafting thread for the topic's owner and admins
-  // (QA 2026-07-28). Fall back to the thread's list page only when no
-  // path builds.
-  const base =
-    topicPath(slug, n.topicHostSlug, n.topicSlug) ??
-    (n.visibility === "admin_only"
-      ? `/f/${slug}/${viewerIsAdmin ? "pending" : "my-topics"}`
-      : null);
-  const href = base ? `${base}#comment-${n.commentId}` : null;
-  const replyHref = base
-    ? `${base}?reply=${n.commentId}#comment-${n.commentId}`
-    : null;
+  const { href, replyHref } = cardLinks(n, slug, viewerIsAdmin);
+  const detail = isSessionKind(n.kind)
+    ? sessionWhen(n.body)
+    : `“${n.body.slice(0, 160)}”`;
   return (
     <li className="card">
       <div className="row" style={{ alignItems: "flex-start" }}>
@@ -79,26 +131,23 @@ function NotificationCard({
         </PersonChip>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 14 }}>
-            <b>{n.authorName ?? "Someone"}</b>{" "}
-            {n.kind === "reply"
-              ? "replied to your comment on"
-              : n.kind === "mention"
-                ? "mentioned you on"
-                : "commented on"}{" "}
+            <b>{n.authorName ?? "Someone"}</b> {KIND_VERBS[n.kind]}{" "}
             {href ? <Link href={href}>{n.topicTitle}</Link> : n.topicTitle}
           </div>
-          <div
-            className="faint"
-            style={{
-              fontSize: 13,
-              marginTop: 2,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
-            &ldquo;{n.body.slice(0, 160)}&rdquo;
-          </div>
+          {detail ? (
+            <div
+              className="faint"
+              style={{
+                fontSize: 13,
+                marginTop: 2,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {detail}
+            </div>
+          ) : null}
           <div className="faint" style={{ fontSize: 11, marginTop: 2 }}>
             {new Date(n.createdAt).toLocaleString()}
           </div>

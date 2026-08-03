@@ -28,4 +28,13 @@ export const ACTION_LABELS: Record<string, string> = {
   "queue.finish": "finished the topic queue",
   "forum.settings": "changed forum settings",
   "forum.privacy": "changed the forum's visibility",
+  // Calendar v2 (QA 2026-08-03).
+  "calendar.schedule": "updated the calendar schedule",
+  "slot.propose": "proposed a session time",
+  "slot.pencil": "pencilled in a session",
+  "slot.confirm": "confirmed a session",
+  "slot.clear": "cleared a pencilled session",
+  "slot.comment": "commented on a timeslot",
+  "availability.set": "updated their availability",
+  "availability.pattern": "updated their weekly availability pattern",
 };

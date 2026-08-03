@@ -302,6 +302,7 @@ function CalendarCards({
           slug={slug}
           topics={claimTopics}
           locations={calendar.locations ?? []}
+          admin={perms.canAdmin}
         />
       ) : null}
     </>

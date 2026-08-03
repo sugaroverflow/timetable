@@ -10,6 +10,39 @@ const PROPOSE = `mutation($s: String!, $a: String!, $b: String!, $loc: String, $
   proposeSlot(idOrSlug: $s, startsAt: $a, endsAt: $b, location: $loc, topicId: $t) { id }
 }`;
 
+/** Plain options for hosts; grouped-by-author optgroups for admins. */
+function TopicOptions({
+  topics,
+  admin,
+}: {
+  topics: TopicOption[];
+  admin: boolean;
+}) {
+  const option = (t: TopicOption) => (
+    <option key={t.id} value={t.id}>
+      {t.title}
+    </option>
+  );
+  if (!admin) return <>{topics.map(option)}</>;
+
+  const groups = new Map<string, TopicOption[]>();
+  for (const topic of topics) {
+    const host = topic.hostName ?? "Unknown host";
+    groups.set(host, [...(groups.get(host) ?? []), topic]);
+  }
+  return (
+    <>
+      {[...groups.keys()]
+        .sort((a, b) => a.localeCompare(b))
+        .map((host) => (
+          <optgroup key={host} label={host}>
+            {(groups.get(host) ?? []).map(option)}
+          </optgroup>
+        ))}
+    </>
+  );
+}
+
 /**
  * Off-piste proposal (calendar v2): "why not breakfast? why not in the
  * park?" — a host (policy-gated) or admin proposes a session at a time
@@ -20,10 +53,14 @@ export function ProposeSlotForm({
   slug,
   topics,
   locations,
+  admin = false,
 }: {
   slug: string;
   topics: TopicOption[];
   locations: string[];
+  /** Admins pick any topic, grouped by author; hosts get only their own
+   * (the caller pre-filters) — QA 2026-08-03. */
+  admin?: boolean;
 }) {
   const { run, busy } = useGqlAction();
   const [open, setOpen] = useState(false);
@@ -89,11 +126,7 @@ export function ProposeSlotForm({
             style={{ width: "auto" }}
           >
             <option value="">Topic…</option>
-            {topics.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.title}
-              </option>
-            ))}
+            <TopicOptions topics={topics} admin={admin} />
           </select>
           <input
             type="datetime-local"

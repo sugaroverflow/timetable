@@ -12,6 +12,7 @@ import {
   getSlotCommentById,
   getTopicById,
   listSlotComments,
+  logActivity,
   proposeSlot,
   setAvailability,
   setAvailabilityPattern,
@@ -371,6 +372,14 @@ builder.mutationFields((t) => ({
       if (!canManageCalendar(viewer)) forbidden("Admins only");
       const inputs = parseSlotInputs(args.slotsJson);
       const created = await createSlots(readable.timetable.id, inputs);
+      if (created.length > 0) {
+        await logActivity({
+          timetableId: readable.timetable.id,
+          actorId: ctx.user?.id ?? null,
+          action: "calendar.schedule",
+          note: `${created.length} slot${created.length === 1 ? "" : "s"} generated`,
+        });
+      }
       return created.length;
     },
   }),
@@ -396,7 +405,7 @@ builder.mutationFields((t) => ({
       if (!canProposeSession(viewer, policy)) {
         forbidden("Slot proposals are admin-only in this forum");
       }
-      await assertOwnTopicInTimetable(
+      const topic = await assertOwnTopicInTimetable(
         viewer,
         args.topicId,
         readable.timetable.id,
@@ -411,11 +420,22 @@ builder.mutationFields((t) => ({
       if (endsAt.getTime() <= startsAt.getTime()) {
         badRequest("endsAt must be after startsAt");
       }
-      await proposeSlot(readable.timetable.id, user.id, {
+      const slot = await proposeSlot(readable.timetable.id, user.id, {
         startsAt,
         endsAt,
         location: args.location ?? "",
         topicId: args.topicId,
+      });
+      await logActivity({
+        timetableId: readable.timetable.id,
+        actorId: user.id,
+        action: "slot.propose",
+        payload: {
+          slotId: slot.id,
+          startsAt: startsAt.toISOString(),
+          topicId: topic.id,
+          title: topic.title,
+        },
       });
       return { ...readable.timetable, viewerRoles: readable.roles as string[] };
     },
@@ -500,7 +520,7 @@ builder.mutationFields((t) => ({
       url: t.arg.string({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
-      await requireUser(ctx);
+      const user = await requireUser(ctx);
       const { slot, viewer, timetable } = await loadSlotAndViewer(
         ctx,
         args.slotId,
@@ -515,11 +535,26 @@ builder.mutationFields((t) => ({
         forbidden("Another host's session is pencilled into this slot");
       }
 
+      const slotEvent = (topic: { id: string; title: string }) => ({
+        slotId: slot.id,
+        startsAt: slot.startsAt.toISOString(),
+        topicId: topic.id,
+        title: topic.title,
+      });
+
       if (args.topicId == null) {
         // Clearing back to empty ("un-pencil"): admins, or the host whose
         // own session it is (canTouchSlotSession above already pinned that).
         if (!canProposeSession(viewer, policy)) forbidden();
         await setSlotSession(slot.id, { topicId: null });
+        if (currentTopic) {
+          await logActivity({
+            timetableId: timetable.id,
+            actorId: user.id,
+            action: "slot.clear",
+            payload: slotEvent(currentTopic),
+          });
+        }
         return true;
       }
 
@@ -533,11 +568,23 @@ builder.mutationFields((t) => ({
             : "Pencilling sessions is admin-only in this forum",
         );
       }
-      await assertOwnTopicInTimetable(viewer, args.topicId, timetable.id);
+      const topic = await assertOwnTopicInTimetable(
+        viewer,
+        args.topicId,
+        timetable.id,
+      );
       await setSlotSession(slot.id, {
         topicId: args.topicId,
         status,
         url: parseSessionUrl(args.url),
+      });
+      // Re-confirming (e.g. a URL edit) still logs slot.confirm — the log
+      // is a feed, and the fresh URL is the news.
+      await logActivity({
+        timetableId: timetable.id,
+        actorId: user.id,
+        action: status === "confirmed" ? "slot.confirm" : "slot.pencil",
+        payload: slotEvent(topic),
       });
       return true;
     },
@@ -565,7 +612,18 @@ builder.mutationFields((t) => ({
       );
       requireCalendarEnabled(timetable.settings);
       if (!isElector(viewer.roles)) forbidden("Electors only");
-      await setAvailability(slot.id, user.id, parseState(args.state));
+      const state = parseState(args.state);
+      await setAvailability(slot.id, user.id, state);
+      await logActivity({
+        timetableId: timetable.id,
+        actorId: user.id,
+        action: "availability.set",
+        payload: {
+          slotId: slot.id,
+          startsAt: slot.startsAt.toISOString(),
+          state,
+        },
+      });
       return true;
     },
   }),
@@ -586,6 +644,11 @@ builder.mutationFields((t) => ({
       if (!isElector(readable.roles)) forbidden("Electors only");
       const cells = parsePatternCells(args.cellsJson);
       await setAvailabilityPattern(readable.timetable.id, user.id, cells);
+      await logActivity({
+        timetableId: readable.timetable.id,
+        actorId: user.id,
+        action: "availability.pattern",
+      });
       return true;
     },
   }),
@@ -613,6 +676,7 @@ builder.mutationFields((t) => ({
       await assertActionLimit(user.id, "comment");
 
       let claim: Parameters<typeof addSlotComment>[3];
+      let claimTopic: { id: string; title: string } | null = null;
       if (args.topicId) {
         const topic = await getTopicById(args.topicId);
         if (!topic || topic.timetableId !== timetable.id) {
@@ -626,9 +690,23 @@ builder.mutationFields((t) => ({
           topicId: topic.id,
           counts: await computeSlotCounts(slot, hearters),
         };
+        claimTopic = topic;
       }
 
       const comment = await addSlotComment(slot.id, user.id, body, claim);
+      await logActivity({
+        timetableId: timetable.id,
+        actorId: user.id,
+        action: "slot.comment",
+        payload: {
+          slotId: slot.id,
+          startsAt: slot.startsAt.toISOString(),
+          ...(claimTopic
+            ? { topicId: claimTopic.id, title: claimTopic.title }
+            : {}),
+        },
+        note: body,
+      });
       const thread = await listSlotComments(slot.id);
       const view = thread.find((c) => c.id === comment.id);
       if (!view) notFound("Comment not found");
