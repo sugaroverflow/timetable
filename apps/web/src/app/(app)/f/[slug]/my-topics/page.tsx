@@ -71,15 +71,19 @@ export default async function MyTopicsPage({
 
   return (
     <div className="grid grid-2">
-      {/* Hidden behind the big button until pressed (QA 2026-07-29). */}
-      <CreateTopicReveal>
-        <CreateTopicForm slug={slug} hosts={otherHosts} hostLabel={hostLabel} />
-      </CreateTopicReveal>
-
       <div className="stack">
         <div className="page-head">
           <h2 className="page-title">My Topics</h2>
         </div>
+        {/* Hidden behind the button until pressed; under the heading, same
+            treatment as the calendar's propose button (QA 2026-08-03). */}
+        <CreateTopicReveal>
+          <CreateTopicForm
+            slug={slug}
+            hosts={otherHosts}
+            hostLabel={hostLabel}
+          />
+        </CreateTopicReveal>
         {data.hostDashboard.length > 1 ? (
           <div className="toolbar feed-toolbar">
             <ListSortControl value={sort} options={MY_TOPICS_SORTS} />
