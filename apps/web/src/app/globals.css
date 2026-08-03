@@ -1079,6 +1079,12 @@ textarea {
   align-items: center;
   gap: 2px;
   color: var(--ink);
+  /* A native select sizes to its LONGEST option — topic-lens options carry
+     whole topic titles, which pushed the page into sideways scroll on
+     phones. Cap at the toolbar line and ellipsize the value instead
+     (mobile pass 2026-08-03). */
+  min-width: 0;
+  max-width: 100%;
 }
 .select-minimal svg {
   flex: none;
@@ -1091,6 +1097,8 @@ textarea {
   border: none;
   background: transparent;
   width: auto;
+  min-width: 0;
+  text-overflow: ellipsis;
   padding: 4px 2px;
   font-weight: var(--fw-semibold);
   cursor: pointer;
@@ -1657,6 +1665,15 @@ textarea {
      visible rows negotiated (QA 2026-08-03 — unfold overflowed). */
   contain: inline-size;
 }
+/* Native selects size to their longest option — topic titles in the
+   pencil-in select pushed the fold (and with it the table) hundreds of px
+   past a phone screen. Cap every fold control at the fold's width
+   (mobile pass 2026-08-03). */
+.cal-fold select,
+.cal-fold input {
+  max-width: 100%;
+  text-overflow: ellipsis;
+}
 .cal-detail-row .host-thread {
   border-top: 0;
   margin-top: 0;
@@ -1708,6 +1725,88 @@ textarea {
   border-top: 1px dashed var(--line);
   font-size: var(--text-xs);
   color: var(--muted);
+}
+
+/* Mobile calendar (design pass 2026-08-03): the desktop row grid
+   (💬 | when | meter | you) is ~580px — far past a phone, so the meter,
+   session lines, and the whole fold hid behind sideways scroll. Under
+   640px each slot stacks instead: 💬 + when (+ the elector's own 🟢🟡🔴
+   toggle right-aligned) on the first line, the full-width avatar meter
+   beneath; session lines and the fold span the whole block. */
+@media (max-width: 640px) {
+  .cal-table,
+  .cal-table tbody {
+    display: block;
+  }
+  .cal-table tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 8px 0;
+    border-top: 1px solid var(--line);
+  }
+  /* Row rules move from the cells to the row blocks above. The nowrap the
+     cells inherit from .data-table would clip fold bubbles and session
+     lines — restore wrapping. (Selector list mirrors the base rules it
+     must out-cascade.) */
+  .cal-table td,
+  .cal-table td:not(:first-child),
+  .cal-table tr.cal-week-start td {
+    display: block;
+    border-top: 0;
+    padding: 0;
+    width: auto;
+    white-space: normal;
+  }
+  .cal-table tr.cal-week-start {
+    border-top-width: 3px;
+    border-top-color: var(--primary);
+  }
+  .cal-table tbody tr:first-child {
+    border-top: 0;
+  }
+  .cal-table td.cal-caret-cell {
+    padding-right: 6px;
+  }
+  .cal-table td.cal-when-cell {
+    flex: 1;
+    min-width: 0;
+    white-space: normal;
+  }
+  /* The meter drops to its own full-width line; `order` sends it past the
+     elector's you-cell so the toggle stays on the when line. min-width
+     overrides the flex item's content floor — without it the avatar row
+     props the cell (and table) ~20px past the screen. */
+  .cal-table td.cal-avail-cell {
+    order: 10;
+    width: 100%;
+    min-width: 0;
+    padding-top: 4px;
+  }
+  /* Slightly smaller faces so a ~20-elector audience fits one meter line. */
+  .avail-meter .avatar {
+    width: 15px;
+    height: 15px;
+    font-size: 6px;
+  }
+  /* Divider/utility rows are plain blocks; their spacer cells vanish. */
+  .cal-table tr.cal-month-row,
+  .cal-table tr.cal-session-row,
+  .cal-table tr.cal-detail-row {
+    display: block;
+    border-top: 0;
+  }
+  .cal-table tr.cal-month-row {
+    padding: 14px 0 4px;
+  }
+  .cal-table tr.cal-session-row,
+  .cal-table tr.cal-detail-row {
+    padding: 0 0 4px;
+  }
+  .cal-session-row td:first-child,
+  .cal-detail-row td:first-child {
+    display: none;
+  }
 }
 
 /* Host insights panel — collapsible vote breakdown */
