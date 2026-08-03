@@ -49,7 +49,9 @@ export function AudienceFilter({
       }}
     >
       <option value="all">All {electorsLabel}</option>
-      {isHost ? <option value="hearted_mine">❤️ my topics</option> : null}
+      {isHost ? (
+        <option value="hearted_mine">All ❤️s on all my topics</option>
+      ) : null}
       {admin
         ? [...groups.keys()]
             .sort((a, b) => a.localeCompare(b))
