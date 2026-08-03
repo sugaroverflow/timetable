@@ -249,10 +249,14 @@ Main mutations cover:
   (`setMyAvailabilityPattern`); effective state resolves explicit → pattern
   cell (via the slot's `cellKey`) → yellow
 - slot comments, optionally as session claims (`topicId` + a
-  server-computed, frozen 🟢🟡🔴 snapshot of that topic's hearters)
-- the session lifecycle (`setSlotSession`: topic + `empty`/`proposed`/
-  `confirmed` + URL), gated by the forum's confirm policy and the
-  never-displace rule (`canTouchSlotSession`)
+  server-computed, frozen 🟢🟡🔴 snapshot of that topic's hearters), with
+  author edit/delete and admin hide (`updateSlotComment`,
+  `deleteSlotComment`, `hideSlotComment`)
+- the session lifecycle (`setSlotSession`: a topic OR an office-hours
+  `sessionHostId`, + `empty`/`proposed`/`confirmed` + URL), gated by the
+  forum's confirm policy and the never-displace rule
+  (`canTouchSlotSession` against `session_host_id`); calendar actions are
+  activity-logged and session events notify the topic's hearters
 - topic publishing by the owning host when
   `settings.topics.hostsPublishDirectly` is on (same `moderateTopic`
   mutation; admin review becomes post-hoc)
@@ -292,13 +296,15 @@ Core tables:
 - `comments`
 - `activity_events`
 - `timeslots` (calendar v2: + `status`, singular `topic_id`, `url`,
-  `created_by_id`, `cell_key` — the pattern-cell provenance for inference;
-  the `slot_topics` m2m was dropped, simultaneous sessions are separate
-  slots)
+  `created_by_id`, `cell_key` — the pattern-cell provenance for inference —
+  and `session_host_id`, THE session-ownership column: the topic's host,
+  or the host themselves for topic-less "office hours" sessions; the
+  `slot_topics` m2m was dropped, simultaneous sessions are separate slots)
 - `availability` (explicit per-slot answers)
 - `availability_patterns` (one row per forum+user; jsonb cell → state map)
 - `slot_comments` (+ optional claim: `topic_id` and frozen
-  green/yellow/red counts)
+  green/yellow/red counts; + `edited_at`/`hidden_at`/`hidden_by_user_id`
+  for author edits and admin moderation)
 - `api_rate_limit_buckets`
 
 Notable columns: `timetables.settings` is a JSON blob holding role labels,

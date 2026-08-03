@@ -6,7 +6,7 @@ import { Plus } from "lucide-react";
 import {
   SessionChoiceOptions,
   sessionChoiceVars,
-} from "@/components/CalendarTable";
+} from "@/components/SlotSessionControls";
 import type { CalendarPerms, TopicOption } from "@/lib/calendarTypes";
 import { useGqlAction } from "@/lib/useGqlAction";
 

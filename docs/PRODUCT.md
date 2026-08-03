@@ -106,27 +106,42 @@ information you share":
    painted once and inherited by every generated slot
 3. nothing shared → 🟡 (maybe)
 
-**Sessions.** Each slot carries at most one topic plus a status: `empty`
-(open) → `proposed` (pencilled in, under discussion) → `confirmed` (happening;
-URL points at the real event page). Who may pencil/confirm is a forum setting:
-admins only / hosts propose, admins confirm (default) / hosts confirm
-themselves (unconference mode). A host can only ever act on their own topic
-and never displace another host's session — collisions stay conversations.
-Hosts can also propose off-piste slots at any time/location; those are born
+**Sessions.** Each slot carries at most one session — **a topic, or a
+host's "office hours"** (a typed topic-less session whose subject is the
+host; its display label is a forum setting, "Office hours" by default,
+never per-session free text) — plus a status: `empty` (open) → `proposed`
+(pencilled in, under discussion) → `confirmed` (happening; URL points at
+the real event page, rendered as a "register" pill). Who may
+pencil/confirm is a forum setting expressed as two switches (hosts may
+pencil / hosts may confirm; both off = admins schedule everything). A host
+only ever acts on their own topic or their own office hours and never
+displaces another host's session — collisions stay conversations. Hosts
+can also propose off-piste slots at any time/location; those are born
 `proposed` and collect availability immediately.
 
-**Host view.** A topic lens filters every slot's counts and per-elector
-avatars (grouped 🟢→🟡→🔴, host/admin-only) to the electors who ❤️'d that
-topic. Slot discussions ("host chat") support claim comments that attach a
-topic plus a frozen server-computed availability snapshot ("I'd like this
-slot for Yoga · 4🟢 8🟡 2🔴") — a record of what the claim was based on.
+**Host view.** The page is a compact table (rows fold open via a 💬
+bubble). A topic lens filters every slot's availability meter — elector
+avatars sitting inside their 🟢/🟡/🔴 stretch, host/admin-only — to the
+electors who ❤️'d that topic; group availability is hidden from electors,
+who see only their own toggle. Slot discussions ("host chat") support
+claim comments that attach the active lens topic plus a frozen
+server-computed availability snapshot ("I'd like this slot for Yoga ·
+4🟢 8🟡 2🔴"); slot comments have the standard author edit/delete and
+admin hide/unhide controls.
 
-Past slots are archived out of the default view ("Show past" reveals them).
-The ICS feed maps proposed/confirmed onto RFC 5545 `STATUS:TENTATIVE`/
+Past slots are archived out of the default view ("Show past" reveals
+them); until slots exist the whole page and nav link hide from
+non-admins. Pencil/confirm/clear/propose/schedule/comment/availability
+actions land in the activity log, and hearters of a topic get in-app
+notifications when its session is pencilled, confirmed, or cleared. The
+ICS feed maps proposed/confirmed onto RFC 5545 `STATUS:TENTATIVE`/
 `CONFIRMED` and carries the session URL; it 404s while the calendar is
-disabled. Digests gain a "📅 Coming up" section (confirmed sessions, new ones
-marked) and a "Can you make it?" section (proposed sessions for topics the
-recipient ❤️'d); stale listings alone never trigger an email.
+disabled. In digests, a hearter's upcoming confirmed sessions ride their
+topic's card (in every digest until the session happens, with a
+Register → URL link) and proposed sessions appear as a "Can you make it?"
+section; stale listings alone never trigger an email. Office-hours
+sessions reach people via the calendar page and ICS only (notifications
+and digests key off topic ❤️s).
 
 Relatedly, a forum can let **hosts publish topics without admin review**
 (Forum Settings) — review becomes after-the-fact oversight and every publish

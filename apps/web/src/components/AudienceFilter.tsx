@@ -1,7 +1,7 @@
 "use client";
 
 import { SelectMinimal } from "@/components/SelectMinimal";
-import type { TopicOption } from "@/lib/calendarTypes";
+import { groupTopicsByHost, type TopicOption } from "@/lib/calendarTypes";
 import { useSetSearchParam } from "@/lib/useSearchParamNav";
 
 /** The calendar's topic lens. Hosts see only their own topics (the caller
@@ -23,13 +23,9 @@ export function AudienceFilter({
 }) {
   const setParam = useSetSearchParam();
 
-  const groups = new Map<string, TopicOption[]>();
-  if (admin) {
-    for (const topic of topics) {
-      const host = topic.hostName ?? "Unknown host";
-      groups.set(host, [...(groups.get(host) ?? []), topic]);
-    }
-  }
+  const groups = admin
+    ? groupTopicsByHost(topics)
+    : new Map<string, TopicOption[]>();
 
   const option = (tp: TopicOption) => (
     <option key={tp.id} value={`hearted_topic:${tp.id}`}>
@@ -53,13 +49,11 @@ export function AudienceFilter({
         <option value="hearted_mine">All ❤️s on all my topics</option>
       ) : null}
       {admin
-        ? [...groups.keys()]
-            .sort((a, b) => a.localeCompare(b))
-            .map((host) => (
-              <optgroup key={host} label={host}>
-                {(groups.get(host) ?? []).map(option)}
-              </optgroup>
-            ))
+        ? [...groups.entries()].map(([host, hostTopics]) => (
+            <optgroup key={host} label={host}>
+              {hostTopics.map(option)}
+            </optgroup>
+          ))
         : topics.map(option)}
     </SelectMinimal>
   );
