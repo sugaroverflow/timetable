@@ -77,30 +77,79 @@ const AVAILABILITY_STATE_VALUES = [
 ] as const satisfies readonly AvailabilityState[];
 
 type SlotAvailability = { person: string; state: AvailabilityState };
-type SlotDiscussionEntry = { author: string; text: string };
+type SlotDiscussionEntry = {
+  author: string;
+  text: string;
+  /** Session claim (calendar v2): "I'd like this slot for <topic>", with the
+   * frozen 🟢🟡🔴 snapshot the author saw when posting. */
+  claimTopic: string | null;
+  claimCounts: { green: number; yellow: number; red: number } | null;
+};
 
 type SlotFixture = {
   label: string;
-  date: string; // YYYY-MM-DD
+  date: string; // YYYY-MM-DD (already resolved from any relative form)
   startTime: string; // HH:MM
   endTime: string; // HH:MM
   location: string;
   /** The slot's session topic (calendar v2: one topic per slot; the first
    * listed tag wins if a fixture still lists several). */
   topicTags: string[];
-  /** Session status; defaults to proposed when a topic is set, empty
+  /** Office-hours session (QA 2026-08-03): the session's subject is this
+   * host, not a topic. Mutually exclusive with topicTags. */
+  sessionHost: string | null;
+  /** Session status; defaults to proposed when a session is set, empty
    * otherwise. */
   status: SlotStatus | null;
+  /** Off-piste slot (host proposal outside the weekly pattern): no cellKey,
+   * excluded from the derived forum pattern/term/locations. */
+  offGrid: boolean;
   url: string;
   availability: SlotAvailability[];
   discussion: SlotDiscussionEntry[];
 };
 
-const BASE_TIME = new Date("2026-06-01T09:00:00.000Z");
-const TOPIC_TIME = new Date("2026-06-09T09:00:00.000Z");
-const COMMENT_TIME = new Date("2026-06-20T09:00:00.000Z");
-const HEART_TIME = new Date("2026-06-21T09:00:00.000Z");
-const ACTIVITY_TIME = new Date("2026-06-22T09:00:00.000Z");
+/**
+ * Seed times are RELATIVE to the seed run (2026-08-03): fixed dates left the
+ * feed, digests, and calendar looking dead the day after they were written.
+ * Anchored to `SEED_NOW`, every reseed yields recent comments/❤️s (inside
+ * the digest's 24h window), a calendar with past + upcoming weeks, and
+ * sessions inside the digest's 14-day horizon — on any day, forever.
+ */
+const SEED_NOW = new Date();
+const HOUR_MS = 3_600_000;
+const DAY_MS = 24 * HOUR_MS;
+
+function hoursAgo(hours: number): Date {
+  return new Date(SEED_NOW.getTime() - hours * HOUR_MS);
+}
+
+/** The i-th of `count` moments spread evenly across a window ending before
+ * SEED_NOW — monotonic in `i`, and never in the future however large the
+ * fixture grows. */
+function spreadTime(
+  windowStartHoursAgo: number,
+  windowEndHoursAgo: number,
+  index: number,
+  count: number,
+): Date {
+  const start = SEED_NOW.getTime() - windowStartHoursAgo * HOUR_MS;
+  const end = SEED_NOW.getTime() - windowEndHoursAgo * HOUR_MS;
+  const step = count > 1 ? (end - start) / (count - 1) : 0;
+  return new Date(start + step * index);
+}
+
+const BASE_TIME = hoursAgo(60 * 24); // memberships, slots, patterns
+const TOPIC_TIME = hoursAgo(50 * 24); // topic createdAt stagger
+const COMMENT_WINDOW = [42, 1] as const; // comments: last ~2 days
+const HEART_WINDOW = [4, 1] as const; // ❤️s: all inside the digest day
+const ACTIVITY_WINDOW = [20, 2] as const; // activity log: last day
+/** "Published date, if published: recent" resolves here — inside the digest
+ * window, so the topic surfaces as a "New" card for electors. */
+const RECENT_PUBLISH_TIME = hoursAgo(6);
+/** Slot updatedAt: recent, so seeded sessions count as news ("New" pill) in
+ * the first digest run after seeding — stale sessions never trigger email. */
+const SLOT_UPDATED_TIME = hoursAgo(3);
 const RESET_DATABASE_TABLES = [
   "api_rate_limit_buckets",
   "activity_events",
@@ -142,6 +191,9 @@ type TopicFixture = {
   status: TopicStatus;
   publishedAt: Date | null;
   coverImageUrl: string | null;
+  /** "Recently assigned: yes" seeds a fresh topic.reassign activity event,
+   * so the host's digest shows an "Assigned to you" card. */
+  recentlyAssigned: boolean;
   bodyMd: string;
 };
 
@@ -345,12 +397,25 @@ function parsePeople(markdown: string): PersonFixture[] {
 
 function parseTopicDate(value: string, label: string): Date | null {
   if (!value) return null;
+  // "recent" = a few hours before the seed run — inside the digest window,
+  // so the topic shows up as a "New" card in the next digest.
+  if (value === "recent") return RECENT_PUBLISH_TIME;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     throw new Error(
-      `Invalid published date "${value}" for topic "${label}". Use YYYY-MM-DD.`,
+      `Invalid published date "${value}" for topic "${label}". Use YYYY-MM-DD or "recent".`,
     );
   }
   return new Date(`${value}T12:00:00.000Z`);
+}
+
+function parseYesNo(value: string, field: string, label: string): boolean {
+  if (!value) return false;
+  const normalized = value.toLowerCase();
+  if (["yes", "true"].includes(normalized)) return true;
+  if (["no", "false"].includes(normalized)) return false;
+  throw new Error(
+    `Invalid ${field} value "${value}" for "${label}". Use yes or no.`,
+  );
 }
 
 function parseTopics(markdown: string): TopicFixture[] {
@@ -394,6 +459,11 @@ function parseTopics(markdown: string): TopicFixture[] {
         label,
       ),
       coverImageUrl: fieldFromBlock(fields, "Cover image URL, if any") || null,
+      recentlyAssigned: parseYesNo(
+        fieldFromBlock(fields, "Recently assigned"),
+        "Recently assigned",
+        label,
+      ),
       bodyMd,
     });
   }
@@ -412,16 +482,6 @@ function visibilityFromText(value: string, label: string): CommentVisibility {
   if (hasValue(COMMENT_VISIBILITY_VALUES, normalized)) return normalized;
   throw new Error(
     `Invalid visibility "${value}" for comment "${label}". Valid values: public, hosts only, admins only`,
-  );
-}
-
-function parseHidden(value: string | undefined, label: string): boolean {
-  if (!value) return false;
-  const normalized = value.toLowerCase();
-  if (["yes", "true"].includes(normalized)) return true;
-  if (["no", "false"].includes(normalized)) return false;
-  throw new Error(
-    `Invalid Hidden value "${value}" for comment "${label}". Use yes or no.`,
   );
 }
 
@@ -444,7 +504,7 @@ function commentFromFields(fields: Record<string, string>): CommentFixture {
     author,
     visibility: visibilityFromText(visibility, label),
     replyTo: fields["Reply to"] || null,
-    hidden: parseHidden(fields["Hidden"], label),
+    hidden: parseYesNo(fields["Hidden"] ?? "", "Hidden", label),
     text,
   };
 }
@@ -578,11 +638,31 @@ function parseSlotAvailability(
   return entries;
 }
 
-/** Apply a "  Text: …" or continuation line to the discussion entry. */
+/** Apply a "  Text:"/"  Claim:"/"  Counts:" or continuation line to the
+ * discussion entry. Claim + Counts turn the comment into a session claim
+ * ("I'd like this slot for <topic> · 4🟢 8🟡 2🔴" — counts deliberately
+ * frozen, as in the live feature). */
 function applyDiscussionLine(current: SlotDiscussionEntry, line: string): void {
   const textMatch = /^ {2}Text:\s*(.*)$/.exec(line);
   if (textMatch) {
     current.text = textMatch[1]?.trim() ?? "";
+    return;
+  }
+  const claimMatch = /^ {2}Claim:\s*(\S+)\s*$/.exec(line);
+  if (claimMatch) {
+    current.claimTopic = claimMatch[1]!;
+    return;
+  }
+  const countsMatch =
+    /^ {2}Counts:\s*(\d+)\s+green,\s*(\d+)\s+yellow,\s*(\d+)\s+red\s*$/.exec(
+      line,
+    );
+  if (countsMatch) {
+    current.claimCounts = {
+      green: Number(countsMatch[1]),
+      yellow: Number(countsMatch[2]),
+      red: Number(countsMatch[3]),
+    };
     return;
   }
   if (line.startsWith("  ") && line.trim()) {
@@ -605,7 +685,12 @@ function parseSlotDiscussion(rest: string): SlotDiscussionEntry[] {
     const authorMatch = /^- Author:\s*(.+)$/.exec(line);
     if (authorMatch) {
       if (current) discussion.push(current);
-      current = { author: authorMatch[1]!.trim(), text: "" };
+      current = {
+        author: authorMatch[1]!.trim(),
+        text: "",
+        claimTopic: null,
+        claimCounts: null,
+      };
       continue;
     }
     if (current) applyDiscussionLine(current, line);
@@ -618,7 +703,10 @@ function parseSlotBlock(slotBlock: string): SlotFixture {
   const { label, rest } = splitLabeledBlock(slotBlock);
   if (!label) throw new Error("Found slot section without a label");
 
-  const date = fieldFromBlock(rest, "Date", { required: true });
+  const date = resolveSlotDate(
+    fieldFromBlock(rest, "Date", { required: true }),
+    label,
+  );
   const startTime = fieldFromBlock(rest, "Start", { required: true });
   const endTime = fieldFromBlock(rest, "End", { required: true });
   const location = fieldFromBlock(rest, "Location", { required: true });
@@ -639,7 +727,9 @@ function parseSlotBlock(slotBlock: string): SlotFixture {
     endTime,
     location,
     topicTags,
+    sessionHost: fieldFromBlock(rest, "Session host").trim() || null,
     status: (statusRaw as SlotStatus) || null,
+    offGrid: parseYesNo(fieldFromBlock(rest, "Off-grid"), "Off-grid", label),
     url: fieldFromBlock(rest, "Url").trim(),
     availability: parseSlotAvailability(rest, label),
     discussion: parseSlotDiscussion(rest),
@@ -774,7 +864,7 @@ function validateHearts(
   }
 }
 
-function validateSlot(
+function validateSlotSession(
   slot: SlotFixture,
   topicsByLabel: Map<string, TopicFixture>,
   peopleByLabel: Map<string, PersonFixture>,
@@ -783,6 +873,24 @@ function validateSlot(
     if (!topicsByLabel.has(tag))
       throw new Error(`Slot "${slot.label}" references missing topic "${tag}"`);
   }
+  if (!slot.sessionHost) return;
+  if (slot.topicTags.length > 0) {
+    throw new Error(
+      `Slot "${slot.label}" has both Topics and Session host — an office-hours session has no topic`,
+    );
+  }
+  const host = peopleByLabel.get(slot.sessionHost);
+  if (!host || !host.roles.includes("host")) {
+    throw new Error(
+      `Slot "${slot.label}" session host "${slot.sessionHost}" is not a person with the host role`,
+    );
+  }
+}
+
+function validateSlotAvailability(
+  slot: SlotFixture,
+  peopleByLabel: Map<string, PersonFixture>,
+): void {
   for (const av of slot.availability) {
     const p = peopleByLabel.get(av.person);
     if (!p)
@@ -798,12 +906,39 @@ function validateSlot(
       );
     }
   }
+}
+
+function validateSlotDiscussion(
+  slot: SlotFixture,
+  topicsByLabel: Map<string, TopicFixture>,
+  peopleByLabel: Map<string, PersonFixture>,
+): void {
   for (const d of slot.discussion) {
     if (!peopleByLabel.has(d.author))
       throw new Error(
         `Slot "${slot.label}" discussion references missing author "${d.author}"`,
       );
+    if (d.claimTopic && !topicsByLabel.has(d.claimTopic)) {
+      throw new Error(
+        `Slot "${slot.label}" discussion claims missing topic "${d.claimTopic}"`,
+      );
+    }
+    if (d.claimCounts && !d.claimTopic) {
+      throw new Error(
+        `Slot "${slot.label}" discussion has Counts without a Claim topic`,
+      );
+    }
   }
+}
+
+function validateSlot(
+  slot: SlotFixture,
+  topicsByLabel: Map<string, TopicFixture>,
+  peopleByLabel: Map<string, PersonFixture>,
+): void {
+  validateSlotSession(slot, topicsByLabel, peopleByLabel);
+  validateSlotAvailability(slot, peopleByLabel);
+  validateSlotDiscussion(slot, topicsByLabel, peopleByLabel);
 }
 
 function validateFixture(fixture: Fixture): void {
@@ -884,6 +1019,10 @@ function buildMembershipRows(
     image: null,
     bio: person.bio,
     slug: slugFor(person.displayName),
+    // Digests only email memberships the forum has made contact with
+    // (inviteSentAt or a seen-watermark) — seed everyone as invited so a
+    // local digest run actually sends.
+    inviteSentAt: addMinutes(BASE_TIME, index),
     createdAt: addMinutes(BASE_TIME, index),
     updatedAt: addMinutes(BASE_TIME, index),
   }));
@@ -1005,6 +1144,10 @@ function buildRows(fixture: Fixture): {
   // published); the old per-row archivedAt marking is gone — "archiving"
   // is now the timetable-level heartsCountFrom cutoff.
   const heartRows: NewHeart[] = [];
+  const totalHearts = fixture.hearts.reduce(
+    (sum, row) => sum + row.people.length,
+    0,
+  );
   let heartIndex = 0;
   for (const row of fixture.hearts) {
     for (const personLabel of row.people) {
@@ -1012,7 +1155,12 @@ function buildRows(fixture: Fixture): {
         id: stableUuid("heart", `${row.topic}:${personLabel}`),
         topicId: topicIds.get(row.topic) ?? "",
         userId: userIds.get(personLabel) ?? "",
-        createdAt: addMinutes(HEART_TIME, heartIndex),
+        createdAt: spreadTime(
+          HEART_WINDOW[0],
+          HEART_WINDOW[1],
+          heartIndex,
+          totalHearts,
+        ),
       });
       heartIndex += 1;
     }
@@ -1056,8 +1204,14 @@ function toCommentRow(
   },
   ownerId: string,
   index: number,
+  count: number,
 ): NewComment {
-  const createdAt = addMinutes(COMMENT_TIME, index * 7);
+  const createdAt = spreadTime(
+    COMMENT_WINDOW[0],
+    COMMENT_WINDOW[1],
+    index,
+    count,
+  );
   const hiddenAt = comment.hidden ? addMinutes(createdAt, 3) : null;
 
   return {
@@ -1096,7 +1250,15 @@ function buildCommentRows(
     for (const [label, comment] of Array.from(pending.entries())) {
       if (comment.replyTo && !inserted.has(comment.replyTo)) continue;
 
-      rows.push(toCommentRow(comment, ids, ownerId, rows.length));
+      rows.push(
+        toCommentRow(
+          comment,
+          ids,
+          ownerId,
+          rows.length,
+          fixtureComments.length,
+        ),
+      );
 
       inserted.add(label);
       pending.delete(label);
@@ -1144,6 +1306,16 @@ function pushTopicActivity(
       topicId,
       title: topic.title,
     });
+    if (topic.recentlyAssigned) {
+      // Payload mirrors reassignTopic in @timetable/core — the digest's
+      // "Assigned to you" card reads payload.newHostId.
+      push(`reassign:${topic.label}`, ownerId, "topic.reassign", {
+        topicId,
+        title: topic.title,
+        previousHostId: ownerId,
+        newHostId: hostId,
+      });
+    }
   } else if (topic.status === "unpublished") {
     push(`unpublish:${topic.label}`, hostId, "topic.unpublish", {
       topicId,
@@ -1183,7 +1355,7 @@ function buildActivityRows(
       action,
       payload,
       note,
-      createdAt: addMinutes(ACTIVITY_TIME, rows.length * 11),
+      createdAt: SEED_NOW, // remapped below once the count is known
     });
   };
 
@@ -1199,7 +1371,47 @@ function buildActivityRows(
     });
   }
 
-  return rows;
+  return rows.map((row, index) => ({
+    ...row,
+    createdAt: spreadTime(
+      ACTIVITY_WINDOW[0],
+      ACTIVITY_WINDOW[1],
+      index,
+      rows.length,
+    ),
+  }));
+}
+
+const WEEKDAY_NAMES = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+
+/**
+ * Slot dates may be absolute ("2026-10-05") or relative ("mon+1" = Monday
+ * of next week, "fri+0" = this week's Friday, UTC weeks starting Monday).
+ * Relative dates keep the seeded calendar rolling: past sessions in week 0,
+ * digest-horizon sessions in weeks +1/+2, open slots beyond.
+ */
+function resolveSlotDate(raw: string, label: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const match = /^(sun|mon|tue|wed|thu|fri|sat)([+-]\d+)$/.exec(
+    raw.toLowerCase(),
+  );
+  if (!match) {
+    throw new Error(
+      `Invalid date "${raw}" for slot "${label}". Use YYYY-MM-DD or a relative "<weekday>[+-]<weeks>" like "mon+1".`,
+    );
+  }
+  const todayUtc = Date.UTC(
+    SEED_NOW.getUTCFullYear(),
+    SEED_NOW.getUTCMonth(),
+    SEED_NOW.getUTCDate(),
+  );
+  const mondayThisWeek =
+    todayUtc - ((new Date(todayUtc).getUTCDay() + 6) % 7) * DAY_MS;
+  const dayFromMonday = (WEEKDAY_NAMES.indexOf(match[1]!) + 6) % 7;
+  const resolved = new Date(
+    mondayThisWeek + (Number(match[2]) * 7 + dayFromMonday) * DAY_MS,
+  );
+  return resolved.toISOString().slice(0, 10);
 }
 
 /** Pattern-cell key for a fixture slot ("{weekday}-{HH:MM}", UTC). */
@@ -1210,18 +1422,20 @@ function slotCellKey(slot: SlotFixture): string {
 
 /** Calendar settings for the seeded forum, derived from the slot fixtures:
  * enabled, hosts-may-propose, the distinct weekly cells as the pattern, one
- * term spanning the fixture dates, and the fixture locations as presets. */
+ * term spanning the fixture dates, and the fixture locations as presets.
+ * Off-grid slots (host off-piste proposals) don't shape the pattern. */
 function buildCalendarSeedSettings(
   slots: SlotFixture[],
 ): NonNullable<NewTimetable["settings"]>["calendar"] {
-  if (slots.length === 0) return { enabled: true };
+  const gridSlots = slots.filter((slot) => !slot.offGrid);
+  if (gridSlots.length === 0) return { enabled: true };
   const cells = new Map<
     string,
     { weekday: number; start: string; end: string }
   >();
   const locations = new Set<string>();
   const dates: string[] = [];
-  for (const slot of slots) {
+  for (const slot of gridSlots) {
     const weekday = new Date(`${slot.date}T00:00:00.000Z`).getUTCDay();
     cells.set(slotCellKey(slot), {
       weekday,
@@ -1243,33 +1457,40 @@ function buildCalendarSeedSettings(
   };
 }
 
-/** A couple of standing weekly patterns so inference shows up in dev: one
- * elector who never answered slots explicitly but painted the grid. */
+/** Standing weekly patterns so inference shows up in dev: electors who never
+ * answered slots explicitly but painted the grid — all-green, all-red, a
+ * mixed grid, and a partial one (unpainted cells fall back to 🟡). */
 function buildPatternRows(
   fixture: Fixture,
   timetableId: string,
   userIds: Map<string, string>,
 ): NewAvailabilityPattern[] {
-  const cellKeys = [...new Set(fixture.slots.map(slotCellKey))];
+  const cellKeys = [
+    ...new Set(fixture.slots.filter((s) => !s.offGrid).map(slotCellKey)),
+  ].sort();
   if (cellKeys.length === 0) return [];
-  const paint = (state: AvailabilityState) =>
-    Object.fromEntries(cellKeys.map((k) => [k, state]));
+  const paint = (stateFor: (index: number) => AvailabilityState | null) =>
+    Object.fromEntries(
+      cellKeys.flatMap((k, i) => {
+        const state = stateFor(i);
+        return state ? [[k, state]] : [];
+      }),
+    );
+  const patterns: [string, (index: number) => AvailabilityState | null][] = [
+    ["elector-grace", () => "green"],
+    ["elector-oscar", () => "red"],
+    ["elector-yuki", (i) => (i % 2 === 0 ? "green" : "yellow")],
+    // Partial pattern: only the first two cells painted, the rest infer 🟡.
+    ["elector-ben", (i) => (i < 2 ? "green" : null)],
+  ];
   const rows: NewAvailabilityPattern[] = [];
-  const grace = userIds.get("elector-grace");
-  if (grace) {
+  for (const [label, stateFor] of patterns) {
+    const userId = userIds.get(label);
+    if (!userId) continue;
     rows.push({
       timetableId,
-      userId: grace,
-      cells: paint("green"),
-      updatedAt: BASE_TIME,
-    });
-  }
-  const oscar = userIds.get("elector-oscar");
-  if (oscar) {
-    rows.push({
-      timetableId,
-      userId: oscar,
-      cells: paint("red"),
+      userId,
+      cells: paint(stateFor),
       updatedAt: BASE_TIME,
     });
   }
@@ -1287,30 +1508,68 @@ function buildSlotRows(
   slotCommentRows: NewSlotComment[];
   patternRows: NewAvailabilityPattern[];
 } {
+  const hostByTopicLabel = new Map(
+    fixture.topics.map((topic) => [topic.label, topic.host]),
+  );
+
+  const toTimeslotRow = (slot: SlotFixture, slotId: string): NewTimeslot => {
+    const topicTag = slot.topicTags[0];
+    const topicId = topicTag ? (topicIds.get(topicTag) ?? null) : null;
+    // Session ownership (the never-displace rule keys off this): the
+    // topic's host for topic sessions, the named host for office hours.
+    const sessionHostLabel = topicTag
+      ? hostByTopicLabel.get(topicTag)
+      : slot.sessionHost;
+    const sessionHostId = sessionHostLabel
+      ? (userIds.get(sessionHostLabel) ?? null)
+      : null;
+    return {
+      id: slotId,
+      timetableId,
+      startsAt: new Date(`${slot.date}T${slot.startTime}:00.000Z`),
+      endsAt: new Date(`${slot.date}T${slot.endTime}:00.000Z`),
+      location: slot.location,
+      topicId,
+      sessionHostId,
+      status: topicId || sessionHostId ? (slot.status ?? "proposed") : "empty",
+      url: slot.url,
+      // Off-grid = a host's off-piste proposal: no pattern provenance, and
+      // recorded as created by that host rather than by admin generation.
+      cellKey: slot.offGrid ? null : slotCellKey(slot),
+      createdById: slot.offGrid ? sessionHostId : null,
+      createdAt: BASE_TIME,
+      updatedAt: SLOT_UPDATED_TIME,
+    };
+  };
+
+  const toSlotCommentRow = (
+    slot: SlotFixture,
+    slotId: string,
+    d: SlotDiscussionEntry,
+    index: number,
+  ): NewSlotComment => ({
+    id: stableUuid("slot-comment", `${slot.label}:${index}`),
+    slotId,
+    authorId: userIds.get(d.author) ?? "",
+    body: d.text,
+    ...(d.claimTopic
+      ? {
+          topicId: topicIds.get(d.claimTopic) ?? null,
+          greenCount: d.claimCounts?.green ?? 0,
+          yellowCount: d.claimCounts?.yellow ?? 0,
+          redCount: d.claimCounts?.red ?? 0,
+        }
+      : {}),
+    createdAt: addMinutes(BASE_TIME, index * 30),
+  });
+
   const timeslotRows: NewTimeslot[] = [];
   const availabilityRows: NewAvailability[] = [];
   const slotCommentRows: NewSlotComment[] = [];
 
   for (const slot of fixture.slots) {
     const slotId = stableUuid("slot", slot.label);
-    const startsAt = new Date(`${slot.date}T${slot.startTime}:00.000Z`);
-    const endsAt = new Date(`${slot.date}T${slot.endTime}:00.000Z`);
-    const topicTag = slot.topicTags[0];
-    const topicId = topicTag ? (topicIds.get(topicTag) ?? null) : null;
-
-    timeslotRows.push({
-      id: slotId,
-      timetableId,
-      startsAt,
-      endsAt,
-      location: slot.location,
-      topicId,
-      status: topicId ? (slot.status ?? "proposed") : "empty",
-      url: slot.url,
-      cellKey: slotCellKey(slot),
-      createdAt: BASE_TIME,
-      updatedAt: BASE_TIME,
-    });
+    timeslotRows.push(toTimeslotRow(slot, slotId));
 
     for (const av of slot.availability) {
       availabilityRows.push({
@@ -1322,16 +1581,9 @@ function buildSlotRows(
       });
     }
 
-    for (let i = 0; i < slot.discussion.length; i++) {
-      const d = slot.discussion[i]!;
-      slotCommentRows.push({
-        id: stableUuid("slot-comment", `${slot.label}:${i}`),
-        slotId,
-        authorId: userIds.get(d.author) ?? "",
-        body: d.text,
-        createdAt: BASE_TIME,
-      });
-    }
+    slotCommentRows.push(
+      ...slot.discussion.map((d, i) => toSlotCommentRow(slot, slotId, d, i)),
+    );
   }
 
   return {
