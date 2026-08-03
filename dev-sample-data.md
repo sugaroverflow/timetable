@@ -68,113 +68,149 @@ Notes:
 
 Title: Comparative Chat Architecture
 Host: host-jake
-Status: submitted
-Published date, if published:
+Status: published
+Published date, if published: 2026-07-24
 Cover image URL, if any:
 
 Body:
 
-WhatsApp, Signal, Rocket.Chat, Slack, Discord.
+WhatsApp, Signal, Rocket.Chat, Slack, Discord, Matrix, Zulip. Every organising community lives inside a chat product, and every chat product quietly imposes its own politics: who can create a room, who can see history, who can be removed, what gets archived and by whom.
 
-_Draft — full body to be written._
+### What we'd do
+
+1. Tour the architecture of five or six systems — groups vs channels vs threads, federation vs silos, encryption models, admin tooling
+2. Map each design choice to an organising consequence (onboarding friction, moderation load, data custody, what happens when you fork)
+3. End with a decision framework: *given this community, which trade-offs should you accept?*
+
+No code required — if you've ever migrated a community between two chat tools and felt the loss, you already have the qualifications.
 
 ### Topic: topic-organisers-needs-from-whatsapp
 
 Title: Organisers' Needs from WhatsApp
 Host: host-jake
-Status: submitted
-Published date, if published:
+Status: published
+Published date, if published: 2026-07-24
 Cover image URL, if any:
 
 Body:
 
-_Draft — body to be written._
+Most UK community organising happens in WhatsApp, whether we like it or not. Rather than tut about it, I want to catalogue what organisers actually *do* there — broadcast lists as newsletters, group-hopping as governance, voice notes as meetings — and where the tool visibly fights them.
+
+The output I'm after is a concrete needs list: the ten things organisers need that WhatsApp almost-but-not-quite does. That list is a design brief for anyone in this room building civic tools, and a negotiating position for everyone else.
+
+Bring a WhatsApp group you help run (screenshots optional, war stories mandatory).
 
 ### Topic: topic-matrix-protocol
 
 Title: Matrix Protocol
 Host: host-jake
-Status: submitted
-Published date, if published:
+Status: published
+Published date, if published: 2026-07-24
 Cover image URL, if any:
 
 Body:
 
-Chat, and other things.
+Chat, and other things. Matrix is the most serious attempt so far at a *federated* real-time communication layer — an open protocol where rooms live on many servers at once and no single operator can delete your community out from under you.
 
-_Draft — full body to be written._
+I'd cover how federation and state resolution actually work (gently), what it feels like to run a homeserver, where the UX still hurts, and the governance question underneath: several European governments now run Matrix internally — what does it mean when the state adopts the "rebel" protocol before civil society does?
+
+Good pairing with the Comparative Chat Architecture session; either order works.
 
 ### Topic: topic-sociocracy
 
 Title: Sociocracy
 Host: host-jake
-Status: submitted
-Published date, if published:
+Status: published
+Published date, if published: 2026-07-24
 Cover image URL, if any:
 
 Body:
 
-_Draft — body to be written._
+Sociocracy is a governance system built from small consent-based circles, linked so that decisions flow both up and down. It's one of the few alternatives to majority voting with decades of real organisational use behind it — co-ops, schools, software projects, intentional communities.
+
+The session would be practical: we'd actually *run* a consent round on a real decision this cohort needs to make, then debrief what felt different from voting. I'll cover circles, double-linking, consent vs consensus, and the common failure modes (the eternal objection-holder, the rubber-stamp circle).
+
+No reading needed, though [Many Voices One Song](https://www.sociocracyforall.org/many-voices-one-song/) is the reference if you want depth.
 
 ### Topic: topic-worker-coops
 
 Title: Worker Coops
 Host: host-jake
-Status: submitted
-Published date, if published:
+Status: published
+Published date, if published: 2026-07-24
 Cover image URL, if any:
 
 Body:
 
-_Draft — body to be written._
+What if the company were owned by the people who do the work? Worker co-operatives are a live, legal, surprisingly boring-in-a-good-way answer — and the UK has both a proud tradition (the co-op movement started here) and a strangely thin present.
+
+I'd like to walk through how a worker co-op actually works day to day: membership, pay ratios, how decisions get made when there's no boss to appeal to, what happens when someone underperforms. Then the political-tech angle — platform co-ops, and whether the software we're all building in this room should itself be co-operatively owned.
+
+I've spent time inside two co-ops (one thriving, one that dissolved) and I'll be honest about both.
 
 ### Topic: topic-sources-of-social-power
 
 Title: Sources of Social Power
 Host: host-jake
-Status: submitted
-Published date, if published:
+Status: published
+Published date, if published: 2026-07-24
 Cover image URL, if any:
 
 Body:
 
-_Draft — body to be written._
+Michael Mann's *The Sources of Social Power* argues that societies are shaped by four overlapping networks — ideological, economic, military, and political — and that the interesting history happens where they fail to line up.
+
+This is the closest thing I've found to a usable physics of power, and I want to test it against the things this school cares about: where does *technological* power fit (Mann barely saw it coming)? Is a platform an economic network or an ideological one? What network is a political party, really?
+
+Format: I present the framework in 30 minutes, then we spend the rest of the session trying to break it with counterexamples. Bring one institution you know well.
 
 ### Topic: topic-maps
 
 Title: Maps
 Host: host-jake
-Status: submitted
-Published date, if published:
+Status: published
+Published date, if published: recent
 Cover image URL, if any:
 
 Body:
 
-_Draft — body to be written._
+Maps are arguments. Every boundary, colour ramp and omission is a claim about what matters, and civic life in the UK runs on a surprisingly small number of them — constituency boundaries, LSOAs, flood zones, school catchments.
+
+A hands-on session: we take one local question (where should the new pedestrian crossing go? which streets flooded last winter?) and build the map that argues for an answer, using OpenStreetMap, QGIS or plain web tools depending on who turns up. Along the way: where UK geodata actually lives, what's open, what's licensed, and the quiet scandal of the things we still can't map.
+
+No GIS experience needed — if you can use a spreadsheet you can do everything in this session.
 
 ### Topic: topic-land-registry-data
 
 Title: Land Registry Data in England and Wales
 Host: host-jake
-Status: submitted
-Published date, if published:
+Status: published
+Published date, if published: 2026-07-24
 Cover image URL, if any:
 
 Body:
 
-_Draft — body to be written._
+Who owns England? For most of history you couldn't ask; now you mostly can, if you know where to look. HM Land Registry publishes price-paid data, the UK/overseas company ownership datasets, and (for a fee that keeps falling) individual titles — and journalists and campaigners have used them to map everything from offshore-owned mansions to land banking around proposed rail routes.
+
+We'd get hands-on: pull the open datasets, join them against Companies House, and see what questions fall out about our own postcodes. I'll also cover the gaps — unregistered land, trusts, and why "who owns this field" can still take a £3 fee and three weeks.
+
+Inspired by Guy Shrubsole's [Who Owns England?](https://whoownsengland.org) — skim it if you want a head start.
 
 ### Topic: topic-front-end-development
 
 Title: Front-end Development
 Host: host-jake
-Status: submitted
-Published date, if published:
+Status: published
+Published date, if published: 2026-07-24
 Cover image URL, if any:
 
 Body:
 
-_Draft — body to be written._
+Every civic project eventually needs a web page, and the gap between "someone on the team can make a web page" and "nobody can" decides more project outcomes than any strategy document.
+
+This is a from-zero, judgement-free session on the modern front end: HTML and CSS that you actually understand, just enough JavaScript, and when you genuinely need a framework (later than you think). We'll build one real page together — probably a campaign landing page with a working signup form — and deploy it for free before the session ends.
+
+Aimed at the fellows who've been nodding along in technical conversations while quietly wondering what a `div` is. You are my people; come.
 
 <!-- ===================== Host: Teddy Kelvin ===================== -->
 
@@ -484,19 +520,25 @@ Cover image URL, if any:
 
 Body:
 
-_Submitted — body to be written. (In moderation queue for testing.)_
+Reform UK went from insurgency to serious parliamentary presence faster than any party in modern British history, and most of the political-tech world still treats it as a rounding error. That's a mistake whatever your politics: their digital operation — supporter data, branch bootstrapping, candidate vetting at speed — is worth studying precisely because it was improvised.
+
+A dispassionate session: what their infrastructure actually is, where it failed publicly (vetting, notably), and what any fast-scaling political organisation can learn. This is analysis, not endorsement; strong opinions welcome, keep them about the machinery.
 
 ### Topic: topic-elections-in-the-uk
 
 Title: Elections in the UK
 Host: host-hayley
-Status: submitted
-Published date, if published:
+Status: published
+Published date, if published: recent
 Cover image URL, if any:
 
 Body:
 
-_Draft — body to be written._
+The UK runs elections under at least five different voting systems, depending on where you live and what you're voting for — and almost nobody, including most people who work in politics, can name them all.
+
+A practical tour of the machinery: registration, the electoral timetable, short and long campaigns, spending limits and what actually gets a candidate disqualified, counts and recounts, and who the returning officer really is. I'll bring artefacts from real campaigns (imprints and all) and we'll trace one constituency's election from writ to declaration.
+
+Useful groundwork for anyone building campaign tools — half the "weird" requirements in that space are electoral law wearing a trench coat.
 
 <!-- ===================== Host: Sam Sutton ===================== -->
 
@@ -543,79 +585,97 @@ Body:
 
 Title: The Psychology of Power and Hierarchy
 Host: host-sam
-Status: submitted
-Published date, if published:
+Status: published
+Published date, if published: 2026-07-27
 Cover image URL, if any:
 
 Body:
 
-_Draft — body to be written._
+Power changes people — the evidence on this is uncomfortably strong. Holding power reliably reduces perspective-taking, increases risk appetite, and makes people worse at reading the room they nominally lead.
+
+I want to work through what the research actually says (approach/inhibition theory, the "power paradox", status vs power as distinct systems) and then apply it locally: what does this predict about founders, about rotating leadership, about this cohort? The interesting question for institution-designers is not "are leaders corruptible" but "which structures are corridor-proof — which keep working even when the person in the corridor has stopped listening?"
+
+One hour of evidence, one hour of institutional design implications.
 
 ### Topic: topic-healthy-institutions
 
 Title: Healthy Institutions
 Host: host-sam
-Status: submitted
-Published date, if published:
+Status: published
+Published date, if published: 2026-07-27
 Cover image URL, if any:
 
 Body:
 
-_Draft — body to be written._
+We can all name institutions that feel *alive* — responsive, self-correcting, worth belonging to — and ones that are technically still functioning but clearly dead inside. What's the difference, mechanically?
+
+I'd like to assemble a working checklist of institutional health: clear membership and exit, legible decision rights, feedback loops that reach the people with power to act, rituals that still mean something, succession that doesn't cause a crisis, and an honest relationship with its own founding story.
+
+We'll apply the checklist live to two or three institutions the group knows well (this school included — with the Dean's blessing) and see where it bites. The aim is a diagnostic you can reuse, not a lecture.
 
 ### Topic: topic-healthy-relationships-to-work
 
 Title: Healthy Relationships to Work and Institutions
 Host: host-sam
-Status: submitted
-Published date, if published:
+Status: published
+Published date, if published: 2026-07-27
 Cover image URL, if any:
 
 Body:
 
-e.g., identifying and preventing burnout.
+Mission-driven work eats its young. The sector runs on people who care too much to stop, and burnout in civic tech and organising isn't a personal failing — it's a predictable output of how we structure the work.
 
-_Draft — full body to be written._
+This session is half evidence, half practice: what the research says actually predicts burnout (spoiler: it's less about hours than about autonomy, reward and fairness — the demand–control and effort–reward models), and then a structured exercise where each of us maps our own current relationship to our work and institutions against it.
+
+Not therapy, but adjacent; expect honest conversation. Everything shared in the room stays in the room.
 
 ### Topic: topic-leadership-six
 
 Title: Leadership
 Host: host-sam
-Status: submitted
-Published date, if published:
+Status: published
+Published date, if published: 2026-07-27
 Cover image URL, if any:
 
 Body:
 
-_Draft — body to be written._
+Leadership research is a graveyard of confident theories, but a few things survive contact with the evidence: leadership is a *relationship* rather than a trait, it's granted as much as taken, and different situations genuinely demand different kinds of it.
+
+I'll run through six lenses that I find actually useful — trait, behavioural, situational, transformational, servant, and distributed leadership — with one honest example of each from organisations I've worked in. Then the practical half: what kind of leadership does a fellowship like this one need, and from whom? (Trick question: the answer is never "the Dean, exclusively".)
+
+If you've ever been told you should "step up" and privately wondered into *what*, this session is for you.
 
 ### Topic: topic-models-of-group-development
 
 Title: Models of Group Development
 Host: host-sam
-Status: submitted
-Published date, if published:
+Status: published
+Published date, if published: 2026-07-27
 Cover image URL, if any:
 
 Body:
 
-e.g., 'forming, norming, storming, performing'.
+'Forming, storming, norming, performing' is the one everybody knows — and it's fifty years old, based on therapy groups, and only weakly supported. Yet it persists because groups *do* have life stages, and having a shared map of them changes how a group treats its own conflicts.
 
-_Draft — full body to be written._
+We'll look at Tuckman honestly, then at the better-evidenced alternatives: punctuated equilibrium (groups restructure at the temporal midpoint, not on a smooth curve), Wheelan's integrated model, and what any of this predicts for a one-year cohort like ours — including when this fellowship should *expect* its storming phase, and what to do when it arrives on schedule.
+
+Comes with a facilitation cheat-sheet you can take to any group you run.
 
 ### Topic: topic-presentation-of-self
 
 Title: Presentation of Self
 Host: host-sam
-Status: submitted
-Published date, if published:
+Status: published
+Published date, if published: 2026-07-27
 Cover image URL, if any:
 
 Body:
 
-Impression management; 'front- and back-stage'.
+Goffman's *The Presentation of Self in Everyday Life* is the best user manual for social reality ever written: all interaction is performance, every setting has a front stage and a back stage, and teams collude to sustain each other's roles.
 
-_Draft — full body to be written._
+The fun is in the application. What is a Twitter account, in Goffman's terms? A conference lanyard? A "casual" Slack channel that everyone knows the funders read? Political technology is largely *stagecraft infrastructure* — tools that manage which audiences see which performance — and I don't think our field has fully noticed.
+
+Light reading beforehand (chapter one, ~30 pages); the session itself will be discussion-led with some gleefully uncomfortable exercises.
 
 <!-- ===================== Host: Harvey Dunmore ===================== -->
 
@@ -850,9 +910,11 @@ Cover image URL, if any:
 
 Body:
 
-Collective intelligence as governance of AI, and AI for collective intelligence.
+Collective intelligence as governance of AI, and AI for collective intelligence — two research programmes that need each other and barely talk.
 
-_Draft — full body to be written._
+On one side: can deliberating publics meaningfully steer AI development (citizens' assemblies on model deployment, alignment assemblies, the various "democratic inputs" experiments)? On the other: can AI make groups genuinely smarter rather than merely faster — argument mapping, consensus-finding tools like Polis, LLM-mediated deliberation at scales no facilitator could hold?
+
+I'd survey the live experiments in both directions, then have us design one: a concrete mechanism by which this fellowship could use AI to think together better than any of us thinks alone.
 
 <!-- ===================== Host: Sadie Mercer ===================== -->
 
@@ -1226,6 +1288,7 @@ Title: Audience Participation
 Host: host-eli
 Status: published
 Published date, if published: 2026-06-08
+Recently assigned: yes
 Cover image URL, if any:
 
 Body:
@@ -9880,21 +9943,79 @@ List the people who hearted each topic.
 | topic-the-basics-of-polling | elector-priya, elector-marcus, elector-daniel, elector-maya, elector-ella, elector-noah, elector-amara |
 | topic-low-hanging-fruit | elector-ben, elector-grace, elector-amara, elector-sofia, elector-noah, elector-rosa, elector-maya, elector-tom, elector-farah, elector-tariq, elector-marcus |
 | topic-how-do-media-organisations-work | elector-leila, elector-tariq, elector-maya, elector-ella, elector-oscar, elector-tom, elector-daniel, elector-noah, elector-amara, elector-grace, elector-rosa |
+| topic-arhuaco-philosophy | elector-maya, elector-grace, elector-rosa, elector-tariq, elector-leila |
+| topic-bridgebuilding-political-conflict | elector-sofia, elector-daniel, elector-noah, elector-amara, elector-rosa, elector-marcus |
+| topic-complex-adaptive-systems | elector-farah, elector-oscar, elector-kwame, elector-yuki, elector-ella |
+| topic-crisis-escalation-decision-making | elector-tom, elector-noah, elector-daniel, elector-grace, elector-hana, elector-tariq, elector-sofia |
+| topic-cryptography-threat-modeling | elector-sofia, elector-hana, elector-marcus, elector-kwame |
+| topic-data-pipelines | elector-priya, elector-hana, elector-oscar, elector-daniel, elector-ben |
+| topic-designing-civic-interventions | elector-amara, elector-maya, elector-ella, elector-ben, elector-rosa, elector-noah, elector-grace |
+| topic-experimental-governance-in-the-wild | elector-grace, elector-tariq, elector-yuki, elector-marcus, elector-farah, elector-tom |
+| topic-leadership-convening-stewardship | elector-leila, elector-rosa, elector-ben, elector-noah |
+| topic-legitimacy-authority-consent | elector-hana, elector-sofia, elector-kwame, elector-daniel, elector-ella, elector-tariq |
+| topic-mechanics-of-political-attention | elector-yuki, elector-marcus, elector-farah, elector-maya, elector-tom, elector-amara, elector-noah |
+| topic-metaphors-of-the-collective | elector-grace, elector-leila, elector-priya |
+| topic-mps-offices | elector-ben, elector-rosa, elector-daniel, elector-farah, elector-hana |
+| topic-postcolonial-futurism | elector-amara, elector-kwame, elector-leila, elector-maya, elector-tariq, elector-grace |
+| topic-running-experiments-uk-campaigns | elector-yuki, elector-ben, elector-noah, elector-ella, elector-priya |
+| topic-security-and-privacy-in-ml | elector-hana, elector-oscar, elector-sofia, elector-farah |
+| topic-separatist-utopias | elector-tom, elector-grace, elector-marcus |
+| topic-software-supply-chains | elector-daniel, elector-kwame, elector-oscar, elector-noah, elector-priya |
+| topic-state-capacity-institutional-failure | elector-sofia, elector-ella, elector-amara, elector-daniel, elector-rosa, elector-noah, elector-marcus, elector-grace |
+| topic-strategy-getting-big-things-done | elector-tom, elector-ben, elector-yuki, elector-farah, elector-tariq, elector-kwame |
+| topic-structured-data-extraction | elector-priya, elector-hana, elector-daniel |
+| topic-threat-modelling | elector-farah, elector-sofia, elector-noah, elector-kwame, elector-hana |
+| topic-training-and-serving-local-ai-models | elector-oscar, elector-yuki, elector-kwame, elector-maya, elector-ben, elector-priya |
+| topic-utopian-family | elector-grace, elector-rosa, elector-leila, elector-maya |
+| topic-web-data | elector-priya, elector-daniel, elector-farah, elector-ella, elector-hana |
+| topic-xenofeminism | elector-maya, elector-amara, elector-grace, elector-leila, elector-yuki |
+| topic-your-responsibilities | elector-noah, elector-tom, elector-ella, elector-rosa, elector-daniel |
+| topic-comparative-chat-architecture | elector-noah, elector-marcus, elector-farah, elector-ella, elector-kwame, elector-tom |
+| topic-organisers-needs-from-whatsapp | elector-rosa, elector-amara, elector-leila, elector-daniel, elector-grace, elector-tariq, elector-priya |
+| topic-matrix-protocol | elector-oscar, elector-kwame, elector-noah, elector-farah |
+| topic-sociocracy | elector-grace, elector-ella, elector-sofia, elector-marcus, elector-rosa, elector-leila, host-eli |
+| topic-worker-coops | elector-tom, elector-daniel, elector-amara, elector-yuki, elector-noah |
+| topic-sources-of-social-power | elector-hana, elector-tariq, elector-sofia, elector-marcus, elector-ella, elector-kwame, elector-noah |
+| topic-maps | elector-ben, elector-priya, elector-farah, elector-tom, elector-amara |
+| topic-land-registry-data | elector-daniel, elector-hana, elector-marcus, elector-grace, elector-noah, elector-leila |
+| topic-front-end-development | elector-rosa, elector-yuki, elector-priya, elector-ella |
+| topic-elections-in-the-uk | elector-noah, elector-farah, elector-daniel, elector-maya, elector-tariq, elector-amara, elector-ben, elector-grace |
+| topic-psychology-of-power-and-hierarchy | elector-sofia, elector-marcus, elector-leila, elector-tom, elector-hana, elector-ella |
+| topic-healthy-institutions | elector-grace, elector-noah, elector-amara, elector-daniel, elector-rosa |
+| topic-healthy-relationships-to-work | elector-maya, elector-leila, elector-rosa, elector-farah, elector-sofia, elector-tariq, elector-ella |
+| topic-leadership-six | elector-ben, elector-kwame, elector-tom, elector-noah |
+| topic-models-of-group-development | elector-priya, elector-grace, elector-marcus, elector-amara, elector-hana |
+| topic-presentation-of-self | elector-yuki, elector-ella, elector-maya, elector-sofia, elector-daniel, elector-noah, elector-leila |
 
 <!-- topic-how-do-media-organisations-work is archived; its hearts let you test the
-     "include hearts added after [archive date]" behaviour. -->
+     "include hearts added after [archive date]" behaviour.
+     Coverage (2026-08-03): 79 of 87 topics carry at least one heart (~91%).
+     Unhearted by design: the 4 submitted queue examples, the 2 unpublished
+     topics, and topic-programming-sarah / topic-online-help-seeking
+     (published but heartless — the sad-empty-state case). -->
 
 
 ## Timeslots
 
-### Slot: slot-mon
-Date: 2026-10-05
+<!-- Dates are RELATIVE ("mon+1" = Monday of next week, weeks start Monday,
+     resolved at seed time) so the calendar always shows a live rolling term:
+     week 0 partly in the past, weeks +1/+2 inside the digest's 14-day
+     horizon, week +3 still open. The weekly pattern derived from these is
+     Mon 10:00–12:00 Classroom · Tue 14:00–16:00 Hall · Wed 10:00–11:30
+     Lounge · Thu 16:00–18:00 Classroom · Fri 13:00–15:00 Terrace.
+     Electors grace/oscar/yuki/ben deliberately have NO explicit availability
+     below (one exception) — their standing patterns supply inferred states.
+     "Off-grid: yes" slots are host off-piste proposals: no pattern cell.
+     "Session host:" with no Topics is an office-hours session. -->
+
+### Slot: slot-w0-mon
+Date: mon+0
 Start: 10:00
 End: 12:00
 Location: Classroom
 Topics: topic-the-nature-of-voting
 Status: confirmed
-Url: https://lu.ma/sample-nature-of-voting
+Url: https://lu.ma/spt-nature-of-voting
 
 Availability:
 | Person label | State |
@@ -9910,12 +10031,14 @@ Discussion:
 - Author: admin-edwin
   Text: Confirmed for The Nature of Voting — event page is up on Luma.
 
-### Slot: slot-tue
-Date: 2026-10-06
+### Slot: slot-w0-tue
+Date: tue+0
 Start: 14:00
 End: 16:00
 Location: Hall
 Topics: topic-science-of-collectivity
+Status: confirmed
+Url: https://lu.ma/spt-science-of-collectivity
 
 Availability:
 | Person label | State |
@@ -9928,21 +10051,23 @@ Availability:
 | host-eli | yellow |
 
 Discussion:
-- Author: host-eli
+- Author: host-zara
   Text: I'll run the Science of Collectivity session here — great space for discussion.
 - Author: admin-edwin
-  Text: Confirmed. I'll tag the topic once we have the room booking.
+  Text: Confirmed. Event page is up.
 - Author: elector-noah
   Text: Really looking forward to this one.
-- Author: host-eli
+- Author: host-zara
   Text: Bring questions about emergence and collective intelligence!
 
-### Slot: slot-wed
-Date: 2026-10-07
+### Slot: slot-w0-wed
+Date: wed+0
 Start: 10:00
 End: 11:30
 Location: Lounge
 Topics: topic-cryptocurrencies
+Status: confirmed
+Url: https://lu.ma/spt-cryptocurrencies
 
 Availability:
 | Person label | State |
@@ -9958,8 +10083,8 @@ Discussion:
 - Author: admin-edwin
   Text: Lounge works well for the crypto session — more informal.
 
-### Slot: slot-thu
-Date: 2026-10-08
+### Slot: slot-w0-thu
+Date: thu+0
 Start: 16:00
 End: 18:00
 Location: Classroom
@@ -9975,8 +10100,8 @@ Availability:
 | elector-tariq | yellow |
 | host-eli | red |
 
-### Slot: slot-fri
-Date: 2026-10-09
+### Slot: slot-w0-fri
+Date: fri+0
 Start: 13:00
 End: 15:00
 Location: Terrace
@@ -9998,16 +10123,304 @@ Discussion:
 - Author: admin-edwin
   Text: Yes — no session tagged yet so it's open.
 
+### Slot: slot-w1-mon
+Date: mon+1
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-ai
+Status: confirmed
+Url: https://lu.ma/spt-ai-post-chatgpt
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-noah | green |
+| elector-ella | green |
+| elector-maya | green |
+| elector-kwame | yellow |
+| elector-sofia | green |
+| elector-oscar | green |
+| elector-tariq | yellow |
+| host-eli | green |
+
+Discussion:
+- Author: host-teddy
+  Text: Projector booked. If you want the local-inference demo to run on your own laptop, install Ollama beforehand.
+- Author: admin-edwin
+  Text: Confirmed and announced — this one will be busy, Classroom holds 30.
+
+### Slot: slot-w1-tue
+Date: tue+1
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-designing-rituals-of-participation
+Status: confirmed
+Url: https://lu.ma/spt-rituals-of-participation
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-maya | green |
+| elector-tariq | green |
+| elector-ella | yellow |
+| elector-marcus | green |
+| elector-rosa | green |
+| host-eli | green |
+
+Discussion:
+- Author: host-eli
+  Text: We'll need the movable chairs — the whole point is rearranging the room mid-session.
+
+### Slot: slot-w1-wed
+Date: wed+1
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-data-visualisation-nash
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-amara | green |
+| elector-farah | green |
+| elector-tariq | yellow |
+| elector-priya | green |
+| elector-hana | green |
+
+Discussion:
+- Author: host-jordan
+  Claim: topic-data-visualisation-nash
+  Counts: 9 green, 3 yellow, 1 red
+  Text: I'd like this slot for Data Visualisation — most of my hearters are free on Wednesday mornings.
+- Author: admin-edwin
+  Text: Looks strong. I'll confirm once the projector situation in the Lounge is sorted.
+
+### Slot: slot-w1-thu
+Date: thu+1
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-constructing-legitimacy
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-sofia | green |
+| elector-hana | yellow |
+| elector-ella | green |
+| elector-kwame | green |
+| elector-noah | red |
+
+Discussion:
+- Author: host-hayley
+  Text: Pencilling this in for Constructing Legitimacy — late slot suits the discussion format.
+
+### Slot: slot-w1-fri
+Date: fri+1
+Start: 13:00
+End: 15:00
+Location: Terrace
+Session host: host-sadie
+Status: confirmed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-farah | green |
+| elector-hana | green |
+| elector-daniel | yellow |
+
+Discussion:
+- Author: host-sadie
+  Text: Security office hours — bring your threat models, your dodgy password habits, or just questions. No topic, no agenda.
+- Author: admin-edwin
+  Text: Confirmed. Office hours are a nice use of the Friday slot.
+
+### Slot: slot-w1-sat
+Date: sat+1
+Start: 15:00
+End: 17:00
+Location: The Park
+Topics: topic-future-crafting
+Off-grid: yes
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-grace | green |
+| elector-maya | green |
+| elector-tom | yellow |
+
+Discussion:
+- Author: host-zara
+  Claim: topic-future-crafting
+  Counts: 6 green, 2 yellow, 1 red
+  Text: Off-piste proposal — Future Crafting wants sunshine and grass, not a classroom. Saturday afternoon in the park, weather permitting.
+- Author: admin-edwin
+  Text: Unorthodox, approved in spirit. Rain plan is the Lounge.
+
+### Slot: slot-w2-mon
+Date: mon+2
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-knowledge-infrastructure
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-amara | green |
+| elector-kwame | green |
+| elector-marcus | yellow |
+| elector-leila | green |
+
+Discussion:
+- Author: host-teddy
+  Claim: topic-knowledge-infrastructure
+  Counts: 7 green, 3 yellow, 2 red
+  Text: Claiming this one for Knowledge Infrastructure — Monday mornings get the serious crowd.
+
+### Slot: slot-w2-tue
+Date: tue+2
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-herds-birds-and-words
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-maya | green |
+| elector-sofia | yellow |
+| elector-grace | green |
+
+Discussion:
+- Author: host-eli
+  Text: Herds, Birds, and Words here? The Hall's acoustics suit the starling recordings.
+
+### Slot: slot-w2-wed
+Date: wed+2
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics:
+
+### Slot: slot-w2-wed-eve
+Date: wed+2
+Start: 18:30
+End: 20:00
+Location: Lounge
+Session host: host-harvey
+Off-grid: yes
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-hana | green |
+| elector-priya | green |
+
+Discussion:
+- Author: host-harvey
+  Text: Evening data-pipelines clinic: bring a dataset that's fighting you and we'll wrangle it together. Proposing an evening slot since daytimes are full.
+
+### Slot: slot-w2-thu
+Date: thu+2
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-designing-campaign-tools
+Status: confirmed
+Url: https://lu.ma/spt-campaign-tools
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-yuki | green |
+| elector-ben | green |
+| elector-amara | yellow |
+| elector-hana | green |
+
+Discussion:
+- Author: host-hayley
+  Text: Confirmed early because two guest speakers are travelling up for it.
+
+### Slot: slot-w2-fri
+Date: fri+2
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics:
+
+### Slot: slot-w3-mon
+Date: mon+3
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics:
+
+### Slot: slot-w3-tue
+Date: tue+3
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-commoning-theory-and-praxis
+
+Discussion:
+- Author: host-zara
+  Text: Provisionally pencilling Commoning in here — will firm up once Future Crafting has happened.
+
+### Slot: slot-w3-wed
+Date: wed+3
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics:
+
+### Slot: slot-w3-thu
+Date: thu+3
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics:
+
+### Slot: slot-w3-fri
+Date: fri+3
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics:
+
+Discussion:
+- Author: admin-edwin
+  Text: End-of-week slot held open for whatever the cohort wants to run themselves.
+
 
 ## Notes for engineers
 
-- **Statuses cover all five states**: published (most), draft (title-only / placeholder
-  topics), submitted (topic-reform, topic-open-social-web, topic-serious-games),
+- **Statuses cover every state**: published (81 topics, ~91% carrying at least one
+  ❤️), submitted (topic-reform, topic-open-social-web, topic-serious-games,
+  topic-artificial-collective-intelligence — the moderation-queue examples),
   unpublished (topic-software-development, topic-getting-funded), archived
   (topic-how-do-media-organisations-work). Adjust freely.
-- **Placeholder bodies**: topics that were lorem-ipsum in the source are marked
-  `_Draft — body to be written._` rather than filled with filler text. Say the word and
-  I'll generate realistic blurbs for these so every topic renders with real content.
+- **Every topic has a real body** (2026-08-03): the former `_Draft — body to be
+  written._` placeholders got realistic blurbs so lists, cards, and digests render
+  with real content.
+- **Relative time anchors** (2026-08-03): slot dates use `mon+1`-style relative
+  forms and the seed script anchors comment/❤️/activity timestamps to the seed
+  run, so the feed, digests, and calendar look alive on any day. Two topics
+  (`topic-maps`, `topic-elections-in-the-uk`) use `Published date: recent` and
+  `topic-audience-participation` carries `Recently assigned: yes` — together with
+  the recent ❤️s/comments they exercise every digest card type. Run
+  `POST /api/jobs/digests` locally right after seeding to see full digests
+  (no `RESEND_API_KEY` → emails print to the API console).
+- **Calendar v2 coverage**: a 4-week rolling schedule (confirmed sessions with
+  Luma URLs, proposed sessions with claim comments + frozen 🟢🟡🔴 counts, empty
+  slots), an office-hours session (`Session host:` — host-sadie, plus an off-grid
+  evening one from host-harvey), an off-piste Saturday park slot (`Off-grid: yes`),
+  and standing availability patterns (grace all-green, oscar all-red — with one
+  explicit green override on slot-w1-mon — yuki mixed, ben partial).
 - **Harvey / Zara split**: the source doc had a duplicate host heading. The first set
   (web data, structured extraction, local AI, data pipelines) is Harvey Dunmore's; the
   second (collective-intelligence / utopias series) is Zara Ashworth's (host-zara).
@@ -10019,4 +10432,5 @@ Discussion:
   timetables can rename roles; drop them if v1 doesn't support custom labels yet.
 - **Cover images**: `topic-cryptocurrencies` and `topic-ai` have cover image URLs set via picsum.photos with stable seeds.
 - **Submitted with feedback**: `topic-serious-games` is submitted and has a host-only admin comment (`c-games-1`), which surfaces as the `feedback` field in the moderation queue and host topic manager.
-- **Not yet modelled** (tracked in issue #44): timeslots / sessions, elector availability, slot discussions, slot-topic tags, and the resulting conflict alerts on the dashboard.
+- **Digest recipients**: every seeded membership gets `inviteSentAt`, because digests
+  only email members the forum has contacted (invite sent or seen in-app).
