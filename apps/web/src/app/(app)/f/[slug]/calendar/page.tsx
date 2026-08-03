@@ -29,7 +29,11 @@ import type {
 } from "@/lib/calendarTypes";
 import { gqlFetch } from "@/lib/graphql";
 import { displayRolesFromCookies } from "@/lib/previewRoles.server";
-import { parseTimetableSettings, roleLabel } from "@/lib/timetableSettings";
+import {
+  parseTimetableSettings,
+  pluralLabel,
+  roleLabel,
+} from "@/lib/timetableSettings";
 
 type Data = {
   timetable: { viewerRoles: string[]; settings: string } | null;
@@ -80,6 +84,7 @@ function CalendarToolbar({
   hostView,
   audience,
   location,
+  electorsLabel,
 }: {
   calendar: CalendarSlot[];
   topics: TopicOption[];
@@ -87,6 +92,7 @@ function CalendarToolbar({
   hostView: boolean;
   audience?: string;
   location?: string;
+  electorsLabel: string;
 }) {
   const locations = [
     ...new Set(calendar.map((s) => s.location).filter(Boolean)),
@@ -104,6 +110,7 @@ function CalendarToolbar({
           isHost={hostView}
           admin={perms.canAdmin}
           topics={topics}
+          electorsLabel={electorsLabel}
         />
       ) : null}
       {locations.length > 0 ? (
@@ -379,6 +386,9 @@ export default async function CalendarPage({
         hostView={isHost(roles)}
         audience={audience}
         location={location}
+        electorsLabel={pluralLabel(
+          roleLabel(settings.roleLabels, "elector"),
+        ).toLowerCase()}
       />
 
       <CalendarBody

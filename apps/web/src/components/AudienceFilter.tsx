@@ -6,17 +6,20 @@ import { useSetSearchParam } from "@/lib/useSearchParamNav";
 
 /** The calendar's topic lens. Hosts see only their own topics (the caller
  * passes them pre-filtered); admins see every topic, grouped by host
- * (QA 2026-08-02). */
+ * (QA 2026-08-02). `electorsLabel` is the forum's own (plural) elector
+ * role label (QA 2026-08-03). */
 export function AudienceFilter({
   value,
   isHost,
   admin,
   topics,
+  electorsLabel = "electors",
 }: {
   value: string;
   isHost: boolean;
   admin: boolean;
   topics: TopicOption[];
+  electorsLabel?: string;
 }) {
   const setParam = useSetSearchParam();
 
@@ -45,7 +48,7 @@ export function AudienceFilter({
         setParam("audience", next === "all" ? "" : next);
       }}
     >
-      <option value="all">All electors</option>
+      <option value="all">All {electorsLabel}</option>
       {isHost ? <option value="hearted_mine">❤️ my topics</option> : null}
       {admin
         ? [...groups.keys()]
