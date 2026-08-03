@@ -203,6 +203,9 @@ export type CommentNode = {
   authorId: string;
   authorName: string | null;
   authorImage: string | null;
+  /** The author's roles in the topic's forum (role pill next to the name);
+   * empty for ex-members and tombstones. */
+  authorRoles: string[];
   body: string;
   visibility: CommentVisibility;
   hidden: boolean;
@@ -227,6 +230,7 @@ type CommentTreeRow = {
   authorId: string;
   authorName: string | null;
   authorImage: string | null;
+  authorRoles: string[] | null;
   body: string;
   visibility: CommentVisibility;
   hiddenAt: Date | null;
@@ -261,6 +265,7 @@ async function fetchCommentRows(
       authorId: comments.authorId,
       authorName: timetableMemberships.name,
       authorImage: timetableMemberships.image,
+      authorRoles: timetableMemberships.roles,
       body: comments.body,
       visibility: comments.visibility,
       hiddenAt: comments.hiddenAt,
@@ -291,6 +296,7 @@ function buildCommentTree(rows: CommentTreeRow[]): CommentNode[] {
       authorId: r.authorId,
       authorName: r.authorName,
       authorImage: r.authorImage,
+      authorRoles: r.authorRoles ?? [],
       body: r.body,
       visibility: r.visibility,
       hidden: r.hiddenAt !== null,
@@ -326,6 +332,7 @@ function pruneDeleted(nodes: CommentNode[]): CommentNode[] {
       node.authorId = "";
       node.authorName = null;
       node.authorImage = null;
+      node.authorRoles = [];
     }
     out.push(node);
   }

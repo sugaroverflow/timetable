@@ -356,6 +356,9 @@ export type SlotCommentView = {
   authorId: string;
   authorName: string | null;
   authorImage: string | null;
+  /** The author's roles in the slot's forum (role pill next to the name);
+   * empty for ex-members. */
+  authorRoles: string[];
   body: string;
   topicId: string | null;
   topicTitle: string | null;
@@ -377,6 +380,7 @@ export async function listSlotComments(
       authorId: slotComments.authorId,
       authorName: timetableMemberships.name,
       authorImage: timetableMemberships.image,
+      authorRoles: timetableMemberships.roles,
       body: slotComments.body,
       topicId: slotComments.topicId,
       topicTitle: topics.title,
@@ -409,6 +413,7 @@ export async function listSlotComments(
     authorId: r.authorId,
     authorName: r.authorName,
     authorImage: r.authorImage,
+    authorRoles: r.authorRoles ?? [],
     body: r.body,
     topicId: r.topicId,
     topicTitle: r.topicTitle,

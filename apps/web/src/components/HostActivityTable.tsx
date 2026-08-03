@@ -104,12 +104,15 @@ export function HostActivityTable({
           {sorted.map((host) => (
             <tr key={host.hostId}>
               <td>
-                <span className="row" style={{ gap: 8, alignItems: "center" }}>
+                {/* One link around avatar + name — both click through
+                    (links pass 2026-08-03). */}
+                <Link
+                  className="person-trigger"
+                  href={personPath(slug, host.hostSlug ?? host.hostId)}
+                >
                   <Avatar small name={host.hostName} image={host.hostImage} />
-                  <Link href={personPath(slug, host.hostSlug ?? host.hostId)}>
-                    <strong>{host.hostName ?? hostLabel}</strong>
-                  </Link>
-                </span>
+                  <strong>{host.hostName ?? hostLabel}</strong>
+                </Link>
               </td>
               <td className="mono">{host.topicCount}</td>
               <td className="mono">{host.commentCount}</td>

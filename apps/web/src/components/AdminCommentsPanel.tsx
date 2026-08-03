@@ -5,7 +5,7 @@ import { Collapsible } from "@base-ui/react/collapsible";
 import { ChevronDown, ChevronRight, Shield } from "lucide-react";
 
 import type { FeedComment } from "@/lib/feedTypes";
-import { pluralLabel } from "@/lib/timetableSettings";
+import { pluralLabel, type RoleLabels } from "@/lib/timetableSettings";
 
 import { CommentComposer } from "./CommentComposer";
 import { CommentList } from "./CommentList";
@@ -29,6 +29,7 @@ export function AdminCommentsPanel({
   slug,
   adminLabel = "Admin",
   hostLabel = "Host",
+  roleLabels,
 }: {
   topicId: string;
   comments: FeedComment[];
@@ -37,6 +38,7 @@ export function AdminCommentsPanel({
   slug?: string;
   adminLabel?: string;
   hostLabel?: string;
+  roleLabels?: RoleLabels;
 }) {
   const count = countNested(comments);
   const [expanded, setExpanded] = useState(count > 0);
@@ -74,6 +76,7 @@ export function AdminCommentsPanel({
               canModerate={canModerate}
               viewerId={viewerId}
               slug={slug}
+              roleLabels={roleLabels}
             />
             <CommentComposer
               topicId={topicId}

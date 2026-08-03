@@ -81,6 +81,7 @@ export default async function ModerationPage({
               viewerId={data.me?.id ?? null}
               hostLabel={hostLabel}
               adminLabel={adminLabel}
+              electorLabel={roleLabel(settings.roleLabels, "elector")}
               hosts={data.timetableHosts}
             />
           ))}

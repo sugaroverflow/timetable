@@ -223,6 +223,7 @@ export function TopicManager({
   viewerId,
   hostLabel,
   adminLabel,
+  electorLabel,
   isAdmin,
   hosts,
   canPublishDirectly = false,
@@ -232,6 +233,7 @@ export function TopicManager({
   viewerId: string | null;
   hostLabel: string;
   adminLabel: string;
+  electorLabel?: string;
   isAdmin: boolean;
   hosts: { id: string; name: string | null }[];
   canPublishDirectly?: boolean;
@@ -239,6 +241,12 @@ export function TopicManager({
   const permalink = permalinkFor(topic, slug);
   const publicComments = topic.comments ?? [];
   const hostComments = topic.hostOnlyComments ?? [];
+  // Resolved forum labels, reshaped for the threads' author role pills.
+  const roleLabels = {
+    admin: adminLabel,
+    host: hostLabel,
+    elector: electorLabel,
+  };
 
   return (
     <li className="card stack">
@@ -291,6 +299,7 @@ export function TopicManager({
             canModerate={false}
             viewerId={viewerId}
             slug={slug}
+            roleLabels={roleLabels}
           />
         ) : null}
         {topic.status === "published" ? (
@@ -305,6 +314,7 @@ export function TopicManager({
             canModerate={false}
             slug={slug}
             hostLabel={hostLabel}
+            roleLabels={roleLabels}
           />
         ) : null}
 
@@ -316,6 +326,7 @@ export function TopicManager({
           canModerate={false}
           slug={slug}
           adminLabel={adminLabel}
+          roleLabels={roleLabels}
         />
 
         <ManageControls

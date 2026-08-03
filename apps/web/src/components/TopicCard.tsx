@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import type { FeedTopic } from "@/lib/feedTypes";
 import { topicPath } from "@/lib/topicPath";
+import type { RoleLabels } from "@/lib/timetableSettings";
 
 import { AdminTopicActions } from "./AdminTopicActions";
 import { Avatar } from "./Avatar";
@@ -78,6 +79,7 @@ function TopicTail({
   viewerId,
   hostLabel,
   adminLabel,
+  roleLabels,
   hosts,
   hostComments,
 }: {
@@ -88,6 +90,7 @@ function TopicTail({
   viewerId: string | null;
   hostLabel: string;
   adminLabel: string;
+  roleLabels: RoleLabels;
   hosts: { id: string; name: string | null }[];
   hostComments: FeedTopic["comments"];
 }) {
@@ -108,6 +111,7 @@ function TopicTail({
           viewerId={viewerId}
           slug={slug}
           hostLabel={hostLabel}
+          roleLabels={roleLabels}
         />
       ) : null}
 
@@ -172,6 +176,7 @@ function CommentSection({
   publicComments,
   folded,
   viewerId,
+  roleLabels,
 }: {
   topic: FeedTopic;
   perms: FeedPerms;
@@ -179,6 +184,7 @@ function CommentSection({
   publicComments: FeedTopic["comments"];
   folded: boolean;
   viewerId: string | null;
+  roleLabels: RoleLabels;
 }) {
   const thread = (
     <>
@@ -188,6 +194,7 @@ function CommentSection({
         canModerate={perms.canModerate}
         viewerId={viewerId}
         slug={slug}
+        roleLabels={roleLabels}
       />
       {perms.canComment ? (
         <CommentComposer topicId={topic.id} mentionSlug={slug} />
@@ -251,6 +258,13 @@ export function TopicCard({
   );
   const isOwner = viewerId != null && viewerId === topic.hostId;
   const permalink = topicPath(slug, topic.hostSlug, topic.slug, topic.hostId);
+  // The card's label props are the forum's resolved role labels — reshape
+  // them for the comment threads' author role pills.
+  const roleLabels: RoleLabels = {
+    admin: adminLabel,
+    host: hostLabel,
+    elector: electorLabel,
+  };
 
   return (
     <article className={`card stack${isNew ? " topic-new" : ""}`}>
@@ -304,6 +318,7 @@ export function TopicCard({
           publicComments={publicComments}
           folded={queueControls != null}
           viewerId={viewerId}
+          roleLabels={roleLabels}
         />
 
         <TopicTail
@@ -314,6 +329,7 @@ export function TopicCard({
           viewerId={viewerId}
           hostLabel={hostLabel}
           adminLabel={adminLabel}
+          roleLabels={roleLabels}
           hosts={hosts}
           hostComments={hostComments}
         />

@@ -5,6 +5,7 @@ import { Collapsible } from "@base-ui/react/collapsible";
 import { ChevronDown, ChevronRight, Lock } from "lucide-react";
 
 import type { FeedComment } from "@/lib/feedTypes";
+import type { RoleLabels } from "@/lib/timetableSettings";
 
 import { CommentComposer } from "./CommentComposer";
 import { CommentList } from "./CommentList";
@@ -22,6 +23,7 @@ export function HostOnlyPanel({
   viewerId = null,
   slug,
   hostLabel = "Host",
+  roleLabels,
 }: {
   topicId: string;
   comments: FeedComment[];
@@ -29,6 +31,7 @@ export function HostOnlyPanel({
   viewerId?: string | null;
   slug?: string;
   hostLabel?: string;
+  roleLabels?: RoleLabels;
 }) {
   const [expanded, setExpanded] = useState(false);
   const count = countNested(comments);
@@ -58,6 +61,7 @@ export function HostOnlyPanel({
               canModerate={canModerate}
               viewerId={viewerId}
               slug={slug}
+              roleLabels={roleLabels}
             />
             <CommentComposer
               topicId={topicId}

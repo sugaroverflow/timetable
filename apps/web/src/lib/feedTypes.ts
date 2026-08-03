@@ -11,6 +11,9 @@ export type FeedComment = {
   authorId: string;
   authorName: string | null;
   authorImage: string | null;
+  /** The author's roles in this forum (role pill); empty for ex-members
+   * and tombstones. */
+  authorRoles: string[];
   body: string;
   visibility: CommentVisibility;
   hidden: boolean;

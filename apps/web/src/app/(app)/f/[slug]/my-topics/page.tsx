@@ -97,6 +97,7 @@ export default async function MyTopicsPage({
                 viewerId={data.me?.id ?? null}
                 hostLabel={hostLabel}
                 adminLabel={adminLabel}
+                electorLabel={roleLabel(settings.roleLabels, "elector")}
                 isAdmin={admin}
                 hosts={admin ? data.timetableHosts : []}
                 canPublishDirectly={Boolean(

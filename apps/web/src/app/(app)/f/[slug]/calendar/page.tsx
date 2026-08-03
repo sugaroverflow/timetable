@@ -34,6 +34,7 @@ import {
   parseTimetableSettings,
   pluralLabel,
   roleLabel,
+  type RoleLabels,
 } from "@/lib/timetableSettings";
 
 type Data = {
@@ -278,6 +279,7 @@ function CalendarBody({
   lensTopic,
   adminLabel,
   ohLabel,
+  roleLabels,
   past,
   base,
 }: {
@@ -289,6 +291,7 @@ function CalendarBody({
   lensTopic: TopicOption | null;
   adminLabel: string;
   ohLabel: string;
+  roleLabels?: RoleLabels;
   past: boolean;
   base: string;
 }) {
@@ -305,6 +308,7 @@ function CalendarBody({
         lensTopic={lensTopic}
         adminLabel={adminLabel}
         officeHoursLabel={ohLabel}
+        roleLabels={roleLabels}
         showingPast={past}
         base={base}
       />
@@ -451,6 +455,7 @@ export default async function CalendarPage({
         lensTopic={lensTopic}
         adminLabel={adminLabel}
         ohLabel={officeHoursLabel(settings)}
+        roleLabels={settings.roleLabels}
         past={past}
         base={base}
       />

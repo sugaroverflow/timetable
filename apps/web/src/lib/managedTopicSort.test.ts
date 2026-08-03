@@ -16,6 +16,7 @@ function comment(createdAt: string, replies: FeedComment[] = []): FeedComment {
     authorId: "u1",
     authorName: null,
     authorImage: null,
+    authorRoles: [],
     body: "hi",
     visibility: "public",
     hidden: false,
