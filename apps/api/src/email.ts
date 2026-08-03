@@ -388,6 +388,12 @@ function renderCard(
     (a): a is Discussion => a.kind === "comment" || a.kind === "reply",
   );
   const heart = card.activities.find((a) => a.kind === "heart");
+  // Upcoming confirmed sessions lead the card (QA 2026-08-03) — present in
+  // every digest a hearter receives, "New" pill when freshly confirmed.
+  const sessions = card.activities.filter(
+    (a): a is Extract<DigestActivity, { kind: "session" }> =>
+      a.kind === "session",
+  );
   const pills = statuses.map((a) => statusPill(a.kind)).join("");
 
   const header =
@@ -399,6 +405,11 @@ function renderCard(
     `</td></tr></table>`;
 
   const sections: string[] = [];
+  if (sessions.length > 0) {
+    sections.push(
+      sessions.map((a) => sessionLine(a.session, forumSlug, accent)).join(""),
+    );
+  }
   if (statuses.length > 0 && card.body) {
     sections.push(bodyExcerpt(card.body, card.path, accent));
   }
@@ -488,9 +499,14 @@ function renderSessionCard(
 /** "3 comments, 2 replies …" — the subject's tail, counted across cards. */
 function digestSummary(digest: ForumDigest): string {
   const counts = { comment: 0, reply: 0, heart: 0, new: 0, assignment: 0 };
+  let confirmedNew = 0;
   for (const card of digest.topics) {
     for (const a of card.activities) {
-      if (a.kind in counts) counts[a.kind as keyof typeof counts] += 1;
+      if (a.kind === "session") {
+        if (a.session.isNew) confirmedNew += 1;
+      } else if (a.kind in counts) {
+        counts[a.kind as keyof typeof counts] += 1;
+      }
     }
   }
   const bits: string[] = [];
@@ -501,9 +517,8 @@ function digestSummary(digest: ForumDigest): string {
   n(counts.heart, "topic with new ❤️", "topics with new ❤️");
   n(counts.new, "new topic", "new topics");
   n(counts.assignment, "topic assigned to you", "topics assigned to you");
-  const confirmedNew = digest.upcoming.filter((s) => s.isNew).length;
-  const asksNew = digest.availabilityAsks.filter((s) => s.isNew).length;
   n(confirmedNew, "session confirmed", "sessions confirmed");
+  const asksNew = digest.availabilityAsks.filter((s) => s.isNew).length;
   n(
     asksNew,
     "session wants your availability",
@@ -522,16 +537,9 @@ export function renderDigest(digest: ForumDigest): {
 } {
   const accent = digest.accent ?? E.primary;
   const summary = digestSummary(digest);
-  // Sessions lead: "Coming up" is the highest-value content, and the
-  // availability ask is the digest's one direct call to action.
+  // Confirmed sessions ride their topic's card (QA 2026-08-03); the
+  // availability ask stays a section — the digest's one direct CTA.
   const body = [
-    renderSessionCard(
-      "📅 Coming up",
-      "Confirmed sessions for topics you ❤️'d.",
-      digest.upcoming,
-      digest.forumSlug,
-      accent,
-    ),
     renderSessionCard(
       "Can you make it?",
       "Sessions proposed for topics you ❤️'d — share your availability.",
@@ -604,7 +612,11 @@ const sComment = (
 
 /** Two discussion cards: a busy multi-reply thread (merged into one tree)
  * and a reply to your comment on someone else's topic. */
-function sampleThreadCards(me: DigestPerson, p: SamplePath): DigestTopicCard[] {
+function sampleThreadCards(
+  me: DigestPerson,
+  p: SamplePath,
+  forumId: string,
+): DigestTopicCard[] {
   const marcus = sWho("Marcus Webb", "sample-marcus");
   const leila = sWho("Leila Haddad", "sample-leila");
   const base = [
@@ -635,6 +647,23 @@ function sampleThreadCards(me: DigestPerson, p: SamplePath): DigestTopicCard[] {
       body: null,
       path: p("marcus", "ranked-choice"),
       activities: [
+        // A freshly confirmed session leads the card (calendar v2).
+        {
+          kind: "session",
+          session: {
+            slotId: "sample-slot-confirmed",
+            startsAt: sAt("2026-08-04T18:00:00Z"),
+            endsAt: sAt("2026-08-04T20:00:00Z"),
+            location: "Classroom",
+            url: "https://lu.ma/sample-rcv",
+            topicId: "sample-rcv",
+            topicTitle: "Should we adopt ranked-choice for our elections?",
+            timetableId: forumId,
+            updatedAt: sAt("2026-07-30T09:00:00Z"),
+            isNew: true,
+          },
+          at: sAt("2026-07-30T09:00:00Z"),
+        },
         sReply("public", leilaReply, base, "2026-07-30T10:05:00Z"),
         sReply(
           "public",
@@ -807,23 +836,9 @@ export function sampleDigest(args: {
     hostLabel: "Host",
     adminLabel: "Admin",
     topics: [
-      ...sampleThreadCards(me, p),
+      ...sampleThreadCards(me, p, args.forumId),
       sampleOwnCard(me, p),
       ...sampleStatusCards(me, p),
-    ],
-    upcoming: [
-      {
-        slotId: "sample-slot-confirmed",
-        startsAt: sAt("2026-08-04T18:00:00Z"),
-        endsAt: sAt("2026-08-04T20:00:00Z"),
-        location: "Classroom",
-        url: "",
-        topicId: "sample-rcv",
-        topicTitle: "Should we adopt ranked-choice for our elections?",
-        timetableId: args.forumId,
-        updatedAt: sAt("2026-07-30T09:00:00Z"),
-        isNew: true,
-      },
     ],
     availabilityAsks: [
       {

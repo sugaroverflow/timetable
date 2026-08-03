@@ -70,6 +70,11 @@ export type DigestActivity =
     }
   /** ❤️s on the recipient's topic — every hearter named (no cap). */
   | { kind: "heart"; hearters: DigestPerson[]; at: Date }
+  /** An upcoming CONFIRMED session for a topic the recipient ❤️'d
+   * (QA 2026-08-03): rides the topic's card in every digest until it
+   * happens; only `session.isNew` (confirmed since the last digest) can
+   * make an otherwise-quiet digest send. */
+  | { kind: "session"; session: DigestSessionLine; at: Date }
   /** A topic newly published in a forum where the recipient is an elector. */
   | { kind: "new"; at: Date }
   /** A topic an admin (re)assigned to the recipient. */
@@ -115,10 +120,9 @@ export type ForumDigest = {
   hostLabel: string;
   adminLabel: string;
   topics: DigestTopicCard[];
-  /** "Coming up": upcoming CONFIRMED sessions (calendar-enabled forums). */
-  upcoming: DigestSessionLine[];
   /** "Can you make it?": upcoming PROPOSED sessions for topics this
-   * recipient ❤️'d — the moment they're motivated to upgrade a 🟡. */
+   * recipient ❤️'d — the moment they're motivated to upgrade a 🟡.
+   * (Confirmed sessions ride their topic's card instead — QA 2026-08-03.) */
   availabilityAsks: DigestSessionLine[];
 };
 
@@ -746,6 +750,7 @@ async function assignmentActivities(
 /** Ranks — the coarse one groups cards (your content first, drafts last),
  * the fine one orders activities within a single card. */
 const CARD_TIER: Record<DigestActivity["kind"], number> = {
+  session: 0,
   reply: 0,
   comment: 0,
   heart: 0,
@@ -754,12 +759,13 @@ const CARD_TIER: Record<DigestActivity["kind"], number> = {
   draft: 3,
 };
 const ACTIVITY_RANK: Record<DigestActivity["kind"], number> = {
-  reply: 0,
-  comment: 1,
-  heart: 2,
-  assignment: 3,
-  new: 4,
-  draft: 5,
+  session: 0,
+  reply: 1,
+  comment: 2,
+  heart: 3,
+  assignment: 4,
+  new: 5,
+  draft: 6,
 };
 
 function cardTier(card: DigestTopicCard): number {
@@ -810,7 +816,16 @@ export async function computeUserForumDigests(
       activity: { kind: "draft" as const, at: new Date(0) },
     }));
 
+  // Confirmed sessions ride their topic's card (QA 2026-08-03) — present
+  // in every digest a hearter receives until the session happens.
+  const sessionsA: RawActivity[] = sessions.upcoming.map((s) => ({
+    topicId: s.topicId,
+    timetableId: s.timetableId,
+    activity: { kind: "session" as const, session: s, at: s.updatedAt },
+  }));
+
   const all = [
+    ...sessionsA,
     ...commentsA,
     ...repliesA,
     ...heartsA,
@@ -838,7 +853,6 @@ export async function computeUserForumDigests(
       hostLabel: ctx.hostLabel.get(forumId) ?? "Host",
       adminLabel: ctx.adminLabel.get(forumId) ?? "Admin",
       topics: cards,
-      upcoming: sessions.upcoming.filter((s) => s.timetableId === forumId),
       availabilityAsks: sessions.asks.filter((s) => s.timetableId === forumId),
     };
   });
@@ -883,16 +897,21 @@ function buildCards(
   return cards;
 }
 
-/** Empty = nothing but drafts and already-seen session listings. A
- * lingering draft alone must never trigger an email, and neither may a
- * standing "Coming up" list with nothing new in it — only a session
- * confirmed/proposed since the last digest counts as news. */
+/** Whether one activity justifies sending an email. Drafts never do;
+ * a standing (not-new) session listing never does either — it appears in
+ * every digest that sends, but only a session confirmed since the last
+ * digest is itself news (QA 2026-08-03). */
+function activityIsNews(a: DigestActivity): boolean {
+  if (a.kind === "draft") return false;
+  if (a.kind === "session") return a.session.isNew;
+  return true;
+}
+
+/** Empty = nothing that counts as news. */
 export function isForumDigestEmpty(digest: ForumDigest): boolean {
   const topicNews = digest.topics.some((card) =>
-    card.activities.some((a) => a.kind !== "draft"),
+    card.activities.some(activityIsNews),
   );
-  const sessionNews =
-    digest.upcoming.some((s) => s.isNew) ||
-    digest.availabilityAsks.some((s) => s.isNew);
-  return !topicNews && !sessionNews;
+  const askNews = digest.availabilityAsks.some((s) => s.isNew);
+  return !topicNews && !askNews;
 }

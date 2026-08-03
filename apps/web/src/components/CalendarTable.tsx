@@ -859,7 +859,7 @@ function MeterAndYouCells({
         </td>
       ) : null}
       {perms.canSetAvailability ? (
-        <td>
+        <td className="cal-you-cell">
           {past ? null : (
             <AvailabilityControl
               slotId={slot.id}

@@ -1501,6 +1501,13 @@ textarea {
 .cal-table td.cal-avail-cell {
   width: 100%;
 }
+/* Elector's own 🟢🟡🔴 toggle hugs the table's right edge (QA 2026-08-03). */
+.cal-table td.cal-you-cell {
+  text-align: right;
+}
+.cal-you-cell .avseg {
+  justify-content: flex-end;
+}
 .avail-meter {
   width: 100%;
   min-width: 160px;
