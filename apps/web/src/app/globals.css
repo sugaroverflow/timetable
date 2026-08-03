@@ -869,6 +869,32 @@ textarea {
   color: var(--primary);
 }
 
+/* Short viewports (QA 2026-08-03): the rail's content is ~716px, so on
+   screens under ~815px it grew a scrollbar. Compress instead — the nav
+   buttons give up vertical padding first, then type and gaps tighten.
+   overflow-y stays as the last-resort fallback below ~620px. */
+@media (max-height: 820px) {
+  .side-nav a {
+    padding: 4px 12px;
+  }
+}
+@media (max-height: 720px) {
+  .sidebar {
+    gap: 10px;
+  }
+  .side-nav {
+    gap: 2px;
+  }
+  .side-nav a {
+    padding: 3px 12px;
+    font-size: var(--text-sm);
+  }
+  .sidebar-foot {
+    padding-top: 8px;
+    gap: 6px;
+  }
+}
+
 .stack {
   display: flex;
   flex-direction: column;
