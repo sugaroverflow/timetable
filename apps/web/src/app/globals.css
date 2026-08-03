@@ -1599,6 +1599,13 @@ textarea {
   border-top: 0;
   padding-top: 0;
 }
+/* "Host: Topic" in the title face — prominent, but under the card's
+   section heading (QA 2026-08-03). */
+.cal-session-line {
+  font-family: var(--serif);
+  font-size: 15px;
+  font-weight: var(--fw-semibold);
+}
 /* Emoji-only availability segments for table cells. */
 .avseg-compact button {
   padding: 3px 7px;

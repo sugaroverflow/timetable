@@ -194,7 +194,7 @@ function SessionLine({ slot, slug }: { slot: CalendarSlot; slug: string }) {
   );
   return (
     <div className="row wrap" style={{ gap: 8, alignItems: "center" }}>
-      <span style={{ fontSize: 13 }}>
+      <span className="cal-session-line">
         <Link href={`/f/${slug}/${slot.topic.hostId}`}>
           {slot.topic.hostName ?? "…"}
         </Link>

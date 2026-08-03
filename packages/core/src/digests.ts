@@ -261,11 +261,12 @@ async function loadDigestContext(
 /** How far ahead the digest looks for sessions. */
 const SESSION_HORIZON_DAYS = 14;
 
-/** Upcoming confirmed sessions ("Coming up") and proposed sessions for
- * topics the recipient ❤️'d ("Can you make it?"), across the recipient's
- * calendar-enabled forums. `isNew` = session changed since the window
- * start, so only genuinely fresh sessions can trigger an email by
- * themselves. */
+/** Upcoming confirmed sessions ("Coming up") and proposed sessions ("Can
+ * you make it?"), both scoped to topics the recipient ❤️'d (QA 2026-08-03
+ * — a hearter's digest always carries their upcoming confirmed sessions),
+ * across the recipient's calendar-enabled forums. `isNew` = session
+ * changed since the window start; only fresh sessions can trigger an
+ * email by themselves. */
 async function loadSessionSections(
   ctx: DigestContext,
   since: Date,
@@ -284,30 +285,33 @@ async function loadSessionSections(
     listUpcomingSessions(ctx.calendarTimetableIds, "proposed", horizon),
   ]);
 
-  const upcoming = confirmed.map((s) => ({ ...s, isNew: s.updatedAt > since }));
+  // Both sections go to the people who ❤️'d the session's topic — the
+  // ones the session is for / whose availability the host is waiting on.
+  const allTopicIds = [...confirmed, ...proposed].map((s) => s.topicId);
+  if (allTopicIds.length === 0) return { upcoming: [], asks: [] };
+  const heartRows = await db
+    .select({ topicId: hearts.topicId })
+    .from(hearts)
+    .where(
+      and(
+        eq(hearts.userId, ctx.recipient.id),
+        inArray(hearts.topicId, allTopicIds),
+      ),
+    );
+  const heartedTopicIds = new Set(heartRows.map((r) => r.topicId));
+  const heartedLine = (s: DigestSession) => ({
+    ...s,
+    isNew: s.updatedAt > since,
+  });
 
-  // Asks go only to electors who ❤️'d the session's topic — the people
-  // whose availability the host is actually waiting on.
-  let asks: DigestSessionLine[] = [];
-  if (proposed.length > 0) {
-    const heartRows = await db
-      .select({ topicId: hearts.topicId })
-      .from(hearts)
-      .where(
-        and(
-          eq(hearts.userId, ctx.recipient.id),
-          inArray(
-            hearts.topicId,
-            proposed.map((s) => s.topicId),
-          ),
-        ),
-      );
-    const heartedTopicIds = new Set(heartRows.map((r) => r.topicId));
-    asks = proposed
+  return {
+    upcoming: confirmed
       .filter((s) => heartedTopicIds.has(s.topicId))
-      .map((s) => ({ ...s, isNew: s.updatedAt > since }));
-  }
-  return { upcoming, asks };
+      .map(heartedLine),
+    asks: proposed
+      .filter((s) => heartedTopicIds.has(s.topicId))
+      .map(heartedLine),
+  };
 }
 
 /** One raw activity tagged with its topic + forum, before cards are built. */

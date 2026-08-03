@@ -443,7 +443,8 @@ function sessionWhen(s: DigestSessionLine): string {
 const NEW_PILL = `<span style="display:inline-block;background:#e8f6ec;color:#207a32;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;margin-left:6px;white-space:nowrap;vertical-align:middle;">New</span>`;
 
 /** One session line: bold linked topic (its URL when published elsewhere,
- * the forum calendar otherwise), then when/where. */
+ * the forum calendar otherwise), when/where, and the event URL spelled out
+ * as a register link (QA 2026-08-03). */
 function sessionLine(
   s: DigestSessionLine,
   forumSlug: string,
@@ -451,11 +452,15 @@ function sessionLine(
 ): string {
   const href = s.url || `${linkBase}/f/${forumSlug}/calendar`;
   const where = s.location ? ` · ${esc(s.location)}` : "";
+  const register = s.url
+    ? `<div style="font-size:13px;"><a href="${esc(s.url)}" style="color:${accent};font-weight:600;text-decoration:none;">Register → ${esc(s.url.replace(/^https?:\/\//, ""))}</a></div>`
+    : "";
   return (
     `<div style="margin:6px 0;">` +
     `<a href="${esc(href)}" style="color:${accent};font-weight:600;text-decoration:none;">${esc(s.topicTitle)}</a>` +
     `${s.isNew ? NEW_PILL : ""}` +
     `<div class="em-muted" style="color:${E.muted};font-size:13px;">${esc(sessionWhen(s))}${where}</div>` +
+    register +
     `</div>`
   );
 }
@@ -522,7 +527,7 @@ export function renderDigest(digest: ForumDigest): {
   const body = [
     renderSessionCard(
       "📅 Coming up",
-      "",
+      "Confirmed sessions for topics you ❤️'d.",
       digest.upcoming,
       digest.forumSlug,
       accent,
