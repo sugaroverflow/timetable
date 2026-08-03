@@ -1443,6 +1443,67 @@ textarea {
   flex-wrap: wrap;
 }
 
+/* Generic toggle switch (QA 2026-08-03) — the queue ❤️ switch's
+   track/thumb, reusable; primary-coloured when on. */
+.ui-switch-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  color: var(--ink);
+  font-size: var(--text-sm);
+}
+.ui-switch-row:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.ui-switch {
+  position: relative;
+  flex: none;
+  width: 38px;
+  height: 22px;
+  margin-top: 1px;
+  border-radius: var(--radius-pill);
+  background: var(--line-strong);
+  transition: background 0.15s ease;
+}
+.ui-switch.on {
+  background: var(--primary);
+}
+.ui-switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--card);
+  box-shadow: var(--shadow);
+  transition: left 0.15s ease;
+}
+.ui-switch.on .ui-switch-thumb {
+  left: 18px;
+}
+.ui-switch-label {
+  min-width: 0;
+}
+
+/* Forum Settings combined card (QA 2026-08-03). */
+.settings-subtitle {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: var(--fw-semibold);
+}
+.settings-divider {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 2px 0;
+}
+
 /* Calendar v2 — table page */
 /* Compact slot table (QA 2026-07-31 — one row per slot, Analysis-style). */
 .cal-table td {

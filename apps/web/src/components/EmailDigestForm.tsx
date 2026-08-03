@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { isDigestEnabled } from "@timetable/shared";
 
+import { Switch } from "@/components/Switch";
 import { useToast } from "@/components/Toast";
 import { clientApi } from "@/lib/clientApi";
 import type { DigestSettings } from "@/lib/timetableSettings";
@@ -69,25 +70,21 @@ export function EmailDigestForm({
   }
 
   return (
-    <form onSubmit={submit} className="card">
-      <h2 className="section-title" style={{ marginBottom: 10 }}>
-        Email digest
-      </h2>
-      <p className="faint" style={{ marginTop: 0, fontSize: "var(--text-xs)" }}>
-        A regular email summary of forum activity — comments on their topics,
-        replies, and new topics. New members start with this default; each
-        person can switch it on or off on their Notifications page.
-      </p>
-      <label className="row" style={{ marginBottom: 8 }}>
-        <input
-          type="checkbox"
-          checked={enabled}
-          onChange={(e) => setEnabled(e.target.checked)}
-          style={{ width: "auto" }}
-        />
-        Send digests to new members
-      </label>
-      <div className="row wrap" style={{ marginTop: 12 }}>
+    <form onSubmit={submit} className="stack" style={{ gap: 12 }}>
+      <div>
+        <h3 className="settings-subtitle">Email digest</h3>
+        <p className="faint" style={{ margin: "2px 0 0", fontSize: 12 }}>
+          A regular email summary of forum activity — comments on their topics,
+          replies, and new topics. New members start with this default; each
+          person can switch it on or off on their Notifications page.
+        </p>
+      </div>
+      <Switch
+        checked={enabled}
+        onChange={setEnabled}
+        label="Send digests to new members"
+      />
+      <div className="row wrap">
         <button className="btn btn-primary" type="submit" disabled={busy}>
           {busy ? "Saving…" : saved ? "Saved" : "Save"}
         </button>

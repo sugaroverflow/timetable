@@ -66,19 +66,34 @@ export default async function SettingsPage({
         <SettingsForm slug={slug} current={settings} />
       </div>
 
-      <HeartsCutoffForm slug={slug} current={first.timetable.heartsCountFrom} />
+      {/* One "Forum settings" card (QA 2026-08-03): hearts cutoff,
+          calendar, and digest defaults as subsections. */}
+      <div className="card stack" style={{ gap: 16 }}>
+        <h2 className="section-title" style={{ margin: 0 }}>
+          Forum settings
+        </h2>
 
-      <CalendarSettingsForm
-        slug={slug}
-        current={(settings as TimetableSettings).calendar ?? {}}
-        hostsPublishDirectly={Boolean(
-          (settings as TimetableSettings).topics?.hostsPublishDirectly,
-        )}
-        hostLabel={roleLabel(settings.roleLabels, "host")}
-        adminLabel={roleLabel(settings.roleLabels, "admin")}
-      />
+        <HeartsCutoffForm
+          slug={slug}
+          current={first.timetable.heartsCountFrom}
+        />
 
-      <EmailDigestForm slug={slug} digestDefaults={settings.digestDefaults} />
+        <hr className="settings-divider" />
+
+        <CalendarSettingsForm
+          slug={slug}
+          current={(settings as TimetableSettings).calendar ?? {}}
+          hostsPublishDirectly={Boolean(
+            (settings as TimetableSettings).topics?.hostsPublishDirectly,
+          )}
+          hostLabel={roleLabel(settings.roleLabels, "host")}
+          adminLabel={roleLabel(settings.roleLabels, "admin")}
+        />
+
+        <hr className="settings-divider" />
+
+        <EmailDigestForm slug={slug} digestDefaults={settings.digestDefaults} />
+      </div>
 
       <div className="grid grid-2">
         <InviteForm timetableId={first.timetable.id} />
