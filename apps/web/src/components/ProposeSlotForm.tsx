@@ -3,11 +3,15 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 
-import type { TopicOption } from "@/lib/calendarTypes";
+import {
+  SessionChoiceOptions,
+  sessionChoiceVars,
+} from "@/components/CalendarTable";
+import type { CalendarPerms, TopicOption } from "@/lib/calendarTypes";
 import { useGqlAction } from "@/lib/useGqlAction";
 
-const PROPOSE = `mutation($s: String!, $a: String!, $b: String!, $loc: String, $t: String!) {
-  proposeSlot(idOrSlug: $s, startsAt: $a, endsAt: $b, location: $loc, topicId: $t) { id }
+const PROPOSE = `mutation($s: String!, $a: String!, $b: String!, $loc: String, $t: String, $sh: String) {
+  proposeSlot(idOrSlug: $s, startsAt: $a, endsAt: $b, location: $loc, topicId: $t, sessionHostId: $sh) { id }
 }`;
 
 /**
@@ -20,14 +24,20 @@ export function ProposeSlotForm({
   slug,
   topics,
   locations,
+  perms,
+  officeHoursLabel = "Office hours",
 }: {
   slug: string;
   topics: TopicOption[];
   locations: string[];
+  /** Admins pick any topic (grouped by author) or any host's office
+   * hours; hosts get only their own — QA 2026-08-03. */
+  perms: CalendarPerms;
+  officeHoursLabel?: string;
 }) {
   const { run, busy } = useGqlAction();
   const [open, setOpen] = useState(false);
-  const [topicId, setTopicId] = useState(
+  const [choice, setChoice] = useState(
     topics.length === 1 ? topics[0]!.id : "",
   );
   const [start, setStart] = useState("");
@@ -36,7 +46,7 @@ export function ProposeSlotForm({
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!start || !end || !topicId) return;
+    if (!start || !end || !choice) return;
     void run(
       PROPOSE,
       {
@@ -44,7 +54,7 @@ export function ProposeSlotForm({
         a: new Date(start).toISOString(),
         b: new Date(end).toISOString(),
         loc: location,
-        t: topicId,
+        ...sessionChoiceVars(choice),
       },
       {
         success: "Session time proposed",
@@ -83,17 +93,18 @@ export function ProposeSlotForm({
         </p>
         <div className="row wrap" style={{ gap: 8 }}>
           <select
-            aria-label="Topic"
-            value={topicId}
-            onChange={(e) => setTopicId(e.target.value)}
+            aria-label="Session"
+            value={choice}
+            onChange={(e) => setChoice(e.target.value)}
             style={{ width: "auto" }}
           >
-            <option value="">Topic…</option>
-            {topics.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.title}
-              </option>
-            ))}
+            <option value="">Session…</option>
+            <SessionChoiceOptions
+              claimTopics={topics}
+              admin={perms.canAdmin}
+              viewerId={perms.viewerId}
+              officeHoursLabel={officeHoursLabel}
+            />
           </select>
           <input
             type="datetime-local"
@@ -127,7 +138,7 @@ export function ProposeSlotForm({
           <button
             className="btn btn-primary"
             type="submit"
-            disabled={busy || !start || !end || !topicId}
+            disabled={busy || !start || !end || !choice}
           >
             Propose
           </button>

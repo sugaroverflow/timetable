@@ -5,6 +5,7 @@ import { isAdmin, type Role } from "@timetable/shared";
 import Link from "next/link";
 
 import { CalendarSettingsForm } from "@/components/CalendarSettingsForm";
+import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { EmailDigestForm } from "@/components/EmailDigestForm";
 import { HeartsCutoffForm } from "@/components/HeartsCutoffForm";
 import { InviteForm } from "@/components/InviteForm";
@@ -66,19 +67,37 @@ export default async function SettingsPage({
         <SettingsForm slug={slug} current={settings} />
       </div>
 
-      <HeartsCutoffForm slug={slug} current={first.timetable.heartsCountFrom} />
+      {/* One "Forum settings" card (QA 2026-08-03): hearts cutoff,
+          calendar, and digest defaults as fold-up subsections. */}
+      <div className="card">
+        <CollapsibleSection title="Forum settings">
+          <div className="stack" style={{ gap: 16 }}>
+            <HeartsCutoffForm
+              slug={slug}
+              current={first.timetable.heartsCountFrom}
+            />
 
-      <CalendarSettingsForm
-        slug={slug}
-        current={(settings as TimetableSettings).calendar ?? {}}
-        hostsPublishDirectly={Boolean(
-          (settings as TimetableSettings).topics?.hostsPublishDirectly,
-        )}
-        hostLabel={roleLabel(settings.roleLabels, "host")}
-        adminLabel={roleLabel(settings.roleLabels, "admin")}
-      />
+            <hr className="settings-divider" />
 
-      <EmailDigestForm slug={slug} digestDefaults={settings.digestDefaults} />
+            <CalendarSettingsForm
+              slug={slug}
+              current={(settings as TimetableSettings).calendar ?? {}}
+              hostsPublishDirectly={Boolean(
+                (settings as TimetableSettings).topics?.hostsPublishDirectly,
+              )}
+              hostLabel={roleLabel(settings.roleLabels, "host")}
+              adminLabel={roleLabel(settings.roleLabels, "admin")}
+            />
+
+            <hr className="settings-divider" />
+
+            <EmailDigestForm
+              slug={slug}
+              digestDefaults={settings.digestDefaults}
+            />
+          </div>
+        </CollapsibleSection>
+      </div>
 
       <div className="grid grid-2">
         <InviteForm timetableId={first.timetable.id} />

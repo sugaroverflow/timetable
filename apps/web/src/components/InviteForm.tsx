@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { RoleCheckboxGroup } from "@/components/RoleCheckboxGroup";
 import { clientApi } from "@/lib/clientApi";
 
@@ -58,38 +59,37 @@ export function InviteForm({ timetableId }: { timetableId: string }) {
 
   return (
     <form onSubmit={onSubmit} className="card">
-      <h2 className="section-title" style={{ marginBottom: 10 }}>
-        Invite people
-      </h2>
-      <p className="muted" style={{ marginTop: 0 }}>
-        Existing users are added immediately. Unknown emails get a pending
-        invite claimed when they sign up.
-      </p>
-
-      <div className="field">
-        <label htmlFor="emails">Emails (comma or newline separated)</label>
-        <textarea
-          id="emails"
-          value={emails}
-          onChange={(e) => setEmails(e.target.value)}
-          placeholder="alex@example.com, sam@example.com"
-        />
-      </div>
-
-      <div className="field">
-        <label>Roles</label>
-        <RoleCheckboxGroup value={roles} onChange={setRoles} variant="pill" />
-      </div>
-
-      {message ? (
-        <p style={{ fontSize: 13 }} className="muted">
-          {message}
+      <CollapsibleSection title="Invite people">
+        <p className="muted" style={{ marginTop: 0 }}>
+          Existing users are added immediately. Unknown emails get a pending
+          invite claimed when they sign up.
         </p>
-      ) : null}
 
-      <button className="btn btn-primary" type="submit" disabled={busy}>
-        {busy ? "Sending…" : "Send invites"}
-      </button>
+        <div className="field">
+          <label htmlFor="emails">Emails (comma or newline separated)</label>
+          <textarea
+            id="emails"
+            value={emails}
+            onChange={(e) => setEmails(e.target.value)}
+            placeholder="alex@example.com, sam@example.com"
+          />
+        </div>
+
+        <div className="field">
+          <label>Roles</label>
+          <RoleCheckboxGroup value={roles} onChange={setRoles} variant="pill" />
+        </div>
+
+        {message ? (
+          <p style={{ fontSize: 13 }} className="muted">
+            {message}
+          </p>
+        ) : null}
+
+        <button className="btn btn-primary" type="submit" disabled={busy}>
+          {busy ? "Sending…" : "Send invites"}
+        </button>
+      </CollapsibleSection>
     </form>
   );
 }

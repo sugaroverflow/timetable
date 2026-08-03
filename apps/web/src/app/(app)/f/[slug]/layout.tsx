@@ -35,6 +35,7 @@ type TimetableResult = {
     customDomain: string | null;
     viewerRoles: string[];
     settings: string;
+    calendarHasSlots: boolean;
   } | null;
 };
 
@@ -48,6 +49,7 @@ const TIMETABLE_QUERY = `
       customDomain
       viewerRoles
       settings
+      calendarHasSlots
     }
   }
 `;
@@ -163,6 +165,17 @@ async function loadSwitcherAndUnread(
     queueNeverSeen: unreadData.topicQueue?.neverSeenCount ?? 0,
     pendingCount: unreadData.moderationQueue?.length ?? 0,
   };
+}
+
+/** Non-admins see the Calendar link only once slots exist (QA 2026-08-03)
+ * — admins need it regardless, to set the schedule up. */
+function calendarNavVisible(
+  settings: ReturnType<typeof parseTimetableSettings>,
+  roles: Role[],
+  hasSlots: boolean,
+): boolean {
+  if (!settings.calendar?.enabled) return false;
+  return isAdmin(roles) || hasSlots;
 }
 
 function NotificationsNavLink({
@@ -346,7 +359,11 @@ export default async function TimetableLayout({
             elector={isElector(roles)}
             hostOrAdmin={isHost(roles) || isAdmin(roles)}
             admin={isAdmin(roles)}
-            calendarOn={Boolean(settings.calendar?.enabled)}
+            calendarOn={calendarNavVisible(
+              settings,
+              roles,
+              timetable.calendarHasSlots,
+            )}
             unread={unread}
             queueNeverSeen={queueNeverSeen}
             pendingCount={pendingCount}

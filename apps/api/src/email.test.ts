@@ -129,15 +129,22 @@ describe("renderDigest (v3, topic cards)", () => {
   });
 });
 
-describe("renderDigest calendar sections (calendar v2)", () => {
-  it("leads with Coming up and the availability ask, before topic cards", () => {
+describe("renderDigest calendar content (calendar v2)", () => {
+  const sessionCard = SAMPLE.topics.find((c) =>
+    c.activities.some((a) => a.kind === "session"),
+  )!;
+
+  it("renders the confirmed session inside its topic's card, not a section", () => {
     const { html } = renderDigest(SAMPLE);
-    const comingUp = html.indexOf("Coming up");
+    expect(html).not.toContain("Coming up");
+    // The session's when-line and register link ride the ranked-choice card.
+    expect(html).toContain("Tue 4 Aug, 18:00–20:00 · Classroom");
+    expect(html).toContain("Register → lu.ma/sample-rcv");
+    // The ask is still its own section, before the cards.
     const ask = html.indexOf("Can you make it?");
-    const firstTopicCard = html.indexOf("sketched three options");
-    expect(comingUp).toBeGreaterThan(-1);
-    expect(ask).toBeGreaterThan(comingUp);
-    expect(firstTopicCard).toBeGreaterThan(ask);
+    const card = html.indexOf("sketched three options");
+    expect(ask).toBeGreaterThan(-1);
+    expect(card).toBeGreaterThan(ask);
   });
 
   it("counts fresh sessions into the subject", () => {
@@ -146,28 +153,29 @@ describe("renderDigest calendar sections (calendar v2)", () => {
     expect(subject).toContain("1 session wants your availability");
   });
 
-  it("links sessions to their event URL, else the forum calendar", () => {
-    const withUrl: ForumDigest = {
-      ...SAMPLE,
-      upcoming: [{ ...SAMPLE.upcoming[0]!, url: "https://lu.ma/xyz" }],
-    };
-    expect(renderDigest(withUrl).html).toContain('href="https://lu.ma/xyz"');
-    // The sample sessions carry no URL → they point at the calendar page.
+  it("links URL-less sessions to the forum calendar", () => {
+    // The sample ask carries no URL → it points at the calendar page.
     expect(renderDigest(SAMPLE).html).toContain("/f/sparkle/calendar");
   });
 
-  it("stale session listings alone never make a digest non-empty", () => {
-    const staleOnly: ForumDigest = {
+  it("standing session listings alone never make a digest non-empty", () => {
+    const staleSession = (isNew: boolean): ForumDigest => ({
       ...SAMPLE,
-      topics: [],
-      upcoming: SAMPLE.upcoming.map((s) => ({ ...s, isNew: false })),
+      topics: [
+        {
+          ...sessionCard,
+          activities: sessionCard.activities
+            .filter((a) => a.kind === "session")
+            .map((a) =>
+              a.kind === "session"
+                ? { ...a, session: { ...a.session, isNew } }
+                : a,
+            ),
+        },
+      ],
       availabilityAsks: [],
-    };
-    expect(isForumDigestEmpty(staleOnly)).toBe(true);
-    const freshConfirm: ForumDigest = {
-      ...staleOnly,
-      upcoming: SAMPLE.upcoming.map((s) => ({ ...s, isNew: true })),
-    };
-    expect(isForumDigestEmpty(freshConfirm)).toBe(false);
+    });
+    expect(isForumDigestEmpty(staleSession(false))).toBe(true);
+    expect(isForumDigestEmpty(staleSession(true))).toBe(false);
   });
 });

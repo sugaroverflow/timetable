@@ -13,9 +13,12 @@ export type CalendarSlot = {
   topic: {
     id: string;
     title: string;
+    topicSlug: string | null;
     hostId: string;
     hostName: string | null;
   } | null;
+  /** Office-hours sessions (no topic): whose they are. */
+  sessionHost: { id: string; name: string | null } | null;
   viewerState: AvailabilityState | null;
   counts: { green: number; yellow: number; red: number };
   perUser:

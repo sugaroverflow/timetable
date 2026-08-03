@@ -29,8 +29,14 @@ export const timeslots = pgTable(
     /** Session state (calendar v2): empty → proposed → confirmed. */
     status: slotStatusEnum().notNull().default("empty"),
     /** The one pencilled/confirmed topic. Singular by design: simultaneous
-     * sessions are separate slots (same time, different location). */
+     * sessions are separate slots (same time, different location). Null on
+     * an office-hours session (QA 2026-08-03) — a session whose subject is
+     * the host, not a topic; `sessionHostId` carries who. */
     topicId: uuid().references(() => topics.id, { onDelete: "set null" }),
+    /** Whose session this is — the topic's host for topic sessions, the
+     * host themselves for office hours. THE ownership column for the
+     * never-displace rule. */
+    sessionHostId: text().references(() => users.id, { onDelete: "set null" }),
     /** Where the session actually lives once published elsewhere (Luma,
      * event page…). The calendar points at it; it never becomes it. */
     url: text().notNull().default(""),
@@ -105,6 +111,13 @@ export const slotComments = pgTable(
     greenCount: integer(),
     yellowCount: integer(),
     redCount: integer(),
+    /** Set on author edits only — drives the "(edited)" marker. */
+    editedAt: timestamp({ withTimezone: true }),
+    /** Admin moderation, mirroring topic comments (QA 2026-08-03). Hidden
+     * comments stay visible to admins; authors hard-delete instead (the
+     * thread is flat, so there's no reply structure to preserve). */
+    hiddenAt: timestamp({ withTimezone: true }),
+    hiddenByUserId: text().references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("slot_comments_slot_idx").on(t.slotId)],

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { clientGql } from "@/lib/clientGraphql";
 import type { RoleLabels } from "@/lib/timetableSettings";
 import { useGqlAction } from "@/lib/useGqlAction";
@@ -198,21 +199,20 @@ export function TimetableProfileForm({
 
   return (
     <form onSubmit={submit} className="card">
-      <h2 className="section-title" style={{ marginBottom: 10 }}>
-        Forum profile
-      </h2>
-      <IdentityFields
-        slug={slug}
-        value={identity}
-        onChange={(patch) => setIdentity((s) => ({ ...s, ...patch }))}
-      />
-      <RoleLabelFields
-        value={labels}
-        onChange={(patch) => setLabels((s) => ({ ...s, ...patch }))}
-      />
-      <button className="btn btn-primary" type="submit" disabled={busy}>
-        {busy ? "Saving…" : saved ? "Saved" : "Save"}
-      </button>
+      <CollapsibleSection title="Forum profile">
+        <IdentityFields
+          slug={slug}
+          value={identity}
+          onChange={(patch) => setIdentity((s) => ({ ...s, ...patch }))}
+        />
+        <RoleLabelFields
+          value={labels}
+          onChange={(patch) => setLabels((s) => ({ ...s, ...patch }))}
+        />
+        <button className="btn btn-primary" type="submit" disabled={busy}>
+          {busy ? "Saving…" : saved ? "Saved" : "Save"}
+        </button>
+      </CollapsibleSection>
     </form>
   );
 }

@@ -136,6 +136,11 @@ export function patternCellKey(cell: {
   return `${cell.weekday}-${cell.start}`;
 }
 
+/** The forum's label for topic-less host sessions. */
+export function officeHoursLabel(settings: TimetableSettings): string {
+  return settings.calendar?.officeHoursLabel?.trim() || "Office hours";
+}
+
 /** A named date range slots are generated for (a term, or an event
  * weekend). Dates are inclusive "YYYY-MM-DD". */
 export type CalendarTerm = {
@@ -151,6 +156,10 @@ export type CalendarTerm = {
 export type CalendarSettings = {
   enabled?: boolean;
   confirmPolicy?: ConfirmPolicy;
+  /** Display label for topic-less host sessions (QA 2026-08-03) —
+   * "Office hours" by default; a fixed type label, never free text per
+   * session, so the topic discipline holds. */
+  officeHoursLabel?: string;
   /** Preset locations offered when creating/proposing slots (free text
    * stays allowed). */
   locations?: string[];

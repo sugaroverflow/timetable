@@ -16,14 +16,15 @@ import type {
   TopicOption,
 } from "@/lib/calendarTypes";
 import { clientGql } from "@/lib/clientGraphql";
+import { topicPath } from "@/lib/topicPath";
 import { useGqlAction } from "@/lib/useGqlAction";
 
 import { Avatar } from "./Avatar";
 import { AvailabilityControl } from "./AvailabilityControl";
 import { GrowingTextarea } from "./GrowingTextarea";
 
-const SET_SESSION = `mutation($slot: String!, $topic: String, $status: String, $url: String) {
-  setSlotSession(slotId: $slot, topicId: $topic, status: $status, url: $url)
+const SET_SESSION = `mutation($slot: String!, $topic: String, $sh: String, $status: String, $url: String) {
+  setSlotSession(slotId: $slot, topicId: $topic, sessionHostId: $sh, status: $status, url: $url)
 }`;
 const UPDATE_SLOT = `mutation($slot: String!, $a: String, $b: String, $loc: String) {
   updateTimeslot(slotId: $slot, startsAt: $a, endsAt: $b, location: $loc)
@@ -31,12 +32,19 @@ const UPDATE_SLOT = `mutation($slot: String!, $a: String, $b: String, $loc: Stri
 const DELETE_SLOT = `mutation($slot: String!) { deleteTimeslot(slotId: $slot) }`;
 const COMMENTS_QUERY = `query($id: String!) {
   slotComments(slotId: $id) {
-    id authorId authorName authorImage body topicTitle createdAt
+    id authorId authorName authorImage body topicTitle editedAt hidden createdAt
     counts { green yellow red }
   }
 }`;
 const ADD_COMMENT = `mutation($id: String!, $body: String!, $topic: String) {
   addSlotComment(slotId: $id, body: $body, topicId: $topic) { id }
+}`;
+const UPDATE_COMMENT = `mutation($id: String!, $body: String!) {
+  updateSlotComment(commentId: $id, body: $body)
+}`;
+const DELETE_COMMENT = `mutation($id: String!) { deleteSlotComment(commentId: $id) }`;
+const HIDE_COMMENT = `mutation($id: String!, $hidden: Boolean!) {
+  hideSlotComment(commentId: $id, hidden: $hidden)
 }`;
 
 type SlotComment = {
@@ -47,6 +55,8 @@ type SlotComment = {
   body: string;
   topicTitle: string | null;
   counts: { green: number; yellow: number; red: number } | null;
+  editedAt: string | null;
+  hidden: boolean;
   createdAt: string;
 };
 
@@ -170,17 +180,48 @@ function AvailabilityMeter({
   );
 }
 
-/** "Author: **Topic**" as regular text plus a status pill — "pencilled",
- * or a clickable "register" pill to the event page when confirmed
- * (QA 2026-08-03). Blank when nothing's planned. */
-function SessionLine({ slot }: { slot: CalendarSlot }) {
-  if (!slot.topic) return null;
+/** "Author: **Topic**" — both linked — or "**Hannah** — Office hours" for
+ * topic-less host sessions (QA 2026-08-03), plus a status pill:
+ * "pencilled", or a clickable "register" pill to the event page when
+ * confirmed. Blank when nothing's planned. */
+function SessionLine({
+  slot,
+  slug,
+  officeHoursLabel,
+}: {
+  slot: CalendarSlot;
+  slug: string;
+  officeHoursLabel: string;
+}) {
+  if (!slot.topic && !slot.sessionHost) return null;
   const confirmed = slot.status === "confirmed";
+  const permalink = slot.topic
+    ? topicPath(slug, null, slot.topic.topicSlug, slot.topic.hostId)
+    : null;
   return (
     <div className="row wrap" style={{ gap: 8, alignItems: "center" }}>
-      <span style={{ fontSize: 13 }}>
-        {slot.topic.hostName ?? "…"}: <strong>{slot.topic.title}</strong>
-      </span>
+      {slot.topic ? (
+        <span className="cal-session-line">
+          <Link href={`/f/${slug}/${slot.topic.hostId}`}>
+            {slot.topic.hostName ?? "…"}
+          </Link>
+          :{" "}
+          {permalink ? (
+            <Link href={permalink}>
+              <strong>{slot.topic.title}</strong>
+            </Link>
+          ) : (
+            <strong>{slot.topic.title}</strong>
+          )}
+        </span>
+      ) : (
+        <span className="cal-session-line">
+          <Link href={`/f/${slug}/${slot.sessionHost!.id}`}>
+            <strong>{slot.sessionHost!.name ?? "…"}</strong>
+          </Link>{" "}
+          — {officeHoursLabel}
+        </span>
+      )}
       {!confirmed ? (
         <span className="pill" title="Pencilled in — under discussion">
           ✎ pencilled
@@ -202,45 +243,112 @@ function SessionLine({ slot }: { slot: CalendarSlot }) {
   );
 }
 
-/** "Pencil in a topic…" for an open slot. */
+/** Choice encoding for the pencil-in/propose selects: a topic id, or
+ * "oh:{hostId}" for office hours (QA 2026-08-03). */
+export function sessionChoiceVars(
+  choice: string,
+): { topic: string; sh: null } | { topic: null; sh: string } {
+  return choice.startsWith("oh:")
+    ? { topic: null, sh: choice.slice(3) }
+    : { topic: choice, sh: null };
+}
+
+/** Options for the pencil-in/propose selects — hosts see their own topics
+ * plus their office hours; admins see every topic grouped by author, with
+ * office hours atop each group (QA 2026-08-03). */
+export function SessionChoiceOptions({
+  claimTopics,
+  admin,
+  viewerId,
+  officeHoursLabel,
+}: {
+  claimTopics: TopicOption[];
+  admin: boolean;
+  viewerId: string | null;
+  officeHoursLabel: string;
+}) {
+  const option = (t: TopicOption) => (
+    <option key={t.id} value={t.id}>
+      {t.title}
+    </option>
+  );
+  if (!admin) {
+    return (
+      <>
+        {viewerId ? (
+          <option value={`oh:${viewerId}`}>{officeHoursLabel} (you)</option>
+        ) : null}
+        {claimTopics.map(option)}
+      </>
+    );
+  }
+  const groups = new Map<string, TopicOption[]>();
+  for (const topic of claimTopics) {
+    const host = topic.hostName ?? "Unknown host";
+    groups.set(host, [...(groups.get(host) ?? []), topic]);
+  }
+  return (
+    <>
+      {[...groups.keys()]
+        .sort((a, b) => a.localeCompare(b))
+        .map((host) => {
+          const topics = groups.get(host) ?? [];
+          return (
+            <optgroup key={host} label={host}>
+              <option value={`oh:${topics[0]!.hostId}`}>
+                {officeHoursLabel} — {host}
+              </option>
+              {topics.map(option)}
+            </optgroup>
+          );
+        })}
+    </>
+  );
+}
+
+/** "Pencil in…" for an open slot: a topic, or office hours. */
 function PencilInControl({
   slot,
   claimTopics,
+  perms,
+  officeHoursLabel,
 }: {
   slot: CalendarSlot;
   claimTopics: TopicOption[];
+  perms: CalendarPerms;
+  officeHoursLabel: string;
 }) {
   const { run, busy } = useGqlAction();
-  const [topicId, setTopicId] = useState("");
-  if (claimTopics.length === 0) return null;
+  const [choice, setChoice] = useState("");
 
   return (
     <div className="row wrap" style={{ gap: 8 }}>
       <select
-        aria-label="Pencil in a topic"
-        value={topicId}
-        onChange={(e) => setTopicId(e.target.value)}
+        aria-label="Pencil in a session"
+        value={choice}
+        onChange={(e) => setChoice(e.target.value)}
         style={{ width: "auto" }}
       >
-        <option value="">Pencil in a topic…</option>
-        {claimTopics.map((t) => (
-          <option key={t.id} value={t.id}>
-            {t.title}
-          </option>
-        ))}
+        <option value="">Pencil in…</option>
+        <SessionChoiceOptions
+          claimTopics={claimTopics}
+          admin={perms.canAdmin}
+          viewerId={perms.viewerId}
+          officeHoursLabel={officeHoursLabel}
+        />
       </select>
       <button
         type="button"
         className="btn"
-        disabled={busy || !topicId}
+        disabled={busy || !choice}
         onClick={() =>
           void run(
             SET_SESSION,
-            { slot: slot.id, topic: topicId, status: "proposed" },
+            { slot: slot.id, ...sessionChoiceVars(choice), status: "proposed" },
             {
               success: "Pencilled in",
               errorFallback: "Could not pencil in",
-              onSuccess: () => setTopicId(""),
+              onSuccess: () => setChoice(""),
             },
           )
         }
@@ -251,19 +359,22 @@ function PencilInControl({
   );
 }
 
-/** Confirm / URL / clear for a slot that carries a session. */
+/** Confirm / URL / clear for a slot that carries a session — a topic
+ * session or office hours; the mutation keeps whichever subject is set. */
 function ActiveSessionControls({
   slot,
-  topic,
   perms,
 }: {
   slot: CalendarSlot;
-  topic: NonNullable<CalendarSlot["topic"]>;
   perms: CalendarPerms;
 }) {
   const { run, busy } = useGqlAction();
   const [url, setUrl] = useState(slot.url);
   const confirmed = slot.status === "confirmed";
+  const subject = {
+    topic: slot.topic?.id ?? null,
+    sh: slot.topic ? null : (slot.sessionHost?.id ?? null),
+  };
 
   return (
     <div className="row wrap" style={{ gap: 8 }}>
@@ -284,7 +395,7 @@ function ActiveSessionControls({
           onClick={() =>
             void run(
               SET_SESSION,
-              { slot: slot.id, topic: topic.id, status: "confirmed", url },
+              { slot: slot.id, ...subject, status: "confirmed", url },
               {
                 success: "Session confirmed",
                 errorFallback: "Could not confirm",
@@ -303,7 +414,7 @@ function ActiveSessionControls({
           onClick={() =>
             void run(
               SET_SESSION,
-              { slot: slot.id, topic: topic.id, status: "confirmed", url },
+              { slot: slot.id, ...subject, status: "confirmed", url },
               { success: "URL saved", errorFallback: "Could not save URL" },
             )
           }
@@ -318,7 +429,7 @@ function ActiveSessionControls({
         onClick={() =>
           void run(
             SET_SESSION,
-            { slot: slot.id, topic: null },
+            { slot: slot.id, topic: null, sh: null },
             { success: "Slot cleared", errorFallback: "Could not clear" },
           )
         }
@@ -335,22 +446,26 @@ function SessionControls({
   slot,
   perms,
   claimTopics,
+  officeHoursLabel,
 }: {
   slot: CalendarSlot;
   perms: CalendarPerms;
   claimTopics: TopicOption[];
+  officeHoursLabel: string;
 }) {
-  const sessionHostId = slot.topic?.hostId ?? null;
-  const mayTouch =
-    perms.canAdmin ||
-    sessionHostId === null ||
-    sessionHostId === perms.viewerId;
+  const owner = slot.sessionHost?.id ?? slot.topic?.hostId ?? null;
+  const mayTouch = perms.canAdmin || owner === null || owner === perms.viewerId;
   if (!mayTouch || (!perms.canPropose && !perms.canAdmin)) return null;
 
-  return slot.topic ? (
-    <ActiveSessionControls slot={slot} topic={slot.topic} perms={perms} />
+  return slot.topic || slot.sessionHost ? (
+    <ActiveSessionControls slot={slot} perms={perms} />
   ) : (
-    <PencilInControl slot={slot} claimTopics={claimTopics} />
+    <PencilInControl
+      slot={slot}
+      claimTopics={claimTopics}
+      perms={perms}
+      officeHoursLabel={officeHoursLabel}
+    />
   );
 }
 
@@ -455,30 +570,189 @@ function AdminSlotControls({
   );
 }
 
-/** One comment; a session claim renders its topic + frozen snapshot chip.
- * Avatar and name link to the author's person page. */
-function CommentRow({ comment, slug }: { comment: SlotComment; slug: string }) {
-  const personHref = `/f/${slug}/${comment.authorId}`;
+/** Edit / Delete (author) and Hide / Unhide (admin) under a slot comment —
+ * same control row as topic comments (QA 2026-08-03). */
+function SlotCommentActions({
+  comment,
+  isOwn,
+  canModerate,
+  onEdit,
+  onChanged,
+}: {
+  comment: SlotComment;
+  isOwn: boolean;
+  canModerate: boolean;
+  onEdit: () => void;
+  onChanged: () => Promise<void>;
+}) {
+  const { run, busy } = useGqlAction();
+  if (!isOwn && !canModerate) return null;
+
+  function act(
+    query: string,
+    variables: Record<string, unknown>,
+    success: string,
+  ) {
+    void run(query, variables, {
+      success,
+      errorFallback: "Could not update comment",
+      onSuccess: onChanged,
+    });
+  }
+
   return (
-    <div className="hc">
+    <div className="comment-actions">
+      {isOwn ? (
+        <button type="button" onClick={onEdit} disabled={busy}>
+          Edit
+        </button>
+      ) : null}
+      {isOwn ? (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => {
+            if (confirm("Delete this comment? This can't be undone."))
+              act(DELETE_COMMENT, { id: comment.id }, "Comment deleted");
+          }}
+        >
+          Delete
+        </button>
+      ) : null}
+      {canModerate ? (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() =>
+            act(
+              HIDE_COMMENT,
+              { id: comment.id, hidden: !comment.hidden },
+              comment.hidden ? "Comment unhidden" : "Comment hidden",
+            )
+          }
+        >
+          {comment.hidden ? "Unhide" : "Hide"}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+/** In-place editor for the author's own slot comment. */
+function SlotCommentEditor({
+  comment,
+  onDone,
+}: {
+  comment: SlotComment;
+  onDone: () => Promise<void>;
+}) {
+  const { run, busy } = useGqlAction();
+  const [body, setBody] = useState(comment.body);
+
+  function save(e: React.FormEvent) {
+    e.preventDefault();
+    const text = body.trim();
+    if (!text) return;
+    void run(
+      UPDATE_COMMENT,
+      { id: comment.id, body: text },
+      {
+        success: "Comment updated",
+        errorFallback: "Could not update comment",
+        onSuccess: onDone,
+      },
+    );
+  }
+
+  return (
+    <form onSubmit={save} className="inline-form" style={{ marginTop: 4 }}>
+      <GrowingTextarea
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        aria-label="Edit comment"
+      />
+      <button
+        className="btn btn-primary btn-send"
+        type="submit"
+        disabled={busy}
+        aria-label="Save comment"
+        title="Save"
+      >
+        <Send size={16} aria-hidden />
+      </button>
+    </form>
+  );
+}
+
+/** One comment; a session claim renders its topic + frozen snapshot chip.
+ * Avatar and name link to the author's person page; the author gets
+ * edit/delete and admins hide/unhide, like comments everywhere. */
+function CommentRow({
+  comment,
+  slug,
+  viewerId,
+  canModerate,
+  onChanged,
+}: {
+  comment: SlotComment;
+  slug: string;
+  viewerId: string | null;
+  canModerate: boolean;
+  onChanged: () => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const personHref = `/f/${slug}/${comment.authorId}`;
+  const isOwn = viewerId !== null && comment.authorId === viewerId;
+
+  return (
+    <div className={`hc${comment.hidden ? " cal-comment-hidden" : ""}`}>
       <Link href={personHref} className="cal-person-link">
         <Avatar name={comment.authorName} image={comment.authorImage} small />
       </Link>
-      <div>
+      <div style={{ flex: 1 }}>
         <div className="hc-name">
           <Link href={personHref}>{comment.authorName ?? "Someone"}</Link>
-        </div>
-        <div className="hc-bubble">
-          {comment.body}
-          {comment.topicTitle ? (
-            <div className="cal-claim">
-              📌 {comment.topicTitle}
-              {comment.counts
-                ? ` · 🟢 ${comment.counts.green} 🟡 ${comment.counts.yellow} 🔴 ${comment.counts.red}`
-                : ""}
-            </div>
+          {comment.editedAt ? (
+            <span className="faint" style={{ fontWeight: 400 }}>
+              {" "}
+              (edited)
+            </span>
+          ) : null}
+          {comment.hidden ? (
+            <span className="faint" style={{ fontWeight: 400 }}>
+              {" "}
+              (hidden)
+            </span>
           ) : null}
         </div>
+        {editing ? (
+          <SlotCommentEditor
+            comment={comment}
+            onDone={async () => {
+              setEditing(false);
+              await onChanged();
+            }}
+          />
+        ) : (
+          <div className="hc-bubble">
+            {comment.body}
+            {comment.topicTitle ? (
+              <div className="cal-claim">
+                📌 {comment.topicTitle}
+                {comment.counts
+                  ? ` · 🟢 ${comment.counts.green} 🟡 ${comment.counts.yellow} 🔴 ${comment.counts.red}`
+                  : ""}
+              </div>
+            ) : null}
+          </div>
+        )}
+        <SlotCommentActions
+          comment={comment}
+          isOwn={isOwn}
+          canModerate={canModerate}
+          onEdit={() => setEditing(!editing)}
+          onChanged={onChanged}
+        />
       </div>
     </div>
   );
@@ -489,12 +763,14 @@ function CommentRow({ comment, slug }: { comment: SlotComment; slug: string }) {
 function DiscussionPanel({
   slot,
   slug,
+  perms,
   lensTopic,
   comments,
   onReload,
 }: {
   slot: CalendarSlot;
   slug: string;
+  perms: CalendarPerms;
   /** The page's active topic lens — posting attaches it + the snapshot;
    * "All electors" (null) posts a plain comment (QA 2026-08-03). */
   lensTopic: TopicOption | null;
@@ -524,7 +800,14 @@ function DiscussionPanel({
   return (
     <div className="host-thread">
       {comments?.map((c) => (
-        <CommentRow key={c.id} comment={c} slug={slug} />
+        <CommentRow
+          key={c.id}
+          comment={c}
+          slug={slug}
+          viewerId={perms.viewerId}
+          canModerate={perms.canAdmin}
+          onChanged={onReload}
+        />
       ))}
       {comments && comments.length === 0 ? (
         <div className="faint" style={{ fontSize: 12, padding: "4px 0" }}>
@@ -569,6 +852,7 @@ function SlotDetail({
   claimTopics,
   lensTopic,
   adminLabel,
+  officeHoursLabel,
   comments,
   onReload,
 }: {
@@ -578,6 +862,7 @@ function SlotDetail({
   claimTopics: TopicOption[];
   lensTopic: TopicOption | null;
   adminLabel: string;
+  officeHoursLabel: string;
   comments: SlotComment[] | null;
   onReload: () => Promise<void>;
 }) {
@@ -586,11 +871,17 @@ function SlotDetail({
       <DiscussionPanel
         slot={slot}
         slug={slug}
+        perms={perms}
         lensTopic={lensTopic}
         comments={comments}
         onReload={onReload}
       />
-      <SessionControls slot={slot} perms={perms} claimTopics={claimTopics} />
+      <SessionControls
+        slot={slot}
+        perms={perms}
+        claimTopics={claimTopics}
+        officeHoursLabel={officeHoursLabel}
+      />
       {perms.canAdmin ? (
         <AdminSlotControls slot={slot} label={adminLabel} />
       ) : null}
@@ -640,7 +931,7 @@ function MeterAndYouCells({
         </td>
       ) : null}
       {perms.canSetAvailability ? (
-        <td>
+        <td className="cal-you-cell">
           {past ? null : (
             <AvailabilityControl
               slotId={slot.id}
@@ -663,6 +954,7 @@ function SlotTableRow({
   claimTopics,
   lensTopic,
   adminLabel,
+  officeHoursLabel,
   columns,
 }: {
   slot: CalendarSlot;
@@ -674,6 +966,7 @@ function SlotTableRow({
   claimTopics: TopicOption[];
   lensTopic: TopicOption | null;
   adminLabel: string;
+  officeHoursLabel: string;
   columns: number;
 }) {
   const [open, setOpen] = useState(false);
@@ -716,13 +1009,17 @@ function SlotTableRow({
         <WhenCell slot={slot} />
         <MeterAndYouCells slot={slot} past={past} perms={perms} slug={slug} />
       </tr>
-      {/* "Author: Topic" + status pill on its own line under the row
-          (QA 2026-08-03) — visually part of the same slot block. */}
-      {slot.topic ? (
+      {/* "Author: Topic" / "Host — office hours" + status pill on its own
+          line under the row — visually part of the same slot block. */}
+      {slot.topic || slot.sessionHost ? (
         <tr className={`cal-session-row${past ? " cal-past" : ""}`}>
           <td />
           <td colSpan={columns - 1}>
-            <SessionLine slot={slot} />
+            <SessionLine
+              slot={slot}
+              slug={slug}
+              officeHoursLabel={officeHoursLabel}
+            />
           </td>
         </tr>
       ) : null}
@@ -740,6 +1037,7 @@ function SlotTableRow({
                 claimTopics={claimTopics}
                 lensTopic={lensTopic}
                 adminLabel={adminLabel}
+                officeHoursLabel={officeHoursLabel}
                 comments={comments}
                 onReload={loadComments}
               />
@@ -764,6 +1062,7 @@ export function CalendarTable({
   claimTopics,
   lensTopic,
   adminLabel = "Admin",
+  officeHoursLabel = "Office hours",
   showingPast,
   base,
 }: {
@@ -773,6 +1072,7 @@ export function CalendarTable({
   claimTopics: TopicOption[];
   lensTopic: TopicOption | null;
   adminLabel?: string;
+  officeHoursLabel?: string;
   showingPast: boolean;
   base: string;
 }) {
@@ -838,6 +1138,7 @@ export function CalendarTable({
                     claimTopics={claimTopics}
                     lensTopic={lensTopic}
                     adminLabel={adminLabel}
+                    officeHoursLabel={officeHoursLabel}
                     columns={columns}
                   />
                 </Fragment>

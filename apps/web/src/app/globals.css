@@ -1443,6 +1443,67 @@ textarea {
   flex-wrap: wrap;
 }
 
+/* Generic toggle switch (QA 2026-08-03) — the queue ❤️ switch's
+   track/thumb, reusable; primary-coloured when on. */
+.ui-switch-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  color: var(--ink);
+  font-size: var(--text-sm);
+}
+.ui-switch-row:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.ui-switch {
+  position: relative;
+  flex: none;
+  width: 38px;
+  height: 22px;
+  margin-top: 1px;
+  border-radius: var(--radius-pill);
+  background: var(--line-strong);
+  transition: background 0.15s ease;
+}
+.ui-switch.on {
+  background: var(--primary);
+}
+.ui-switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--card);
+  box-shadow: var(--shadow);
+  transition: left 0.15s ease;
+}
+.ui-switch.on .ui-switch-thumb {
+  left: 18px;
+}
+.ui-switch-label {
+  min-width: 0;
+}
+
+/* Forum Settings combined card (QA 2026-08-03). */
+.settings-subtitle {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: var(--fw-semibold);
+}
+.settings-divider {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 2px 0;
+}
+
 /* Calendar v2 — table page */
 /* Compact slot table (QA 2026-07-31 — one row per slot, Analysis-style). */
 .cal-table td {
@@ -1490,17 +1551,23 @@ textarea {
   border-top-width: 3px;
   border-top-color: var(--primary);
 }
-/* When/where + the session pill underneath — pills may be long, so this
-   cell wraps. */
+/* When/where takes only the width it needs; the availability meter's
+   column absorbs everything left over (QA 2026-08-03). */
 .cal-table td.cal-when-cell {
-  white-space: normal;
-  min-width: 180px;
+  white-space: nowrap;
 }
 /* Availability meter with avatars inside their 🟢/🟡/🔴 stretch
    (QA 2026-08-02). Fills its column — the audience is the same on every
    row of a view, so length carries no information. */
 .cal-table td.cal-avail-cell {
-  width: 55%;
+  width: 100%;
+}
+/* Elector's own 🟢🟡🔴 toggle hugs the table's right edge (QA 2026-08-03). */
+.cal-table td.cal-you-cell {
+  text-align: right;
+}
+.cal-you-cell .avseg {
+  justify-content: flex-end;
 }
 .avail-meter {
   width: 100%;
@@ -1536,9 +1603,9 @@ textarea {
 .cal-past-row .topic-body-toggle {
   margin-top: 0;
 }
-/* Collapsible section heading (schedule setup) — the Analysis card
-   heading, made pressable; no rule above it. */
-.cal-section-toggle {
+/* Collapsible section heading (QA 2026-08-03, generalized from the
+   schedule-setup card): a pressable section title with a chevron. */
+.section-toggle {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1549,7 +1616,7 @@ textarea {
   cursor: pointer;
   text-align: left;
 }
-.cal-section-toggle .section-title {
+.section-toggle .section-title {
   margin: 0;
 }
 /* Divider/utility rows sit on the card surface, not the page background
@@ -1585,6 +1652,10 @@ textarea {
 .cal-fold {
   border-left: 2px solid var(--line);
   padding-left: 14px;
+  /* The fold's composer/thread must never widen the table: inline-size
+     containment zeroes its intrinsic width, so it fits the columns the
+     visible rows negotiated (QA 2026-08-03 — unfold overflowed). */
+  contain: inline-size;
 }
 .cal-detail-row .host-thread {
   border-top: 0;
@@ -1595,6 +1666,13 @@ textarea {
 .cal-session-row td {
   border-top: 0;
   padding-top: 0;
+}
+/* "Host: Topic" in the title face — prominent, but under the card's
+   section heading (QA 2026-08-03). */
+.cal-session-line {
+  font-family: var(--serif);
+  font-size: 15px;
+  font-weight: var(--fw-semibold);
 }
 /* Emoji-only availability segments for table cells. */
 .avseg-compact button {
@@ -1618,6 +1696,10 @@ textarea {
 /* A past slot stays readable but visibly archived. */
 .cal-past {
   opacity: 0.6;
+}
+/* Hidden slot comment (admins only see these) — faded like elsewhere. */
+.cal-comment-hidden .hc-bubble {
+  opacity: 0.5;
 }
 /* Frozen availability snapshot on a session-claim comment. */
 .cal-claim {

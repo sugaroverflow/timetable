@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { Avatar } from "@/components/Avatar";
+import { CollapsibleSection } from "@/components/CollapsibleSection";
 import {
   BreakdownCaret,
   BreakdownPanelBody,
@@ -164,65 +165,64 @@ export function TopicLeaderboard({
 
   return (
     <div className="card">
-      <div
-        className="row wrap"
-        style={{
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          marginBottom: 4,
-        }}
-      >
-        <div>
-          <h3 className="section-title">Topics</h3>
+      <CollapsibleSection title="Topics">
+        <div
+          className="row wrap"
+          style={{
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            marginBottom: 4,
+          }}
+        >
           <p className="faint" style={{ margin: "2px 0 0", fontSize: 12 }}>
             {subtitle}
           </p>
+          <span className="row wrap" style={{ gap: 10, alignItems: "center" }}>
+            {hostFilter}
+            <SelectMinimal
+              aria-label="Score normalisation"
+              value={norm}
+              onChange={(e) => setNorm(e.target.value as AnyNormKey)}
+            >
+              <optgroup label="❤️ hearts">
+                {NORM_MODES.map((m) => (
+                  <option key={m.key} value={m.key} title={m.description}>
+                    {m.symbol} — {m.label}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="💬 comments">
+                {COMMENT_NORM_MODES.map((m) => (
+                  <option key={m.key} value={m.key} title={m.description}>
+                    {m.symbol} — {m.label}
+                  </option>
+                ))}
+              </optgroup>
+            </SelectMinimal>
+          </span>
         </div>
-        <span className="row wrap" style={{ gap: 10, alignItems: "center" }}>
-          {hostFilter}
-          <SelectMinimal
-            aria-label="Score normalisation"
-            value={norm}
-            onChange={(e) => setNorm(e.target.value as AnyNormKey)}
-          >
-            <optgroup label="❤️ hearts">
-              {NORM_MODES.map((m) => (
-                <option key={m.key} value={m.key} title={m.description}>
-                  {m.symbol} — {m.label}
-                </option>
-              ))}
-            </optgroup>
-            <optgroup label="💬 comments">
-              {COMMENT_NORM_MODES.map((m) => (
-                <option key={m.key} value={m.key} title={m.description}>
-                  {m.symbol} — {m.label}
-                </option>
-              ))}
-            </optgroup>
-          </SelectMinimal>
-        </span>
-      </div>
-      <p className="faint" style={{ marginTop: 0, fontSize: 12 }}>
-        {mode.description}
-      </p>
-      {sorted.length === 0 ? (
-        <p className="faint" style={{ fontSize: 13 }}>
-          No published topics yet.
+        <p className="faint" style={{ marginTop: 0, fontSize: 12 }}>
+          {mode.description}
         </p>
-      ) : (
-        <ul className="list">
-          {sorted.map((t) => (
-            <LeaderboardRow
-              key={t.id}
-              entry={t}
-              norm={norm}
-              slug={slug}
-              hostLabel={hostLabel}
-              electorLabel={electorLabel}
-            />
-          ))}
-        </ul>
-      )}
+        {sorted.length === 0 ? (
+          <p className="faint" style={{ fontSize: 13 }}>
+            No published topics yet.
+          </p>
+        ) : (
+          <ul className="list">
+            {sorted.map((t) => (
+              <LeaderboardRow
+                key={t.id}
+                entry={t}
+                norm={norm}
+                slug={slug}
+                hostLabel={hostLabel}
+                electorLabel={electorLabel}
+              />
+            ))}
+          </ul>
+        )}
+      </CollapsibleSection>
     </div>
   );
 }

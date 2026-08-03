@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { ImageUploadField } from "@/components/ImageUploadField";
 import {
   BRAND_FONTS,
@@ -494,54 +495,56 @@ export function SettingsForm({
 
   return (
     <form onSubmit={submit} className="card">
-      <h2 className="section-title" style={{ marginBottom: 10 }}>
-        Theme
-      </h2>
-      <p className="faint" style={{ marginTop: 0, fontSize: 12 }}>
-        Colours preview live — Save to keep them, Discard to revert.
-      </p>
+      <CollapsibleSection title="Theme">
+        <p className="faint" style={{ marginTop: 0, fontSize: 12 }}>
+          Colours preview live — Save to keep them, Discard to revert.
+        </p>
 
-      <FontsBlock state={state} onChange={setThemeField} />
+        <FontsBlock state={state} onChange={setThemeField} />
 
-      <PresetPicker onApply={applyPreset} />
+        <PresetPicker onApply={applyPreset} />
 
-      <h3 style={{ fontSize: "var(--text-md)", margin: "14px 0 2px" }}>
-        Light palette
-      </h3>
-      <ColourGroup
-        fields={LIGHT_COLOUR_FIELDS}
-        state={state}
-        onChange={setThemeField}
-      />
+        <h3 style={{ fontSize: "var(--text-md)", margin: "14px 0 2px" }}>
+          Light palette
+        </h3>
+        <ColourGroup
+          fields={LIGHT_COLOUR_FIELDS}
+          state={state}
+          onChange={setThemeField}
+        />
 
-      <h3 style={{ fontSize: "var(--text-md)", margin: "18px 0 2px" }}>
-        Dark mode palette
-      </h3>
-      <p className="faint" style={{ marginTop: 0, fontSize: "var(--text-xs)" }}>
-        Used when a member switches to dark mode (sidebar toggle).
-      </p>
-      <ColourGroup
-        fields={DARK_COLOUR_FIELDS}
-        state={state}
-        onChange={setThemeField}
-      />
+        <h3 style={{ fontSize: "var(--text-md)", margin: "18px 0 2px" }}>
+          Dark mode palette
+        </h3>
+        <p
+          className="faint"
+          style={{ marginTop: 0, fontSize: "var(--text-xs)" }}
+        >
+          Used when a member switches to dark mode (sidebar toggle).
+        </p>
+        <ColourGroup
+          fields={DARK_COLOUR_FIELDS}
+          state={state}
+          onChange={setThemeField}
+        />
 
-      <MediaBlock
-        slug={slug}
-        state={state}
-        onField={setField}
-        onIcon={handleIconChange}
-        onEmoji={chooseEmoji}
-        setUploadingCover={setUploadingCover}
-        setUploadingIcon={setUploadingIcon}
-      />
+        <MediaBlock
+          slug={slug}
+          state={state}
+          onField={setField}
+          onIcon={handleIconChange}
+          onEmoji={chooseEmoji}
+          setUploadingCover={setUploadingCover}
+          setUploadingIcon={setUploadingIcon}
+        />
 
-      <FormFooter
-        busy={busy}
-        saved={saved}
-        uploading={uploadingCover || uploadingIcon}
-        onDiscard={discard}
-      />
+        <FormFooter
+          busy={busy}
+          saved={saved}
+          uploading={uploadingCover || uploadingIcon}
+          onDiscard={discard}
+        />
+      </CollapsibleSection>
     </form>
   );
 }

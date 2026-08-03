@@ -16,8 +16,14 @@ function escapeText(s: string): string {
     .replace(/\n/g, "\\n");
 }
 
-/** Build an RFC 5545 VCALENDAR for a timetable's slots. */
-export function buildIcs(calendarName: string, slots: IcsSlot[]): string {
+/** Build an RFC 5545 VCALENDAR for a timetable's slots.
+ * `officeHoursLabel` names topic-less host sessions ("Hannah — Office
+ * hours"); a bare name would be cryptic in a calendar app. */
+export function buildIcs(
+  calendarName: string,
+  slots: IcsSlot[],
+  officeHoursLabel = "Office hours",
+): string {
   const now = icsDate(new Date());
   const lines: string[] = [
     "BEGIN:VCALENDAR",
@@ -28,7 +34,11 @@ export function buildIcs(calendarName: string, slots: IcsSlot[]): string {
   ];
 
   for (const slot of slots) {
-    const summary = slot.topicTitle ?? "Open slot";
+    const summary =
+      slot.topicTitle ??
+      (slot.sessionHostName
+        ? `${slot.sessionHostName} — ${officeHoursLabel}`
+        : "Open slot");
     // Session state maps straight onto RFC 5545: proposed → TENTATIVE,
     // confirmed → CONFIRMED; empty slots carry no STATUS at all.
     const status =
