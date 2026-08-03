@@ -4,11 +4,13 @@
  */
 import {
   countViewerPublishedHearts,
+  forumHasSlots,
   getPerson,
   type CommentNode,
   type WeightedHeartEntry,
 } from "@timetable/core";
 import type { Timetable } from "@timetable/db";
+import { isCalendarEnabled } from "@timetable/shared";
 
 import { builder } from "./builder";
 
@@ -41,6 +43,13 @@ export const TimetableType = builder
       settings: t.field({
         type: "String",
         resolve: (tt) => JSON.stringify(tt.settings ?? {}),
+      }),
+      /** Whether any timeslots exist (past included) — the calendar nav
+       * link/page hide from non-admins until the schedule does
+       * (QA 2026-08-03). False without a COUNT when the calendar's off. */
+      calendarHasSlots: t.boolean({
+        resolve: (tt) =>
+          isCalendarEnabled(tt.settings ?? {}) ? forumHasSlots(tt.id) : false,
       }),
       /**
        * Published topics the signed-in viewer currently hearts — their vote

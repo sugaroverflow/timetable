@@ -169,6 +169,17 @@ export async function listSlots(
     .orderBy(asc(timeslots.startsAt));
 }
 
+/** Whether the forum has any slots at all (past included) — gates the
+ * calendar nav link/page for non-admins until the schedule exists
+ * (QA 2026-08-03). */
+export async function forumHasSlots(timetableId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(timeslots)
+    .where(eq(timeslots.timetableId, timetableId));
+  return (row?.n ?? 0) > 0;
+}
+
 export type IcsSlot = {
   id: string;
   startsAt: Date;

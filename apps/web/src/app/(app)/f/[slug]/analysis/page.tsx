@@ -1,5 +1,6 @@
 import { isAdmin, isHost, type Role } from "@timetable/shared";
 
+import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { ElectorActivityTable } from "@/components/ElectorActivityTable";
 import { HostActivityTable } from "@/components/HostActivityTable";
 import { HostFilter } from "@/components/HostFilter";
@@ -104,32 +105,33 @@ function ElectorActivityCard({
 }) {
   return (
     <div className="card">
-      <div
-        className="row wrap"
-        style={{ justifyContent: "space-between", marginBottom: 12 }}
-      >
-        <h3 className="section-title">{electorLabel} activity</h3>
-        {/* This table's own host filter: counts only activity on the
-            chosen host's topics (independent of the topics table's). */}
-        <span className="row wrap" style={{ gap: 10, alignItems: "center" }}>
-          {hostFilter}
-          <span className="faint" style={{ fontSize: 12 }}>
-            {rows.length} shown
+      <CollapsibleSection title={`${electorLabel} activity`}>
+        <div
+          className="row wrap"
+          style={{ justifyContent: "flex-end", marginBottom: 12 }}
+        >
+          {/* This table's own host filter: counts only activity on the
+              chosen host's topics (independent of the topics table's). */}
+          <span className="row wrap" style={{ gap: 10, alignItems: "center" }}>
+            {hostFilter}
+            <span className="faint" style={{ fontSize: 12 }}>
+              {rows.length} shown
+            </span>
           </span>
-        </span>
-      </div>
-      {rows.length === 0 ? (
-        <p className="faint" style={{ fontSize: 13 }}>
-          No {pluralLabel(electorLabel).toLowerCase()} yet.
-        </p>
-      ) : (
-        <ElectorActivityTable
-          slug={slug}
-          electorLabel={electorLabel}
-          hostLabel={hostLabel}
-          rows={rows}
-        />
-      )}
+        </div>
+        {rows.length === 0 ? (
+          <p className="faint" style={{ fontSize: 13 }}>
+            No {pluralLabel(electorLabel).toLowerCase()} yet.
+          </p>
+        ) : (
+          <ElectorActivityTable
+            slug={slug}
+            electorLabel={electorLabel}
+            hostLabel={hostLabel}
+            rows={rows}
+          />
+        )}
+      </CollapsibleSection>
     </div>
   );
 }
@@ -149,27 +151,26 @@ function HostActivityCard({
 }) {
   return (
     <div className="card">
-      <div
-        className="row wrap"
-        style={{ justifyContent: "space-between", marginBottom: 12 }}
-      >
-        <div>
-          <h3 className="section-title">{hostLabel} activity</h3>
-          <p className="faint" style={{ margin: "2px 0 0", fontSize: 12 }}>
+      <CollapsibleSection title={`${hostLabel} activity`}>
+        <div
+          className="row wrap"
+          style={{ justifyContent: "space-between", marginBottom: 12 }}
+        >
+          <p className="faint" style={{ margin: 0, fontSize: 12 }}>
             Only visible to {adminsPlural.toLowerCase()}
           </p>
+          <span className="faint" style={{ fontSize: 12 }}>
+            {rows.length} shown
+          </span>
         </div>
-        <span className="faint" style={{ fontSize: 12 }}>
-          {rows.length} shown
-        </span>
-      </div>
-      {rows.length === 0 ? (
-        <p className="faint" style={{ fontSize: 13 }}>
-          No {hostsPlural.toLowerCase()} yet.
-        </p>
-      ) : (
-        <HostActivityTable slug={slug} hostLabel={hostLabel} rows={rows} />
-      )}
+        {rows.length === 0 ? (
+          <p className="faint" style={{ fontSize: 13 }}>
+            No {hostsPlural.toLowerCase()} yet.
+          </p>
+        ) : (
+          <HostActivityTable slug={slug} hostLabel={hostLabel} rows={rows} />
+        )}
+      </CollapsibleSection>
     </div>
   );
 }

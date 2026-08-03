@@ -36,7 +36,11 @@ import {
 } from "@/lib/timetableSettings";
 
 type Data = {
-  timetable: { viewerRoles: string[]; settings: string } | null;
+  timetable: {
+    viewerRoles: string[];
+    settings: string;
+    calendarHasSlots: boolean;
+  } | null;
   me: { id: string } | null;
   calendar: CalendarSlot[];
   topicFeed: TopicOption[];
@@ -53,7 +57,7 @@ const SLOT_FIELDS = `
 
 const QUERY = `
   query Calendar($s: String!, $audience: String, $past: Boolean) {
-    timetable: forum(idOrSlug: $s) { viewerRoles settings }
+    timetable: forum(idOrSlug: $s) { viewerRoles settings calendarHasSlots }
     calendar(idOrSlug: $s, audience: $audience, includePast: $past) { ${SLOT_FIELDS} }
     topicFeed(idOrSlug: $s) { id title hostId hostName heartCount }
   }
@@ -61,7 +65,7 @@ const QUERY = `
 
 const QUERY_AUTHED = `
   query CalendarAuthed($s: String!, $audience: String, $past: Boolean) {
-    timetable: forum(idOrSlug: $s) { viewerRoles settings }
+    timetable: forum(idOrSlug: $s) { viewerRoles settings calendarHasSlots }
     me { id }
     calendar(idOrSlug: $s, audience: $audience, includePast: $past) { ${SLOT_FIELDS} }
     topicFeed(idOrSlug: $s) { id title hostId hostName heartCount }
@@ -124,6 +128,23 @@ function isPast(slot: CalendarSlot): boolean {
   return new Date(slot.endsAt).getTime() < Date.now();
 }
 
+/** Hosts pencil/claim/filter by their own published topics; admins see
+ * every topic (the lens groups them by host — QA 2026-08-02). */
+function selectClaimTopics(
+  topicFeed: TopicOption[],
+  admin: boolean,
+  viewerId: string | null,
+): TopicOption[] {
+  return admin ? topicFeed : topicFeed.filter((t) => t.hostId === viewerId);
+}
+
+function filterByLocation(
+  slots: CalendarSlot[],
+  location: string | undefined,
+): CalendarSlot[] {
+  return location ? slots.filter((s) => s.location === location) : slots;
+}
+
 /** The active lens topic (from ?audience=hearted_topic:<id>), or null for
  * "All electors" — it doubles as the comment attachment (QA 2026-08-03). */
 function findLensTopic(
@@ -160,6 +181,24 @@ function parsePattern(
   } catch {
     return {};
   }
+}
+
+/** The two reasons this page shows a notice instead of the calendar:
+ * feature off, or (for non-admins) no schedule yet — the nav link hides in
+ * both cases too, so this covers deep links (QA 2026-08-03). */
+function calendarGate(
+  admin: boolean,
+  settings: ReturnType<typeof parseTimetableSettings>,
+  hasSlots: boolean,
+  base: string,
+): React.ReactNode | null {
+  if (!isCalendarEnabled(settings)) {
+    return <CalendarDisabledNotice admin={admin} base={base} />;
+  }
+  if (!admin && !hasSlots) {
+    return <div className="notice">The calendar isn’t set up yet.</div>;
+  }
+  return null;
 }
 
 function CalendarDisabledNotice({
@@ -336,26 +375,26 @@ export default async function CalendarPage({
   const settings = parseTimetableSettings(data.timetable?.settings);
   const base = `/f/${slug}`;
 
-  if (!isCalendarEnabled(settings)) {
-    return <CalendarDisabledNotice admin={isAdmin(roles)} base={base} />;
-  }
+  const gate = calendarGate(
+    isAdmin(roles),
+    settings,
+    data.timetable?.calendarHasSlots ?? false,
+    base,
+  );
+  if (gate) return gate;
 
   const viewerId = data.me?.id ?? null;
   const perms = buildPerms(roles, viewerId, calendarConfirmPolicy(settings));
   const adminLabel = roleLabel(settings.roleLabels, "admin");
   const calendarSettings = settings.calendar ?? {};
 
-  // Hosts pencil/claim/filter by their own published topics; admins see
-  // every topic (the lens groups them by host — QA 2026-08-02).
-  const claimTopics = perms.canAdmin
-    ? data.topicFeed
-    : data.topicFeed.filter((t) => t.hostId === viewerId);
-
+  const claimTopics = selectClaimTopics(
+    data.topicFeed,
+    perms.canAdmin,
+    viewerId,
+  );
   const lensTopic = findLensTopic(audience, data.topicFeed);
-
-  const visibleSlots = location
-    ? data.calendar.filter((s) => s.location === location)
-    : data.calendar;
+  const visibleSlots = filterByLocation(data.calendar, location);
 
   return (
     <div className="stack">

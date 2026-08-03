@@ -1603,9 +1603,9 @@ textarea {
 .cal-past-row .topic-body-toggle {
   margin-top: 0;
 }
-/* Collapsible section heading (schedule setup) — the Analysis card
-   heading, made pressable; no rule above it. */
-.cal-section-toggle {
+/* Collapsible section heading (QA 2026-08-03, generalized from the
+   schedule-setup card): a pressable section title with a chevron. */
+.section-toggle {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1616,7 +1616,7 @@ textarea {
   cursor: pointer;
   text-align: left;
 }
-.cal-section-toggle .section-title {
+.section-toggle .section-title {
   margin: 0;
 }
 /* Divider/utility rows sit on the card surface, not the page background
