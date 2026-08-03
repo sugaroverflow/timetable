@@ -316,7 +316,10 @@ terms), and the topics policy (`hostsPublishDirectly`);
 per-forum); `topics.contentUpdatedAt` tracks content edits
 for "newest" sorting; memberships carry `lastSeenFeedAt` and
 `lastSeenNotificationsAt` watermarks plus `inviteSentAt` (null = added by an
-admin but never invited).
+admin but never invited). A membership with `inviteSentAt` null AND both
+seen-watermarks null is a pre-created account whose owner doesn't know the
+forum exists — the digest builder skips those forums entirely
+(2026-08-03).
 
 The settings JSON shapes (`TimetableSettings`, `ThemeSettings`, role labels,
 notification defaults) live in `packages/shared/src/settings.ts` as the single
