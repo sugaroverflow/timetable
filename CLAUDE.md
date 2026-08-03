@@ -118,3 +118,7 @@ Lint covers everything: `apps/web` has its own Next config; the root
   re-applied in an every-commit layout effect, not keyed on props.
 - The API refuses to boot when `SPACES_BUCKET` is set without
   `SPACES_KEY`/`SPACES_SECRET` — keep app specs and workflow env in sync.
+- Drizzle raw `sql` templates with Date params (`` sql`${col} >= ${now}` ``)
+  bypass the column's Date mapping and THROW at runtime on hosted Postgres
+  while passing every local check — always use `gte`/`lte`/`eq` operators
+  for date comparisons (calendar-v2 dev outage, 2026-07-31).
