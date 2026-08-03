@@ -916,6 +916,7 @@ describe("createApiApp", () => {
         status: "confirmed",
         url: "https://lu.ma/opening-session",
         topicTitle: "Opening Session",
+        sessionHostName: null,
       },
     ];
 

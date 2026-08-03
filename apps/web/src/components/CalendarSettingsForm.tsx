@@ -38,6 +38,9 @@ export function CalendarSettingsForm({
   const [locations, setLocations] = useState(
     (current.locations ?? []).join(", "),
   );
+  const [ohLabel, setOhLabel] = useState(
+    current.officeHoursLabel ?? "Office hours",
+  );
   const [direct, setDirect] = useState(hostsPublishDirectly);
 
   const hosts = `${hostLabel}s`;
@@ -52,6 +55,7 @@ export function CalendarSettingsForm({
     const cal = JSON.stringify({
       enabled,
       confirmPolicy,
+      officeHoursLabel: ohLabel.trim().slice(0, 40) || "Office hours",
       locations: locations
         .split(",")
         .map((l) => l.trim())
@@ -100,6 +104,19 @@ export function CalendarSettingsForm({
             label={`${hosts} can confirm sessions`}
             hint={`Full self-service (unconference mode) — ${admins.toLowerCase()} keep override.`}
           />
+          <div className="field" style={{ margin: 0 }}>
+            <label htmlFor="cal-oh-label">
+              Label for topic-less {hostLabel.toLowerCase()} sessions
+            </label>
+            <input
+              id="cal-oh-label"
+              value={ohLabel}
+              onChange={(e) => setOhLabel(e.target.value)}
+              placeholder="Office hours"
+              maxLength={40}
+              style={{ maxWidth: 260 }}
+            />
+          </div>
           <div className="field" style={{ margin: 0 }}>
             <label htmlFor="cal-locations-input">
               Locations (comma-separated, offered when creating slots)

@@ -43,6 +43,7 @@ import {
   inviteSchema,
   isCalendarEnabled,
   normalizeEmail,
+  officeHoursLabel,
   updateMemberEmailSchema,
   updateMemberRolesSchema,
   type Role,
@@ -846,7 +847,11 @@ restRouter.get(
     }
 
     const slots = await getSlotsForIcs(readable.timetable.id);
-    const ics = buildIcs(readable.timetable.name, slots);
+    const ics = buildIcs(
+      readable.timetable.name,
+      slots,
+      officeHoursLabel(readable.timetable.settings),
+    );
     res.setHeader("Content-Type", "text/calendar; charset=utf-8");
     res.setHeader(
       "Content-Disposition",

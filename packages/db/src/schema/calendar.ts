@@ -29,8 +29,14 @@ export const timeslots = pgTable(
     /** Session state (calendar v2): empty → proposed → confirmed. */
     status: slotStatusEnum().notNull().default("empty"),
     /** The one pencilled/confirmed topic. Singular by design: simultaneous
-     * sessions are separate slots (same time, different location). */
+     * sessions are separate slots (same time, different location). Null on
+     * an office-hours session (QA 2026-08-03) — a session whose subject is
+     * the host, not a topic; `sessionHostId` carries who. */
     topicId: uuid().references(() => topics.id, { onDelete: "set null" }),
+    /** Whose session this is — the topic's host for topic sessions, the
+     * host themselves for office hours. THE ownership column for the
+     * never-displace rule. */
+    sessionHostId: text().references(() => users.id, { onDelete: "set null" }),
     /** Where the session actually lives once published elsewhere (Luma,
      * event page…). The calendar points at it; it never becomes it. */
     url: text().notNull().default(""),

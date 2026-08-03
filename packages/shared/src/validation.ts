@@ -78,6 +78,7 @@ export const calendarSettingsSchema = z
   .object({
     enabled: z.boolean().optional(),
     confirmPolicy: z.enum(CONFIRM_POLICIES).optional(),
+    officeHoursLabel: z.string().max(40).optional(),
     locations: z.array(z.string().max(80)).max(50).optional(),
     patternCells: z
       .array(

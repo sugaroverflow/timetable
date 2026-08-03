@@ -190,6 +190,13 @@
       "when": 1785717206508,
       "tag": "0026_daily_moonstone",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1785720153384,
+      "tag": "0027_same_cerebro",
+      "breakpoints": true
     }
   ]
 }

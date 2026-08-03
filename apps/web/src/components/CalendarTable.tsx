@@ -23,8 +23,8 @@ import { Avatar } from "./Avatar";
 import { AvailabilityControl } from "./AvailabilityControl";
 import { GrowingTextarea } from "./GrowingTextarea";
 
-const SET_SESSION = `mutation($slot: String!, $topic: String, $status: String, $url: String) {
-  setSlotSession(slotId: $slot, topicId: $topic, status: $status, url: $url)
+const SET_SESSION = `mutation($slot: String!, $topic: String, $sh: String, $status: String, $url: String) {
+  setSlotSession(slotId: $slot, topicId: $topic, sessionHostId: $sh, status: $status, url: $url)
 }`;
 const UPDATE_SLOT = `mutation($slot: String!, $a: String, $b: String, $loc: String) {
   updateTimeslot(slotId: $slot, startsAt: $a, endsAt: $b, location: $loc)
@@ -180,33 +180,48 @@ function AvailabilityMeter({
   );
 }
 
-/** "Author: **Topic**" — both linked to their pages — plus a status pill:
+/** "Author: **Topic**" — both linked — or "**Hannah** — Office hours" for
+ * topic-less host sessions (QA 2026-08-03), plus a status pill:
  * "pencilled", or a clickable "register" pill to the event page when
- * confirmed (QA 2026-08-03). Blank when nothing's planned. */
-function SessionLine({ slot, slug }: { slot: CalendarSlot; slug: string }) {
-  if (!slot.topic) return null;
+ * confirmed. Blank when nothing's planned. */
+function SessionLine({
+  slot,
+  slug,
+  officeHoursLabel,
+}: {
+  slot: CalendarSlot;
+  slug: string;
+  officeHoursLabel: string;
+}) {
+  if (!slot.topic && !slot.sessionHost) return null;
   const confirmed = slot.status === "confirmed";
-  const permalink = topicPath(
-    slug,
-    null,
-    slot.topic.topicSlug,
-    slot.topic.hostId,
-  );
+  const permalink = slot.topic
+    ? topicPath(slug, null, slot.topic.topicSlug, slot.topic.hostId)
+    : null;
   return (
     <div className="row wrap" style={{ gap: 8, alignItems: "center" }}>
-      <span className="cal-session-line">
-        <Link href={`/f/${slug}/${slot.topic.hostId}`}>
-          {slot.topic.hostName ?? "…"}
-        </Link>
-        :{" "}
-        {permalink ? (
-          <Link href={permalink}>
-            <strong>{slot.topic.title}</strong>
+      {slot.topic ? (
+        <span className="cal-session-line">
+          <Link href={`/f/${slug}/${slot.topic.hostId}`}>
+            {slot.topic.hostName ?? "…"}
           </Link>
-        ) : (
-          <strong>{slot.topic.title}</strong>
-        )}
-      </span>
+          :{" "}
+          {permalink ? (
+            <Link href={permalink}>
+              <strong>{slot.topic.title}</strong>
+            </Link>
+          ) : (
+            <strong>{slot.topic.title}</strong>
+          )}
+        </span>
+      ) : (
+        <span className="cal-session-line">
+          <Link href={`/f/${slug}/${slot.sessionHost!.id}`}>
+            <strong>{slot.sessionHost!.name ?? "…"}</strong>
+          </Link>{" "}
+          — {officeHoursLabel}
+        </span>
+      )}
       {!confirmed ? (
         <span className="pill" title="Pencilled in — under discussion">
           ✎ pencilled
@@ -228,65 +243,112 @@ function SessionLine({ slot, slug }: { slot: CalendarSlot; slug: string }) {
   );
 }
 
-/** "Pencil in a topic…" for an open slot — hosts see their own topics,
- * admins every topic grouped by author (QA 2026-08-03). */
-function PencilInControl({
-  slot,
+/** Choice encoding for the pencil-in/propose selects: a topic id, or
+ * "oh:{hostId}" for office hours (QA 2026-08-03). */
+export function sessionChoiceVars(
+  choice: string,
+): { topic: string; sh: null } | { topic: null; sh: string } {
+  return choice.startsWith("oh:")
+    ? { topic: null, sh: choice.slice(3) }
+    : { topic: choice, sh: null };
+}
+
+/** Options for the pencil-in/propose selects — hosts see their own topics
+ * plus their office hours; admins see every topic grouped by author, with
+ * office hours atop each group (QA 2026-08-03). */
+export function SessionChoiceOptions({
   claimTopics,
   admin,
+  viewerId,
+  officeHoursLabel,
 }: {
-  slot: CalendarSlot;
   claimTopics: TopicOption[];
   admin: boolean;
+  viewerId: string | null;
+  officeHoursLabel: string;
 }) {
-  const { run, busy } = useGqlAction();
-  const [topicId, setTopicId] = useState("");
-  if (claimTopics.length === 0) return null;
-
-  const groups = new Map<string, TopicOption[]>();
-  if (admin) {
-    for (const topic of claimTopics) {
-      const host = topic.hostName ?? "Unknown host";
-      groups.set(host, [...(groups.get(host) ?? []), topic]);
-    }
-  }
   const option = (t: TopicOption) => (
     <option key={t.id} value={t.id}>
       {t.title}
     </option>
   );
+  if (!admin) {
+    return (
+      <>
+        {viewerId ? (
+          <option value={`oh:${viewerId}`}>{officeHoursLabel} (you)</option>
+        ) : null}
+        {claimTopics.map(option)}
+      </>
+    );
+  }
+  const groups = new Map<string, TopicOption[]>();
+  for (const topic of claimTopics) {
+    const host = topic.hostName ?? "Unknown host";
+    groups.set(host, [...(groups.get(host) ?? []), topic]);
+  }
+  return (
+    <>
+      {[...groups.keys()]
+        .sort((a, b) => a.localeCompare(b))
+        .map((host) => {
+          const topics = groups.get(host) ?? [];
+          return (
+            <optgroup key={host} label={host}>
+              <option value={`oh:${topics[0]!.hostId}`}>
+                {officeHoursLabel} — {host}
+              </option>
+              {topics.map(option)}
+            </optgroup>
+          );
+        })}
+    </>
+  );
+}
+
+/** "Pencil in…" for an open slot: a topic, or office hours. */
+function PencilInControl({
+  slot,
+  claimTopics,
+  perms,
+  officeHoursLabel,
+}: {
+  slot: CalendarSlot;
+  claimTopics: TopicOption[];
+  perms: CalendarPerms;
+  officeHoursLabel: string;
+}) {
+  const { run, busy } = useGqlAction();
+  const [choice, setChoice] = useState("");
 
   return (
     <div className="row wrap" style={{ gap: 8 }}>
       <select
-        aria-label="Pencil in a topic"
-        value={topicId}
-        onChange={(e) => setTopicId(e.target.value)}
+        aria-label="Pencil in a session"
+        value={choice}
+        onChange={(e) => setChoice(e.target.value)}
         style={{ width: "auto" }}
       >
-        <option value="">Pencil in a topic…</option>
-        {admin
-          ? [...groups.keys()]
-              .sort((a, b) => a.localeCompare(b))
-              .map((host) => (
-                <optgroup key={host} label={host}>
-                  {(groups.get(host) ?? []).map(option)}
-                </optgroup>
-              ))
-          : claimTopics.map(option)}
+        <option value="">Pencil in…</option>
+        <SessionChoiceOptions
+          claimTopics={claimTopics}
+          admin={perms.canAdmin}
+          viewerId={perms.viewerId}
+          officeHoursLabel={officeHoursLabel}
+        />
       </select>
       <button
         type="button"
         className="btn"
-        disabled={busy || !topicId}
+        disabled={busy || !choice}
         onClick={() =>
           void run(
             SET_SESSION,
-            { slot: slot.id, topic: topicId, status: "proposed" },
+            { slot: slot.id, ...sessionChoiceVars(choice), status: "proposed" },
             {
               success: "Pencilled in",
               errorFallback: "Could not pencil in",
-              onSuccess: () => setTopicId(""),
+              onSuccess: () => setChoice(""),
             },
           )
         }
@@ -297,19 +359,22 @@ function PencilInControl({
   );
 }
 
-/** Confirm / URL / clear for a slot that carries a session. */
+/** Confirm / URL / clear for a slot that carries a session — a topic
+ * session or office hours; the mutation keeps whichever subject is set. */
 function ActiveSessionControls({
   slot,
-  topic,
   perms,
 }: {
   slot: CalendarSlot;
-  topic: NonNullable<CalendarSlot["topic"]>;
   perms: CalendarPerms;
 }) {
   const { run, busy } = useGqlAction();
   const [url, setUrl] = useState(slot.url);
   const confirmed = slot.status === "confirmed";
+  const subject = {
+    topic: slot.topic?.id ?? null,
+    sh: slot.topic ? null : (slot.sessionHost?.id ?? null),
+  };
 
   return (
     <div className="row wrap" style={{ gap: 8 }}>
@@ -330,7 +395,7 @@ function ActiveSessionControls({
           onClick={() =>
             void run(
               SET_SESSION,
-              { slot: slot.id, topic: topic.id, status: "confirmed", url },
+              { slot: slot.id, ...subject, status: "confirmed", url },
               {
                 success: "Session confirmed",
                 errorFallback: "Could not confirm",
@@ -349,7 +414,7 @@ function ActiveSessionControls({
           onClick={() =>
             void run(
               SET_SESSION,
-              { slot: slot.id, topic: topic.id, status: "confirmed", url },
+              { slot: slot.id, ...subject, status: "confirmed", url },
               { success: "URL saved", errorFallback: "Could not save URL" },
             )
           }
@@ -364,7 +429,7 @@ function ActiveSessionControls({
         onClick={() =>
           void run(
             SET_SESSION,
-            { slot: slot.id, topic: null },
+            { slot: slot.id, topic: null, sh: null },
             { success: "Slot cleared", errorFallback: "Could not clear" },
           )
         }
@@ -381,25 +446,25 @@ function SessionControls({
   slot,
   perms,
   claimTopics,
+  officeHoursLabel,
 }: {
   slot: CalendarSlot;
   perms: CalendarPerms;
   claimTopics: TopicOption[];
+  officeHoursLabel: string;
 }) {
-  const sessionHostId = slot.topic?.hostId ?? null;
-  const mayTouch =
-    perms.canAdmin ||
-    sessionHostId === null ||
-    sessionHostId === perms.viewerId;
+  const owner = slot.sessionHost?.id ?? slot.topic?.hostId ?? null;
+  const mayTouch = perms.canAdmin || owner === null || owner === perms.viewerId;
   if (!mayTouch || (!perms.canPropose && !perms.canAdmin)) return null;
 
-  return slot.topic ? (
-    <ActiveSessionControls slot={slot} topic={slot.topic} perms={perms} />
+  return slot.topic || slot.sessionHost ? (
+    <ActiveSessionControls slot={slot} perms={perms} />
   ) : (
     <PencilInControl
       slot={slot}
       claimTopics={claimTopics}
-      admin={perms.canAdmin}
+      perms={perms}
+      officeHoursLabel={officeHoursLabel}
     />
   );
 }
@@ -787,6 +852,7 @@ function SlotDetail({
   claimTopics,
   lensTopic,
   adminLabel,
+  officeHoursLabel,
   comments,
   onReload,
 }: {
@@ -796,6 +862,7 @@ function SlotDetail({
   claimTopics: TopicOption[];
   lensTopic: TopicOption | null;
   adminLabel: string;
+  officeHoursLabel: string;
   comments: SlotComment[] | null;
   onReload: () => Promise<void>;
 }) {
@@ -809,7 +876,12 @@ function SlotDetail({
         comments={comments}
         onReload={onReload}
       />
-      <SessionControls slot={slot} perms={perms} claimTopics={claimTopics} />
+      <SessionControls
+        slot={slot}
+        perms={perms}
+        claimTopics={claimTopics}
+        officeHoursLabel={officeHoursLabel}
+      />
       {perms.canAdmin ? (
         <AdminSlotControls slot={slot} label={adminLabel} />
       ) : null}
@@ -882,6 +954,7 @@ function SlotTableRow({
   claimTopics,
   lensTopic,
   adminLabel,
+  officeHoursLabel,
   columns,
 }: {
   slot: CalendarSlot;
@@ -893,6 +966,7 @@ function SlotTableRow({
   claimTopics: TopicOption[];
   lensTopic: TopicOption | null;
   adminLabel: string;
+  officeHoursLabel: string;
   columns: number;
 }) {
   const [open, setOpen] = useState(false);
@@ -935,13 +1009,17 @@ function SlotTableRow({
         <WhenCell slot={slot} />
         <MeterAndYouCells slot={slot} past={past} perms={perms} slug={slug} />
       </tr>
-      {/* "Author: Topic" + status pill on its own line under the row
-          (QA 2026-08-03) — visually part of the same slot block. */}
-      {slot.topic ? (
+      {/* "Author: Topic" / "Host — office hours" + status pill on its own
+          line under the row — visually part of the same slot block. */}
+      {slot.topic || slot.sessionHost ? (
         <tr className={`cal-session-row${past ? " cal-past" : ""}`}>
           <td />
           <td colSpan={columns - 1}>
-            <SessionLine slot={slot} slug={slug} />
+            <SessionLine
+              slot={slot}
+              slug={slug}
+              officeHoursLabel={officeHoursLabel}
+            />
           </td>
         </tr>
       ) : null}
@@ -959,6 +1037,7 @@ function SlotTableRow({
                 claimTopics={claimTopics}
                 lensTopic={lensTopic}
                 adminLabel={adminLabel}
+                officeHoursLabel={officeHoursLabel}
                 comments={comments}
                 onReload={loadComments}
               />
@@ -983,6 +1062,7 @@ export function CalendarTable({
   claimTopics,
   lensTopic,
   adminLabel = "Admin",
+  officeHoursLabel = "Office hours",
   showingPast,
   base,
 }: {
@@ -992,6 +1072,7 @@ export function CalendarTable({
   claimTopics: TopicOption[];
   lensTopic: TopicOption | null;
   adminLabel?: string;
+  officeHoursLabel?: string;
   showingPast: boolean;
   base: string;
 }) {
@@ -1057,6 +1138,7 @@ export function CalendarTable({
                     claimTopics={claimTopics}
                     lensTopic={lensTopic}
                     adminLabel={adminLabel}
+                    officeHoursLabel={officeHoursLabel}
                     columns={columns}
                   />
                 </Fragment>

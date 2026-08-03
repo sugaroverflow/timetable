@@ -11,6 +11,7 @@ import {
   getAvailabilityPattern,
   getSlotCommentById,
   getTopicById,
+  getViewerRoles,
   listSlotComments,
   logActivity,
   proposeSlot,
@@ -36,8 +37,11 @@ import {
   canProposeSession,
   canSeeHostOnly,
   canTouchSlotSession,
+  isAdmin,
   isCalendarEnabled,
   isElector,
+  isHost,
+  officeHoursLabel,
   type Viewer,
 } from "@timetable/shared";
 
@@ -220,6 +224,15 @@ const SlotTopicType = builder
     }),
   });
 
+const SessionHostType = builder
+  .objectRef<{ id: string; name: string | null }>("SessionHost")
+  .implement({
+    fields: (t) => ({
+      id: t.exposeID("id"),
+      name: t.exposeString("name", { nullable: true }),
+    }),
+  });
+
 const TimeslotType = builder.objectRef<GqlSlot>("Timeslot").implement({
   fields: (t) => ({
     id: t.exposeID("id"),
@@ -235,6 +248,12 @@ const TimeslotType = builder.objectRef<GqlSlot>("Timeslot").implement({
       type: SlotTopicType,
       nullable: true,
       resolve: (s) => s.topic,
+    }),
+    /** Office-hours sessions (no topic): whose they are (QA 2026-08-03). */
+    sessionHost: t.field({
+      type: SessionHostType,
+      nullable: true,
+      resolve: (s) => s.sessionHost,
     }),
     counts: t.field({ type: AvailabilityCountsType, resolve: (s) => s.counts }),
     // Per-elector availability is host/admin-only.
@@ -384,8 +403,9 @@ builder.mutationFields((t) => ({
     },
   }),
 
-  /** Host (policy-gated) or admin: propose an off-piste slot for a topic —
-   * born `proposed`, collecting availability from day one. */
+  /** Host (policy-gated) or admin: propose an off-piste slot — for a
+   * topic, or (QA 2026-08-03) as office hours for `sessionHostId` — born
+   * `proposed`, collecting availability from day one. */
   proposeSlot: t.field({
     type: TimetableType,
     args: {
@@ -393,7 +413,9 @@ builder.mutationFields((t) => ({
       startsAt: t.arg.string({ required: true }),
       endsAt: t.arg.string({ required: true }),
       location: t.arg.string({ required: false }),
-      topicId: t.arg.string({ required: true }),
+      topicId: t.arg.string({ required: false }),
+      /** Office hours: the host the session is for (topicId omitted). */
+      sessionHostId: t.arg.string({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
       const { user, readable, viewer } = await loadTimetableAndViewer(
@@ -405,26 +427,19 @@ builder.mutationFields((t) => ({
       if (!canProposeSession(viewer, policy)) {
         forbidden("Slot proposals are admin-only in this forum");
       }
-      const topic = await assertOwnTopicInTimetable(
+      const subject = await resolveSessionSubject(
         viewer,
+        readable.timetable,
         args.topicId,
-        readable.timetable.id,
+        args.sessionHostId,
       );
-      const [startsAt, endsAt] = [
-        new Date(args.startsAt),
-        new Date(args.endsAt),
-      ];
-      if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) {
-        badRequest("startsAt/endsAt must be ISO date-times");
-      }
-      if (endsAt.getTime() <= startsAt.getTime()) {
-        badRequest("endsAt must be after startsAt");
-      }
+      const { startsAt, endsAt } = parseSlotWindow(args.startsAt, args.endsAt);
       const slot = await proposeSlot(readable.timetable.id, user.id, {
         startsAt,
         endsAt,
         location: args.location ?? "",
-        topicId: args.topicId,
+        topicId: subject.topicId,
+        sessionHostId: subject.sessionHostId,
       });
       await logActivity({
         timetableId: readable.timetable.id,
@@ -433,9 +448,9 @@ builder.mutationFields((t) => ({
         payload: {
           slotId: slot.id,
           startsAt: startsAt.toISOString(),
-          topicId: topic.id,
-          title: topic.title,
+          ...subject.payloadExtra,
         },
+        ...(subject.note ? { note: subject.note } : {}),
       });
       return { ...readable.timetable, viewerRoles: readable.roles as string[] };
     },
@@ -507,15 +522,131 @@ async function assertOwnTopicInTimetable(
   return topic;
 }
 
+/** Office-hours target (QA 2026-08-03): hosts book themselves only;
+ * admins may book any member who holds the host or admin role. */
+async function assertOfficeHoursHost(
+  viewer: Viewer,
+  sessionHostId: string,
+  timetableId: string,
+): Promise<void> {
+  if (!canManageCalendar(viewer) && sessionHostId !== viewer.userId) {
+    forbidden("You can only pencil in your own office hours");
+  }
+  const roles = await getViewerRoles(sessionHostId, timetableId);
+  if (!isHost(roles) && !isAdmin(roles)) {
+    forbidden("Office hours belong to a host or admin of this forum");
+  }
+}
+
+type SessionSubject = {
+  topicId: string | null;
+  sessionHostId: string;
+  /** Extra activity payload — topicId+title auto-link the timeline. */
+  payloadExtra: Record<string, unknown>;
+  /** Office hours: the forum's label rides as the activity note. */
+  note: string | null;
+};
+
+/** Validate a session subject — a topic, or office hours for a host — and
+ * derive the ownership column + activity-log fields for it. */
+async function resolveSessionSubject(
+  viewer: Viewer,
+  timetable: { id: string; settings: TimetableSettings },
+  topicIdArg: string | null | undefined,
+  sessionHostIdArg: string | null | undefined,
+): Promise<SessionSubject> {
+  if (topicIdArg != null) {
+    const topic = await assertOwnTopicInTimetable(
+      viewer,
+      topicIdArg,
+      timetable.id,
+    );
+    return {
+      topicId: topic.id,
+      sessionHostId: topic.hostId,
+      payloadExtra: { topicId: topic.id, title: topic.title },
+      note: null,
+    };
+  }
+  if (sessionHostIdArg == null) {
+    badRequest("Pick a topic session or office hours");
+  }
+  await assertOfficeHoursHost(viewer, sessionHostIdArg, timetable.id);
+  return {
+    topicId: null,
+    sessionHostId: sessionHostIdArg,
+    payloadExtra: {},
+    note: officeHoursLabel(timetable.settings),
+  };
+}
+
+/** Un-pencil a slot back to empty, logging what was cleared. */
+async function clearSlotSession(
+  ctx: {
+    slot: { id: string; status: string };
+    timetable: { id: string; settings: TimetableSettings };
+    actorId: string;
+  },
+  currentTopic: { id: string; title: string } | null,
+  eventBase: Record<string, unknown>,
+): Promise<void> {
+  await setSlotSession(ctx.slot.id, { topicId: null, sessionHostId: null });
+  if (ctx.slot.status === "empty") return;
+  await logActivity({
+    timetableId: ctx.timetable.id,
+    actorId: ctx.actorId,
+    action: "slot.clear",
+    payload: currentTopic
+      ? { ...eventBase, topicId: currentTopic.id, title: currentTopic.title }
+      : eventBase,
+    ...(currentTopic ? {} : { note: officeHoursLabel(ctx.timetable.settings) }),
+  });
+}
+
+/** Pencilling needs the propose gate, confirming the confirm gate. */
+function assertStatusGate(
+  viewer: Viewer,
+  policy: ReturnType<typeof calendarConfirmPolicy>,
+  status: SlotStatus,
+): void {
+  const gate = status === "confirmed" ? canConfirmSession : canProposeSession;
+  if (!gate(viewer, policy)) {
+    forbidden(
+      status === "confirmed"
+        ? "Confirming sessions is admin-only in this forum"
+        : "Pencilling sessions is admin-only in this forum",
+    );
+  }
+}
+
+/** Validated start/end for a hand-proposed slot. */
+function parseSlotWindow(
+  startsAtRaw: string,
+  endsAtRaw: string,
+): { startsAt: Date; endsAt: Date } {
+  const startsAt = new Date(startsAtRaw);
+  const endsAt = new Date(endsAtRaw);
+  if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) {
+    badRequest("startsAt/endsAt must be ISO date-times");
+  }
+  if (endsAt.getTime() <= startsAt.getTime()) {
+    badRequest("endsAt must be after startsAt");
+  }
+  return { startsAt, endsAt };
+}
+
 builder.mutationFields((t) => ({
-  /** Set (or clear, with topicId: null) a slot's session — topic, status,
-   * URL. Who may do what depends on the forum's confirm policy; a host can
-   * never displace another host's session. */
+  /** Set (or clear, with both ids null) a slot's session — a topic, or
+   * (QA 2026-08-03) an office-hours session for `sessionHostId`, plus
+   * status and URL. Who may do what depends on the forum's confirm
+   * policy; a host can never displace another host's session. */
   setSlotSession: t.field({
     type: "Boolean",
     args: {
       slotId: t.arg.string({ required: true }),
       topicId: t.arg.string({ required: false }),
+      /** Office hours: the host the session is for (topicId omitted). */
+      sessionHostId: t.arg.string({ required: false }),
       status: t.arg.string({ required: false }),
       url: t.arg.string({ required: false }),
     },
@@ -528,53 +659,45 @@ builder.mutationFields((t) => ({
       requireCalendarEnabled(timetable.settings);
       const policy = calendarConfirmPolicy(timetable.settings);
 
+      // sessionHostId is THE ownership column; legacy rows fall back to
+      // the topic's host.
       const currentTopic = slot.topicId
         ? await getTopicById(slot.topicId)
         : null;
-      if (!canTouchSlotSession(viewer, currentTopic?.hostId ?? null)) {
+      const currentOwner = slot.sessionHostId ?? currentTopic?.hostId ?? null;
+      if (!canTouchSlotSession(viewer, currentOwner)) {
         forbidden("Another host's session is pencilled into this slot");
       }
 
-      const slotEvent = (topic: { id: string; title: string }) => ({
+      const eventBase = {
         slotId: slot.id,
         startsAt: slot.startsAt.toISOString(),
-        topicId: topic.id,
-        title: topic.title,
-      });
+      };
 
-      if (args.topicId == null) {
+      if (args.topicId == null && args.sessionHostId == null) {
         // Clearing back to empty ("un-pencil"): admins, or the host whose
         // own session it is (canTouchSlotSession above already pinned that).
         if (!canProposeSession(viewer, policy)) forbidden();
-        await setSlotSession(slot.id, { topicId: null });
-        if (currentTopic) {
-          await logActivity({
-            timetableId: timetable.id,
-            actorId: user.id,
-            action: "slot.clear",
-            payload: slotEvent(currentTopic),
-          });
-        }
+        await clearSlotSession(
+          { slot, timetable, actorId: user.id },
+          currentTopic,
+          eventBase,
+        );
         return true;
       }
 
       const status = parseSessionStatus(args.status);
-      const gate =
-        status === "confirmed" ? canConfirmSession : canProposeSession;
-      if (!gate(viewer, policy)) {
-        forbidden(
-          status === "confirmed"
-            ? "Confirming sessions is admin-only in this forum"
-            : "Pencilling sessions is admin-only in this forum",
-        );
-      }
-      const topic = await assertOwnTopicInTimetable(
+      assertStatusGate(viewer, policy, status);
+
+      const subject = await resolveSessionSubject(
         viewer,
+        timetable,
         args.topicId,
-        timetable.id,
+        args.sessionHostId,
       );
       await setSlotSession(slot.id, {
-        topicId: args.topicId,
+        topicId: subject.topicId,
+        sessionHostId: subject.sessionHostId,
         status,
         url: parseSessionUrl(args.url),
       });
@@ -584,7 +707,8 @@ builder.mutationFields((t) => ({
         timetableId: timetable.id,
         actorId: user.id,
         action: status === "confirmed" ? "slot.confirm" : "slot.pencil",
-        payload: slotEvent(topic),
+        payload: { ...eventBase, ...subject.payloadExtra },
+        ...(subject.note ? { note: subject.note } : {}),
       });
       return true;
     },

@@ -9,6 +9,7 @@ import {
   isCalendarEnabled,
   isElector,
   isHost,
+  officeHoursLabel,
   type Role,
   type Viewer,
 } from "@timetable/shared";
@@ -51,6 +52,7 @@ type Data = {
 const SLOT_FIELDS = `
   id startsAt endsAt location status url cellKey commentCount viewerState
   topic { id title topicSlug hostId hostName }
+  sessionHost { id name }
   counts { green yellow red }
   perUser { userId name image state }
 `;
@@ -275,6 +277,7 @@ function CalendarBody({
   claimTopics,
   lensTopic,
   adminLabel,
+  ohLabel,
   past,
   base,
 }: {
@@ -285,6 +288,7 @@ function CalendarBody({
   claimTopics: TopicOption[];
   lensTopic: TopicOption | null;
   adminLabel: string;
+  ohLabel: string;
   past: boolean;
   base: string;
 }) {
@@ -300,6 +304,7 @@ function CalendarBody({
         claimTopics={claimTopics}
         lensTopic={lensTopic}
         adminLabel={adminLabel}
+        officeHoursLabel={ohLabel}
         showingPast={past}
         base={base}
       />
@@ -316,6 +321,7 @@ function CalendarCards({
   myPattern,
   claimTopics,
   adminLabel,
+  ohLabel,
 }: {
   slug: string;
   perms: CalendarPerms;
@@ -323,6 +329,7 @@ function CalendarCards({
   myPattern: Record<string, AvailabilityState>;
   claimTopics: TopicOption[];
   adminLabel: string;
+  ohLabel: string;
 }) {
   return (
     <>
@@ -336,12 +343,15 @@ function CalendarCards({
           initial={myPattern}
         />
       ) : null}
-      {perms.canPropose && claimTopics.length > 0 ? (
+      {/* Office hours need no topics, so the form shows whenever the
+          viewer may propose (QA 2026-08-03). */}
+      {perms.canPropose ? (
         <ProposeSlotForm
           slug={slug}
           topics={claimTopics}
           locations={calendar.locations ?? []}
-          admin={perms.canAdmin}
+          perms={perms}
+          officeHoursLabel={ohLabel}
         />
       ) : null}
     </>
@@ -417,6 +427,7 @@ export default async function CalendarPage({
         myPattern={parsePattern(data.myAvailabilityPattern)}
         claimTopics={claimTopics}
         adminLabel={adminLabel}
+        ohLabel={officeHoursLabel(settings)}
       />
 
       <CalendarToolbar
@@ -439,6 +450,7 @@ export default async function CalendarPage({
         claimTopics={claimTopics}
         lensTopic={lensTopic}
         adminLabel={adminLabel}
+        ohLabel={officeHoursLabel(settings)}
         past={past}
         base={base}
       />

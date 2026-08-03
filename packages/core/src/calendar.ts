@@ -81,11 +81,12 @@ export async function createSlots(
     .returning();
 }
 
-/** A host's off-piste slot: born `proposed` with their topic attached. */
+/** A host's off-piste slot: born `proposed` with their topic attached —
+ * or, with topicId null, an office-hours session owned by sessionHostId. */
 export async function proposeSlot(
   timetableId: string,
   createdById: string,
-  input: SlotInput & { topicId: string },
+  input: SlotInput & { topicId: string | null; sessionHostId: string },
 ): Promise<Timeslot> {
   const [slot] = await db
     .insert(timeslots)
@@ -96,6 +97,7 @@ export async function proposeSlot(
       location: input.location ?? "",
       status: "proposed",
       topicId: input.topicId,
+      sessionHostId: input.sessionHostId,
       createdById,
     })
     .returning();
@@ -120,22 +122,26 @@ export async function updateSlot(
   return updated ?? null;
 }
 
-/** Set a slot's session: topic + status + url together. `topicId: null`
- * clears the session back to empty (url cleared too). Permission rules
+/** Set a slot's session: topic (or office-hours host) + status + url
+ * together. Both ids null clears the session back to empty (url cleared
+ * too). `sessionHostId` is the ownership column: the topic's host for
+ * topic sessions, the host themselves for office hours. Permission rules
  * (confirm policy, never-displace) live in the resolver. */
 export async function setSlotSession(
   slotId: string,
   session: {
     topicId: string | null;
+    sessionHostId: string | null;
     status?: SlotStatus;
     url?: string;
   },
 ): Promise<Timeslot | null> {
-  const clearing = session.topicId === null;
+  const clearing = session.topicId === null && session.sessionHostId === null;
   const [updated] = await db
     .update(timeslots)
     .set({
       topicId: session.topicId,
+      sessionHostId: session.sessionHostId,
       status: clearing ? "empty" : (session.status ?? "proposed"),
       url: clearing ? "" : (session.url ?? ""),
       updatedAt: new Date(),
@@ -188,6 +194,8 @@ export type IcsSlot = {
   status: SlotStatus;
   url: string;
   topicTitle: string | null;
+  /** Office-hours sessions: the host's per-forum name. */
+  sessionHostName: string | null;
 };
 
 /** Slots with their session, for the ICS calendar feed (upcoming + past —
@@ -201,13 +209,31 @@ export async function getSlotsForIcs(timetableId: string): Promise<IcsSlot[]> {
       location: timeslots.location,
       status: timeslots.status,
       url: timeslots.url,
+      topicId: timeslots.topicId,
       topicTitle: topics.title,
+      sessionHostName: timetableMemberships.name,
     })
     .from(timeslots)
     .leftJoin(topics, eq(topics.id, timeslots.topicId))
+    .leftJoin(
+      timetableMemberships,
+      and(
+        eq(timetableMemberships.userId, timeslots.sessionHostId),
+        eq(timetableMemberships.timetableId, timeslots.timetableId),
+      ),
+    )
     .where(eq(timeslots.timetableId, timetableId))
     .orderBy(asc(timeslots.startsAt));
-  return rows;
+  return rows.map((r) => ({
+    id: r.id,
+    startsAt: r.startsAt,
+    endsAt: r.endsAt,
+    location: r.location,
+    status: r.status,
+    url: r.url,
+    topicTitle: r.topicTitle,
+    sessionHostName: r.topicId ? null : r.sessionHostName,
+  }));
 }
 
 // --------------------------------------------------------------------------
@@ -539,6 +565,8 @@ export type CalendarSlot = {
     hostId: string;
     hostName: string | null;
   } | null;
+  /** Office-hours sessions (topicId null): whose they are. */
+  sessionHost: { id: string; name: string | null } | null;
   viewerState: AvailabilityState | null;
   counts: SlotCounts;
   perUser: {
@@ -565,6 +593,7 @@ type SlotRelatedRows = {
       hostName: string | null;
     }
   >;
+  sessionHostNames: Map<string, string | null>;
   commentCountBySlot: Map<string, number>;
 };
 
@@ -664,12 +693,38 @@ async function loadSlotRelatedRows(
     )
     .groupBy(slotComments.slotId);
 
+  // Office-hours sessions (no topic): the session host's per-forum name.
+  const officeHoursHostIds = [
+    ...new Set(
+      slots
+        .filter((s) => !s.topicId && s.sessionHostId)
+        .map((s) => s.sessionHostId as string),
+    ),
+  ];
+  const sessionHostNames = new Map<string, string | null>();
+  if (officeHoursHostIds.length > 0) {
+    const hostRows = await db
+      .select({
+        id: timetableMemberships.userId,
+        name: timetableMemberships.name,
+      })
+      .from(timetableMemberships)
+      .where(
+        and(
+          eq(timetableMemberships.timetableId, timetableId),
+          inArray(timetableMemberships.userId, officeHoursHostIds),
+        ),
+      );
+    for (const h of hostRows) sessionHostNames.set(h.id, h.name);
+  }
+
   return {
     availRows,
     audienceProfiles,
     patterns,
     viewerPattern: viewerUserId ? patterns.get(viewerUserId) : undefined,
     topicsById,
+    sessionHostNames,
     commentCountBySlot: new Map(commentRows.map((c) => [c.slotId, c.n])),
   };
 }
@@ -697,56 +752,76 @@ export async function buildCalendar(
     viewerUserId,
   );
 
-  return slots.map((slot) => {
-    const explicitByUser = new Map<string, AvailabilityState>();
-    for (const r of related.availRows) {
-      if (r.slotId === slot.id) explicitByUser.set(r.userId, r.state);
-    }
+  return slots.map((slot) =>
+    toCalendarSlot(slot, related, audienceIds, viewerUserId),
+  );
+}
 
-    const viewerState = viewerUserId
-      ? resolveState(
-          explicitByUser.get(viewerUserId),
-          slot.cellKey,
-          related.viewerPattern,
-        )
-      : null;
+function slotAvailability(
+  slot: Timeslot,
+  related: SlotRelatedRows,
+  audienceIds: string[],
+  viewerUserId: string | null,
+): Pick<CalendarSlot, "viewerState" | "counts" | "perUser"> {
+  const explicitByUser = new Map<string, AvailabilityState>();
+  for (const r of related.availRows) {
+    if (r.slotId === slot.id) explicitByUser.set(r.userId, r.state);
+  }
 
-    const counts: SlotCounts = { green: 0, yellow: 0, red: 0 };
-    const perUser: CalendarSlot["perUser"] = [];
-    for (const uid of audienceIds) {
-      const state = resolveState(
-        explicitByUser.get(uid),
+  const viewerState = viewerUserId
+    ? resolveState(
+        explicitByUser.get(viewerUserId),
         slot.cellKey,
-        related.patterns.get(uid),
-      );
-      counts[state] += 1;
-      const profile = related.audienceProfiles.get(uid);
-      perUser.push({
-        userId: uid,
-        name: profile?.name ?? null,
-        image: profile?.image ?? null,
-        state,
-      });
-    }
+        related.viewerPattern,
+      )
+    : null;
 
-    return {
-      id: slot.id,
-      startsAt: slot.startsAt,
-      endsAt: slot.endsAt,
-      location: slot.location,
-      status: slot.status,
-      url: slot.url,
-      cellKey: slot.cellKey,
-      createdById: slot.createdById,
-      topic: slot.topicId
-        ? (related.topicsById.get(slot.topicId) ?? null)
+  const counts: SlotCounts = { green: 0, yellow: 0, red: 0 };
+  const perUser: CalendarSlot["perUser"] = [];
+  for (const uid of audienceIds) {
+    const state = resolveState(
+      explicitByUser.get(uid),
+      slot.cellKey,
+      related.patterns.get(uid),
+    );
+    counts[state] += 1;
+    const profile = related.audienceProfiles.get(uid);
+    perUser.push({
+      userId: uid,
+      name: profile?.name ?? null,
+      image: profile?.image ?? null,
+      state,
+    });
+  }
+  return { viewerState, counts, perUser };
+}
+
+function toCalendarSlot(
+  slot: Timeslot,
+  related: SlotRelatedRows,
+  audienceIds: string[],
+  viewerUserId: string | null,
+): CalendarSlot {
+  return {
+    id: slot.id,
+    startsAt: slot.startsAt,
+    endsAt: slot.endsAt,
+    location: slot.location,
+    status: slot.status,
+    url: slot.url,
+    cellKey: slot.cellKey,
+    createdById: slot.createdById,
+    topic: slot.topicId ? (related.topicsById.get(slot.topicId) ?? null) : null,
+    sessionHost:
+      !slot.topicId && slot.sessionHostId
+        ? {
+            id: slot.sessionHostId,
+            name: related.sessionHostNames.get(slot.sessionHostId) ?? null,
+          }
         : null,
-      viewerState,
-      counts,
-      perUser,
-      commentCount: related.commentCountBySlot.get(slot.id) ?? 0,
-    };
-  });
+    ...slotAvailability(slot, related, audienceIds, viewerUserId),
+    commentCount: related.commentCountBySlot.get(slot.id) ?? 0,
+  };
 }
 
 // --------------------------------------------------------------------------
