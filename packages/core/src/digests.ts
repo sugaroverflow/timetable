@@ -201,13 +201,32 @@ function afterSeen(since: Date, seen: Date | null | undefined): Date {
   return seen && seen > since ? seen : since;
 }
 
+/**
+ * Whether this membership may be emailed about its forum. Admins pre-create
+ * accounts ("Add person") and populate them before the person knows the
+ * forum exists — until the invite email goes out (`inviteSentAt`) or the
+ * member opens the forum themselves (either seen-watermark), digest emails
+ * would be the forum's surprise first contact. Organic members (creators,
+ * invite-link claimants) always pass: visiting the app sets a watermark.
+ */
+function membershipIsEmailable(m: {
+  inviteSentAt: Date | null;
+  lastSeenFeedAt: Date | null;
+  lastSeenNotificationsAt: Date | null;
+}): boolean {
+  return Boolean(
+    m.inviteSentAt ?? m.lastSeenFeedAt ?? m.lastSeenNotificationsAt,
+  );
+}
+
 async function loadDigestContext(
   recipient: DigestRecipient,
 ): Promise<DigestContext> {
-  const memberships = await db
+  const rows = await db
     .select({
       timetableId: timetableMemberships.timetableId,
       roles: timetableMemberships.roles,
+      inviteSentAt: timetableMemberships.inviteSentAt,
       lastSeenFeedAt: timetableMemberships.lastSeenFeedAt,
       lastSeenNotificationsAt: timetableMemberships.lastSeenNotificationsAt,
       name: timetables.name,
@@ -217,6 +236,8 @@ async function loadDigestContext(
     .from(timetableMemberships)
     .innerJoin(timetables, eq(timetables.id, timetableMemberships.timetableId))
     .where(eq(timetableMemberships.userId, recipient.id));
+
+  const memberships = rows.filter(membershipIsEmailable);
 
   return {
     recipient,
