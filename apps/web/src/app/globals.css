@@ -1869,12 +1869,18 @@ textarea {
   border-top: 1px solid var(--host-line);
   padding-top: 10px;
 }
-/* The faculty 💙 actions row (host hearts, QA 2026-08-04) sits directly
- * under the thread's own divider — drop card-actions' border so the two
- * rules don't stack. */
-.host-thread .card-actions {
-  border-top: 0;
+/* The faculty box variant with the 💙 actions row (host hearts, QA
+ * 2026-08-04): match the public card's rhythm — divider attached tight
+ * under the trigger, 8px either side of the row (the row's own border
+ * would stack with the thread divider, so it goes). The plain
+ * .host-thread (admin drafting panel) keeps its spacing. */
+.host-thread-actions {
+  margin-top: 4px;
   padding-top: 0;
+}
+.host-thread-actions .card-actions {
+  border-top: 0;
+  padding: 8px 0;
 }
 /* 💙'd state wears the host palette, not the elector ❤️'s pink wash. */
 .host-heart-btn.on {

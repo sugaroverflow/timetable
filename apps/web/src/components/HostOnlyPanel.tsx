@@ -148,7 +148,7 @@ export function HostOnlyPanel({
       </Collapsible.Trigger>
       <Collapsible.Panel>
         {expanded && (
-          <div className="host-thread" ref={threadRef}>
+          <div className="host-thread host-thread-actions" ref={threadRef}>
             {hostHearters ? (
               <HostHeartsActionsRow
                 topicId={topicId}
