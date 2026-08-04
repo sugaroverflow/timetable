@@ -6,7 +6,6 @@ import { useState } from "react";
 import { BreakdownCaret, BreakdownPanelBody } from "./BreakdownPanel";
 import { FocusCommentButton } from "./FocusCommentButton";
 import { HeartButton } from "./HeartButton";
-import { HostHeartButton } from "./HostHeartButton";
 
 /** The ❤️ + comments action row on a topic card, with the ❤️-breakdown
  * disclosure triangle to the left of the ❤️ button — visible to any
@@ -19,9 +18,6 @@ export function TopicActionsRow({
   viewerHasHearted,
   commentCount,
   canHeart,
-  canHostHeart = false,
-  viewerHasHostHearted = false,
-  hostHeartAudience = "",
   signedIn,
   viewerHeartCount,
   electorLabel = "Elector",
@@ -32,12 +28,6 @@ export function TopicActionsRow({
   viewerHasHearted: boolean;
   commentCount: number;
   canHeart: boolean;
-  /** Host-non-electors get the 💙 toggle next to the read-only ❤️ count
-   * (host hearts, 2026-08-04). */
-  canHostHeart?: boolean;
-  viewerHasHostHearted?: boolean;
-  /** Who sees the 💙 — honesty hint on the button's tooltip. */
-  hostHeartAudience?: string;
   signedIn: boolean;
   viewerHeartCount: number | null;
   electorLabel?: string;
@@ -64,13 +54,6 @@ export function TopicActionsRow({
             {heartCount}
           </span>
         )}
-        {canHostHeart ? (
-          <HostHeartButton
-            topicId={topicId}
-            hearted={viewerHasHostHearted}
-            audience={hostHeartAudience}
-          />
-        ) : null}
         <FocusCommentButton topicId={topicId} commentCount={commentCount} />
         <span style={{ flex: 1 }} />
         {viewerHasHearted && viewerHeartCount ? (

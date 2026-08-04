@@ -29,14 +29,19 @@ elector vote or set up an inter-host popularity contest.
   `QueueControls`) — they finally get a live switch instead of read-through.
 - **💙 Topics**: `/topics?hearted=host` mirrors electors' `?hearted=me`
   (nav link, page head, empty state, infinite scroll).
-- **Topic cards**: a 💙 toggle in the actions row for eligible hosts; the
-  attributed row + count in the host-only panel.
+- **Topic cards**: the 💙 toggle + attributed row + count all live INSIDE
+  the host-only comments panel (QA same day: it started in the actions row
+  next to the elector ❤️, but placement inside the box makes "only hosts
+  see this" self-evident).
 - **Analysis**: admin-only 💙 optgroup on the topics table (all four
   normalisations — `shared/hearts.ts` math reused verbatim over
   `host_hearts` rows: "each host distributes one unit of interest across
   their 💙s"); under a 💙 sort the row expander shows hosts
   (`topicHostHeartBreakdown`, mapped into the existing `BreakdownTable`);
-  the host-activity table gains a "💙 given" column.
+  the host-activity table gains a "💙 given" column, and each host row
+  folds open into the topics they 💙'd (same `HeartedTopicsTable` as the
+  elector rows' ❤️ fold; "Comments" there is that host's own comments on
+  the topic).
 - **Digests**: "💙 Eli Morgan" lines under the ❤️s on a host's topic card,
   and a subject count — gated by the host-comments option (below), so the
   email never leaks what the UI hides.
