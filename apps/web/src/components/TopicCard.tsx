@@ -117,6 +117,8 @@ function TopicTail({
           hostLabel={hostLabel}
           roleLabels={roleLabels}
           hostHearters={topic.hostHearters}
+          canHostHeart={perms.canHostHeart}
+          viewerHasHostHearted={topic.viewerHasHostHearted}
         />
       ) : null}
 
@@ -146,7 +148,6 @@ function ActionsSlot({
   viewerId,
   viewerHeartCount,
   electorLabel,
-  hostHeartAudience,
   queueControls,
 }: {
   topic: FeedTopic;
@@ -155,7 +156,6 @@ function ActionsSlot({
   viewerId: string | null;
   viewerHeartCount: number | null;
   electorLabel: string;
-  hostHeartAudience: string;
   queueControls: React.ReactNode;
 }) {
   if (queueControls) return <>{queueControls}</>;
@@ -167,9 +167,6 @@ function ActionsSlot({
       viewerHasHearted={topic.viewerHasHearted}
       commentCount={topic.commentCount}
       canHeart={perms.canHeart}
-      canHostHeart={perms.canHostHeart}
-      viewerHasHostHearted={topic.viewerHasHostHearted}
-      hostHeartAudience={hostHeartAudience}
       signedIn={viewerId != null}
       viewerHeartCount={viewerHeartCount}
       electorLabel={electorLabel}
@@ -225,18 +222,6 @@ function TopicBody({ html, expand }: { html: string; expand: boolean }) {
   return <CollapsibleTopicBody html={html} />;
 }
 
-/** Honesty hint on the 💙 button: who can see the gesture (host hearts,
- * 2026-08-04). With the host-only thread off, 💙s are admin-only bookmarks. */
-function hostHeartAudienceFor(
-  hostCommentsEnabled: boolean,
-  hostLabel: string,
-  adminLabel: string,
-): string {
-  return hostCommentsEnabled
-    ? `visible to ${hostLabel.toLowerCase()}s and ${adminLabel.toLowerCase()}s`
-    : `visible to ${adminLabel.toLowerCase()}s only`;
-}
-
 /* Element order per QA #42: title, author, cover, description,
  * hearts + comments, comment bar, then the two collapsed panels
  * (vote breakdown, host-only comments), host actions, admin actions. */
@@ -290,11 +275,6 @@ export function TopicCard({
     host: hostLabel,
     elector: electorLabel,
   };
-  const hostHeartAudience = hostHeartAudienceFor(
-    hostCommentsEnabled,
-    hostLabel,
-    adminLabel,
-  );
 
   return (
     <article className={`card stack${isNew ? " topic-new" : ""}`}>
@@ -338,7 +318,6 @@ export function TopicCard({
           viewerId={viewerId}
           viewerHeartCount={viewerHeartCount}
           electorLabel={electorLabel}
-          hostHeartAudience={hostHeartAudience}
           queueControls={queueControls}
         />
 

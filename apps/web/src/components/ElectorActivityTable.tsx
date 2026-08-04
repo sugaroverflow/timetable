@@ -11,7 +11,7 @@ import { personPath } from "@/lib/personPath";
 import { relativeTime } from "@/lib/relativeTime";
 import { topicPath } from "@/lib/topicPath";
 
-type HeartedTopic = {
+export type HeartedTopic = {
   topicId: string;
   title: string;
   slug: string | null;
@@ -38,8 +38,10 @@ type TopicSortKey = "name" | "host" | "comments";
 
 /** The fold under an elector row: the topics they ❤️'d as a sortable table
  * (QA 2026-07-27 — replaced the page-wide "Show ❤️s" toggle and its
- * host-grouped lists). "Comments" is THIS elector's comments per topic. */
-function HeartedTopicsTable({
+ * host-grouped lists). "Comments" is THIS elector's comments per topic.
+ * Exported for the host-activity rows' 💙 fold (host hearts, 2026-08-04),
+ * which shares the shape. */
+export function HeartedTopicsTable({
   slug,
   topics,
   hostLabel,

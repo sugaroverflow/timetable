@@ -1,9 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 
 import { Avatar } from "@/components/Avatar";
+import { BreakdownCaret } from "@/components/BreakdownPanel";
+import {
+  HeartedTopicsTable,
+  type HeartedTopic,
+} from "@/components/ElectorActivityTable";
 import { SortHeader } from "@/components/SortHeader";
 import { formatExactTime } from "@/lib/dates";
 import { personPath } from "@/lib/personPath";
@@ -19,6 +24,8 @@ export type HostActivityRow = {
   /** 💙s this host has given (host hearts, 2026-08-04) — the API sends
    * null to non-admins, but this table only renders for admins. */
   hostHeartCount: number | null;
+  /** The topics behind that count — the row's fold-open sub-table. */
+  hostHeartedTopics: HeartedTopic[] | null;
   latestActivityAt: string | null;
 };
 
@@ -42,11 +49,81 @@ function compareRows(a: HostActivityRow, b: HostActivityRow, key: SortKey) {
   }
 }
 
+/** One host row + its fold: the topics this host 💙'd, mirroring the
+ * elector rows' ❤️ fold (host hearts, 2026-08-04). */
+function HostRowItem({
+  slug,
+  host,
+  hostLabel,
+}: {
+  slug: string;
+  host: HostActivityRow;
+  hostLabel: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const heartedTopics = host.hostHeartedTopics ?? [];
+  return (
+    <Fragment>
+      <tr>
+        <td>
+          <span className="row" style={{ gap: 6, alignItems: "center" }}>
+            <BreakdownCaret open={open} onToggle={() => setOpen(!open)} />
+            {/* One link around avatar + name — both click through
+                (links pass 2026-08-03). */}
+            <Link
+              className="person-trigger"
+              href={personPath(slug, host.hostSlug ?? host.hostId)}
+            >
+              <Avatar small name={host.hostName} image={host.hostImage} />
+              <strong>{host.hostName ?? hostLabel}</strong>
+            </Link>
+          </span>
+        </td>
+        <td className="mono">{host.topicCount}</td>
+        <td className="mono">{host.commentCount}</td>
+        <td className="mono">{host.hostHeartCount ?? 0}</td>
+        <td>
+          {host.latestActivityAt ? (
+            // suppressHydrationWarning: server and client may render
+            // this a minute apart; hover carries the exact timestamp.
+            <span
+              title={formatExactTime(host.latestActivityAt)}
+              suppressHydrationWarning
+            >
+              {relativeTime(host.latestActivityAt)}
+            </span>
+          ) : (
+            <span className="faint">None</span>
+          )}
+        </td>
+      </tr>
+      {open ? (
+        <tr className="elector-hearts-row">
+          <td colSpan={5}>
+            {heartedTopics.length === 0 ? (
+              <span className="faint" style={{ fontSize: 12 }}>
+                No 💙s yet.
+              </span>
+            ) : (
+              <HeartedTopicsTable
+                slug={slug}
+                topics={heartedTopics}
+                hostLabel={hostLabel}
+              />
+            )}
+          </td>
+        </tr>
+      ) : null}
+    </Fragment>
+  );
+}
+
 /**
  * Host-activity table (QA 2026-07-27 — replaced the weighted-votes host
  * leaderboard): every host with their published-topic count, comments
- * written, and last activity. Names link to person pages; click-to-sort
- * headers, client-side like the elector table's.
+ * written, 💙s given, and last activity. Names link to person pages;
+ * click-to-sort headers, client-side like the elector table's; rows fold
+ * open into the host's 💙'd topics.
  */
 export function HostActivityTable({
   slug,
@@ -113,36 +190,12 @@ export function HostActivityTable({
         </thead>
         <tbody>
           {sorted.map((host) => (
-            <tr key={host.hostId}>
-              <td>
-                {/* One link around avatar + name — both click through
-                    (links pass 2026-08-03). */}
-                <Link
-                  className="person-trigger"
-                  href={personPath(slug, host.hostSlug ?? host.hostId)}
-                >
-                  <Avatar small name={host.hostName} image={host.hostImage} />
-                  <strong>{host.hostName ?? hostLabel}</strong>
-                </Link>
-              </td>
-              <td className="mono">{host.topicCount}</td>
-              <td className="mono">{host.commentCount}</td>
-              <td className="mono">{host.hostHeartCount ?? 0}</td>
-              <td>
-                {host.latestActivityAt ? (
-                  // suppressHydrationWarning: server and client may render
-                  // this a minute apart; hover carries the exact timestamp.
-                  <span
-                    title={formatExactTime(host.latestActivityAt)}
-                    suppressHydrationWarning
-                  >
-                    {relativeTime(host.latestActivityAt)}
-                  </span>
-                ) : (
-                  <span className="faint">None</span>
-                )}
-              </td>
-            </tr>
+            <HostRowItem
+              key={host.hostId}
+              slug={slug}
+              host={host}
+              hostLabel={hostLabel}
+            />
           ))}
         </tbody>
       </table>

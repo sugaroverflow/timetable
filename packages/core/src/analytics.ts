@@ -5,6 +5,7 @@ import {
   comments,
   db,
   hearts,
+  hostHearts,
   timeslots,
   timetableMemberships,
   topics,
@@ -19,7 +20,7 @@ import {
 } from "@timetable/shared";
 
 import { coerceDate } from "./dates";
-import { computeHostHeartScores, loadPublishedHostHearts } from "./hostHearts";
+import { computeHostHeartScores } from "./hostHearts";
 import { loadQueueCoverage } from "./queue";
 import { getHeartsCountFrom } from "./topics";
 import { buildFeed, type FeedTopic } from "./topics";
@@ -84,6 +85,18 @@ export type DashboardData = {
      * nulled by the API for non-admin viewers; deliberately NOT folded into
      * latestActivityAt so nothing about 💙 timing leaks to hosts. */
     hostHeartCount: number;
+    /** The topics this host 💙'd (the row's fold-open sub-table, mirroring
+     * the elector rows' heartedTopics). Admin eyes only, same as the count.
+     * `commentCount` is this host's public comments on that topic. */
+    hostHeartedTopics: {
+      topicId: string;
+      title: string;
+      slug: string | null;
+      hostId: string;
+      hostName: string | null;
+      hostSlug: string | null;
+      commentCount: number;
+    }[];
     latestActivityAt: Date | null;
   }[];
   electorActivity: {
@@ -289,8 +302,14 @@ function buildHostActivity(args: {
   }[];
   topicStats: Map<string, Stat>;
   commentsByAuthor: Map<string, Stat>;
-  hostHeartsGiven: Map<string, number>;
+  hostHeartRows: HeartActivityRow[];
+  commentsByAuthorTopic: Map<string, number>;
 }): DashboardData["hostActivity"] {
+  const givenByHost = heartStatsByElector(args.hostHeartRows);
+  const heartedByHost = heartedTopicsByElector(
+    args.hostHeartRows,
+    args.commentsByAuthorTopic,
+  );
   return args.hostRows
     .map((h) => {
       const topicStat = args.topicStats.get(h.userId);
@@ -302,7 +321,8 @@ function buildHostActivity(args: {
         hostSlug: h.slug,
         topicCount: topicStat?.count ?? 0,
         commentCount: commentStat?.count ?? 0,
-        hostHeartCount: args.hostHeartsGiven.get(h.userId) ?? 0,
+        hostHeartCount: givenByHost.get(h.userId)?.count ?? 0,
+        hostHeartedTopics: heartedByHost.get(h.userId) ?? [],
         latestActivityAt: latestDate(
           topicStat?.latestAt,
           commentStat?.latestAt,
@@ -392,6 +412,42 @@ async function loadHeartActivity(
       ),
     )
     .where(and(...heartCountConds));
+}
+
+/** All 💙s on published topics, HeartActivityRow-shaped: `electorId` is
+ * the GIVING host; topic fields describe the 💙'd topic and its owner.
+ * No cutoff/window — 💙s ignore heartsCountFrom (host hearts,
+ * 2026-08-04). Feeds the leaderboard 💙 norms, the given-counts, and the
+ * host rows' fold-open topic lists. */
+async function loadHostHeartActivity(
+  timetableId: string,
+): Promise<HeartActivityRow[]> {
+  return db
+    .select({
+      electorId: hostHearts.userId,
+      topicId: topics.id,
+      title: topics.title,
+      slug: topics.slug,
+      hostId: topics.hostId,
+      hostName: timetableMemberships.name,
+      hostSlug: timetableMemberships.slug,
+      createdAt: hostHearts.createdAt,
+    })
+    .from(hostHearts)
+    .innerJoin(topics, eq(topics.id, hostHearts.topicId))
+    .leftJoin(
+      timetableMemberships,
+      and(
+        eq(timetableMemberships.userId, topics.hostId),
+        eq(timetableMemberships.timetableId, topics.timetableId),
+      ),
+    )
+    .where(
+      and(
+        eq(topics.timetableId, timetableId),
+        eq(topics.status, "published" as const),
+      ),
+    );
 }
 
 function heartStatsByElector(
@@ -664,14 +720,7 @@ export async function getDashboard(
   const commentTallies = await loadCommentTallies(timetableId, activitySince);
   // 💙s ignore the activity window and cutoff — they aren't votes; the
   // admin table shows the standing picture.
-  const hostHeartRows = await loadPublishedHostHearts(timetableId);
-  const hostHeartsGiven = new Map<string, number>();
-  for (const row of hostHeartRows) {
-    hostHeartsGiven.set(
-      row.electorId,
-      (hostHeartsGiven.get(row.electorId) ?? 0) + 1,
-    );
-  }
+  const hostHeartRows = await loadHostHeartActivity(timetableId);
   const topicLeaderboard = buildLeaderboards(
     feed,
     topicCommentScores(commentTallies),
@@ -686,9 +735,9 @@ export async function getDashboard(
   );
   // The host table ignores both host filters — recount unfiltered when the
   // elector table's filter would otherwise shrink hosts' comment stats.
-  const hostCommentStats = opts.activityHostId
-    ? (await loadCommentActivity(baseTopicConds, activitySince)).byElector
-    : commentActivity.byElector;
+  const hostCommentActivity = opts.activityHostId
+    ? await loadCommentActivity(baseTopicConds, activitySince)
+    : commentActivity;
   const availabilityByElector = await loadAvailabilityActivity(
     timetableId,
     activitySince,
@@ -710,8 +759,9 @@ export async function getDashboard(
   const hostActivity = buildHostActivity({
     hostRows,
     topicStats: await loadHostTopicStats(timetableId),
-    commentsByAuthor: hostCommentStats,
-    hostHeartsGiven,
+    commentsByAuthor: hostCommentActivity.byElector,
+    hostHeartRows,
+    commentsByAuthorTopic: hostCommentActivity.byElectorTopic,
   });
 
   const unallocatedTopics = await findUnallocated(timetableId, feed);

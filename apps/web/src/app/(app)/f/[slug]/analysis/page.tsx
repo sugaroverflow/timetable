@@ -47,6 +47,17 @@ type Dashboard = {
     topicCount: number;
     commentCount: number;
     hostHeartCount: number | null;
+    hostHeartedTopics:
+      | {
+          topicId: string;
+          title: string;
+          slug: string | null;
+          hostId: string;
+          hostName: string | null;
+          hostSlug: string | null;
+          commentCount: number;
+        }[]
+      | null;
     latestActivityAt: string | null;
   }[];
   electorActivity: {
@@ -85,7 +96,11 @@ const QUERY = `
     dashboard(idOrSlug: $s, hostId: $host, activityHostId: $activityHost) {
       totalHearts electorCount hostCount
       topicLeaderboard { id title slug hostId hostName hostImage hostSlug weightedScore l2Score devotionScore heartCount commentTotal commenterCount commentL2 commentL1 commentDevotion hostHeartCount hostHeartL2 hostHeartL1 hostHeartDevotion }
-      hostActivity { hostId hostName hostImage hostSlug topicCount commentCount hostHeartCount latestActivityAt }
+      hostActivity {
+        hostId hostName hostImage hostSlug topicCount commentCount hostHeartCount
+        latestActivityAt
+        hostHeartedTopics { topicId title slug hostId hostName hostSlug commentCount }
+      }
       electorActivity {
         electorId electorName electorImage heartCount commentCount queueCount
         latestActivityAt

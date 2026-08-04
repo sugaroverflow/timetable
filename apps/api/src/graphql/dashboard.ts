@@ -98,6 +98,13 @@ const HostActivityType = builder
         nullable: true,
         resolve: (r) => (r.showHostHearts ? r.hostHeartCount : null),
       }),
+      /** The topics behind that count — the row's fold-open sub-table,
+       * same shape as the elector rows' heartedTopics. Admin eyes only. */
+      hostHeartedTopics: t.field({
+        type: [ElectorHeartedTopicType],
+        nullable: true,
+        resolve: (r) => (r.showHostHearts ? r.hostHeartedTopics : null),
+      }),
       latestActivityAt: t.string({
         nullable: true,
         resolve: (h) => h.latestActivityAt?.toISOString() ?? null,
