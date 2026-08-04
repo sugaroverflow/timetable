@@ -267,6 +267,14 @@ function renderHearts(hearters: DigestPerson[]): string {
     .join("");
 }
 
+/** Every 💙 on its own line — same as ❤️s, the 💙 says who it's from
+ * (fellow hosts; the "{hostLabel}s" heading is on the caller). */
+function renderHostHearts(hearters: DigestPerson[]): string {
+  return hearters
+    .map((h) => `<div style="margin:3px 0;">💙 ${personName(h)}</div>`)
+    .join("");
+}
+
 const STATUS_PILLS: Record<
   "new" | "assignment" | "draft",
   [string, string, string]
@@ -414,9 +422,14 @@ function renderCard(
     sections.push(bodyExcerpt(card.body, card.path, accent));
   }
   // ❤️s before comments — the same order as a topic card in the app, where
-  // the actions row sits above the thread (QA 2026-07-30).
+  // the actions row sits above the thread (QA 2026-07-30). 💙s ride along
+  // beneath them (host hearts, 2026-08-04).
   if (heart && heart.kind === "heart") {
     sections.push(renderHearts(heart.hearters));
+  }
+  const hostHeart = card.activities.find((a) => a.kind === "hostHeart");
+  if (hostHeart && hostHeart.kind === "hostHeart") {
+    sections.push(renderHostHearts(hostHeart.hearters));
   }
   sections.push(
     ...renderDiscussion(card, discussion, accent, hostLabel, adminLabel),
@@ -498,7 +511,14 @@ function renderSessionCard(
 
 /** "3 comments, 2 replies …" — the subject's tail, counted across cards. */
 function digestSummary(digest: ForumDigest): string {
-  const counts = { comment: 0, reply: 0, heart: 0, new: 0, assignment: 0 };
+  const counts = {
+    comment: 0,
+    reply: 0,
+    heart: 0,
+    hostHeart: 0,
+    new: 0,
+    assignment: 0,
+  };
   let confirmedNew = 0;
   for (const card of digest.topics) {
     for (const a of card.activities) {
@@ -515,6 +535,7 @@ function digestSummary(digest: ForumDigest): string {
   n(counts.comment, "comment on your topics", "comments on your topics");
   n(counts.reply, "reply", "replies");
   n(counts.heart, "topic with new ❤️", "topics with new ❤️");
+  n(counts.hostHeart, "topic with new 💙", "topics with new 💙");
   n(counts.new, "new topic", "new topics");
   n(counts.assignment, "topic assigned to you", "topics assigned to you");
   n(confirmedNew, "session confirmed", "sessions confirmed");
@@ -775,6 +796,14 @@ function sampleOwnCard(me: DigestPerson, p: SamplePath): DigestTopicCard {
           sWho("Kwame Mensah", "sample-kwame"),
         ],
         at: sAt("2026-07-30T07:55:00Z"),
+      },
+      {
+        kind: "hostHeart",
+        hearters: [
+          sWho("Eli Morgan", "sample-eli"),
+          sWho("Zara Ashworth", "sample-zara"),
+        ],
+        at: sAt("2026-07-30T07:50:00Z"),
       },
     ],
   };

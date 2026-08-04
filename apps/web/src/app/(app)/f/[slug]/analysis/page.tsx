@@ -34,6 +34,10 @@ type Dashboard = {
     commentL2: number;
     commentL1: number;
     commentDevotion: number;
+    hostHeartCount: number | null;
+    hostHeartL2: number | null;
+    hostHeartL1: number | null;
+    hostHeartDevotion: number | null;
   }[];
   hostActivity: {
     hostId: string;
@@ -42,6 +46,7 @@ type Dashboard = {
     hostSlug: string | null;
     topicCount: number;
     commentCount: number;
+    hostHeartCount: number | null;
     latestActivityAt: string | null;
   }[];
   electorActivity: {
@@ -79,8 +84,8 @@ const QUERY = `
     timetableHosts: forumHosts(idOrSlug: $s) { id name }
     dashboard(idOrSlug: $s, hostId: $host, activityHostId: $activityHost) {
       totalHearts electorCount hostCount
-      topicLeaderboard { id title slug hostId hostName hostImage hostSlug weightedScore l2Score devotionScore heartCount commentTotal commenterCount commentL2 commentL1 commentDevotion }
-      hostActivity { hostId hostName hostImage hostSlug topicCount commentCount latestActivityAt }
+      topicLeaderboard { id title slug hostId hostName hostImage hostSlug weightedScore l2Score devotionScore heartCount commentTotal commenterCount commentL2 commentL1 commentDevotion hostHeartCount hostHeartL2 hostHeartL1 hostHeartDevotion }
+      hostActivity { hostId hostName hostImage hostSlug topicCount commentCount hostHeartCount latestActivityAt }
       electorActivity {
         electorId electorName electorImage heartCount commentCount queueCount
         latestActivityAt
@@ -221,6 +226,7 @@ export default async function DashboardPage({
         hostCount={d.hostCount}
         electorCount={d.electorCount}
         electorLabel={electorLabel}
+        showHostHearts={viewerIsAdmin}
         hostFilter={
           <HostFilter
             value={host}

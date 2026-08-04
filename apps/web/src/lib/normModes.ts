@@ -67,6 +67,45 @@ export const COMMENT_NORM_MODES: CommentNormMode[] = [
   },
 ];
 
+/** The 💙 analogs (host hearts, 2026-08-04), admin-only in Analysis: the
+ * same four normalisations over host 💙s — "each host distributes one unit
+ * of interest across the topics they 💙". Math: `computeHostHeartScores`
+ * in @timetable/core over `topicNormScores`. */
+export type HostHeartNormKey = "hh_raw" | "hh_l2" | "hh_l1" | "hh_devotion";
+
+export type HostHeartNormMode = Omit<NormMode, "key"> & {
+  key: HostHeartNormKey;
+};
+
+export const HOST_HEART_NORM_MODES: HostHeartNormMode[] = [
+  {
+    key: "hh_raw",
+    symbol: "Σ💙",
+    label: "Total 💙s",
+    description: "No normalisation — every 💙 counts equally (L∞).",
+  },
+  {
+    key: "hh_l2",
+    symbol: "Σ💙/√💙",
+    label: "Interest (L2)",
+    description: "Interest discounted by the √ of each host's total 💙s (L2).",
+  },
+  {
+    key: "hh_l1",
+    symbol: "Σ💙/💙",
+    label: "One unit each (L1)",
+    description:
+      "Each host has one unit of interest split across their 💙s (L1).",
+  },
+  {
+    key: "hh_devotion",
+    symbol: "(Σ💙/💙)/Σ💙",
+    label: "Average devotion",
+    description:
+      "The mean share of their 💙s that this topic's 💙-ers gave it (L1/L∞).",
+  },
+];
+
 export const NORM_MODES: NormMode[] = [
   {
     key: "raw",

@@ -11,9 +11,18 @@ const HEART = `mutation QueueHeart($id: String!) {
   heartTopic(topicId: $id) { hearted }
 }`;
 
+const HOST_HEART = `mutation QueueHostHeart($id: String!) {
+  hostHeartTopic(topicId: $id) { hearted }
+}`;
+
 const NEXT = `mutation QueueNext($id: String!) {
   queueMarkSeen(topicId: $id)
 }`;
+
+function switchLabel(hearted: boolean, hostMode: boolean): string {
+  const glyph = hostMode ? "💙" : "❤️";
+  return hearted ? `${glyph}'d — click to remove` : `${glyph} this topic`;
+}
 
 /**
  * The Topic Queue's decision controls (v2 2026-07-29): a ❤️ on/off
@@ -21,17 +30,22 @@ const NEXT = `mutation QueueNext($id: String!) {
  * hearted, then moves on. Same big round layout as v1's two buttons.
  * Toggling the heart saves immediately but does NOT advance (no refresh —
  * hearting marks the topic seen server-side, so a refresh would skip it);
- * only Next advances. Non-electors (hosts read the queue too) get Next
- * alone.
+ * only Next advances. Host-non-electors get the same switch bound to 💙
+ * (host hearts, 2026-08-04); members with neither gesture read through
+ * with Next alone.
  */
 export function QueueControls({
   topicId,
   hearted: initialHearted,
   canHeart,
+  hostMode = false,
 }: {
   topicId: string;
   hearted: boolean;
   canHeart: boolean;
+  /** Bind the switch to 💙 instead of ❤️ (the viewer's roles decide —
+   * one person, one gesture). */
+  hostMode?: boolean;
 }) {
   const router = useRouter();
   const { toastError } = useToast();
@@ -59,7 +73,7 @@ export function QueueControls({
   async function toggleHeart() {
     setInFlight(true);
     try {
-      await clientGql(HEART, { id: topicId });
+      await clientGql(hostMode ? HOST_HEART : HEART, { id: topicId });
       setHearted((h) => !h);
     } catch {
       toastError("That didn't save — try again.");
@@ -90,13 +104,13 @@ export function QueueControls({
           className={`queue-switch${hearted ? " on" : ""}`}
           role="switch"
           aria-checked={hearted}
-          aria-label={hearted ? "❤️'d — click to remove" : "❤️ this topic"}
-          title={hearted ? "❤️'d — click to remove" : "❤️ this topic"}
+          aria-label={switchLabel(hearted, hostMode)}
+          title={switchLabel(hearted, hostMode)}
           disabled={busy}
           onClick={toggleHeart}
         >
           <span className="queue-switch-heart" aria-hidden>
-            {hearted ? "❤️" : "🤍"}
+            {hearted ? (hostMode ? "💙" : "❤️") : "🤍"}
           </span>
           <span className="queue-switch-track" aria-hidden>
             <span className="queue-switch-thumb" />

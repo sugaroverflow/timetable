@@ -4,6 +4,7 @@ import {
   addComment,
   addReply,
   getCommentById,
+  getTimetableById,
   getTopicById,
   getUserById,
   getViewerRoles,
@@ -17,6 +18,7 @@ import {
   canComment,
   canModerate,
   canSeeHostOnly,
+  isHostCommentsEnabled,
   type Viewer,
 } from "@timetable/shared";
 
@@ -57,6 +59,20 @@ function requireBody(raw: string): string {
   const body = raw.trim();
   if (!body) throw new GraphQLError("Comment cannot be empty");
   return body;
+}
+
+/** New host_only comments are refused while the forum's host-only thread
+ * is switched off (host hearts, 2026-08-04) — the UI hides the composer;
+ * this is the API-side backstop. Existing comments are kept, just hidden. */
+async function assertHostThreadOpen(
+  timetableId: string,
+  visibility: CommentVisibility,
+): Promise<void> {
+  if (visibility !== "host_only") return;
+  const timetable = await getTimetableById(timetableId);
+  if (timetable && !isHostCommentsEnabled(timetable.settings)) {
+    forbidden("The host-only thread is switched off in this forum");
+  }
 }
 
 /** One mutation-payload builder for every comment mutation (they used to
@@ -106,6 +122,7 @@ builder.mutationFields((t) => ({
             ? "admin_only"
             : "public";
       assertMayComment(viewer, topic, user.id, visibility);
+      await assertHostThreadOpen(topic.timetableId, visibility);
       const body = requireBody(args.body);
       await assertActionLimit(user.id, "comment");
       const comment = await addComment(topic.id, user.id, body, visibility);
@@ -125,6 +142,7 @@ builder.mutationFields((t) => ({
       if (!parent) notFound("Comment not found");
       const { topic, viewer } = await loadTopicAndViewer(ctx, parent.topicId);
       assertMayComment(viewer, topic, user.id, parent.visibility);
+      await assertHostThreadOpen(topic.timetableId, parent.visibility);
       const body = requireBody(args.body);
       await assertActionLimit(user.id, "comment");
       const reply = await addReply(parent, user.id, body);

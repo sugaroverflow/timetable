@@ -38,6 +38,14 @@ export type WeightedHeart = {
   heartedAt: string;
 };
 
+/** One attributed 💙 in the host-only thread's "💙 Sarah, Amir" row. */
+export type HostHearter = {
+  userId: string;
+  name: string | null;
+  image: string | null;
+  slug: string | null;
+};
+
 export type FeedTopic = {
   id: string;
   timetableId: string;
@@ -54,6 +62,11 @@ export type FeedTopic = {
   heartCount: number;
   weightedScore: number | null;
   viewerHasHearted: boolean;
+  /** The viewer's own 💙 (host-non-electors; false for everyone else). */
+  viewerHasHostHearted: boolean;
+  /** Attributed 💙s — hosts/admins only, null while the forum's host-only
+   * thread is off (💙s are then admin-analysis bookmarks). */
+  hostHearters: HostHearter[] | null;
   commentCount: number;
   publishedAt: string | null;
   contentUpdatedAt: string | null;

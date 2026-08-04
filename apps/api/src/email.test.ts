@@ -77,6 +77,28 @@ describe("renderDigest (v3, topic cards)", () => {
     expect(html).toContain("border-top:1px solid");
   });
 
+  it("renders 💙s from fellow hosts under the ❤️s (host hearts)", () => {
+    const withHostHearts: ForumDigest = {
+      ...SAMPLE,
+      topics: [
+        {
+          ...SAMPLE.topics[0]!,
+          activities: [
+            ...SAMPLE.topics[0]!.activities,
+            {
+              kind: "hostHeart",
+              hearters: [{ name: "Eli Morgan", userId: "u9", image: null }],
+              at: new Date("2026-07-30T00:00:00Z"),
+            },
+          ],
+        },
+        ...SAMPLE.topics.slice(1),
+      ],
+    };
+    const { html } = renderDigest(withHostHearts);
+    expect(html).toContain("💙 <strong>Eli Morgan</strong>");
+  });
+
   it("builds Reply deep-links; commenters plain, byline still linked", () => {
     const { html } = renderDigest(SAMPLE);
     expect(html).toContain("?reply=garden-robin#comment-garden-robin");

@@ -1,6 +1,10 @@
 import { and, eq, gt, inArray, isNull, ne, sql } from "drizzle-orm";
 
-import { isCalendarEnabled, isDigestEnabled } from "@timetable/shared";
+import {
+  isCalendarEnabled,
+  isDigestEnabled,
+  isHostCommentsEnabled,
+} from "@timetable/shared";
 
 import type { NotificationSettings, TimetableSettings } from "@timetable/db";
 import {
@@ -8,6 +12,7 @@ import {
   comments,
   db,
   hearts,
+  hostHearts,
   timetableMemberships,
   timetables,
   topics,
@@ -70,6 +75,11 @@ export type DigestActivity =
     }
   /** ❤️s on the recipient's topic — every hearter named (no cap). */
   | { kind: "heart"; hearters: DigestPerson[]; at: Date }
+  /** 💙s from fellow hosts on the recipient's topic (host hearts,
+   * 2026-08-04). Only in forums with the host-only thread enabled — with
+   * it off a 💙 is never shown to its recipient, and the email must not
+   * leak what the UI deliberately hides. */
+  | { kind: "hostHeart"; hearters: DigestPerson[]; at: Date }
   /** An upcoming CONFIRMED session for a topic the recipient ❤️'d
    * (QA 2026-08-03): rides the topic's card in every digest until it
    * happens; only `session.isNew` (confirmed since the last digest) can
@@ -194,6 +204,9 @@ type DigestContext = {
   electorTimetableIds: string[];
   /** Forums with the calendar feature switched on (calendar v2). */
   calendarTimetableIds: string[];
+  /** Forums with the host-only thread on — the only ones whose 💙s may
+   * appear in digests (same visibility rule as the thread's 💙 row). */
+  hostCommentsTimetableIds: string[];
 };
 
 /** The later of the digest window start and an in-app seen watermark. */
@@ -274,6 +287,11 @@ async function loadDigestContext(
     calendarTimetableIds: memberships
       .filter((m) =>
         isCalendarEnabled((m.settings as TimetableSettings | null) ?? {}),
+      )
+      .map((m) => m.timetableId),
+    hostCommentsTimetableIds: memberships
+      .filter((m) =>
+        isHostCommentsEnabled((m.settings as TimetableSettings | null) ?? {}),
       )
       .map((m) => m.timetableId),
   };
@@ -686,6 +704,71 @@ async function heartActivities(
   }));
 }
 
+/** 💙s from fellow hosts on the recipient's topics — same shape and feed
+ * watermark as ❤️s, restricted to forums whose host-only thread is on
+ * (elsewhere a 💙 is recipient-invisible by design). */
+async function hostHeartActivities(
+  ctx: DigestContext,
+  since: Date,
+  myTopicIds: string[],
+  timetableByTopic: Map<string, string>,
+): Promise<RawActivity[]> {
+  if (myTopicIds.length === 0 || ctx.hostCommentsTimetableIds.length === 0) {
+    return [];
+  }
+  const enabled = new Set(ctx.hostCommentsTimetableIds);
+  const rows = await db
+    .select({
+      topicId: hostHearts.topicId,
+      createdAt: hostHearts.createdAt,
+      userId: hostHearts.userId,
+      hearter: timetableMemberships.name,
+    })
+    .from(hostHearts)
+    .innerJoin(topics, eq(topics.id, hostHearts.topicId))
+    .leftJoin(
+      timetableMemberships,
+      and(
+        eq(timetableMemberships.userId, hostHearts.userId),
+        eq(timetableMemberships.timetableId, topics.timetableId),
+      ),
+    )
+    .where(
+      and(
+        inArray(hostHearts.topicId, myTopicIds),
+        gt(hostHearts.createdAt, since),
+      ),
+    );
+
+  const byTopic = new Map<
+    string,
+    { hearters: DigestPerson[]; at: Date; timetableId: string }
+  >();
+  for (const row of rows) {
+    const timetableId = timetableByTopic.get(row.topicId) ?? "";
+    if (!enabled.has(timetableId)) continue;
+    const cutoff = afterSeen(since, ctx.seenFeedAt.get(timetableId));
+    if (row.createdAt <= cutoff) continue;
+    const entry = byTopic.get(row.topicId) ?? {
+      hearters: [],
+      at: row.createdAt,
+      timetableId,
+    };
+    entry.hearters.push({
+      name: row.hearter,
+      userId: row.userId,
+      image: null,
+    });
+    if (row.createdAt > entry.at) entry.at = row.createdAt;
+    byTopic.set(row.topicId, entry);
+  }
+  return [...byTopic.entries()].map(([topicId, e]) => ({
+    topicId,
+    timetableId: e.timetableId,
+    activity: { kind: "hostHeart" as const, hearters: e.hearters, at: e.at },
+  }));
+}
+
 /** Topics newly published in the recipient's elector forums, still unseen
  * in the queue. */
 async function newTopicActivities(
@@ -775,6 +858,7 @@ const CARD_TIER: Record<DigestActivity["kind"], number> = {
   reply: 0,
   comment: 0,
   heart: 0,
+  hostHeart: 0,
   assignment: 1,
   new: 2,
   draft: 3,
@@ -784,9 +868,10 @@ const ACTIVITY_RANK: Record<DigestActivity["kind"], number> = {
   reply: 1,
   comment: 2,
   heart: 3,
-  assignment: 4,
-  new: 5,
-  draft: 6,
+  hostHeart: 4,
+  assignment: 5,
+  new: 6,
+  draft: 7,
 };
 
 function cardTier(card: DigestTopicCard): number {
@@ -821,13 +906,15 @@ export async function computeUserForumDigests(
   const myTopicIds = myTopics.map((t) => t.id);
   const timetableByTopic = new Map(myTopics.map((t) => [t.id, t.timetableId]));
 
-  const [commentsA, repliesA, heartsA, newA, assignedA] = await Promise.all([
-    commentActivities(ctx, since, myTopicIds, timetableByTopic),
-    replyActivities(ctx, since),
-    heartActivities(ctx, since, myTopicIds, timetableByTopic),
-    newTopicActivities(ctx, since),
-    assignmentActivities(ctx, since),
-  ]);
+  const [commentsA, repliesA, heartsA, hostHeartsA, newA, assignedA] =
+    await Promise.all([
+      commentActivities(ctx, since, myTopicIds, timetableByTopic),
+      replyActivities(ctx, since),
+      heartActivities(ctx, since, myTopicIds, timetableByTopic),
+      hostHeartActivities(ctx, since, myTopicIds, timetableByTopic),
+      newTopicActivities(ctx, since),
+      assignmentActivities(ctx, since),
+    ]);
 
   const draftsA: RawActivity[] = myTopics
     .filter((t) => t.status === "unpublished")
@@ -850,6 +937,7 @@ export async function computeUserForumDigests(
     ...commentsA,
     ...repliesA,
     ...heartsA,
+    ...hostHeartsA,
     ...newA,
     ...assignedA,
     ...draftsA,

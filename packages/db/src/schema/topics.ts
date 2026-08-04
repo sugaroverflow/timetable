@@ -65,6 +65,29 @@ export const hearts = pgTable(
   ],
 );
 
+/** Host 💙s (2026-08-04): the parallel gesture for host-non-elector
+ * members, mirroring `hearts` in its own table so the elector-heart
+ * pipelines (weights, feed, analytics) stay untouched. Never enters
+ * elector weighting; unaffected by the heartsCountFrom cutoff (a 💙 is
+ * interest, not a ballot). */
+export const hostHearts = pgTable(
+  "host_hearts",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    topicId: uuid()
+      .notNull()
+      .references(() => topics.id, { onDelete: "cascade" }),
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("host_hearts_topic_user_uq").on(t.topicId, t.userId),
+    index("host_hearts_user_idx").on(t.userId),
+  ],
+);
+
 /** Topic Queue exposure record (2026-07-28): one row per (topic, user)
  * the user has been shown in the queue — or hearted anywhere (a heart
  * implies having seen it). `seenAt` is bumped on each showing; "seen this
@@ -171,6 +194,14 @@ export const topicsRelations = relations(topics, ({ one, many }) => ({
 export const heartsRelations = relations(hearts, ({ one }) => ({
   topic: one(topics, { fields: [hearts.topicId], references: [topics.id] }),
   user: one(users, { fields: [hearts.userId], references: [users.id] }),
+}));
+
+export const hostHeartsRelations = relations(hostHearts, ({ one }) => ({
+  topic: one(topics, {
+    fields: [hostHearts.topicId],
+    references: [topics.id],
+  }),
+  user: one(users, { fields: [hostHearts.userId], references: [users.id] }),
 }));
 
 export const commentsRelations = relations(comments, ({ one, many }) => ({

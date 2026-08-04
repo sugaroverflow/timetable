@@ -4,6 +4,7 @@ import {
   comments,
   db,
   hearts,
+  hostHearts,
   timetableMemberships,
   timetables,
   topics,
@@ -608,6 +609,9 @@ export async function buildFeed(
      * visibility — this widens the host/admin-only breakdown to a per-person
      * hearted list. */
     heartedBy?: string;
+    /** Only topics the viewer currently 💙s (the host's "💙 Topics" page).
+     * 💙s ignore the heartsCountFrom cutoff. */
+    hostHeartedByViewer?: boolean;
     sort?: FeedSort;
     /** Shuffle seed for sort=random (QA #59). */
     seed?: string;
@@ -635,8 +639,23 @@ export async function buildFeed(
     }),
   );
 
+  const viewerHostHearted =
+    opts.hostHeartedByViewer && viewerUserId
+      ? new Set(
+          (
+            await db
+              .select({ topicId: hostHearts.topicId })
+              .from(hostHearts)
+              .where(eq(hostHearts.userId, viewerUserId))
+          ).map((r) => r.topicId),
+        )
+      : null;
+
   const visibleFeed = feed.filter((t) => {
     if (opts.heartedByViewer && viewerUserId && !t.viewerHasHearted) {
+      return false;
+    }
+    if (viewerHostHearted && !viewerHostHearted.has(t.id)) {
       return false;
     }
     if (

@@ -18,7 +18,7 @@ import {
   timetableMemberships,
   timetables,
 } from "./timetables";
-import { activityEvents, comments, hearts, topics } from "./topics";
+import { activityEvents, comments, hearts, hostHearts, topics } from "./topics";
 
 /** Convenience: inferred row types for the whole schema. */
 export type User = typeof users.$inferSelect;
@@ -39,6 +39,9 @@ export type TopicStatus = Topic["status"];
 
 export type Heart = typeof hearts.$inferSelect;
 export type NewHeart = typeof hearts.$inferInsert;
+
+export type HostHeart = typeof hostHearts.$inferSelect;
+export type NewHostHeart = typeof hostHearts.$inferInsert;
 
 export type Comment = typeof comments.$inferSelect;
 export type NewComment = typeof comments.$inferInsert;

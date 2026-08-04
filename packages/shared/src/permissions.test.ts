@@ -8,11 +8,13 @@ import {
   canEditSettings,
   canEditTopic,
   canHeart,
+  canHostHeart,
   canModerate,
   canProposeSession,
   canPublishTopicDirectly,
   canReadTimetable,
   canSeeComments,
+  canSeeHostHeartTallies,
   canSeePersonProfile,
   canTouchSlotSession,
   canUseQueue,
@@ -84,6 +86,44 @@ describe("canUseQueue", () => {
     expect(canUseQueue({ userId: "u", roles: ["admin"] })).toBe(true);
     expect(canUseQueue(SIGNED_IN_GUEST)).toBe(false);
     expect(canUseQueue(ANONYMOUS)).toBe(false);
+  });
+});
+
+describe("canHostHeart (host 💙s)", () => {
+  it("hosts who are NOT electors may 💙", () => {
+    expect(canHostHeart({ userId: "u", roles: ["host"] })).toBe(true);
+  });
+
+  it("a dual-role member's ❤️ is their gesture — no 💙 for them", () => {
+    expect(canHostHeart({ userId: "u", roles: ["host", "elector"] })).toBe(
+      false,
+    );
+  });
+
+  it("electors, admins-without-host, guests, and anonymous may not", () => {
+    expect(canHostHeart({ userId: "u", roles: ["elector"] })).toBe(false);
+    expect(canHostHeart({ userId: "u", roles: ["admin"] })).toBe(false);
+    expect(canHostHeart(SIGNED_IN_GUEST)).toBe(false);
+    expect(canHostHeart(ANONYMOUS)).toBe(false);
+  });
+
+  it("an admin who also hosts (but doesn't vote) may 💙", () => {
+    expect(canHostHeart({ userId: "u", roles: ["admin", "host"] })).toBe(true);
+  });
+
+  it("💙 tallies are admin eyes only — hosts never see counts", () => {
+    expect(canSeeHostHeartTallies({ userId: "u", roles: ["admin"] })).toBe(
+      true,
+    );
+    expect(
+      canSeeHostHeartTallies({ userId: "u", roles: ["owner", "admin"] }),
+    ).toBe(true);
+    expect(canSeeHostHeartTallies({ userId: "u", roles: ["host"] })).toBe(
+      false,
+    );
+    expect(canSeeHostHeartTallies({ userId: "u", roles: ["elector"] })).toBe(
+      false,
+    );
   });
 });
 

@@ -18,6 +18,7 @@ export function commentTree(field = "comments"): string {
 export const TOPIC_FEED_FIELDS = `
   id timetableId: forumId hostId hostName hostImage hostSlug title slug bodyMd bodyHtml coverImageUrl status
   heartCount weightedScore viewerHasHearted commentCount
+  viewerHasHostHearted hostHearters { userId name image slug }
   publishedAt createdAt
   ${commentTree()}
 `;

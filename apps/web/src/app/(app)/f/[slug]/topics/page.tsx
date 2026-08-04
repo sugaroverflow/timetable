@@ -55,15 +55,50 @@ async function loadHostCard(slug: string, host: string): Promise<HostCard> {
   return data.person;
 }
 
+/** Page head for the two own-gesture views (❤️ Topics / 💙 Topics); the
+ * plain All Topics view has none. */
+function GesturePageHead({
+  hearted,
+  hostHearted,
+}: {
+  hearted: boolean;
+  hostHearted: boolean;
+}) {
+  if (!hearted && !hostHearted) return null;
+  return (
+    <div className="page-head">
+      <h2 className="page-title">
+        {hostHearted ? (
+          <span aria-hidden>💙</span>
+        ) : (
+          <Heart size={14} fill="currentColor" aria-hidden />
+        )}{" "}
+        Topics
+      </h2>
+    </div>
+  );
+}
+
 function FeedEmpty({
   hearted,
+  hostHearted,
   hostLabel,
   adminLabel,
 }: {
   hearted: boolean;
+  hostHearted: boolean;
   hostLabel: string;
   adminLabel: string;
 }) {
+  if (hostHearted) {
+    return (
+      <EmptyState
+        icon="♥"
+        title="No 💙 topics yet"
+        hint="💙 topics and they'll collect here."
+      />
+    );
+  }
   if (hearted) {
     return (
       <EmptyState
@@ -109,6 +144,8 @@ export default async function FeedPage({
   const sort = normalizeFeedSort(sortParam);
   const host = hostParam ?? "";
   const hearted = heartedParam === "me";
+  // "?hearted=host" is the host's 💙 Topics view (host hearts, 2026-08-04).
+  const hostHearted = heartedParam === "host";
   // Random is the default sort, so a first visit has no seed in the URL.
   // Mint one and redirect so the seed is IN the URL: router.refresh()
   // after an action (edit save, heart, comment) then re-renders the same
@@ -124,7 +161,16 @@ export default async function FeedPage({
   }
   const seed = seedParam ?? "";
 
-  const page = await fetchFeedPage(slug, sort, host, 0, hearted, seed);
+  const page = await fetchFeedPage(
+    slug,
+    sort,
+    host,
+    0,
+    hearted,
+    seed,
+    "",
+    hostHearted,
+  );
   const hostLabel = roleLabel(page.settings.roleLabels, "host");
   const adminLabel = roleLabel(page.settings.roleLabels, "admin");
 
@@ -133,13 +179,7 @@ export default async function FeedPage({
   return (
     <div className="stack">
       {page.isMember ? <MarkFeedSeen slug={slug} /> : null}
-      {hearted ? (
-        <div className="page-head">
-          <h2 className="page-title">
-            <Heart size={14} fill="currentColor" aria-hidden /> Topics
-          </h2>
-        </div>
-      ) : null}
+      <GesturePageHead hearted={hearted} hostHearted={hostHearted} />
       <div className="toolbar feed-toolbar">
         {page.hosts.length > 0 ? (
           <HostFilter
@@ -170,16 +210,18 @@ export default async function FeedPage({
       {page.topics.length === 0 ? (
         <FeedEmpty
           hearted={hearted}
+          hostHearted={hostHearted}
           hostLabel={hostLabel}
           adminLabel={adminLabel}
         />
       ) : (
         <InfiniteFeed
-          key={`${sort}|${host}|${hearted}|${seed}`}
+          key={`${sort}|${host}|${hearted}|${hostHearted}|${seed}`}
           slug={slug}
           sort={sort}
           host={host}
           hearted={hearted}
+          hostHearted={hostHearted}
           seed={seed}
           // eslint-disable-next-line react-hooks/purity -- server-only render marker
           refreshToken={Math.random().toString(36).slice(2, 10)}

@@ -8,6 +8,7 @@ import { CalendarSettingsForm } from "@/components/CalendarSettingsForm";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { EmailDigestForm } from "@/components/EmailDigestForm";
 import { HeartsCutoffForm } from "@/components/HeartsCutoffForm";
+import { HostCommentsForm } from "@/components/HostCommentsForm";
 import { InviteForm } from "@/components/InviteForm";
 import { SettingsForm, type SettingsValues } from "@/components/SettingsForm";
 import { TimetableProfileForm } from "@/components/TimetableProfileForm";
@@ -86,6 +87,18 @@ export default async function SettingsPage({
                 (settings as TimetableSettings).topics?.hostsPublishDirectly,
               )}
               hostLabel={roleLabel(settings.roleLabels, "host")}
+              adminLabel={roleLabel(settings.roleLabels, "admin")}
+            />
+
+            <hr className="settings-divider" />
+
+            <HostCommentsForm
+              slug={slug}
+              enabled={
+                (settings as TimetableSettings).hostComments?.enabled ?? true
+              }
+              hostLabel={roleLabel(settings.roleLabels, "host")}
+              electorLabel={roleLabel(settings.roleLabels, "elector")}
               adminLabel={roleLabel(settings.roleLabels, "admin")}
             />
 

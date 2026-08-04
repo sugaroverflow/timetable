@@ -264,6 +264,10 @@ builder.mutationFields((t) => ({
       calendarJson: t.arg.string({ required: false }),
       /** Hosts publish their own topics without admin review. */
       hostsPublishDirectly: t.arg.boolean({ required: false }),
+      /** The host-only comment thread (and with it the attributed 💙 row +
+       * 💙s in digests). Default on; off turns 💙s into admin-only
+       * bookmarks (host hearts, 2026-08-04). */
+      hostCommentsEnabled: t.arg.boolean({ required: false }),
     },
     // eslint-disable-next-line complexity, sonarjs/cognitive-complexity -- audit debt (2026-07-22): 13-arg settings-patch assembly; decomposition queued
     resolve: async (_p, args, ctx) => {
@@ -347,6 +351,13 @@ builder.mutationFields((t) => ({
         patch.topics = {
           ...(current.topics ?? {}),
           hostsPublishDirectly: args.hostsPublishDirectly,
+        };
+      }
+
+      if (args.hostCommentsEnabled != null) {
+        patch.hostComments = {
+          ...(current.hostComments ?? {}),
+          enabled: args.hostCommentsEnabled,
         };
       }
 
