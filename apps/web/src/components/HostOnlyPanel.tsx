@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Collapsible } from "@base-ui/react/collapsible";
-import { ChevronDown, ChevronRight, Lock } from "lucide-react";
+import { ChevronDown, ChevronRight, Lock, MessageCircle } from "lucide-react";
 
 import type { FeedComment, HostHearter } from "@/lib/feedTypes";
 import type { RoleLabels } from "@/lib/timetableSettings";
 
+import { Avatar } from "./Avatar";
+import { BreakdownCaret } from "./BreakdownPanel";
 import { CommentComposer } from "./CommentComposer";
 import { CommentList } from "./CommentList";
 import { HostHeartButton } from "./HostHeartButton";
@@ -16,42 +18,71 @@ function countNested(comments: FeedComment[]): number {
   return comments.reduce((sum, c) => sum + 1 + countNested(c.replies ?? []), 0);
 }
 
-/** The 💙 row (host hearts, 2026-08-04): the viewer's own toggle (when
- * they're an eligible host-non-elector) plus the attributed "💙 Sarah,
- * Amir" names — INSIDE the host-only thread, so who can see it is
- * self-evident. Counts across topics stay admin-only in Analysis. */
-function HostHeartsRow({
+/** The faculty actions row (host hearts, QA 2026-08-04): mirrors the
+ * public card-actions row — [givers disclosure] [💙 + count] [💬 count] —
+ * INSIDE the host-only thread, so who can see it is self-evident. The
+ * disclosure lists the 💙 givers; cross-topic tallies stay admin-only. */
+function HostHeartsActionsRow({
   topicId,
   hearters,
   canHostHeart,
   viewerHasHostHearted,
+  commentCount,
   slug,
   hostLabel,
+  onFocusComposer,
 }: {
   topicId: string;
   hearters: HostHearter[];
   canHostHeart: boolean;
   viewerHasHostHearted: boolean;
+  commentCount: number;
   slug?: string;
   hostLabel: string;
+  onFocusComposer: () => void;
 }) {
-  if (!canHostHeart && hearters.length === 0) return null;
+  const [open, setOpen] = useState(false);
   return (
-    <div className="row host-hearts-row" style={{ alignItems: "center" }}>
-      {canHostHeart ? (
-        <HostHeartButton topicId={topicId} hearted={viewerHasHostHearted} />
-      ) : null}
-      <span className="faint">
-        {hearters.length === 0 ? (
-          <>No 💙 yet</>
+    <>
+      <div className="card-actions">
+        {hearters.length > 0 ? (
+          <BreakdownCaret
+            open={open}
+            onToggle={() => setOpen(!open)}
+            label="💙 list"
+          />
+        ) : null}
+        {canHostHeart ? (
+          <HostHeartButton
+            topicId={topicId}
+            hearted={viewerHasHostHearted}
+            count={hearters.length}
+          />
         ) : (
-          <>
-            {canHostHeart ? null : <span aria-hidden>💙 </span>}
-            {hearters.map((h, i) => (
-              <span key={h.userId}>
-                {i > 0 ? ", " : ""}
+          <span className="heart-btn" aria-hidden>
+            <span className="ic">💙</span>
+            {hearters.length}
+          </span>
+        )}
+        <button className="act" type="button" onClick={onFocusComposer}>
+          <MessageCircle size={16} aria-hidden />
+          {commentCount || ""}
+          <span style={{ fontWeight: "var(--fw-semibold)" }}>Comment</span>
+        </button>
+      </div>
+      {open ? (
+        <div className="host-panel">
+          <div className="stack" style={{ gap: 6, padding: "6px 2px" }}>
+            {hearters.map((h) => (
+              <span
+                key={h.userId}
+                className="row"
+                style={{ gap: 6, alignItems: "center" }}
+              >
+                <span aria-hidden>💙</span>
                 {slug ? (
                   <PersonChip slug={slug} userId={h.userId}>
+                    <Avatar small name={h.name} image={h.image} />{" "}
                     {h.name ?? hostLabel}
                   </PersonChip>
                 ) : (
@@ -59,10 +90,10 @@ function HostHeartsRow({
                 )}
               </span>
             ))}
-          </>
-        )}
-      </span>
-    </div>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
 
@@ -94,6 +125,7 @@ export function HostOnlyPanel({
 }) {
   const [expanded, setExpanded] = useState(false);
   const count = countNested(comments);
+  const threadRef = useRef<HTMLDivElement>(null);
 
   return (
     <Collapsible.Root
@@ -116,15 +148,19 @@ export function HostOnlyPanel({
       </Collapsible.Trigger>
       <Collapsible.Panel>
         {expanded && (
-          <div className="host-thread">
+          <div className="host-thread" ref={threadRef}>
             {hostHearters ? (
-              <HostHeartsRow
+              <HostHeartsActionsRow
                 topicId={topicId}
                 hearters={hostHearters}
                 canHostHeart={canHostHeart}
                 viewerHasHostHearted={viewerHasHostHearted}
+                commentCount={count}
                 slug={slug}
                 hostLabel={hostLabel}
+                onFocusComposer={() =>
+                  threadRef.current?.querySelector("textarea")?.focus()
+                }
               />
             ) : null}
             <CommentList

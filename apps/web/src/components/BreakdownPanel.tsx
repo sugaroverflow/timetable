@@ -153,21 +153,24 @@ export function HostHeartBreakdownPanelBody({
   return <BreakdownTable slug={slug} rows={rows} electorLabel={hostLabel} />;
 }
 
-/** The triangle that opens a ❤️ breakdown — one look everywhere. */
+/** The triangle that opens a ❤️ breakdown — one look everywhere. `label`
+ * covers the 💙 variants (host hearts, 2026-08-04). */
 export function BreakdownCaret({
   open,
   onToggle,
+  label = "❤️ breakdown",
 }: {
   open: boolean;
   onToggle: () => void;
+  label?: string;
 }) {
   return (
     <button
       type="button"
       className="breakdown-caret"
       aria-expanded={open}
-      aria-label={open ? "Hide ❤️ breakdown" : "Show ❤️ breakdown"}
-      title={open ? "Hide ❤️ breakdown" : "Show ❤️ breakdown"}
+      aria-label={open ? `Hide ${label}` : `Show ${label}`}
+      title={open ? `Hide ${label}` : `Show ${label}`}
       onClick={onToggle}
     >
       {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
