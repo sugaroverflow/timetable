@@ -215,6 +215,16 @@ function permalinkFor(topic: ManagedTopic, slug: string): string | null {
   );
 }
 
+/** The {host}-only panel shows for host comments OR received 💙s — the
+ * owner's view of who 💙'd their topic lives there (host hearts, QA
+ * 2026-08-04). */
+function showsHostPanel(
+  hostComments: unknown[],
+  hostHearters: unknown[] | null | undefined,
+): boolean {
+  return hostComments.length > 0 || (hostHearters?.length ?? 0) > 0;
+}
+
 /** A topic on My Topics — renders like a feed card (cover, description,
  * comments, {host}-only thread; QA #59) with the manage controls below. */
 export function TopicManager({
@@ -306,7 +316,8 @@ export function TopicManager({
           <CommentComposer topicId={topic.id} mentionSlug={slug} />
         ) : null}
 
-        {hostComments.length > 0 ? (
+        {/* No 💙 toggle on your own topic: read-only row. */}
+        {showsHostPanel(hostComments, topic.hostHearters) ? (
           <HostOnlyPanel
             topicId={topic.id}
             viewerId={viewerId}
@@ -315,6 +326,7 @@ export function TopicManager({
             slug={slug}
             hostLabel={hostLabel}
             roleLabels={roleLabels}
+            hostHearters={topic.hostHearters ?? null}
           />
         ) : null}
 

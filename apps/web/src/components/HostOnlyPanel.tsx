@@ -59,8 +59,10 @@ function HostHeartsActionsRow({
             count={hearters.length}
           />
         ) : (
+          // Read-only count (admins, dual-role hosts, the topic's owner on
+          // My Topics): 🤍 at zero so an empty box doesn't read as hearted.
           <span className="heart-btn" aria-hidden>
-            <span className="ic">💙</span>
+            <span className="ic">{hearters.length > 0 ? "💙" : "🤍"}</span>
             {hearters.length}
           </span>
         )}
@@ -71,26 +73,24 @@ function HostHeartsActionsRow({
         </button>
       </div>
       {open ? (
-        <div className="host-panel">
-          <div className="stack" style={{ gap: 6, padding: "6px 2px" }}>
-            {hearters.map((h) => (
-              <span
-                key={h.userId}
-                className="row"
-                style={{ gap: 6, alignItems: "center" }}
-              >
-                <span aria-hidden>💙</span>
-                {slug ? (
-                  <PersonChip slug={slug} userId={h.userId}>
-                    <Avatar small name={h.name} image={h.image} />{" "}
-                    {h.name ?? hostLabel}
-                  </PersonChip>
-                ) : (
-                  (h.name ?? hostLabel)
-                )}
-              </span>
-            ))}
-          </div>
+        <div className="host-hearts-list stack" style={{ gap: 6 }}>
+          {hearters.map((h) => (
+            <span
+              key={h.userId}
+              className="row"
+              style={{ gap: 6, alignItems: "center" }}
+            >
+              <span aria-hidden>💙</span>
+              {slug ? (
+                <PersonChip slug={slug} userId={h.userId}>
+                  <Avatar small name={h.name} image={h.image} />{" "}
+                  {h.name ?? hostLabel}
+                </PersonChip>
+              ) : (
+                (h.name ?? hostLabel)
+              )}
+            </span>
+          ))}
         </div>
       ) : null}
     </>
