@@ -1869,6 +1869,22 @@ textarea {
   border-top: 1px solid var(--host-line);
   padding-top: 10px;
 }
+/* The faculty 💙 actions row (host hearts, QA 2026-08-04) sits directly
+ * under the thread's own divider — drop card-actions' border so the two
+ * rules don't stack. */
+.host-thread .card-actions {
+  border-top: 0;
+  padding-top: 0;
+}
+/* The 💙-givers disclosure list: card surface on the host wash, instead
+ * of nesting a second .host-panel box. */
+.host-hearts-list {
+  margin: 4px 0 8px;
+  padding: 8px 12px;
+  background: var(--card);
+  border: 1px solid var(--host-line);
+  border-radius: var(--radius-sm);
+}
 
 /* Slot date widget */
 .slot-date {

@@ -95,6 +95,9 @@ export type ManagedTopic = {
   comments?: FeedComment[];
   /** Faculty-only thread on published topics. */
   hostOnlyComments?: FeedComment[];
+  /** 💙s received — the host-only box shows them to the topic's owner on
+   * My Topics too (host hearts, QA 2026-08-04). */
+  hostHearters?: HostHearter[] | null;
   /** Drafting thread — admins + topic owner only (QA #59 round 3). */
   adminComments?: FeedComment[];
 };

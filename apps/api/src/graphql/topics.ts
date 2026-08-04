@@ -288,6 +288,20 @@ const ManagedTopicType = builder
             includeHidden: false,
           }),
       }),
+      /** Attributed 💙s for the host-only box on My Topics — the
+       * recipient's view of who 💙'd their topic (host hearts, QA
+       * 2026-08-04). Null while the forum's host-only thread is off. */
+      hostHearters: t.field({
+        type: [HostHearterType],
+        nullable: true,
+        resolve: async (tp) => {
+          const timetable = await getTimetableById(tp.timetableId);
+          if (timetable && !isHostCommentsEnabled(timetable.settings)) {
+            return null;
+          }
+          return listTopicHostHearters(tp.timetableId, tp.id);
+        },
+      }),
       /** Host-only thread. ManagedTopic is only ever served to the owning
        * host or admins, so this is safe. Empty when the forum has switched
        * the host-only thread off (hide, never delete). */
