@@ -1876,6 +1876,12 @@ textarea {
   border-top: 0;
   padding-top: 0;
 }
+/* 💙'd state wears the host palette, not the elector ❤️'s pink wash. */
+.host-heart-btn.on {
+  border-color: var(--host-ink);
+  background: var(--card);
+  color: var(--host-ink);
+}
 /* The 💙-givers disclosure list: card surface on the host wash, instead
  * of nesting a second .host-panel box. */
 .host-hearts-list {

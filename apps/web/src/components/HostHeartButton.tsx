@@ -48,7 +48,7 @@ export function HostHeartButton({
   return (
     <button
       type="button"
-      className={`heart-btn ${hearted ? "on" : ""}`}
+      className={`heart-btn host-heart-btn ${hearted ? "on" : ""}`}
       onClick={toggle}
       disabled={busy}
       aria-pressed={hearted}
