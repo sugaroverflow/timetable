@@ -10,15 +10,17 @@ const MUTATION = `mutation HostHeart($id: String!) {
 
 /** The 💙 toggle (host hearts, 2026-08-04) — the parallel gesture for
  * hosts who aren't electors. Lives INSIDE the host-only thread (QA
- * 2026-08-04: placement makes the audience self-evident), next to the
- * attributed names row. No count on the button: tallies are admin
- * eyes only. */
+ * 2026-08-04: placement makes the audience self-evident), styled like the
+ * public ❤️ button with the topic's 💙 count. Cross-topic tallies stay
+ * admin eyes only. */
 export function HostHeartButton({
   topicId,
   hearted,
+  count,
 }: {
   topicId: string;
   hearted: boolean;
+  count: number;
 }) {
   const { run, busy } = useGqlAction();
   const icRef = useRef<HTMLSpanElement>(null);
@@ -56,6 +58,7 @@ export function HostHeartButton({
       <span className="ic" ref={icRef} aria-hidden>
         {hearted ? "💙" : "🤍"}
       </span>
+      {count}
     </button>
   );
 }
