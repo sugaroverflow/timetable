@@ -19,19 +19,24 @@ import {
   markTopicSeen,
   moderateTopic,
   reassignTopic,
+  listTopicHostHearters,
+  listViewerHostHeartedTopicIds,
   restartQueueRound,
   submitTopic,
   toggleHeart,
+  toggleHostHeart,
   unpublishTopic,
   updateTopic,
   type CommentNode,
   type FeedTopic,
+  type HostHearter,
   type TopicQueueState,
 } from "@timetable/core";
 import type { Topic } from "@timetable/db";
 import {
   canEditTopic,
   canHeart,
+  canHostHeart,
   canUseQueue,
   canModerate,
   canProposeTopics,
@@ -39,8 +44,10 @@ import {
   canSeeComments,
   canSeeHostOnly,
   isAdmin,
+  isHostCommentsEnabled,
   ownsTopicAsHost,
   type Privacy,
+  type Viewer,
 } from "@timetable/shared";
 
 import { assertActionLimit } from "../http/action-limits";
@@ -65,6 +72,11 @@ type GqlTopic = FeedTopic & {
   canSeeHostOnly: boolean;
   canModerate: boolean;
   canSeeComments: boolean;
+  /** Host 💙s (2026-08-04): the forum's host-only-thread option, and the
+   * viewer's own 💙 state (prefetched in one batched query per page).
+   * Unset means false — anonymous/elector viewers never load them. */
+  hostCommentsEnabled?: boolean;
+  viewerHasHostHearted?: boolean;
   /** Comment trees prefetched in one batched query by list resolvers
    * (topicFeed); single-topic paths leave it unset and the field resolver
    * falls back to a per-topic query. */
@@ -88,6 +100,19 @@ const HostOptionType = builder
     }),
   });
 
+/** One attributed 💙 in the host-only thread's "💙 Sarah, Amir" row. */
+const HostHearterType = builder
+  .objectRef<HostHearter>("HostHearter")
+  .implement({
+    fields: (t) => ({
+      userId: t.exposeID("userId"),
+      name: t.exposeString("name", { nullable: true }),
+      image: t.exposeString("image", { nullable: true }),
+      slug: t.exposeString("slug", { nullable: true }),
+      heartedAt: t.string({ resolve: (h) => h.heartedAt.toISOString() }),
+    }),
+  });
+
 const TopicType = builder.objectRef<GqlTopic>("Topic").implement({
   fields: (t) => ({
     id: t.exposeID("id"),
@@ -104,6 +129,23 @@ const TopicType = builder.objectRef<GqlTopic>("Topic").implement({
     status: t.exposeString("status"),
     heartCount: t.exposeInt("heartCount"),
     viewerHasHearted: t.exposeBoolean("viewerHasHearted"),
+    /** The viewer's own 💙 (host-non-electors only; false otherwise). */
+    viewerHasHostHearted: t.boolean({
+      resolve: (tp) => tp.viewerHasHostHearted ?? false,
+    }),
+    /** Attributed 💙s for the host-only thread row — hosts/admins only,
+     * and only while the forum's host-only thread is switched on (with it
+     * off, 💙s are admin-analysis-only bookmarks). */
+    hostHearters: t.field({
+      type: [HostHearterType],
+      nullable: true,
+      resolve: (tp) => {
+        if (!tp.canSeeHostOnly || !(tp.hostCommentsEnabled ?? false)) {
+          return null;
+        }
+        return listTopicHostHearters(tp.timetableId, tp.id);
+      },
+    }),
     commentCount: t.int({
       resolve: (tp) => (tp.canSeeComments ? tp.commentCount : 0),
     }),
@@ -147,7 +189,8 @@ const TopicType = builder.objectRef<GqlTopic>("Topic").implement({
         return (
           tp.prefetchedComments ??
           listCommentTree(tp.id, {
-            includeHostOnly: tp.canSeeHostOnly,
+            includeHostOnly:
+              tp.canSeeHostOnly && (tp.hostCommentsEnabled ?? false),
             includeHidden: tp.canModerate,
           })
         );
@@ -246,10 +289,15 @@ const ManagedTopicType = builder
           }),
       }),
       /** Host-only thread. ManagedTopic is only ever served to the owning
-       * host or admins, so this is safe. */
+       * host or admins, so this is safe. Empty when the forum has switched
+       * the host-only thread off (hide, never delete). */
       hostOnlyComments: t.field({
         type: [CommentType],
         resolve: async (tp) => {
+          const timetable = await getTimetableById(tp.timetableId);
+          if (timetable && !isHostCommentsEnabled(timetable.settings)) {
+            return [];
+          }
           if (tp.prefetchedHostOnlyComments)
             return tp.prefetchedHostOnlyComments;
           const tree = await listCommentTree(tp.id, {
@@ -287,6 +335,18 @@ const HeartResult = builder
     }),
   });
 
+/** The viewer's 💙'd subset of `topicIds` — empty unless they're an
+ * eligible host (host-non-elector), so elector/anonymous pages never pay
+ * the extra query. */
+async function viewerHostHeartedSet(
+  userId: string | null,
+  viewer: Viewer,
+  topicIds: string[],
+): Promise<Set<string>> {
+  if (!userId || !canHostHeart(viewer)) return new Set();
+  return listViewerHostHeartedTopicIds(userId, topicIds);
+}
+
 // ---------------------------------------------------------------------------
 // Queries
 // ---------------------------------------------------------------------------
@@ -299,6 +359,7 @@ builder.queryFields((t) => ({
       idOrSlug: t.arg.string({ required: true }),
       hostId: t.arg.string({ required: false }),
       heartedByMe: t.arg.boolean({ required: false }),
+      hostHeartedByMe: t.arg.boolean({ required: false }),
       heartedBy: t.arg.string({ required: false }),
       sort: t.arg.string({ required: false }),
       seed: t.arg.string({ required: false }),
@@ -312,6 +373,7 @@ builder.queryFields((t) => ({
       const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
       const hostOnly = canSeeHostOnly(viewer);
       const moderate = canModerate(viewer);
+      const hostThreadOn = isHostCommentsEnabled(readable.timetable.settings);
       const seeComments = canSeeComments(
         readable.timetable.privacy as Privacy,
         viewer,
@@ -337,6 +399,7 @@ builder.queryFields((t) => ({
         {
           hostId: args.hostId ?? undefined,
           heartedByViewer: Boolean(args.heartedByMe),
+          hostHeartedByViewer: Boolean(args.hostHeartedByMe),
           heartedBy: args.heartedBy ?? undefined,
           sort,
           seed: args.seed ?? undefined,
@@ -349,14 +412,24 @@ builder.queryFields((t) => ({
       const commentTrees = seeComments
         ? await listCommentTreesForTopics(
             feed.map((tp) => tp.id),
-            { includeHostOnly: hostOnly, includeHidden: moderate },
+            {
+              includeHostOnly: hostOnly && hostThreadOn,
+              includeHidden: moderate,
+            },
           )
         : new Map<string, CommentNode[]>();
+      const viewerHostHearted = await viewerHostHeartedSet(
+        ctx.user?.id ?? null,
+        viewer,
+        feed.map((tp) => tp.id),
+      );
       return feed.map((tp) => ({
         ...tp,
         canSeeHostOnly: hostOnly,
         canModerate: moderate,
         canSeeComments: seeComments,
+        hostCommentsEnabled: hostThreadOn,
+        viewerHasHostHearted: viewerHostHearted.has(tp.id),
         prefetchedComments: commentTrees.get(tp.id) ?? [],
       }));
     },
@@ -421,11 +494,20 @@ builder.queryFields((t) => ({
           { topicId: topic.id },
         );
         if (!feedTopic) return null;
+        const viewerHostHearted = await viewerHostHeartedSet(
+          ctx.user?.id ?? null,
+          viewer,
+          [topic.id],
+        );
         return {
           ...feedTopic,
           canSeeHostOnly: hostOnly,
           canModerate: moderate,
           canSeeComments: seeComments,
+          hostCommentsEnabled: isHostCommentsEnabled(
+            readable.timetable.settings,
+          ),
+          viewerHasHostHearted: viewerHostHearted.has(topic.id),
         };
       }
 
@@ -684,6 +766,21 @@ builder.mutationFields((t) => ({
       return { topicId: topic.id, hearted };
     },
   }),
+
+  /** Toggle the viewer's 💙 (host hearts, 2026-08-04). Host-non-electors
+   * only — a dual-role member's ❤️ is their gesture. Works in every forum
+   * (with the host-only thread off it's a private bookmark). */
+  hostHeartTopic: t.field({
+    type: HeartResult,
+    args: { topicId: t.arg.string({ required: true }) },
+    resolve: async (_p, args, ctx) => {
+      const user = await requireUser(ctx);
+      const { topic, viewer } = await loadTopicAndViewer(ctx, args.topicId);
+      if (!canHostHeart(viewer)) forbidden("Hosts who aren't electors only");
+      const { hearted } = await toggleHostHeart(topic.id, user.id);
+      return { topicId: topic.id, hearted };
+    },
+  }),
 }));
 
 // ---------------------------------------------------------------------------
@@ -739,6 +836,11 @@ builder.queryFields((t) => ({
           topicId: state.currentTopicId,
         });
         if (topic) {
+          const viewerHostHearted = await viewerHostHeartedSet(
+            ctx.user.id,
+            viewer,
+            [topic.id],
+          );
           current = {
             ...topic,
             canSeeHostOnly: canSeeHostOnly(viewer),
@@ -747,6 +849,10 @@ builder.queryFields((t) => ({
               readable.timetable.privacy as Privacy,
               viewer,
             ),
+            hostCommentsEnabled: isHostCommentsEnabled(
+              readable.timetable.settings,
+            ),
+            viewerHasHostHearted: viewerHostHearted.has(topic.id),
           };
         }
       }

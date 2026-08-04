@@ -177,6 +177,21 @@ export type TopicSettings = {
   hostsPublishDirectly?: boolean;
 };
 
+/** The host-only comment thread as a forum option (host 💙s, 2026-08-04):
+ * on by default; forums where every host is also an elector can switch the
+ * faculty backchannel off. Toggling off hides the thread and the 💙
+ * attribution row — nothing is deleted, and host 💙s keep working as a
+ * private bookmark (visible only in admin analysis). */
+export type HostCommentsSettings = {
+  enabled?: boolean;
+};
+
+/** Whether the forum shows the host-only comment thread (and with it the
+ * attributed 💙 row + 💙s in host digests). Defaults ON. */
+export function isHostCommentsEnabled(settings: TimetableSettings): boolean {
+  return settings.hostComments?.enabled ?? true;
+}
+
 /** Per-timetable settings persisted as JSON: custom role labels, theme
  * colors, default digest options, etc. */
 export type TimetableSettings = {
@@ -196,4 +211,6 @@ export type TimetableSettings = {
   calendar?: CalendarSettings;
   /** Topic-lifecycle policy. */
   topics?: TopicSettings;
+  /** Host-only comment thread option (on unless disabled). */
+  hostComments?: HostCommentsSettings;
 };

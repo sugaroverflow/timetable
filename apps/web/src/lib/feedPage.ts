@@ -1,4 +1,10 @@
-import { isAdmin, isElector, isHost, type Role } from "@timetable/shared";
+import {
+  isAdmin,
+  isElector,
+  isHost,
+  isHostCommentsEnabled,
+  type Role,
+} from "@timetable/shared";
 
 import type { FeedPerms } from "@/components/TopicCard";
 import type { FeedTopic } from "@/lib/feedTypes";
@@ -44,12 +50,12 @@ type Data = {
 };
 
 const QUERY = `
-  query Feed($s: String!, $sort: String, $seed: String, $host: String, $hearted: Boolean, $heartedBy: String, $limit: Int, $offset: Int) {
+  query Feed($s: String!, $sort: String, $seed: String, $host: String, $hearted: Boolean, $hostHearted: Boolean, $heartedBy: String, $limit: Int, $offset: Int) {
     timetable: forum(idOrSlug: $s) { viewerRoles settings viewerHeartedPublishedCount }
     me { id }
     myFeedLastSeenAt(idOrSlug: $s)
     timetableHosts: forumHosts(idOrSlug: $s) { id name }
-    topicFeed(idOrSlug: $s, sort: $sort, seed: $seed, hostId: $host, heartedByMe: $hearted, heartedBy: $heartedBy, limit: $limit, offset: $offset) {
+    topicFeed(idOrSlug: $s, sort: $sort, seed: $seed, hostId: $host, heartedByMe: $hearted, hostHeartedByMe: $hostHearted, heartedBy: $heartedBy, limit: $limit, offset: $offset) {
       ${TOPIC_FEED_FIELDS}
       contentUpdatedAt
     }
@@ -86,6 +92,9 @@ export function topicPerms(
   const published = status === "published";
   return {
     canHeart: isElector(roles) && published,
+    // 💙s are the host-non-elector gesture — a dual-role member's ❤️ IS
+    // their gesture (host hearts, 2026-08-04).
+    canHostHeart: isHost(roles) && !isElector(roles) && published,
     canComment: roles.length > 0 && published,
     canHostOnly: isHost(roles) || isAdmin(roles),
     canModerate: isAdmin(roles),
@@ -120,6 +129,7 @@ export function topicCardProps(page: FeedPage, topic: FeedTopic) {
     electorLabel: roleLabel(page.settings.roleLabels, "elector"),
     viewerHeartCount: page.viewerHeartCount,
     hosts: page.hosts,
+    hostCommentsEnabled: isHostCommentsEnabled(page.settings),
   };
 }
 
@@ -175,6 +185,7 @@ export async function fetchFeedPage(
   hearted = false,
   seed = "",
   heartedBy = "",
+  hostHearted = false,
 ): Promise<FeedPage> {
   const data = await gqlFetch<Data>(QUERY, {
     s: slug,
@@ -182,6 +193,7 @@ export async function fetchFeedPage(
     seed: seed || null,
     host: host || null,
     hearted,
+    hostHearted,
     heartedBy: heartedBy || null,
     limit: FEED_PAGE_SIZE + 1,
     offset: Math.max(0, offset),

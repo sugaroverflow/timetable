@@ -4,6 +4,7 @@ export * from "./members";
 export * from "./people";
 export * from "./topics";
 export * from "./hearts";
+export * from "./hostHearts";
 export * from "./queue";
 export * from "./comments";
 export * from "./activity";

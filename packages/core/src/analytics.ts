@@ -15,9 +15,11 @@ import {
   topicCommentScores,
   type CommentTally,
   type TopicCommentScores,
+  type TopicNormScores,
 } from "@timetable/shared";
 
 import { coerceDate } from "./dates";
+import { computeHostHeartScores, loadPublishedHostHearts } from "./hostHearts";
 import { loadQueueCoverage } from "./queue";
 import { getHeartsCountFrom } from "./topics";
 import { buildFeed, type FeedTopic } from "./topics";
@@ -59,6 +61,13 @@ export type DashboardData = {
     commentL2: number;
     commentL1: number;
     commentDevotion: number;
+    /** 💙 metrics (host hearts, 2026-08-04): same four normalisations over
+     * the host_hearts rows. Admin eyes only — the API nulls these for
+     * non-admin dashboard viewers. */
+    hostHeartCount: number;
+    hostHeartL2: number;
+    hostHeartL1: number;
+    hostHeartDevotion: number;
   }[];
   /** Host activity (QA 2026-07-27, replaced the weighted-votes host
    * leaderboard): every host-role member — topic-less ones included —
@@ -71,6 +80,10 @@ export type DashboardData = {
     hostSlug: string | null;
     topicCount: number;
     commentCount: number;
+    /** 💙s this host has given (host hearts, 2026-08-04). Admin eyes only —
+     * nulled by the API for non-admin viewers; deliberately NOT folded into
+     * latestActivityAt so nothing about 💙 timing leaks to hosts. */
+    hostHeartCount: number;
     latestActivityAt: Date | null;
   }[];
   electorActivity: {
@@ -194,33 +207,47 @@ async function countSlots(timetableId: string): Promise<number> {
   return n;
 }
 
+function commentScoreFields(c: TopicCommentScores | undefined) {
+  return {
+    commentTotal: c?.total ?? 0,
+    commenterCount: c?.commenters ?? 0,
+    commentL2: c?.l2 ?? 0,
+    commentL1: c?.l1 ?? 0,
+    commentDevotion: c?.devotion ?? 0,
+  };
+}
+
+function hostHeartScoreFields(hh: TopicNormScores | undefined) {
+  return {
+    hostHeartCount: hh?.raw ?? 0,
+    hostHeartL2: hh?.l2 ?? 0,
+    hostHeartL1: hh?.l1 ?? 0,
+    hostHeartDevotion: hh?.devotion ?? 0,
+  };
+}
+
 function buildLeaderboards(
   feed: FeedTopic[],
   commentScores: Map<string, TopicCommentScores>,
+  hostHeartScores: Map<string, TopicNormScores>,
 ): DashboardData["topicLeaderboard"] {
   // All published topics, not a top-10 — QA #42 wants the dashboard to show
   // every host and every topic, each linked to its permalink.
-  return feed.map((t) => {
-    const c = commentScores.get(t.id);
-    return {
-      id: t.id,
-      title: t.title,
-      slug: t.slug,
-      hostId: t.hostId,
-      hostName: t.hostName,
-      hostImage: t.hostImage,
-      hostSlug: t.hostSlug,
-      weightedScore: t.weightedScore,
-      l2Score: t.l2Score,
-      devotionScore: t.devotionScore,
-      heartCount: t.heartCount,
-      commentTotal: c?.total ?? 0,
-      commenterCount: c?.commenters ?? 0,
-      commentL2: c?.l2 ?? 0,
-      commentL1: c?.l1 ?? 0,
-      commentDevotion: c?.devotion ?? 0,
-    };
-  });
+  return feed.map((t) => ({
+    id: t.id,
+    title: t.title,
+    slug: t.slug,
+    hostId: t.hostId,
+    hostName: t.hostName,
+    hostImage: t.hostImage,
+    hostSlug: t.hostSlug,
+    weightedScore: t.weightedScore,
+    l2Score: t.l2Score,
+    devotionScore: t.devotionScore,
+    heartCount: t.heartCount,
+    ...commentScoreFields(commentScores.get(t.id)),
+    ...hostHeartScoreFields(hostHeartScores.get(t.id)),
+  }));
 }
 
 /** Published-topic count + latest publish/edit per host, forum-wide — the
@@ -262,6 +289,7 @@ function buildHostActivity(args: {
   }[];
   topicStats: Map<string, Stat>;
   commentsByAuthor: Map<string, Stat>;
+  hostHeartsGiven: Map<string, number>;
 }): DashboardData["hostActivity"] {
   return args.hostRows
     .map((h) => {
@@ -274,6 +302,7 @@ function buildHostActivity(args: {
         hostSlug: h.slug,
         topicCount: topicStat?.count ?? 0,
         commentCount: commentStat?.count ?? 0,
+        hostHeartCount: args.hostHeartsGiven.get(h.userId) ?? 0,
         latestActivityAt: latestDate(
           topicStat?.latestAt,
           commentStat?.latestAt,
@@ -633,9 +662,20 @@ export async function getDashboard(
     await activityWindow(timetableId, opts);
 
   const commentTallies = await loadCommentTallies(timetableId, activitySince);
+  // 💙s ignore the activity window and cutoff — they aren't votes; the
+  // admin table shows the standing picture.
+  const hostHeartRows = await loadPublishedHostHearts(timetableId);
+  const hostHeartsGiven = new Map<string, number>();
+  for (const row of hostHeartRows) {
+    hostHeartsGiven.set(
+      row.electorId,
+      (hostHeartsGiven.get(row.electorId) ?? 0) + 1,
+    );
+  }
   const topicLeaderboard = buildLeaderboards(
     feed,
     topicCommentScores(commentTallies),
+    computeHostHeartScores(hostHeartRows),
   );
 
   const heartActivityRows = await loadHeartActivity(heartCountConds);
@@ -671,6 +711,7 @@ export async function getDashboard(
     hostRows,
     topicStats: await loadHostTopicStats(timetableId),
     commentsByAuthor: hostCommentStats,
+    hostHeartsGiven,
   });
 
   const unallocatedTopics = await findUnallocated(timetableId, feed);

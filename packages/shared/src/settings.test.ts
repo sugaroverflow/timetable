@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isDigestEnabled } from "./settings";
+import { isDigestEnabled, isHostCommentsEnabled } from "./settings";
 
 describe("isDigestEnabled", () => {
   it("is off for empty settings", () => {
@@ -23,6 +23,22 @@ describe("isDigestEnabled", () => {
 
   it("lets an explicit opt-out beat legacy flags", () => {
     expect(isDigestEnabled({ digestEnabled: false, digestReplies: true })).toBe(
+      false,
+    );
+  });
+});
+
+describe("isHostCommentsEnabled", () => {
+  it("defaults ON — the host-only thread predates the option", () => {
+    expect(isHostCommentsEnabled({})).toBe(true);
+    expect(isHostCommentsEnabled({ hostComments: {} })).toBe(true);
+  });
+
+  it("follows an explicit flag", () => {
+    expect(isHostCommentsEnabled({ hostComments: { enabled: true } })).toBe(
+      true,
+    );
+    expect(isHostCommentsEnabled({ hostComments: { enabled: false } })).toBe(
       false,
     );
   });

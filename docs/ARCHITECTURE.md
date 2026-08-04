@@ -236,8 +236,12 @@ Main mutations cover:
   `hostId` to create on behalf of another host, logged as `topic.reassign`),
   editing, submission, moderation, unpublishing, and owner reassignment
   (`reassignTopic`)
-- heart toggling and the timetable hearts cutoff (`setHeartsCountFrom`)
-- public and host-only comments
+- heart toggling and the timetable hearts cutoff (`setHeartsCountFrom`);
+  host 💙 toggling (`hostHeartTopic`, host-non-electors only — tallies and
+  the per-topic host breakdown are admin-only, attribution rides the
+  host-only thread)
+- public and host-only comments (the host-only thread is a forum option,
+  `settings.hostComments.enabled`, default on)
 - comment hiding
 - profile and notification settings; admin member-bio editing
   (`updateMemberBio`)
@@ -293,6 +297,9 @@ Core tables:
 - `timetable_invites`
 - `topics`
 - `hearts`
+- `host_hearts` (host 💙s, 2026-08-04: the host-non-elector parallel
+  gesture, mirrored from `hearts` in its own table so elector weighting
+  never sees it; ignores `heartsCountFrom`)
 - `comments`
 - `activity_events`
 - `timeslots` (calendar v2: + `status`, singular `topic_id`, `url`,
@@ -310,7 +317,9 @@ Core tables:
 Notable columns: `timetables.settings` is a JSON blob holding role labels,
 theme (colours, fonts, dark palette), icon/cover URLs, digest defaults, the
 calendar group (enabled flag, confirm policy, locations, pattern cells,
-terms), and the topics policy (`hostsPublishDirectly`);
+terms), the topics policy (`hostsPublishDirectly`), and the host-comments
+option (`hostComments.enabled`, default on — hides the host-only thread and
+💙 attribution when off);
 `timetables.heartsCountFrom` is the heart-count cutoff; `topics.slug` +
 `timetable_memberships.slug` power permalinks (member profiles are
 per-forum); `topics.contentUpdatedAt` tracks content edits

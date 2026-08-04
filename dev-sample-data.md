@@ -9995,6 +9995,29 @@ List the people who hearted each topic.
      (published but heartless — the sad-empty-state case). -->
 
 
+## Host hearts
+
+List the hosts who 💙'd each topic (host hearts, 2026-08-04). Only people
+with the host role and WITHOUT the elector role may appear — a dual-role
+member's ❤️ is their gesture (host-eli is host+elector, so never here).
+No self-💙s: interest is for colleagues' topics.
+
+| Topic | Hosts who 💙'd it |
+| --- | --- |
+| topic-cryptocurrencies | host-sadie, host-harvey |
+| topic-digital-deliberative-spaces | host-jake, host-zara, host-anya |
+| topic-comparative-chat-architecture | host-teddy, host-anya |
+| topic-sociocracy | host-zara, host-sam |
+| topic-ai-in-campaigning-2026 | host-jordan, host-teddy, host-anya |
+| topic-constructing-legitimacy | host-sam, host-aaron |
+| topic-iad-framework-ostrom | host-zara, host-aaron, host-jake |
+| topic-self-determination-theory | host-hayley |
+| topic-science-of-collectivity | host-sam, host-jake, host-liam |
+| topic-future-crafting | host-aaron |
+| topic-zero-knowledge-proofs | host-teddy, host-liam, host-harvey |
+| topic-telling-stories-with-data | host-jordan, host-jake |
+| topic-web-data | host-liam, host-sadie |
+
 ## Timeslots
 
 <!-- Dates are RELATIVE ("mon+1" = Monday of next week, weeks start Monday,

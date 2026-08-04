@@ -82,6 +82,25 @@ export function canHeart(viewer: Viewer): boolean {
   return isAuthenticated(viewer) && isElector(viewer.roles);
 }
 
+/** Host 💙s (2026-08-04): the parallel gesture for hosts who are NOT
+ * electors — a dual-role member's ❤️ IS their gesture (one person, one
+ * gesture), so in forums where every host is an elector nobody is
+ * eligible and the feature self-disables. 💙s never enter elector
+ * weighting; tallies and sorting are admin-only (canSeeHostHeartTallies),
+ * only the attributed names row in the host-only thread is host-visible. */
+export function canHostHeart(viewer: Viewer): boolean {
+  return (
+    isAuthenticated(viewer) && isHost(viewer.roles) && !isElector(viewer.roles)
+  );
+}
+
+/** 💙 tallies, normalisations, and per-topic host breakdowns: admin eyes
+ * only — hosts see who 💙'd in the host-only thread, never counts across
+ * topics (no peer leaderboard). */
+export function canSeeHostHeartTallies(viewer: Viewer): boolean {
+  return isAdmin(viewer.roles);
+}
+
 /** Every member gets a Topic Queue (v2 2026-07-29 — hosts asked for it):
  * electors review with the ❤️ switcher, other members read through. */
 export function canUseQueue(viewer: Viewer): boolean {

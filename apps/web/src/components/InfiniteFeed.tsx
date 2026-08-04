@@ -10,7 +10,43 @@ type LoadMore = (
   hearted?: boolean,
   seed?: string,
   heartedBy?: string,
+  hostHearted?: boolean,
 ) => Promise<{ cards: React.ReactNode; hasNext: boolean }>;
+
+/** The scroller's tail: retry button on failure, sentinel while more
+ * pages remain, nothing at the end. */
+function FeedTail({
+  failed,
+  hasNext,
+  sentinelRef,
+  onRetry,
+}: {
+  failed: boolean;
+  hasNext: boolean;
+  sentinelRef: React.RefObject<HTMLDivElement | null>;
+  onRetry: () => void;
+}) {
+  if (failed) {
+    return (
+      <div className="toolbar" style={{ justifyContent: "center" }}>
+        <button type="button" className="btn" onClick={onRetry}>
+          Couldn&rsquo;t load more topics — retry
+        </button>
+      </div>
+    );
+  }
+  if (!hasNext) return null;
+  return (
+    <div
+      ref={sentinelRef}
+      className="faint"
+      style={{ textAlign: "center", padding: 12, fontSize: 13 }}
+      aria-hidden
+    >
+      Loading more topics…
+    </div>
+  );
+}
 
 /**
  * Renders the server-rendered first page (children) and appends further
@@ -24,6 +60,7 @@ export function InfiniteFeed({
   hearted = false,
   seed = "",
   heartedBy = "",
+  hostHearted = false,
   refreshToken = "",
   pageSize,
   initialHasNext,
@@ -36,6 +73,7 @@ export function InfiniteFeed({
   hearted?: boolean;
   seed?: string;
   heartedBy?: string;
+  hostHearted?: boolean;
   /** Server-render marker: pass a fresh value on every server render so
    * appended pages can re-sync after a router.refresh() (see below). */
   refreshToken?: string;
@@ -65,6 +103,7 @@ export function InfiniteFeed({
         hearted,
         seed,
         heartedBy,
+        hostHearted,
       );
       offsetRef.current += pageSize;
       setPages((prev) => [...prev, res.cards]);
@@ -74,7 +113,17 @@ export function InfiniteFeed({
     } finally {
       loadingRef.current = false;
     }
-  }, [loadMore, slug, sort, host, hearted, seed, heartedBy, pageSize]);
+  }, [
+    loadMore,
+    slug,
+    sort,
+    host,
+    hearted,
+    seed,
+    heartedBy,
+    hostHearted,
+    pageSize,
+  ]);
 
   // After a router.refresh() (an action succeeded → new server render →
   // new refreshToken), the server-rendered first page (children) is fresh
@@ -101,6 +150,7 @@ export function InfiniteFeed({
             hearted,
             seed,
             heartedBy,
+            hostHearted,
           );
           if (cancelled) return;
           fresh.push(res.cards);
@@ -126,6 +176,7 @@ export function InfiniteFeed({
     hearted,
     seed,
     heartedBy,
+    hostHearted,
     pageSize,
   ]);
 
@@ -148,22 +199,12 @@ export function InfiniteFeed({
       {pages.map((cards, i) => (
         <Fragment key={i}>{cards}</Fragment>
       ))}
-      {failed ? (
-        <div className="toolbar" style={{ justifyContent: "center" }}>
-          <button type="button" className="btn" onClick={() => void loadNext()}>
-            Couldn&rsquo;t load more topics — retry
-          </button>
-        </div>
-      ) : hasNext ? (
-        <div
-          ref={sentinelRef}
-          className="faint"
-          style={{ textAlign: "center", padding: 12, fontSize: 13 }}
-          aria-hidden
-        >
-          Loading more topics…
-        </div>
-      ) : null}
+      <FeedTail
+        failed={failed}
+        hasNext={hasNext}
+        sentinelRef={sentinelRef}
+        onRetry={() => void loadNext()}
+      />
     </>
   );
 }

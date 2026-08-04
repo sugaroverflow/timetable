@@ -39,6 +39,7 @@ vi.mock("@timetable/core", async (importOriginal) => {
     logActivity: vi.fn(),
     setMemberRoles: vi.fn(),
     softDeleteComment: vi.fn(),
+    toggleHostHeart: vi.fn(),
     updateCommentBody: vi.fn(),
     updateUserEmail: vi.fn(),
     updateTimetableSettings: vi.fn(),
@@ -258,6 +259,7 @@ afterEach(() => {
   vi.mocked(core.getCommentById).mockReset();
   vi.mocked(core.setMemberRoles).mockReset();
   vi.mocked(core.softDeleteComment).mockReset();
+  vi.mocked(core.toggleHostHeart).mockReset();
   vi.mocked(core.updateCommentBody).mockReset();
   vi.mocked(core.updateUserEmail).mockReset();
   vi.mocked(core.logActivity).mockReset();
@@ -1148,6 +1150,60 @@ describe("createApiApp", () => {
         const body = await requestDelete(baseUrl, topic.id);
         expect(body.errors?.length).toBeGreaterThan(0);
         expect(core.deleteTopic).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("hostHeartTopic (host 💙s)", () => {
+    const HOST_HEART = `mutation($id: String!){ hostHeartTopic(topicId: $id) { hearted } }`;
+
+    async function requestHostHeart(baseUrl: string, topicId: string) {
+      const res = await fetch(`${baseUrl}/graphql`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: HOST_HEART, variables: { id: topicId } }),
+      });
+      return (await res.json()) as {
+        data: { hostHeartTopic: { hearted: boolean } | null } | null;
+        errors?: unknown[];
+      };
+    }
+
+    it("lets a host who is not an elector 💙 a topic", async () => {
+      const topic = topicFixture({ status: "published" });
+      mockSession("host-2", ["host"]);
+      vi.mocked(core.getTopicById).mockResolvedValue(topic);
+      vi.mocked(core.toggleHostHeart).mockResolvedValue({ hearted: true });
+
+      await withTestServer(async (baseUrl) => {
+        const body = await requestHostHeart(baseUrl, topic.id);
+        expect(body.errors).toBeUndefined();
+        expect(body.data?.hostHeartTopic?.hearted).toBe(true);
+        expect(core.toggleHostHeart).toHaveBeenCalledWith(topic.id, "host-2");
+      });
+    });
+
+    it("refuses dual-role members — their ❤️ is their gesture", async () => {
+      const topic = topicFixture({ status: "published" });
+      mockSession("both-1", ["host", "elector"]);
+      vi.mocked(core.getTopicById).mockResolvedValue(topic);
+
+      await withTestServer(async (baseUrl) => {
+        const body = await requestHostHeart(baseUrl, topic.id);
+        expect(body.errors?.length).toBeGreaterThan(0);
+        expect(core.toggleHostHeart).not.toHaveBeenCalled();
+      });
+    });
+
+    it("refuses electors", async () => {
+      const topic = topicFixture({ status: "published" });
+      mockSession("elector-1", ["elector"]);
+      vi.mocked(core.getTopicById).mockResolvedValue(topic);
+
+      await withTestServer(async (baseUrl) => {
+        const body = await requestHostHeart(baseUrl, topic.id);
+        expect(body.errors?.length).toBeGreaterThan(0);
+        expect(core.toggleHostHeart).not.toHaveBeenCalled();
       });
     });
   });

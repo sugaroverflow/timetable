@@ -21,7 +21,7 @@ Roles are scoped to timetable membership:
 | --- | --- |
 | Owner | Everything an admin can do, plus protected ownership of the timetable |
 | Admin | Moderate topics, create topics and reassign their owner, see every host's submitted topics, hide comments, manage members and their bios from the People page, edit settings and theme, set the hearts cutoff, set up the calendar schedule and pencil/confirm sessions, view the dashboard |
-| Host | Propose and submit topics (rich-text editor), edit their own topics from the feed, see weighted-heart breakdowns, use host-only threads, join slot discussions, pencil in / propose / confirm sessions per the forum's calendar policy, view the dashboard |
+| Host | Propose and submit topics (rich-text editor), edit their own topics from the feed, see weighted-heart breakdowns, use host-only threads, 💙 colleagues' topics (host-non-electors only), join slot discussions, pencil in / propose / confirm sessions per the forum's calendar policy, view the dashboard |
 | Elector | Read published topics, heart and comment on them, collect "My hearted topics", share availability (weekly pattern + per-slot answers) |
 
 Each timetable can rename its roles (e.g. Admin → Dean, Host → Faculty,
@@ -76,6 +76,31 @@ same table appears on feed cards (for hosts and admins) and in the dashboard.
 
 Admins can set a timetable-wide hearts cutoff: hearts created before it are
 ignored in every count and weight (this replaced per-topic heart archiving).
+
+### Host 💙s (2026-08-04)
+
+Hosts who are **not** electors get a parallel gesture: 💙. One person, one
+gesture — a dual-role member's ❤️ is their gesture, so in forums where every
+host is also an elector nobody is eligible and the feature self-disables.
+Invariants, held everywhere:
+
+- 💙s never enter elector weighting, feed ranking, or any decision surface —
+  electors never see them at all.
+- Attribution is host-visible (the "💙 Sarah, Amir" row in the host-only
+  thread, and 💙 lines in the host's digest); tallies, normalisations, and
+  sorting are **admin-eyes-only** in Analysis — no peer leaderboard.
+- 💙s are unaffected by the hearts cutoff (interest, not a ballot).
+
+Hosts 💙 from the topic card's actions row, the Topic Queue switch (bound to
+💙 for them), and collect them on a "💙 Topics" page. Admins get all four
+normalisations as extra Analysis sort options, with hosts (instead of
+electors) in the per-topic breakdown dropdown, plus a "💙 given" column in
+the host-activity table.
+
+The host-only comment thread is now a forum option (default on). Switching
+it off — sensible where hosts = electors — hides the thread and 💙 row
+without deleting anything; 💙s keep working as private bookmarks only admins
+see in Analysis, and drop out of digests.
 
 Topic comments support threaded public threads (auto-collapsed), a separate
 host-only thread with its own composer, labelled with the timetable's host

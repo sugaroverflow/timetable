@@ -16,10 +16,31 @@ export type HostActivityRow = {
   hostSlug: string | null;
   topicCount: number;
   commentCount: number;
+  /** 💙s this host has given (host hearts, 2026-08-04) — the API sends
+   * null to non-admins, but this table only renders for admins. */
+  hostHeartCount: number | null;
   latestActivityAt: string | null;
 };
 
-type SortKey = "name" | "topics" | "comments" | "activity";
+type SortKey = "name" | "topics" | "comments" | "hostHearts" | "activity";
+
+function compareRows(a: HostActivityRow, b: HostActivityRow, key: SortKey) {
+  switch (key) {
+    case "name":
+      return (a.hostName ?? "").localeCompare(b.hostName ?? "");
+    case "topics":
+      return a.topicCount - b.topicCount;
+    case "comments":
+      return a.commentCount - b.commentCount;
+    case "hostHearts":
+      return (a.hostHeartCount ?? 0) - (b.hostHeartCount ?? 0);
+    case "activity":
+      return (
+        (a.latestActivityAt ? Date.parse(a.latestActivityAt) : 0) -
+        (b.latestActivityAt ? Date.parse(b.latestActivityAt) : 0)
+      );
+  }
+}
 
 /**
  * Host-activity table (QA 2026-07-27 — replaced the weighted-votes host
@@ -49,23 +70,7 @@ export function HostActivityTable({
   }
 
   const sorted = [...rows].sort((a, b) => {
-    let cmp = 0;
-    switch (sortKey) {
-      case "name":
-        cmp = (a.hostName ?? "").localeCompare(b.hostName ?? "");
-        break;
-      case "topics":
-        cmp = a.topicCount - b.topicCount;
-        break;
-      case "comments":
-        cmp = a.commentCount - b.commentCount;
-        break;
-      case "activity":
-        cmp =
-          (a.latestActivityAt ? Date.parse(a.latestActivityAt) : 0) -
-          (b.latestActivityAt ? Date.parse(b.latestActivityAt) : 0);
-        break;
-    }
+    const cmp = compareRows(a, b, sortKey);
     return dir === "asc" ? cmp : -cmp;
   });
 
@@ -93,6 +98,12 @@ export function HostActivityTable({
               onToggle={() => toggleSort("comments")}
             />
             <SortHeader
+              label="💙 given"
+              active={sortKey === "hostHearts"}
+              dir={dir}
+              onToggle={() => toggleSort("hostHearts")}
+            />
+            <SortHeader
               label="Last activity"
               active={sortKey === "activity"}
               dir={dir}
@@ -116,6 +127,7 @@ export function HostActivityTable({
               </td>
               <td className="mono">{host.topicCount}</td>
               <td className="mono">{host.commentCount}</td>
+              <td className="mono">{host.hostHeartCount ?? 0}</td>
               <td>
                 {host.latestActivityAt ? (
                   // suppressHydrationWarning: server and client may render

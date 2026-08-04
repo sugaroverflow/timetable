@@ -14,6 +14,7 @@ import {
   availabilityPatterns,
   comments,
   hearts,
+  hostHearts,
   slotComments,
   timetableMemberships,
   timetables,
@@ -27,6 +28,7 @@ import {
   type NewAvailabilityPattern,
   type NewComment,
   type NewHeart,
+  type NewHostHeart,
   type NewSlotComment,
   type NewTimetable,
   type NewTimetableMembership,
@@ -159,6 +161,7 @@ const RESET_DATABASE_TABLES = [
   "timeslots",
   "comments",
   "hearts",
+  "host_hearts",
   "topics",
   "timetable_invites",
   "timetable_memberships",
@@ -218,6 +221,8 @@ export type Fixture = {
   topics: TopicFixture[];
   comments: CommentFixture[];
   hearts: HeartsFixture[];
+  /** 💙s from host-non-electors (host hearts, 2026-08-04). */
+  hostHearts: HeartsFixture[];
   slots: SlotFixture[];
 };
 
@@ -585,6 +590,35 @@ function parseHearts(markdown: string): HeartsFixture[] {
   return parsed;
 }
 
+/** 💙 rows (host hearts, 2026-08-04): same table shape as Hearts, in a
+ * "## Host hearts" section. */
+function parseHostHearts(markdown: string): HeartsFixture[] {
+  const block = section(markdown, "Host hearts");
+  const parsed: HeartsFixture[] = [];
+
+  for (const line of block.split("\n")) {
+    if (!line.trim().startsWith("|")) continue;
+    if (line.includes("---") || line.includes("who 💙'd it")) {
+      continue;
+    }
+
+    const [topic, peopleRaw] = markdownTableCells(line);
+    if (!topic) throw new Error(`Invalid host hearts row: ${line}`);
+
+    parsed.push({
+      topic,
+      people: peopleRaw
+        ? peopleRaw
+            .split(",")
+            .map((person) => person.trim())
+            .filter(Boolean)
+        : [],
+    });
+  }
+
+  return parsed;
+}
+
 /** Split a "### Something: <label>" block into its label line and body. */
 function splitLabeledBlock(block: string): { label: string; rest: string } {
   const firstNewline = block.indexOf("\n");
@@ -864,6 +898,55 @@ function validateHearts(
   }
 }
 
+/** 💙 rows must come from people who could 💙 in the app: host role and
+ * NOT elector (a dual-role member's ❤️ is their gesture — canHostHeart). */
+function validateHostHeartPeople(
+  row: HeartsFixture,
+  peopleByLabel: Map<string, PersonFixture>,
+  seen: Set<string>,
+): void {
+  for (const personLabel of row.people) {
+    const person = peopleByLabel.get(personLabel);
+    if (!person) {
+      throw new Error(
+        `Host hearts row for topic "${row.topic}" refers to missing person "${personLabel}"`,
+      );
+    }
+    if (!person.roles.includes("host") || person.roles.includes("elector")) {
+      throw new Error(
+        `Host hearts row for topic "${row.topic}" refers to "${personLabel}" — 💙s come from people with the host role and WITHOUT the elector role`,
+      );
+    }
+    const key = `${row.topic}:${personLabel}`;
+    if (seen.has(key)) {
+      throw new Error(
+        `Duplicate 💙 for topic "${row.topic}" and person "${personLabel}"`,
+      );
+    }
+    seen.add(key);
+  }
+}
+
+function validateHostHearts(
+  fixtureHostHearts: HeartsFixture[],
+  topicsByLabel: Map<string, TopicFixture>,
+  peopleByLabel: Map<string, PersonFixture>,
+): void {
+  const seen = new Set<string>();
+  for (const row of fixtureHostHearts) {
+    const topic = topicsByLabel.get(row.topic);
+    if (!topic) {
+      throw new Error(`Host hearts row refers to missing topic "${row.topic}"`);
+    }
+    if (!["published", "archived"].includes(topic.status)) {
+      throw new Error(
+        `Host hearts row for topic "${row.topic}" targets a ${topic.status} topic; only published or archived topics should be 💙'd`,
+      );
+    }
+    validateHostHeartPeople(row, peopleByLabel, seen);
+  }
+}
+
 function validateSlotSession(
   slot: SlotFixture,
   topicsByLabel: Map<string, TopicFixture>,
@@ -971,6 +1054,7 @@ function validateFixture(fixture: Fixture): void {
     commentsByLabel,
   );
   validateHearts(fixture.hearts, topicsByLabel, peopleByLabel);
+  validateHostHearts(fixture.hostHearts, topicsByLabel, peopleByLabel);
 
   assertUnique(fixture.slots, (s) => s.label, "slot label");
   for (const slot of fixture.slots) {
@@ -986,6 +1070,7 @@ export function parseFixture(markdown: string): Fixture {
     topics: parseTopics(normalized),
     comments: parseComments(normalized),
     hearts: parseHearts(normalized),
+    hostHearts: parseHostHearts(normalized),
     slots: parseSlots(normalized),
   };
 
@@ -1041,6 +1126,30 @@ export function findSampleFile(): string {
   );
 }
 
+/** ❤️/💙 rows are shape-identical; `idPrefix` keeps their stable uuids
+ * distinct and both spread across the digest-day HEART_WINDOW. */
+function buildGestureRows(
+  rows: HeartsFixture[],
+  idPrefix: string,
+  ids: { topicIds: Map<string, string>; userIds: Map<string, string> },
+): NewHeart[] {
+  const total = rows.reduce((sum, row) => sum + row.people.length, 0);
+  const built: NewHeart[] = [];
+  let index = 0;
+  for (const row of rows) {
+    for (const personLabel of row.people) {
+      built.push({
+        id: stableUuid(idPrefix, `${row.topic}:${personLabel}`),
+        topicId: ids.topicIds.get(row.topic) ?? "",
+        userId: ids.userIds.get(personLabel) ?? "",
+        createdAt: spreadTime(HEART_WINDOW[0], HEART_WINDOW[1], index, total),
+      });
+      index += 1;
+    }
+  }
+  return built;
+}
+
 function buildRows(fixture: Fixture): {
   timetableId: string;
   ownerId: string;
@@ -1050,6 +1159,7 @@ function buildRows(fixture: Fixture): {
   topics: NewTopic[];
   comments: NewComment[];
   hearts: NewHeart[];
+  hostHearts: NewHostHeart[];
   activities: NewActivityEvent[];
   timeslotRows: NewTimeslot[];
   availabilityRows: NewAvailability[];
@@ -1142,29 +1252,17 @@ function buildRows(fixture: Fixture): {
 
   // Hearts on archived topics simply don't count (the topic isn't
   // published); the old per-row archivedAt marking is gone — "archiving"
-  // is now the timetable-level heartsCountFrom cutoff.
-  const heartRows: NewHeart[] = [];
-  const totalHearts = fixture.hearts.reduce(
-    (sum, row) => sum + row.people.length,
-    0,
+  // is now the timetable-level heartsCountFrom cutoff. 💙s share the ❤️
+  // window so both land inside the digest day.
+  const heartRows = buildGestureRows(fixture.hearts, "heart", {
+    topicIds,
+    userIds,
+  });
+  const hostHeartRows: NewHostHeart[] = buildGestureRows(
+    fixture.hostHearts,
+    "hostheart",
+    { topicIds, userIds },
   );
-  let heartIndex = 0;
-  for (const row of fixture.hearts) {
-    for (const personLabel of row.people) {
-      heartRows.push({
-        id: stableUuid("heart", `${row.topic}:${personLabel}`),
-        topicId: topicIds.get(row.topic) ?? "",
-        userId: userIds.get(personLabel) ?? "",
-        createdAt: spreadTime(
-          HEART_WINDOW[0],
-          HEART_WINDOW[1],
-          heartIndex,
-          totalHearts,
-        ),
-      });
-      heartIndex += 1;
-    }
-  }
 
   const activityRows = buildActivityRows(
     fixture,
@@ -1187,6 +1285,7 @@ function buildRows(fixture: Fixture): {
     topics: topicRows,
     comments: commentRows,
     hearts: heartRows,
+    hostHearts: hostHeartRows,
     activities: activityRows,
     timeslotRows,
     availabilityRows,
@@ -1686,6 +1785,9 @@ async function insertFixtureRows(
   if (rows.hearts.length > 0) {
     await tx.insert(hearts).values(rows.hearts);
   }
+  if (rows.hostHearts.length > 0) {
+    await tx.insert(hostHearts).values(rows.hostHearts);
+  }
   if (rows.activities.length > 0) {
     await tx.insert(activityEvents).values(rows.activities);
   }
@@ -1743,6 +1845,7 @@ async function main(): Promise<void> {
       `${rows.topics.length} topics`,
       `${rows.comments.length} comments`,
       `${rows.hearts.length} hearts`,
+      `${rows.hostHearts.length} host hearts`,
       `${rows.activities.length} activity events`,
       `${rows.timeslotRows.length} timeslots`,
     ].join(", "),

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 
-import { type Role } from "@timetable/shared";
+import { isHostCommentsEnabled, type Role } from "@timetable/shared";
 
 import { anonGql } from "@/lib/ogCard";
 
@@ -159,6 +159,7 @@ export default async function TopicPermalinkPage({
         electorLabel={roleLabel(settings.roleLabels, "elector")}
         viewerHeartCount={data.timetable?.viewerHeartedPublishedCount ?? null}
         hosts={data.timetableHosts}
+        hostCommentsEnabled={isHostCommentsEnabled(settings)}
       />
       <DraftingThread
         topic={topic}

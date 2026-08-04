@@ -1,11 +1,13 @@
 import {
   getDashboard,
+  getHostHeartBreakdown,
   getOrCreateIcsToken,
   getTimetableByDomain,
   getWeightedBreakdown,
   type DashboardData,
+  type WeightedHeartEntry,
 } from "@timetable/core";
-import { canSeeHostOnly } from "@timetable/shared";
+import { canSeeHostHeartTallies, canSeeHostOnly } from "@timetable/shared";
 
 import { builder } from "./builder";
 import {
@@ -30,8 +32,19 @@ const TopicCountsType = builder
     }),
   });
 
+/** Leaderboard/host-activity rows carry a per-request flag instead of the
+ * dashboard query returning different shapes: 💙 fields resolve to null
+ * unless the viewer may see host-heart tallies (admins — the dashboard
+ * itself is host-visible, so the gate must be finer than the query's). */
+type GqlLeaderboardEntry = DashboardData["topicLeaderboard"][number] & {
+  showHostHearts: boolean;
+};
+type GqlHostActivity = DashboardData["hostActivity"][number] & {
+  showHostHearts: boolean;
+};
+
 const TopicLeaderboardEntryType = builder
-  .objectRef<DashboardData["topicLeaderboard"][number]>("TopicLeaderboardEntry")
+  .objectRef<GqlLeaderboardEntry>("TopicLeaderboardEntry")
   .implement({
     fields: (t) => ({
       id: t.exposeID("id"),
@@ -50,11 +63,28 @@ const TopicLeaderboardEntryType = builder
       commentL2: t.exposeFloat("commentL2"),
       commentL1: t.exposeFloat("commentL1"),
       commentDevotion: t.exposeFloat("commentDevotion"),
+      // 💙 metrics — admin eyes only (host hearts, 2026-08-04).
+      hostHeartCount: t.int({
+        nullable: true,
+        resolve: (r) => (r.showHostHearts ? r.hostHeartCount : null),
+      }),
+      hostHeartL2: t.float({
+        nullable: true,
+        resolve: (r) => (r.showHostHearts ? r.hostHeartL2 : null),
+      }),
+      hostHeartL1: t.float({
+        nullable: true,
+        resolve: (r) => (r.showHostHearts ? r.hostHeartL1 : null),
+      }),
+      hostHeartDevotion: t.float({
+        nullable: true,
+        resolve: (r) => (r.showHostHearts ? r.hostHeartDevotion : null),
+      }),
     }),
   });
 
 const HostActivityType = builder
-  .objectRef<DashboardData["hostActivity"][number]>("HostActivity")
+  .objectRef<GqlHostActivity>("HostActivity")
   .implement({
     fields: (t) => ({
       hostId: t.exposeID("hostId"),
@@ -63,6 +93,11 @@ const HostActivityType = builder
       hostSlug: t.exposeString("hostSlug", { nullable: true }),
       topicCount: t.exposeInt("topicCount"),
       commentCount: t.exposeInt("commentCount"),
+      /** 💙s this host has given — admin eyes only. */
+      hostHeartCount: t.int({
+        nullable: true,
+        resolve: (r) => (r.showHostHearts ? r.hostHeartCount : null),
+      }),
       latestActivityAt: t.string({
         nullable: true,
         resolve: (h) => h.latestActivityAt?.toISOString() ?? null,
@@ -78,6 +113,28 @@ const UnallocatedTopicType = builder
       title: t.exposeString("title"),
       slug: t.exposeString("slug", { nullable: true }),
       hostSlug: t.exposeString("hostSlug", { nullable: true }),
+    }),
+  });
+
+/** Same entry math as WeightedHeart, renamed for the public surface: these
+ * are hosts, not electors (host hearts, 2026-08-04). */
+const HostHeartBreakdownEntryType = builder
+  .objectRef<WeightedHeartEntry>("HostHeartBreakdownEntry")
+  .implement({
+    fields: (t) => ({
+      hostId: t.id({ resolve: (w) => w.electorId }),
+      hostName: t.string({
+        nullable: true,
+        resolve: (w) => w.electorName,
+      }),
+      hostImage: t.string({
+        nullable: true,
+        resolve: (w) => w.electorImage,
+      }),
+      weight: t.exposeFloat("weight"),
+      l2Weight: t.exposeFloat("l2Weight"),
+      devotionWeight: t.exposeFloat("devotionWeight"),
+      heartedAt: t.string({ resolve: (w) => w.heartedAt.toISOString() }),
     }),
   });
 
@@ -120,7 +177,12 @@ const ElectorActivityType = builder
     }),
   });
 
-const DashboardType = builder.objectRef<DashboardData>("Dashboard").implement({
+type GqlDashboard = DashboardData & {
+  /** Whether this viewer may see 💙 tallies (admins only). */
+  showHostHearts: boolean;
+};
+
+const DashboardType = builder.objectRef<GqlDashboard>("Dashboard").implement({
   fields: (t) => ({
     totalHearts: t.exposeInt("totalHearts"),
     electorCount: t.exposeInt("electorCount"),
@@ -132,11 +194,19 @@ const DashboardType = builder.objectRef<DashboardData>("Dashboard").implement({
     }),
     topicLeaderboard: t.field({
       type: [TopicLeaderboardEntryType],
-      resolve: (d) => d.topicLeaderboard,
+      resolve: (d) =>
+        d.topicLeaderboard.map((r) => ({
+          ...r,
+          showHostHearts: d.showHostHearts,
+        })),
     }),
     hostActivity: t.field({
       type: [HostActivityType],
-      resolve: (d) => d.hostActivity,
+      resolve: (d) =>
+        d.hostActivity.map((r) => ({
+          ...r,
+          showHostHearts: d.showHostHearts,
+        })),
     }),
     unallocatedTopics: t.field({
       type: [UnallocatedTopicType],
@@ -175,12 +245,31 @@ builder.queryFields((t) => ({
       const sinceMs = args.activitySince
         ? Date.parse(args.activitySince)
         : Number.NaN;
-      return getDashboard(readable.timetable.id, {
+      const data = await getDashboard(readable.timetable.id, {
         hostId: args.hostId ?? undefined,
         activityHostId: args.activityHostId ?? undefined,
         electorActivity: parseElectorActivityFilter(args.electorActivity),
         activitySince: Number.isNaN(sinceMs) ? undefined : new Date(sinceMs),
       });
+      return { ...data, showHostHearts: canSeeHostHeartTallies(viewer) };
+    },
+  }),
+
+  /** Per-host 💙 breakdown for one topic — the hosts-instead-of-electors
+   * dropdown when the analysis table sorts by 💙. Admin eyes only. */
+  topicHostHeartBreakdown: t.field({
+    type: [HostHeartBreakdownEntryType],
+    nullable: true,
+    args: {
+      idOrSlug: t.arg.string({ required: true }),
+      topicId: t.arg.string({ required: true }),
+    },
+    resolve: async (_p, args, ctx) => {
+      const readable = await readTimetable(ctx, args.idOrSlug);
+      if (!readable) return null;
+      const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
+      if (!canSeeHostHeartTallies(viewer)) return null;
+      return getHostHeartBreakdown(readable.timetable.id, args.topicId);
     },
   }),
 

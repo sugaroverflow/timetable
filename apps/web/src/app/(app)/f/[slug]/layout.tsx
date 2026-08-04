@@ -240,11 +240,41 @@ function PendingNavLink({
   );
 }
 
+/** The viewer's own-gesture collection page: electors' ❤️ Topics, or
+ * host-non-electors' 💙 Topics (host hearts, 2026-08-04) — never both,
+ * since one person has one gesture. */
+function GestureTopicsLinks({
+  base,
+  elector,
+  hostNonElector,
+}: {
+  base: string;
+  elector: boolean;
+  hostNonElector: boolean;
+}) {
+  if (elector) {
+    return (
+      <NavLink href={`${base}/topics?hearted=me`}>
+        <Heart size={14} fill="currentColor" aria-hidden /> Topics
+      </NavLink>
+    );
+  }
+  if (hostNonElector) {
+    return (
+      <NavLink href={`${base}/topics?hearted=host`}>
+        <span aria-hidden>💙</span> Topics
+      </NavLink>
+    );
+  }
+  return null;
+}
+
 function SideNav({
   base,
   isAuthed,
   isMember,
   elector,
+  hostNonElector,
   hostOrAdmin,
   admin,
   calendarOn,
@@ -256,6 +286,8 @@ function SideNav({
   isAuthed: boolean;
   isMember: boolean;
   elector: boolean;
+  /** Eligible to 💙 (host hearts, 2026-08-04) — gets the 💙 Topics link. */
+  hostNonElector: boolean;
   hostOrAdmin: boolean;
   admin: boolean;
   calendarOn: boolean;
@@ -276,11 +308,11 @@ function SideNav({
         />
       )}
       {hostOrAdmin && <NavLink href={`${base}/my-topics`}>My Topics</NavLink>}
-      {elector && (
-        <NavLink href={`${base}/topics?hearted=me`}>
-          <Heart size={14} fill="currentColor" aria-hidden /> Topics
-        </NavLink>
-      )}
+      <GestureTopicsLinks
+        base={base}
+        elector={elector}
+        hostNonElector={hostNonElector}
+      />
       {/* Calendar v2 (closes #55): the link exists only when the forum has
           switched the feature on. */}
       {calendarOn && <NavLink href={`${base}/calendar`}>Calendar</NavLink>}
@@ -357,6 +389,7 @@ export default async function TimetableLayout({
             isAuthed={isAuthed}
             isMember={isMember}
             elector={isElector(roles)}
+            hostNonElector={isHost(roles) && !isElector(roles)}
             hostOrAdmin={isHost(roles) || isAdmin(roles)}
             admin={isAdmin(roles)}
             calendarOn={calendarNavVisible(
