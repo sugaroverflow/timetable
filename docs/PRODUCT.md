@@ -191,14 +191,17 @@ host's session — collisions stay conversations. Hosts can also propose
 off-piste slots at any time/location; those are born `proposed` and collect
 availability immediately.
 
-**The calendar page** is a compact table (rows fold open via a 💬 bubble).
-The calendar wears two hats — upcoming events and scheduling workbench — so
-a slot-state filter (All slots / Sessions / Open slots) gives each its own
-view. Availability meters render as slim count-only bars while scanning; the
-full meter — elector avatars sitting inside their 🟢/🟡/🔴 stretch,
-host/admin-only — appears when a topic lens is active or a row is folded
-open. The lens filters every meter to the electors who ❤️'d that topic;
-group availability is hidden from electors, who see only their own toggle.
+**The calendar page** is a list of row washes (2026-08-05): each slot is
+one rounded block whose background carries the availability chart — three
+low-alpha 🟢🟡🔴 tints whose widths are the group's proportions
+(host/admin-only), with the date, time, location, and session line riding
+on top and gaps (bigger between weeks) instead of rules. Clicking a row
+folds it open: elector avatars aligned under their wash segment, then the
+slot discussion and session controls. The calendar wears two hats —
+upcoming events and scheduling workbench — so a slot-state filter (All
+slots / Sessions / Open slots) gives each its own view. The topic lens
+re-scopes every row's tints to the electors who ❤️'d that topic; group
+availability is hidden from electors, who see only their own toggle.
 Slot discussions ("host chat") support claim comments that attach the active
 lens topic plus a frozen server-computed availability snapshot ("I'd like
 this slot for Yoga · 4🟢 8🟡 2🔴"); slot comments have the standard author
