@@ -45,3 +45,32 @@ Spec deviations, deliberate: date format stays en-GB "Fri 9 Oct" (no
 comma — QA 2026-08-02 pinned it); the elector toggle keeps its
 right-cluster seat (spec was silent; electors have no tints, their rows
 are just quiet lines with a toggle).
+
+## QA round (same day, Ed on dev)
+
+- Dark washes too weak → `html[data-theme="dark"]` overrides run
+  stronger (g 28 / y·r 23, hover 36/30/30; light stays 16/13/13). The
+  theme boot script always stamps `data-theme`, even in system mode, so
+  the selector covers auto.
+- Gaps 3/8 → **6px rows, 12px weeks**.
+- Washes now cover a `.cal-row-head` (content line + open avatar row)
+  and stop above the discussion — the fold's thread and controls sit on
+  the plain surface.
+- "Avatars don't fit the colour areas — make the colours fit the
+  avatars": when open, BOTH the tint layer and the avatar row use
+  identical flex rules (`flexGrow: n, flexBasis: n × 20px` per state —
+  `avatarFitStyle`) over the same container width, so the flex algorithm
+  resolves identical segment widths and faces always fit. Closed rows
+  keep proportional percentage widths (comparable down the list).
+- Long session titles/pills wrap instead of truncating (dropped the
+  nowrap/ellipsis rules; the row grows past its 52px minimum).
+- "No messages yet." removed; slot composer placeholder is now "Talk
+  about this timeslot…".
+- **Duplicate-slots bug** (Ed hit it live): `createSlots` deduped on
+  exact start|end|location, but generation runs on the admin's browser
+  clock — the same cell×date yields different UTC instants from
+  different clock contexts (UTC-clocked seed vs London browser, DST
+  sides), so regeneration doubled the grid. Cell-generated slots now
+  also dedupe on (cellKey, start within 24h); same-cell slots are ≥7
+  days apart by construction so the window is safe. Existing dupes on
+  dev need hand-deleting (or a re-seed dispatch).

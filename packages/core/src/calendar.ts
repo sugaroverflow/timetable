@@ -47,8 +47,15 @@ export type SlotInput = {
 };
 
 /** Admin bulk-create (single slots and pattern × terms generation both land
- * here). Exact duplicates — same start/end/location — are skipped so
- * re-running "Generate slots" after adding a term is idempotent. */
+ * here), idempotently: an exact duplicate — same start/end/location — is
+ * skipped, and a cell-generated slot is ALSO skipped when its pattern cell
+ * already has a slot within 24h. Exact match alone wasn't enough (QA
+ * 2026-08-05 — duplicate slots on dev): generation runs on the admin's
+ * browser clock, so the same cell×date yields DIFFERENT UTC instants from
+ * different clock contexts (the UTC-clocked seed vs a London browser,
+ * either side of a DST switch), and "regeneration" doubled the grid.
+ * Same-cell slots are ≥7 days apart by construction (the cell pins the
+ * weekday), so the 24h window can't collide with legitimate neighbours. */
 export async function createSlots(
   timetableId: string,
   inputs: SlotInput[],
@@ -60,12 +67,21 @@ export async function createSlots(
       (s) => `${s.startsAt.getTime()}|${s.endsAt.getTime()}|${s.location}`,
     ),
   );
-  const fresh = inputs.filter(
-    (s) =>
-      !seen.has(
-        `${s.startsAt.getTime()}|${s.endsAt.getTime()}|${s.location ?? ""}`,
-      ),
-  );
+  const cellStarts = new Map<string, number[]>();
+  for (const s of existing) {
+    if (!s.cellKey) continue;
+    const list = cellStarts.get(s.cellKey) ?? [];
+    list.push(s.startsAt.getTime());
+    cellStarts.set(s.cellKey, list);
+  }
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const fresh = inputs.filter((s) => {
+    const key = `${s.startsAt.getTime()}|${s.endsAt.getTime()}|${s.location ?? ""}`;
+    if (seen.has(key)) return false;
+    if (!s.cellKey) return true;
+    const starts = cellStarts.get(s.cellKey);
+    return !starts?.some((t) => Math.abs(t - s.startsAt.getTime()) < DAY_MS);
+  });
   if (fresh.length === 0) return [];
   return db
     .insert(timeslots)
