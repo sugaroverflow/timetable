@@ -300,6 +300,10 @@ Core tables:
 - `host_hearts` (host 💙s, 2026-08-04: the host-non-elector parallel
   gesture, mirrored from `hearts` in its own table so elector weighting
   never sees it; ignores `heartsCountFrom`)
+- `heart_events` (2026-08-05: append-only ❤️/💙 add/remove ledger — never
+  updated or deleted by the app, unaffected by the cutoff; lets voting
+  history be reconstructed across un-hearts and cutoff resets. Written by
+  both toggles, read only by the admin data export)
 - `comments`
 - `activity_events`
 - `timeslots` (calendar v2: + `status`, singular `topic_id`, `url`,

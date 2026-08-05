@@ -10,6 +10,7 @@ import {
 } from "@timetable/shared";
 
 import { listCommentTreesForTopics, type CommentNode } from "./comments";
+import { listHeartEvents, type HeartEvent } from "./heartEvents";
 import { listPeople } from "./members";
 import {
   buildFeed,
@@ -84,6 +85,10 @@ export type DataExport = {
   myTopics?: ExportManagedTopic[];
   /** Admins: submitted topics awaiting review. */
   pendingTopics?: ExportManagedTopic[];
+  /** Admins: the append-only ❤️/💙 ledger, oldest first. Unlike `hearts`
+   * on each topic (current, post-cutoff state), this history survives
+   * un-hearts and cutoff resets. */
+  heartEvents?: HeartEvent[];
 };
 
 const README = [
@@ -97,6 +102,10 @@ const README = [
   "and their published topics. `myTopics` — present for hosts/admins: the",
   "exporting user's own topics in every status, with their comment threads.",
   "`pendingTopics` — present for admins: submitted topics awaiting review.",
+  "`heartEvents` — present for admins: the append-only ledger of every ❤️",
+  "(kind `heart`) and 💙 (kind `host_heart`) add/remove, oldest first;",
+  "unlike per-topic `hearts` it is unaffected by the hearts cutoff, so",
+  "past voting rounds can be reconstructed from it.",
 ].join(" ");
 
 async function managedTopics(rows: Topic[]): Promise<ExportManagedTopic[]> {
@@ -184,6 +193,11 @@ export async function buildDataExport(
   const pendingTopics = moderate
     ? await managedTopics(await listSubmittedTopics(timetable.id))
     : undefined;
+  // 💙 tallies are admin-eyes-only in the app, and removal history is more
+  // than any non-admin surface shows — so the ledger is admin-only too.
+  const heartEvents = moderate
+    ? await listHeartEvents(timetable.id)
+    : undefined;
 
   return {
     readme: README,
@@ -197,5 +211,6 @@ export async function buildDataExport(
     people,
     ...(myTopics ? { myTopics } : {}),
     ...(pendingTopics ? { pendingTopics } : {}),
+    ...(heartEvents ? { heartEvents } : {}),
   };
 }

@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { db, hearts, topics } from "@timetable/db";
 
 import { logActivity } from "./activity";
+import { recordHeartEvent } from "./heartEvents";
 import { markTopicSeen } from "./queue";
 import { getHeartsCountFrom } from "./topics";
 
@@ -60,6 +61,13 @@ export async function toggleHeart(
     await markTopicSeen(topicId, userId);
   }
 
+  await recordHeartEvent({
+    timetableId: topic.timetableId,
+    topicId,
+    userId,
+    kind: "heart",
+    action: counted ? "remove" : "add",
+  });
   await logActivity({
     timetableId: topic.timetableId,
     actorId: userId,
