@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { Collapsible } from "@base-ui/react/collapsible";
-import { ChevronDown, ChevronRight, Lock, MessageCircle } from "lucide-react";
+import { ChevronDown, ChevronRight, Lock } from "lucide-react";
 
 import type { FeedComment, HostHearter } from "@/lib/feedTypes";
 import type { RoleLabels } from "@/lib/timetableSettings";
@@ -11,17 +11,20 @@ import { Avatar } from "./Avatar";
 import { BreakdownCaret } from "./BreakdownPanel";
 import { CommentComposer } from "./CommentComposer";
 import { CommentList } from "./CommentList";
-import { HostHeartButton } from "./HostHeartButton";
+import { FocusCommentButton } from "./FocusCommentButton";
+import { HeartButton, HeartCount } from "./HeartButton";
 import { PersonChip } from "./PersonChip";
 
 function countNested(comments: FeedComment[]): number {
   return comments.reduce((sum, c) => sum + 1 + countNested(c.replies ?? []), 0);
 }
 
-/** The faculty actions row (host hearts, QA 2026-08-04): mirrors the
- * public card-actions row — [givers disclosure] [💙 + count] [💬 count] —
- * INSIDE the host-only thread, so who can see it is self-evident. The
- * disclosure lists the 💙 givers; cross-topic tallies stay admin-only. */
+/** The faculty actions row (host hearts, QA 2026-08-04): built from the
+ * SAME pieces as the public card-actions row (HeartButton/HeartCount,
+ * FocusCommentButton, BreakdownCaret) so the two rows can't drift —
+ * [givers disclosure] [💙 + count] [💬 count] — INSIDE the host-only
+ * thread, so who can see it is self-evident. The disclosure lists the 💙
+ * givers; cross-topic tallies stay admin-only. */
 function HostHeartsActionsRow({
   topicId,
   hearters,
@@ -53,24 +56,20 @@ function HostHeartsActionsRow({
           />
         ) : null}
         {canHostHeart ? (
-          <HostHeartButton
+          <HeartButton
             topicId={topicId}
             hearted={viewerHasHostHearted}
             count={hearters.length}
+            kind="host"
           />
         ) : (
-          // Read-only count (admins, dual-role hosts, the topic's owner on
-          // My Topics): 🤍 at zero so an empty box doesn't read as hearted.
-          <span className="heart-btn" aria-hidden>
-            <span className="ic">{hearters.length > 0 ? "💙" : "🤍"}</span>
-            {hearters.length}
-          </span>
+          <HeartCount count={hearters.length} kind="host" />
         )}
-        <button className="act" type="button" onClick={onFocusComposer}>
-          <MessageCircle size={16} aria-hidden />
-          {commentCount || ""}
-          <span style={{ fontWeight: "var(--fw-semibold)" }}>Comment</span>
-        </button>
+        <FocusCommentButton
+          topicId={topicId}
+          commentCount={commentCount}
+          onClick={onFocusComposer}
+        />
       </div>
       {open ? (
         <div className="host-hearts-list stack" style={{ gap: 6 }}>
@@ -148,7 +147,7 @@ export function HostOnlyPanel({
       </Collapsible.Trigger>
       <Collapsible.Panel>
         {expanded && (
-          <div className="host-thread host-thread-actions" ref={threadRef}>
+          <div className="host-thread thread-stack" ref={threadRef}>
             {hostHearters ? (
               <HostHeartsActionsRow
                 topicId={topicId}

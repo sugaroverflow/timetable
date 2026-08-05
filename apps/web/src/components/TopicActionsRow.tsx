@@ -1,11 +1,10 @@
 "use client";
 
-import { Heart } from "lucide-react";
 import { useState } from "react";
 
 import { BreakdownCaret, BreakdownPanelBody } from "./BreakdownPanel";
 import { FocusCommentButton } from "./FocusCommentButton";
-import { HeartButton } from "./HeartButton";
+import { HeartButton, HeartCount } from "./HeartButton";
 
 /** The ❤️ + comments action row on a topic card, with the ❤️-breakdown
  * disclosure triangle to the left of the ❤️ button — visible to any
@@ -47,12 +46,7 @@ export function TopicActionsRow({
             count={heartCount}
           />
         ) : (
-          <span className="heart-btn" aria-hidden>
-            <span className="ic">
-              <Heart size={16} fill="currentColor" />
-            </span>
-            {heartCount}
-          </span>
+          <HeartCount count={heartCount} />
         )}
         <FocusCommentButton topicId={topicId} commentCount={commentCount} />
         <span style={{ flex: 1 }} />

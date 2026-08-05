@@ -30,7 +30,9 @@ export function FoldedComments({
         )}{" "}
         💬 Comments ({count})
       </Collapsible.Trigger>
-      <Collapsible.Panel>{open ? children : null}</Collapsible.Panel>
+      <Collapsible.Panel>
+        {open ? <div className="thread-stack">{children}</div> : null}
+      </Collapsible.Panel>
     </Collapsible.Root>
   );
 }

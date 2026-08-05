@@ -1229,21 +1229,17 @@ textarea {
   font-size: var(--text-md);
 }
 
-/* Comments */
+/* Comments.
+ * Card spacing spec (2026-08-05): the card's .stack gap (14px) is the ONLY
+ * space between sections — sections carry no vertical margins; a divided
+ * section puts 8px between its border and its content; sub-thread boxes
+ * (.thread-stack) run a 10px internal gap. */
 .comments {
   border-top: 1px solid var(--line);
-  margin-top: 14px;
-  padding-top: 12px;
+  padding-top: 8px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-}
-/* Directly under the action bar, the row-to-divider space was 8px padding
-   + 14px stack gap + the 14px margin above = 36px of dead air (QA
-   2026-07-29). Pull the divider up so the row sits 14px from it — the
-   same rhythm as the body-to-divider space above the bar. */
-.card-actions + .comments {
-  margin-top: -8px;
 }
 .comment {
   display: flex;
@@ -1283,9 +1279,8 @@ textarea {
   gap: 10px;
 }
 
-/* Host-only panel */
+/* Host-only panel (no own margin — card spacing spec, 2026-08-05) */
 .host-panel {
-  margin-top: 14px;
   background: var(--host-wash);
   border: 1px solid var(--host-line);
   border-radius: var(--radius-sm);
@@ -1865,24 +1860,32 @@ textarea {
   cursor: pointer;
 }
 .host-thread {
-  margin-top: 12px;
   border-top: 1px solid var(--host-line);
-  padding-top: 10px;
+  padding-top: 8px;
 }
-/* The faculty box variant with the 💙 actions row (host hearts, QA
- * 2026-08-04): match the public card's rhythm — divider attached tight
- * under the trigger, 8px either side of the row (the row's own border
- * would stack with the thread divider, so it goes). The plain
- * .host-thread (admin drafting panel) keeps its spacing. */
-.host-thread-actions {
-  margin-top: 4px;
+/* Card sub-threads (faculty/admin boxes, the queue's comment fold): one
+ * internal rhythm — a 10px gap between actions row / comment list /
+ * composer; nested sections drop their own dividers and padding (the box
+ * supplies the divider). Card spacing spec, 2026-08-05. */
+.thread-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.thread-stack .card-actions {
+  border-top: 0;
+  padding: 0;
+}
+.thread-stack .comments {
+  border-top: 0;
   padding-top: 0;
 }
-.host-thread-actions .card-actions {
-  border-top: 0;
-  padding: 8px 0;
+/* The host 💙 wears the host palette at rest and when on — same lucide
+ * heart symbol as the elector button (outline/filled = state), told apart
+ * by colour, never by a different glyph (QA 2026-08-05). */
+.host-heart-btn {
+  color: var(--host-ink);
 }
-/* 💙'd state wears the host palette, not the elector ❤️'s pink wash. */
 .host-heart-btn.on {
   border-color: var(--host-ink);
   background: var(--card);
@@ -1891,7 +1894,6 @@ textarea {
 /* The 💙-givers disclosure list: card surface on the host wash, instead
  * of nesting a second .host-panel box. */
 .host-hearts-list {
-  margin: 4px 0 8px;
   padding: 8px 12px;
   background: var(--card);
   border: 1px solid var(--host-line);
