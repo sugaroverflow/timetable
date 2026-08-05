@@ -1526,17 +1526,22 @@ textarea {
 .cal-list {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 6px;
 }
 .cal-list .cal-week-start {
-  /* 3px list gap + 5px = the 8px week gap. */
-  margin-top: 5px;
+  /* 6px list gap + 6px = the 12px week gap. */
+  margin-top: 6px;
 }
 .cal-row {
   position: relative;
   min-height: 52px;
   border-radius: 8px;
   overflow: hidden;
+}
+/* The tinted region: content line + (open) avatar row. The discussion
+   fold below sits outside the washes (QA 2026-08-05). */
+.cal-row-head {
+  position: relative;
 }
 .cal-row-expandable {
   cursor: pointer;
@@ -1581,6 +1586,28 @@ textarea {
 .cal-row:focus-visible .cal-row-tint .r {
   background: color-mix(in srgb, var(--red) 19%, transparent);
 }
+/* Dark surfaces swallow the washes — run them stronger (QA 2026-08-05). */
+html[data-theme="dark"] .cal-row-tint .g {
+  background: color-mix(in srgb, var(--green) 28%, transparent);
+}
+html[data-theme="dark"] .cal-row-tint .y {
+  background: color-mix(in srgb, var(--yellow) 23%, transparent);
+}
+html[data-theme="dark"] .cal-row-tint .r {
+  background: color-mix(in srgb, var(--red) 23%, transparent);
+}
+html[data-theme="dark"] .cal-row:hover .cal-row-tint .g,
+html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .g {
+  background: color-mix(in srgb, var(--green) 36%, transparent);
+}
+html[data-theme="dark"] .cal-row:hover .cal-row-tint .y,
+html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .y {
+  background: color-mix(in srgb, var(--yellow) 30%, transparent);
+}
+html[data-theme="dark"] .cal-row:hover .cal-row-tint .r,
+html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
+  background: color-mix(in srgb, var(--red) 30%, transparent);
+}
 /* Row content rides above the tint on a single line: when | session,
    with the comment count / elector toggle right-aligned. */
 .cal-row-line {
@@ -1599,13 +1626,10 @@ textarea {
   font-size: var(--text-xs);
   color: var(--muted);
 }
+/* Long topic titles + pills wrap rather than truncate (QA 2026-08-05);
+   the row grows past its 52px minimum when they do. */
 .cal-row-session {
   min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-}
-.cal-row-session .row {
-  flex-wrap: nowrap;
 }
 .cal-row-right {
   margin-left: auto;
@@ -1695,17 +1719,20 @@ textarea {
   margin-top: 0;
   padding-top: 0;
 }
-/* Who exactly: avatars sit inside their wash segment, mirroring the tint
-   widths, evenly spaced (QA 2026-08-03 meter behaviour, relocated). */
+/* Who exactly: avatars sit inside their wash segment. Identical flex
+   rules to the tint layer (avatarFitStyle) resolve to identical segment
+   widths, so the washes fit the faces. Edge-to-edge — horizontal padding
+   would break that alignment. */
 .cal-fold-avatars {
+  position: relative;
   display: flex;
+  padding-bottom: 10px;
 }
 .cal-fold-avatars .cal-fold-seg {
   display: inline-flex;
   align-items: center;
   justify-content: space-evenly;
   min-height: 24px;
-  overflow: hidden;
 }
 .cal-fold-avatars .avatar {
   width: 17px;
