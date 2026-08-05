@@ -50,7 +50,7 @@ export function CommentEditForm({
   }
 
   return (
-    <form onSubmit={save} className="inline-form" style={{ marginTop: 4 }}>
+    <form onSubmit={save} className="inline-form inline-form-nested">
       <GrowingTextarea
         ref={textareaRef}
         value={body}

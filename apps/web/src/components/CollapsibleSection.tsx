@@ -30,7 +30,7 @@ export function CollapsibleSection({
         <span className="section-title">{title}</span>
       </Collapsible.Trigger>
       <Collapsible.Panel>
-        <div style={{ marginTop: 10 }}>{children}</div>
+        <div className="section-body">{children}</div>
       </Collapsible.Panel>
     </Collapsible.Root>
   );

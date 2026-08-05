@@ -154,7 +154,7 @@ function SlotCommentEditor({
   }
 
   return (
-    <form onSubmit={save} className="inline-form" style={{ marginTop: 4 }}>
+    <form onSubmit={save} className="inline-form inline-form-nested">
       <GrowingTextarea
         value={body}
         onChange={(e) => setBody(e.target.value)}
@@ -311,7 +311,7 @@ export function DiscussionPanel({
       ) : null}
       {/* Same composer shape as everywhere else (QA 2026-08-02). */}
       <form onSubmit={post} className="stack" style={{ gap: 6 }}>
-        <div className="inline-form" style={{ marginTop: 4 }}>
+        <div className="inline-form inline-form-nested">
           <GrowingTextarea
             value={body}
             onChange={(e) => setBody(e.target.value)}

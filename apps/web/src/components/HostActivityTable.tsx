@@ -13,6 +13,7 @@ import { SortHeader } from "@/components/SortHeader";
 import { formatExactTime } from "@/lib/dates";
 import { personPath } from "@/lib/personPath";
 import { relativeTime } from "@/lib/relativeTime";
+import { useTableSort } from "@/lib/useTableSort";
 
 export type HostActivityRow = {
   hostId: string;
@@ -134,58 +135,23 @@ export function HostActivityTable({
   hostLabel: string;
   rows: HostActivityRow[];
 }) {
-  const [sortKey, setSortKey] = useState<SortKey>("activity");
-  const [dir, setDir] = useState<"asc" | "desc">("desc");
-
-  function toggleSort(key: SortKey) {
-    if (key === sortKey) {
-      setDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortKey(key);
-      setDir(key === "name" ? "asc" : "desc");
-    }
-  }
-
-  const sorted = [...rows].sort((a, b) => {
-    const cmp = compareRows(a, b, sortKey);
-    return dir === "asc" ? cmp : -cmp;
+  const { sortRows, headerProps } = useTableSort<SortKey, HostActivityRow>({
+    initial: "activity",
+    ascendingKeys: ["name"],
+    compare: compareRows,
   });
+  const sorted = sortRows(rows);
 
   return (
     <div className="table-wrap">
       <table className="data-table sortable-table">
         <thead>
           <tr>
-            <SortHeader
-              label={hostLabel}
-              active={sortKey === "name"}
-              dir={dir}
-              onToggle={() => toggleSort("name")}
-            />
-            <SortHeader
-              label="Topics"
-              active={sortKey === "topics"}
-              dir={dir}
-              onToggle={() => toggleSort("topics")}
-            />
-            <SortHeader
-              label="Comments"
-              active={sortKey === "comments"}
-              dir={dir}
-              onToggle={() => toggleSort("comments")}
-            />
-            <SortHeader
-              label="💙 given"
-              active={sortKey === "hostHearts"}
-              dir={dir}
-              onToggle={() => toggleSort("hostHearts")}
-            />
-            <SortHeader
-              label="Last activity"
-              active={sortKey === "activity"}
-              dir={dir}
-              onToggle={() => toggleSort("activity")}
-            />
+            <SortHeader label={hostLabel} {...headerProps("name")} />
+            <SortHeader label="Topics" {...headerProps("topics")} />
+            <SortHeader label="Comments" {...headerProps("comments")} />
+            <SortHeader label="💙 given" {...headerProps("hostHearts")} />
+            <SortHeader label="Last activity" {...headerProps("activity")} />
           </tr>
         </thead>
         <tbody>
