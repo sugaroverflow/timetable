@@ -10,6 +10,7 @@ import {
 } from "@timetable/shared";
 
 import { logActivity } from "./activity";
+import { recordHeartEvent } from "./heartEvents";
 import { markTopicSeen } from "./queue";
 import type { WeightedHeartEntry } from "./topics";
 
@@ -63,6 +64,13 @@ export async function toggleHostHeart(
     await markTopicSeen(topicId, userId);
   }
 
+  await recordHeartEvent({
+    timetableId: topic.timetableId,
+    topicId,
+    userId,
+    kind: "host_heart",
+    action: existing ? "remove" : "add",
+  });
   await logActivity({
     timetableId: topic.timetableId,
     actorId: userId,

@@ -88,6 +88,36 @@ export const hostHearts = pgTable(
   ],
 );
 
+/** Append-only ❤️/💙 ledger (2026-08-05): one row per gesture event, never
+ * updated or deleted by the app. The `hearts`/`host_hearts` tables stay the
+ * mutable current state (toggles delete rows; a cutoff revival bumps
+ * `createdAt`) — this table is what lets history be reconstructed across
+ * un-hearts and termly cutoff resets. Backfilled at migration time from the
+ * then-current heart rows. */
+export const heartEvents = pgTable(
+  "heart_events",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    timetableId: uuid()
+      .notNull()
+      .references(() => timetables.id, { onDelete: "cascade" }),
+    topicId: uuid()
+      .notNull()
+      .references(() => topics.id, { onDelete: "cascade" }),
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** Which gesture: an elector ❤️ or a host 💙. */
+    kind: text().$type<"heart" | "host_heart">().notNull(),
+    action: text().$type<"add" | "remove">().notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("heart_events_timetable_idx").on(t.timetableId, t.createdAt),
+    index("heart_events_topic_idx").on(t.topicId),
+  ],
+);
+
 /** Topic Queue exposure record (2026-07-28): one row per (topic, user)
  * the user has been shown in the queue — or hearted anywhere (a heart
  * implies having seen it). `seenAt` is bumped on each showing; "seen this
@@ -194,6 +224,18 @@ export const topicsRelations = relations(topics, ({ one, many }) => ({
 export const heartsRelations = relations(hearts, ({ one }) => ({
   topic: one(topics, { fields: [hearts.topicId], references: [topics.id] }),
   user: one(users, { fields: [hearts.userId], references: [users.id] }),
+}));
+
+export const heartEventsRelations = relations(heartEvents, ({ one }) => ({
+  timetable: one(timetables, {
+    fields: [heartEvents.timetableId],
+    references: [timetables.id],
+  }),
+  topic: one(topics, {
+    fields: [heartEvents.topicId],
+    references: [topics.id],
+  }),
+  user: one(users, { fields: [heartEvents.userId], references: [users.id] }),
 }));
 
 export const hostHeartsRelations = relations(hostHearts, ({ one }) => ({

@@ -76,6 +76,13 @@ same table appears on feed cards (for hosts and admins) and in the dashboard.
 
 Admins can set a timetable-wide hearts cutoff: hearts created before it are
 ignored in every count and weight (this replaced per-topic heart archiving).
+The cutoff supports periodic voting resets (e.g. termly): a pre-cutoff heart
+is a dead vote shown as unhearted everywhere, and hearting again revives it.
+
+Every ❤️ and 💙 add/remove is also appended to an immutable `heart_events`
+ledger (2026-08-05) that no app code updates or deletes and the cutoff never
+filters, so past voting rounds stay reconstructable across resets. Its one
+surface is an admin-only `heartEvents` section in the data export.
 
 ### Host 💙s (2026-08-04)
 
