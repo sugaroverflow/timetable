@@ -48,7 +48,7 @@ function monthLabel(iso: string): string {
   });
 }
 
-/** The Monday starting this slot's week (viewer-local) — week-divider key. */
+/** The Monday starting this slot's week (viewer-local) — week-gap key. */
 function weekKey(iso: string): string {
   const d = new Date(iso);
   d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
@@ -63,93 +63,54 @@ function countsTitle(c: { green: number; yellow: number; red: number }) {
   return `🟢 ${c.green} · 🟡 ${c.yellow} · 🔴 ${c.red}`;
 }
 
-/** Speech-bubble discussion button (QA 2026-08-02): count inside the
- * bubble, empty bubble when there are no messages yet. */
-function CommentButton({
-  slot,
-  open,
-  onToggle,
+const STATES = ["green", "yellow", "red"] as const;
+
+/** The row IS the chart (row-wash redesign, 2026-08-05): availability
+ * renders as low-alpha washes across the row's own background. The
+ * denominator is constant down a view, so wash widths compare directly. */
+function TintLayer({
+  counts,
 }: {
-  slot: CalendarSlot;
-  open: boolean;
-  onToggle: () => Promise<void>;
+  counts: { green: number; yellow: number; red: number };
 }) {
+  const total = counts.green + counts.yellow + counts.red;
+  if (total === 0) return null;
   return (
-    <button
-      type="button"
-      className={`cal-comment-btn${slot.commentCount === 0 ? " cal-comment-empty" : ""}`}
-      aria-expanded={open}
-      aria-label={
-        slot.commentCount > 0
-          ? `Discussion (${slot.commentCount} messages)`
-          : "Discussion"
-      }
-      title={open ? "Hide discussion" : "Discussion"}
-      onClick={() => void onToggle()}
-    >
-      <MessageCircle size={22} aria-hidden />
-      {slot.commentCount > 0 ? (
-        <span className="cal-comment-count">
-          {slot.commentCount > 99 ? "99" : slot.commentCount}
-        </span>
-      ) : null}
-    </button>
+    <span className="cal-row-tint" aria-hidden title={countsTitle(counts)}>
+      {STATES.map((state) =>
+        counts[state] === 0 ? null : (
+          <span
+            key={state}
+            className={state[0]}
+            style={{ width: pct(counts[state], total) }}
+          />
+        ),
+      )}
+    </span>
   );
 }
 
-/** Availability meter with the electors' avatars INSIDE their segment
- * (QA 2026-08-02): 🟢 people on the green stretch, and so on. The audience
- * is the same on every row of a view, so the meter always fills its column
- * width; avatars link to the person's page.
- *
- * The avatar meter is workbench apparatus, so it renders only in deciding
- * contexts — a topic lens active, or the row folded open (QA 2026-08-05).
- * Scanning rows get the compact counts-only bar instead. */
-function AvailabilityMeter({
+/** Who exactly — avatars inside their wash segment, mirroring the tint
+ * widths above, shown when the row is folded open. Avatars link to the
+ * person's page. */
+function FoldAvatars({
   perUser,
-  counts,
   slug,
-  detailed,
 }: {
   perUser: NonNullable<CalendarSlot["perUser"]>;
-  counts: { green: number; yellow: number; red: number };
   slug: string;
-  detailed: boolean;
 }) {
-  const states = ["green", "yellow", "red"] as const;
-
-  if (!detailed) {
-    const total = counts.green + counts.yellow + counts.red;
-    if (total === 0) return null;
-    return (
-      <span
-        className="avail-bar avail-meter avail-meter-compact"
-        title={countsTitle(counts)}
-      >
-        {states.map((state) =>
-          counts[state] === 0 ? null : (
-            <span
-              key={state}
-              className={state[0]}
-              style={{ width: pct(counts[state], total) }}
-            />
-          ),
-        )}
-      </span>
-    );
-  }
-
   const total = perUser.length;
   if (total === 0) return null;
   return (
-    <span className="avail-bar avail-meter" title={countsTitle(counts)}>
-      {states.map((state) => {
+    <div className="cal-fold-avatars">
+      {STATES.map((state) => {
         const people = perUser.filter((u) => u.state === state);
         if (people.length === 0) return null;
         return (
           <span
             key={state}
-            className={`avail-meter-seg ${state[0]}`}
+            className="cal-fold-seg"
             style={{ width: pct(people.length, total) }}
           >
             {people.map((u) => (
@@ -165,11 +126,11 @@ function AvailabilityMeter({
           </span>
         );
       })}
-    </span>
+    </div>
   );
 }
 
-/** The fold under a slot row: discussion, then session/admin controls. */
+/** The fold under a row's line: who, then discussion, then controls. */
 function SlotDetail({
   slot,
   slug,
@@ -194,7 +155,8 @@ function SlotDetail({
   onReload: () => Promise<void>;
 }) {
   return (
-    <div className="stack" style={{ gap: 10 }}>
+    <div className="cal-row-detail">
+      {slot.perUser ? <FoldAvatars perUser={slot.perUser} slug={slug} /> : null}
       <DiscussionPanel
         slot={slot}
         slug={slug}
@@ -217,66 +179,74 @@ function SlotDetail({
   );
 }
 
-/** "**Fri 9 Oct** Terrace" over "14:00 – 16:00" (QA 2026-08-02). */
-function WhenCell({ slot }: { slot: CalendarSlot }) {
-  return (
-    <td className="cal-when-cell">
-      <div>
-        <strong>{formatDate(slot.startsAt)}</strong>
-        {slot.location ? <> {slot.location}</> : null}
-      </div>
-      <div className="faint" style={{ fontSize: 12 }}>
-        {formatTime(slot.startsAt)} – {formatTime(slot.endsAt)}
-      </div>
-    </td>
+/** True when a click/keypress landed on an interactive element that owns
+ * the event — links, the availability toggle, fold controls. */
+function onInteractive(e: { target: EventTarget | null }): boolean {
+  return Boolean(
+    (e.target as HTMLElement | null)?.closest(
+      "a,button,input,select,textarea,label",
+    ),
   );
 }
 
-/** The role-gated right-hand cells: group meter (host/admin), own
- * availability toggle (elector). */
-function MeterAndYouCells({
+/** The single content line riding above the tints: when | session | the
+ * right cluster (💬 count when non-zero, the elector's own toggle). */
+function RowLine({
   slot,
   past,
-  perms,
   slug,
-  detailed,
+  perms,
+  officeHoursLabel,
+  canExpand,
 }: {
   slot: CalendarSlot;
   past: boolean;
-  perms: CalendarPerms;
   slug: string;
-  detailed: boolean;
+  perms: CalendarPerms;
+  officeHoursLabel: string;
+  canExpand: boolean;
 }) {
   return (
-    <>
-      {perms.canSeeHostOnly ? (
-        <td className="cal-avail-cell">
-          {slot.perUser ? (
-            <AvailabilityMeter
-              perUser={slot.perUser}
-              counts={slot.counts}
-              slug={slug}
-              detailed={detailed}
-            />
-          ) : null}
-        </td>
+    <div className="cal-row-line">
+      <span className="cal-when">
+        <strong>{formatDate(slot.startsAt)}</strong> {formatTime(slot.startsAt)}{" "}
+        – {formatTime(slot.endsAt)}
+        {slot.location ? (
+          <span className="cal-where"> {slot.location}</span>
+        ) : null}
+      </span>
+      {slot.topic || slot.sessionHost ? (
+        <div className="cal-row-session">
+          <SessionLine
+            slot={slot}
+            slug={slug}
+            officeHoursLabel={officeHoursLabel}
+          />
+        </div>
       ) : null}
-      {perms.canSetAvailability ? (
-        <td className="cal-you-cell">
-          {past ? null : (
-            <AvailabilityControl
-              slotId={slot.id}
-              state={slot.viewerState}
-              compact
-            />
-          )}
-        </td>
-      ) : null}
-    </>
+      <span className="cal-row-right">
+        {canExpand && slot.commentCount > 0 ? (
+          <span
+            className="cal-count"
+            aria-label={`Discussion (${slot.commentCount} messages)`}
+          >
+            <MessageCircle size={14} aria-hidden />
+            {slot.commentCount > 99 ? "99" : slot.commentCount}
+          </span>
+        ) : null}
+        {perms.canSetAvailability && !past ? (
+          <AvailabilityControl
+            slotId={slot.id}
+            state={slot.viewerState}
+            compact
+          />
+        ) : null}
+      </span>
+    </div>
   );
 }
 
-function SlotTableRow({
+function SlotRow({
   slot,
   past,
   weekStart,
@@ -284,25 +254,21 @@ function SlotTableRow({
   perms,
   claimTopics,
   lensTopic,
-  lensActive,
   adminLabel,
   officeHoursLabel,
   roleLabels,
-  columns,
 }: {
   slot: CalendarSlot;
   past: boolean;
-  /** True when this slot starts a new (Mon-first) week — thicker rule. */
+  /** True when this slot starts a new (Mon-first) week — bigger gap. */
   weekStart: boolean;
   slug: string;
   perms: CalendarPerms;
   claimTopics: TopicOption[];
   lensTopic: TopicOption | null;
-  lensActive: boolean;
   adminLabel: string;
   officeHoursLabel: string;
   roleLabels?: RoleLabels;
-  columns: number;
 }) {
   const [open, setOpen] = useState(false);
   const [comments, setComments] = useState<SlotComment[] | null>(null);
@@ -323,75 +289,63 @@ function SlotTableRow({
   }
 
   const rowClasses = [
+    "cal-row",
     past ? "cal-past" : null,
     weekStart ? "cal-week-start" : null,
+    canExpand ? "cal-row-expandable" : null,
   ]
     .filter(Boolean)
     .join(" ");
 
   return (
-    <Fragment>
-      <tr className={rowClasses || undefined}>
-        <td className="cal-caret-cell">
-          {canExpand ? (
-            <CommentButton slot={slot} open={open} onToggle={toggle} />
-          ) : null}
-        </td>
-        <WhenCell slot={slot} />
-        <MeterAndYouCells
-          slot={slot}
-          past={past}
-          perms={perms}
-          slug={slug}
-          detailed={lensActive || open}
-        />
-      </tr>
-      {/* "Author: Topic" / "Host — office hours" + status pill on its own
-          line under the row — visually part of the same slot block. */}
-      {slot.topic || slot.sessionHost ? (
-        <tr className={`cal-session-row${past ? " cal-past" : ""}`}>
-          <td />
-          <td colSpan={columns - 1}>
-            <SessionLine
-              slot={slot}
-              slug={slug}
-              officeHoursLabel={officeHoursLabel}
-            />
-          </td>
-        </tr>
-      ) : null}
-      {/* Fold indented to the when-column with a hierarchy line on the
-          left (QA 2026-08-03). */}
+    <div
+      className={rowClasses}
+      role={canExpand ? "button" : undefined}
+      tabIndex={canExpand ? 0 : undefined}
+      aria-expanded={canExpand ? open : undefined}
+      onClick={(e) => {
+        if (canExpand && !onInteractive(e)) void toggle();
+      }}
+      onKeyDown={(e) => {
+        if (!canExpand || (e.key !== "Enter" && e.key !== " ")) return;
+        if (e.target !== e.currentTarget) return;
+        e.preventDefault();
+        void toggle();
+      }}
+    >
+      {perms.canSeeHostOnly ? <TintLayer counts={slot.counts} /> : null}
+      <RowLine
+        slot={slot}
+        past={past}
+        slug={slug}
+        perms={perms}
+        officeHoursLabel={officeHoursLabel}
+        canExpand={canExpand}
+      />
       {open ? (
-        <tr className="cal-detail-row">
-          <td />
-          <td colSpan={columns - 1}>
-            <div className="cal-fold">
-              <SlotDetail
-                slot={slot}
-                slug={slug}
-                perms={perms}
-                claimTopics={claimTopics}
-                lensTopic={lensTopic}
-                adminLabel={adminLabel}
-                officeHoursLabel={officeHoursLabel}
-                roleLabels={roleLabels}
-                comments={comments}
-                onReload={loadComments}
-              />
-            </div>
-          </td>
-        </tr>
+        <SlotDetail
+          slot={slot}
+          slug={slug}
+          perms={perms}
+          claimTopics={claimTopics}
+          lensTopic={lensTopic}
+          adminLabel={adminLabel}
+          officeHoursLabel={officeHoursLabel}
+          roleLabels={roleLabels}
+          comments={comments}
+          onReload={loadComments}
+        />
       ) : null}
-    </Fragment>
+    </div>
   );
 }
 
 /**
- * The calendar as a compact table (QA 2026-07-31 — replaced one card per
- * slot): the 💬 bubble folds a row open into discussion/controls, the
- * full-width availability meter carries avatars inside their 🟢🟡🔴
- * segment, and month headings ride as divider rows.
+ * The calendar as a list of row washes (2026-08-05 — replaced the table
+ * with its meters, hairlines, and week rules): each slot is one rounded
+ * block whose background tints ARE the availability chart, rows separated
+ * by gaps (bigger between weeks), month headings between groups. The whole
+ * row toggles its fold (discussion, avatars, controls) for hosts/admins.
  */
 export function CalendarTable({
   rows,
@@ -399,7 +353,6 @@ export function CalendarTable({
   perms,
   claimTopics,
   lensTopic,
-  lensActive = false,
   adminLabel = "Admin",
   officeHoursLabel = "Office hours",
   roleLabels,
@@ -411,8 +364,6 @@ export function CalendarTable({
   perms: CalendarPerms;
   claimTopics: TopicOption[];
   lensTopic: TopicOption | null;
-  /** Any lens (a topic or "anyone who ❤️'d mine") — full avatar meters. */
-  lensActive?: boolean;
   adminLabel?: string;
   officeHoursLabel?: string;
   /** Forum role labels for the discussion authors' role pills. */
@@ -420,9 +371,6 @@ export function CalendarTable({
   showingPast: boolean;
   base: string;
 }) {
-  const columns =
-    2 + (perms.canSeeHostOnly ? 1 : 0) + (perms.canSetAvailability ? 1 : 0);
-
   const pastToggle = (
     <Link
       className="topic-body-toggle"
@@ -445,53 +393,44 @@ export function CalendarTable({
       <h3 className="section-title" style={{ marginBottom: 8 }}>
         Calendar
       </h3>
-      <div className="table-wrap">
-        {/* No header row (QA 2026-08-03) — the columns explain themselves. */}
-        <table className="data-table cal-table">
-          <tbody>
-            {rows.map(({ slot, past }, i) => {
-              const month = monthLabel(slot.startsAt);
-              const divider =
-                i === 0 || month !== monthLabel(rows[i - 1]!.slot.startsAt);
-              // Thicker rule between Sunday and Monday (QA 2026-08-02) —
-              // skipped when a month heading already breaks the run.
-              const weekStart =
-                !divider &&
-                i > 0 &&
-                weekKey(slot.startsAt) !== weekKey(rows[i - 1]!.slot.startsAt);
-              return (
-                <Fragment key={slot.id}>
-                  {divider ? (
-                    <tr className="cal-month-row">
-                      <td colSpan={columns}>
-                        <span className="cal-month-inner">
-                          {month}
-                          {/* The past toggle rides in the FIRST month
-                              break (QA 2026-08-03). */}
-                          {i === 0 ? pastToggle : null}
-                        </span>
-                      </td>
-                    </tr>
-                  ) : null}
-                  <SlotTableRow
-                    slot={slot}
-                    past={past}
-                    weekStart={weekStart}
-                    slug={slug}
-                    perms={perms}
-                    claimTopics={claimTopics}
-                    lensTopic={lensTopic}
-                    lensActive={lensActive}
-                    adminLabel={adminLabel}
-                    officeHoursLabel={officeHoursLabel}
-                    roleLabels={roleLabels}
-                    columns={columns}
-                  />
-                </Fragment>
-              );
-            })}
-          </tbody>
-        </table>
+      <div className="cal-list">
+        {rows.map(({ slot, past }, i) => {
+          const month = monthLabel(slot.startsAt);
+          const divider =
+            i === 0 || month !== monthLabel(rows[i - 1]!.slot.startsAt);
+          // Bigger gap between Sunday and Monday — skipped when a month
+          // heading already breaks the run.
+          const weekStart =
+            !divider &&
+            i > 0 &&
+            weekKey(slot.startsAt) !== weekKey(rows[i - 1]!.slot.startsAt);
+          return (
+            <Fragment key={slot.id}>
+              {divider ? (
+                <div className="cal-month-row">
+                  <span className="cal-month-inner">
+                    {month}
+                    {/* The past toggle rides in the FIRST month break
+                        (QA 2026-08-03). */}
+                    {i === 0 ? pastToggle : null}
+                  </span>
+                </div>
+              ) : null}
+              <SlotRow
+                slot={slot}
+                past={past}
+                weekStart={weekStart}
+                slug={slug}
+                perms={perms}
+                claimTopics={claimTopics}
+                lensTopic={lensTopic}
+                adminLabel={adminLabel}
+                officeHoursLabel={officeHoursLabel}
+                roleLabels={roleLabels}
+              />
+            </Fragment>
+          );
+        })}
       </div>
     </div>
   );

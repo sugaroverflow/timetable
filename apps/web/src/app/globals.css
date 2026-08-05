@@ -1431,27 +1431,6 @@ textarea {
 .avail-btn.red {
   background: var(--red-soft);
 }
-.avail-bar {
-  display: inline-flex;
-  height: 10px;
-  border-radius: var(--radius-pill);
-  overflow: hidden;
-  min-width: 120px;
-  border: 1px solid var(--line);
-}
-.avail-bar > span {
-  display: block;
-  height: 100%;
-}
-.avail-bar .g {
-  background: var(--green);
-}
-.avail-bar .y {
-  background: var(--yellow);
-}
-.avail-bar .r {
-  background: var(--red);
-}
 .dot {
   width: 12px;
   height: 12px;
@@ -1539,103 +1518,108 @@ textarea {
   margin: 2px 0;
 }
 
-/* Calendar v2 — table page */
-/* Compact slot table (QA 2026-07-31 — one row per slot, Analysis-style). */
-.cal-table td {
-  vertical-align: middle;
+/* Calendar v2 — row-wash list (2026-08-05, replaced the table+meter
+   design): the row IS the chart. One rounded block per slot; availability
+   renders as three low-alpha washes across the row's own background, so
+   the eye reads one object per row instead of three (hairline, bar, text
+   baseline). Gaps separate rows; bigger gaps separate weeks. */
+.cal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
-.cal-caret-cell {
-  width: 1%;
-  padding-right: 0;
+.cal-list .cal-week-start {
+  /* 3px list gap + 5px = the 8px week gap. */
+  margin-top: 5px;
 }
-/* Speech-bubble discussion button (QA 2026-08-02): primary-filled bubble,
-   the count inside in the card colour; the no-messages bubble is washed
-   out. */
-.cal-comment-btn {
+.cal-row {
   position: relative;
-  display: inline-flex;
-  padding: 3px;
-  border: none;
-  background: none;
-  color: var(--primary);
-  cursor: pointer;
-}
-.cal-comment-btn svg {
-  fill: currentColor;
-}
-.cal-comment-btn.cal-comment-empty {
-  opacity: 0.35;
-}
-.cal-comment-btn:hover,
-.cal-comment-btn[aria-expanded="true"] {
-  opacity: 1;
-  color: var(--primary);
-}
-.cal-comment-count {
-  position: absolute;
-  top: calc(50% - 1px);
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 9px;
-  font-weight: var(--fw-bold);
-  line-height: 1;
-  color: var(--card);
-}
-/* Thicker PRIMARY rule between Sunday and Monday (QA 2026-08-02 r4). */
-.cal-table tr.cal-week-start td {
-  border-top-width: 3px;
-  border-top-color: var(--primary);
-}
-/* When/where takes only the width it needs; the availability meter's
-   column absorbs everything left over (QA 2026-08-03). */
-.cal-table td.cal-when-cell {
-  white-space: nowrap;
-}
-/* Availability meter with avatars inside their 🟢/🟡/🔴 stretch
-   (QA 2026-08-02). Fills its column — the audience is the same on every
-   row of a view, so length carries no information. */
-.cal-table td.cal-avail-cell {
-  width: 100%;
-}
-/* Elector's own 🟢🟡🔴 toggle hugs the table's right edge (QA 2026-08-03). */
-.cal-table td.cal-you-cell {
-  text-align: right;
-}
-.cal-you-cell .avseg {
-  justify-content: flex-end;
-}
-.avail-meter {
-  width: 100%;
-  min-width: 160px;
-  /* As tall as the two-line when/where block beside it (QA 2026-08-03). */
-  height: 38px;
-  border-radius: 999px;
-}
-/* Counts-only bar for scanning rows (QA 2026-08-05): the avatar meter is
-   workbench apparatus, shown when a lens is active or the row is open. */
-.avail-meter.avail-meter-compact {
-  height: 12px;
-}
-/* Avatars spread EVENLY along the meter (QA 2026-08-03): segment width is
-   proportional to its headcount, so space-evenly inside each segment =
-   uniform spacing across the whole bar, with the green/yellow/red ground
-   showing between faces. */
-.avail-meter .avail-meter-seg {
-  display: inline-flex;
-  align-items: center;
-  justify-content: space-evenly;
-  height: 100%;
+  min-height: 52px;
+  border-radius: 8px;
   overflow: hidden;
 }
-.avail-meter .avatar {
-  width: 17px;
-  height: 17px;
-  font-size: 7px;
-  flex: none;
-  box-shadow: 0 0 0 1px rgb(255 255 255 / 55%);
+.cal-row-expandable {
+  cursor: pointer;
 }
-.avail-meter .cal-person-link {
+.cal-row:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+/* Washes composite over the surface (color-mix with transparent, never
+   pale hexes — those break in dark mode). Green runs slightly stronger:
+   it reads weaker than amber/red at equal alpha. Text colour is unchanged
+   over the tints. */
+.cal-row-tint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  pointer-events: none;
+}
+.cal-row-tint > span {
+  display: block;
+  height: 100%;
+}
+.cal-row-tint .g {
+  background: color-mix(in srgb, var(--green) 16%, transparent);
+}
+.cal-row-tint .y {
+  background: color-mix(in srgb, var(--yellow) 13%, transparent);
+}
+.cal-row-tint .r {
+  background: color-mix(in srgb, var(--red) 13%, transparent);
+}
+/* The saturated version exists, but only ever on one row at a time. */
+.cal-row:hover .cal-row-tint .g,
+.cal-row:focus-visible .cal-row-tint .g {
+  background: color-mix(in srgb, var(--green) 22%, transparent);
+}
+.cal-row:hover .cal-row-tint .y,
+.cal-row:focus-visible .cal-row-tint .y {
+  background: color-mix(in srgb, var(--yellow) 19%, transparent);
+}
+.cal-row:hover .cal-row-tint .r,
+.cal-row:focus-visible .cal-row-tint .r {
+  background: color-mix(in srgb, var(--red) 19%, transparent);
+}
+/* Row content rides above the tint on a single line: when | session,
+   with the comment count / elector toggle right-aligned. */
+.cal-row-line {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 0 14px;
+}
+.cal-when {
   flex: none;
+  white-space: nowrap;
+}
+.cal-where {
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+.cal-row-session {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.cal-row-session .row {
+  flex-wrap: nowrap;
+}
+.cal-row-right {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.cal-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--text-xs);
+  color: var(--muted);
 }
 .cal-person-link {
   display: inline-flex;
@@ -1663,15 +1647,19 @@ textarea {
 .section-body {
   margin-top: 10px;
 }
-/* Divider/utility rows sit on the card surface, not the page background
-   (QA 2026-08-02 round 4). Month text in the primary colour, with the
-   past toggle riding in the FIRST month break (QA 2026-08-03). */
-.cal-month-row td {
+/* Month headings between row groups — primary colour, with the past
+   toggle riding in the FIRST month break (QA 2026-08-03). Padding lines
+   the text up with the rows' 14px inset. */
+.cal-month-row {
+  padding: 8px 14px 1px;
   color: var(--primary);
   font-size: var(--text-xs);
   font-weight: var(--fw-bold);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+.cal-list .cal-month-row:first-child {
+  padding-top: 0;
 }
 .cal-month-inner {
   display: flex;
@@ -1684,41 +1672,50 @@ textarea {
   text-transform: none;
   letter-spacing: normal;
 }
-.cal-table tbody tr:first-child td {
-  border-top: 0;
-}
-/* The fold under a slot row: card surface, no rule above it, indented to
-   the when-column with a hierarchy line on the left (QA 2026-08-03). */
-.cal-detail-row td {
-  border-top: 0;
-  white-space: normal;
-}
-.cal-fold {
-  border-left: 2px solid var(--line);
-  padding-left: 14px;
-  /* The fold's composer/thread must never widen the table: inline-size
-     containment zeroes its intrinsic width, so it fits the columns the
-     visible rows negotiated (QA 2026-08-03 — unfold overflowed). */
-  contain: inline-size;
+/* The fold inside the tinted block: avatars in their wash segments, then
+   discussion + controls. Clicks inside are the fold's own. */
+.cal-row-detail {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 14px 12px;
+  cursor: auto;
 }
 /* Native selects size to their longest option — topic titles in the
-   pencil-in select pushed the fold (and with it the table) hundreds of px
-   past a phone screen. Cap every fold control at the fold's width
-   (mobile pass 2026-08-03). */
-.cal-fold select,
-.cal-fold input {
+   pencil-in select pushed the row hundreds of px past a phone screen. Cap
+   every fold control at the row's width (mobile pass 2026-08-03). */
+.cal-row-detail select,
+.cal-row-detail input {
   max-width: 100%;
   text-overflow: ellipsis;
 }
-.cal-detail-row .host-thread {
+.cal-row-detail .host-thread {
   border-top: 0;
   margin-top: 0;
   padding-top: 0;
 }
-/* The session pill's own line, part of the same slot block. */
-.cal-session-row td {
-  border-top: 0;
-  padding-top: 0;
+/* Who exactly: avatars sit inside their wash segment, mirroring the tint
+   widths, evenly spaced (QA 2026-08-03 meter behaviour, relocated). */
+.cal-fold-avatars {
+  display: flex;
+}
+.cal-fold-avatars .cal-fold-seg {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-evenly;
+  min-height: 24px;
+  overflow: hidden;
+}
+.cal-fold-avatars .avatar {
+  width: 17px;
+  height: 17px;
+  font-size: 7px;
+  flex: none;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 55%);
+}
+.cal-fold-avatars .cal-person-link {
+  flex: none;
 }
 /* "Host: Topic" in the title face — prominent, but under the card's
    section heading (QA 2026-08-03). */
@@ -1734,18 +1731,6 @@ textarea {
   line-height: 1;
 }
 
-/* Overlapping audience-avatar strip; one strip per 🟢/🟡/🔴 group. */
-.cal-avatars {
-  display: inline-flex;
-  align-items: center;
-}
-.cal-avatars .avatar {
-  margin-left: -6px;
-  box-shadow: 0 0 0 2px var(--card);
-}
-.cal-avatars .avatar:first-child {
-  margin-left: 0;
-}
 /* A past slot stays readable but visibly archived. */
 .cal-past {
   opacity: 0.6;
@@ -1763,85 +1748,28 @@ textarea {
   color: var(--muted);
 }
 
-/* Mobile calendar (design pass 2026-08-03): the desktop row grid
-   (💬 | when | meter | you) is ~580px — far past a phone, so the meter,
-   session lines, and the whole fold hid behind sideways scroll. Under
-   640px each slot stacks instead: 💬 + when (+ the elector's own 🟢🟡🔴
-   toggle right-aligned) on the first line, the full-width avatar meter
-   beneath; session lines and the fold span the whole block. */
+/* Mobile calendar: the single line can't fit when + session + controls,
+   so the line wraps — when and the right cluster stay on the first line,
+   the session line drops beneath, all still above the tint. */
 @media (max-width: 640px) {
-  .cal-table,
-  .cal-table tbody {
-    display: block;
+  .cal-row {
+    min-height: 44px;
   }
-  .cal-table tr {
-    display: flex;
+  .cal-row-line {
     flex-wrap: wrap;
-    align-items: center;
-    padding: 8px 0;
-    border-top: 1px solid var(--line);
+    row-gap: 2px;
+    min-height: 44px;
+    padding: 8px 14px;
   }
-  /* Row rules move from the cells to the row blocks above. The nowrap the
-     cells inherit from .data-table would clip fold bubbles and session
-     lines — restore wrapping. (Selector list mirrors the base rules it
-     must out-cascade.) */
-  .cal-table td,
-  .cal-table td:not(:first-child),
-  .cal-table tr.cal-week-start td {
-    display: block;
-    border-top: 0;
-    padding: 0;
-    width: auto;
-    white-space: normal;
+  .cal-row-session {
+    flex-basis: 100%;
+    order: 5;
   }
-  .cal-table tr.cal-week-start {
-    border-top-width: 3px;
-    border-top-color: var(--primary);
-  }
-  .cal-table tbody tr:first-child {
-    border-top: 0;
-  }
-  .cal-table td.cal-caret-cell {
-    padding-right: 6px;
-  }
-  .cal-table td.cal-when-cell {
-    flex: 1;
-    min-width: 0;
-    white-space: normal;
-  }
-  /* The meter drops to its own full-width line; `order` sends it past the
-     elector's you-cell so the toggle stays on the when line. min-width
-     overrides the flex item's content floor — without it the avatar row
-     props the cell (and table) ~20px past the screen. */
-  .cal-table td.cal-avail-cell {
-    order: 10;
-    width: 100%;
-    min-width: 0;
-    padding-top: 4px;
-  }
-  /* Slightly smaller faces so a ~20-elector audience fits one meter line. */
-  .avail-meter .avatar {
+  /* Slightly smaller faces so a ~20-elector audience fits one line. */
+  .cal-fold-avatars .avatar {
     width: 15px;
     height: 15px;
     font-size: 6px;
-  }
-  /* Divider/utility rows are plain blocks; their spacer cells vanish. */
-  .cal-table tr.cal-month-row,
-  .cal-table tr.cal-session-row,
-  .cal-table tr.cal-detail-row {
-    display: block;
-    border-top: 0;
-  }
-  .cal-table tr.cal-month-row {
-    padding: 14px 0 4px;
-  }
-  .cal-table tr.cal-session-row,
-  .cal-table tr.cal-detail-row {
-    padding: 0 0 4px;
-  }
-  .cal-session-row td:first-child,
-  .cal-detail-row td:first-child {
-    display: none;
   }
 }
 

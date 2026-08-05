@@ -301,7 +301,6 @@ function CalendarBody({
   roleLabels,
   past,
   base,
-  lensActive,
 }: {
   slug: string;
   visibleSlots: CalendarSlot[];
@@ -314,8 +313,6 @@ function CalendarBody({
   roleLabels?: RoleLabels;
   past: boolean;
   base: string;
-  /** A topic lens is active — the page is in scheduling-workbench mode. */
-  lensActive: boolean;
 }) {
   if (visibleSlots.length === 0) {
     return <CalendarEmpty anySlots={anySlots} canAdmin={perms.canAdmin} />;
@@ -328,7 +325,6 @@ function CalendarBody({
         perms={perms}
         claimTopics={claimTopics}
         lensTopic={lensTopic}
-        lensActive={lensActive}
         adminLabel={adminLabel}
         officeHoursLabel={ohLabel}
         roleLabels={roleLabels}
@@ -486,7 +482,6 @@ export default async function CalendarPage({
         roleLabels={settings.roleLabels}
         past={past}
         base={base}
-        lensActive={Boolean(audience)}
       />
     </div>
   );
