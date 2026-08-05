@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X } from "lucide-react";
+import { Settings, X } from "lucide-react";
 
 import {
   patternCellKey,
@@ -10,7 +10,6 @@ import {
   type CalendarTerm,
 } from "@timetable/shared";
 
-import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { pluralLabel } from "@/lib/timetableSettings";
 import { useGqlAction } from "@/lib/useGqlAction";
 
@@ -193,6 +192,7 @@ export function CalendarSetup({
   adminLabel?: string;
 }) {
   const { run, busy } = useGqlAction();
+  const [open, setOpen] = useState(false);
   const [cells, setCells] = useState<CalendarPatternCell[]>(
     current.patternCells ?? [],
   );
@@ -227,82 +227,103 @@ export function CalendarSetup({
     );
   }
 
+  // Same reveal-in-place rule as "Propose a different time" (QA
+  // 2026-08-05, replacing the folded card): a plain button until pressed.
+  if (!open) {
+    return (
+      <button
+        type="button"
+        className="btn"
+        style={{ alignSelf: "flex-start" }}
+        onClick={() => setOpen(true)}
+      >
+        <Settings size={16} aria-hidden /> Set up the schedule (
+        {pluralLabel(adminLabel)} only)
+      </button>
+    );
+  }
+
   return (
     <div className="card">
-      <CollapsibleSection
-        title={`Set up the schedule (${pluralLabel(adminLabel)} only)`}
-        defaultOpen={false}
-      >
-        <div className="stack" style={{ gap: 12 }}>
-          <div className="stack" style={{ gap: 6 }}>
-            <strong style={{ fontSize: 13 }}>When can sessions happen?</strong>
-            <div className="row wrap" style={{ gap: 6 }}>
-              {cells.map((cell) => (
-                <button
-                  key={patternCellKey(cell)}
-                  type="button"
-                  className="pill"
-                  title="Remove"
-                  onClick={() => setCells(cells.filter((c) => c !== cell))}
-                >
-                  {cellLabel(cell)} <X size={12} aria-hidden />
-                </button>
-              ))}
-            </div>
-            <AddCellForm
-              onAdd={(added) => {
-                const known = new Set(cells.map(patternCellKey));
-                setCells([
-                  ...cells,
-                  ...added.filter((c) => !known.has(patternCellKey(c))),
-                ]);
-              }}
-            />
+      <div className="stack" style={{ gap: 12 }}>
+        <h3 className="section-title" style={{ margin: 0 }}>
+          Set up the schedule
+        </h3>
+        <div className="stack" style={{ gap: 6 }}>
+          <strong style={{ fontSize: 13 }}>When can sessions happen?</strong>
+          <div className="row wrap" style={{ gap: 6 }}>
+            {cells.map((cell) => (
+              <button
+                key={patternCellKey(cell)}
+                type="button"
+                className="pill"
+                title="Remove"
+                onClick={() => setCells(cells.filter((c) => c !== cell))}
+              >
+                {cellLabel(cell)} <X size={12} aria-hidden />
+              </button>
+            ))}
           </div>
-
-          <div className="stack" style={{ gap: 6 }}>
-            <strong style={{ fontSize: 13 }}>During which dates?</strong>
-            <div className="row wrap" style={{ gap: 6 }}>
-              {terms.map((term, i) => (
-                <button
-                  key={`${term.name}-${i}`}
-                  type="button"
-                  className="pill"
-                  title="Remove"
-                  onClick={() => setTerms(terms.filter((t) => t !== term))}
-                >
-                  {term.name} · {term.start} – {term.end}{" "}
-                  <X size={12} aria-hidden />
-                </button>
-              ))}
-            </div>
-            <AddTermForm onAdd={(term) => setTerms([...terms, term])} />
-          </div>
-
-          <p className="faint" style={{ margin: 0, fontSize: 13 }}>
-            {slots.length > 0 ? (
-              <>
-                ➜ This creates <strong>{slots.length} slots</strong>. Electors
-                will be asked about: {cellSummary}. Slots that already exist are
-                left alone.
-              </>
-            ) : (
-              <>Add at least one time and one date range to generate slots.</>
-            )}
-          </p>
-
-          <div className="row">
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={busy}
-              onClick={save}
-            >
-              {slots.length > 0 ? "Save & generate slots" : "Save pattern"}
-            </button>
-          </div>
+          <AddCellForm
+            onAdd={(added) => {
+              const known = new Set(cells.map(patternCellKey));
+              setCells([
+                ...cells,
+                ...added.filter((c) => !known.has(patternCellKey(c))),
+              ]);
+            }}
+          />
         </div>
-      </CollapsibleSection>
+
+        <div className="stack" style={{ gap: 6 }}>
+          <strong style={{ fontSize: 13 }}>During which dates?</strong>
+          <div className="row wrap" style={{ gap: 6 }}>
+            {terms.map((term, i) => (
+              <button
+                key={`${term.name}-${i}`}
+                type="button"
+                className="pill"
+                title="Remove"
+                onClick={() => setTerms(terms.filter((t) => t !== term))}
+              >
+                {term.name} · {term.start} – {term.end}{" "}
+                <X size={12} aria-hidden />
+              </button>
+            ))}
+          </div>
+          <AddTermForm onAdd={(term) => setTerms([...terms, term])} />
+        </div>
+
+        <p className="faint" style={{ margin: 0, fontSize: 13 }}>
+          {slots.length > 0 ? (
+            <>
+              ➜ This creates <strong>{slots.length} slots</strong>. Electors
+              will be asked about: {cellSummary}. Slots that already exist are
+              left alone.
+            </>
+          ) : (
+            <>Add at least one time and one date range to generate slots.</>
+          )}
+        </p>
+
+        <div className="row" style={{ gap: 8 }}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={busy}
+            onClick={save}
+          >
+            {slots.length > 0 ? "Save & generate slots" : "Save pattern"}
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => setOpen(false)}
+          >
+            Close
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

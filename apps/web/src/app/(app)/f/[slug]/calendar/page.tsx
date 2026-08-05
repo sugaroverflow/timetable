@@ -22,6 +22,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { LocationFilter } from "@/components/LocationFilter";
 import { PatternGrid } from "@/components/PatternGrid";
 import { ProposeSlotForm } from "@/components/ProposeSlotForm";
+import { SlotStatusFilter } from "@/components/SlotStatusFilter";
 import type {
   AvailabilityState,
   CalendarPerms,
@@ -91,6 +92,7 @@ function CalendarToolbar({
   hostView,
   audience,
   location,
+  show,
   electorsLabel,
 }: {
   calendar: CalendarSlot[];
@@ -99,13 +101,14 @@ function CalendarToolbar({
   hostView: boolean;
   audience?: string;
   location?: string;
+  show?: string;
   electorsLabel: string;
 }) {
   const locations = [
     ...new Set(calendar.map((s) => s.location).filter(Boolean)),
   ].sort();
 
-  if (!perms.canSeeHostOnly && locations.length === 0) return null;
+  if (calendar.length === 0) return null;
 
   return (
     // Flush floating filter bar, same treatment as the All Topics toolbar
@@ -120,6 +123,7 @@ function CalendarToolbar({
           electorsLabel={electorsLabel}
         />
       ) : null}
+      <SlotStatusFilter value={show ?? ""} />
       {locations.length > 0 ? (
         <LocationFilter value={location ?? ""} locations={locations} />
       ) : null}
@@ -146,6 +150,21 @@ function filterByLocation(
   location: string | undefined,
 ): CalendarSlot[] {
   return location ? slots.filter((s) => s.location === location) : slots;
+}
+
+function hasSession(slot: CalendarSlot): boolean {
+  return Boolean(slot.topic || slot.sessionHost);
+}
+
+/** ?show=sessions|open — the calendar's two jobs (what's happening vs
+ * where's free) as separate views; default is the full chronology. */
+function filterBySlotState(
+  slots: CalendarSlot[],
+  show: string | undefined,
+): CalendarSlot[] {
+  if (show === "sessions") return slots.filter(hasSession);
+  if (show === "open") return slots.filter((s) => !hasSession(s));
+  return slots;
 }
 
 /** The active lens topic (from ?audience=hearted_topic:<id>), or null for
@@ -252,7 +271,7 @@ function CalendarEmpty({
       <EmptyState
         icon="▦"
         title="No slots match"
-        hint="Try a different location."
+        hint="Try a different filter."
       />
     );
   }
@@ -282,6 +301,7 @@ function CalendarBody({
   roleLabels,
   past,
   base,
+  lensActive,
 }: {
   slug: string;
   visibleSlots: CalendarSlot[];
@@ -294,6 +314,8 @@ function CalendarBody({
   roleLabels?: RoleLabels;
   past: boolean;
   base: string;
+  /** A topic lens is active — the page is in scheduling-workbench mode. */
+  lensActive: boolean;
 }) {
   if (visibleSlots.length === 0) {
     return <CalendarEmpty anySlots={anySlots} canAdmin={perms.canAdmin} />;
@@ -306,6 +328,7 @@ function CalendarBody({
         perms={perms}
         claimTopics={claimTopics}
         lensTopic={lensTopic}
+        lensActive={lensActive}
         adminLabel={adminLabel}
         officeHoursLabel={ohLabel}
         roleLabels={roleLabels}
@@ -370,11 +393,12 @@ export default async function CalendarPage({
   searchParams: Promise<{
     audience?: string;
     location?: string;
+    show?: string;
     past?: string;
   }>;
 }) {
   const { slug } = await params;
-  const { audience, location, past: pastParam } = await searchParams;
+  const { audience, location, show, past: pastParam } = await searchParams;
   const { userId } = await auth();
   const past = pastParam === "1";
 
@@ -408,7 +432,10 @@ export default async function CalendarPage({
     viewerId,
   );
   const lensTopic = findLensTopic(audience, data.topicFeed);
-  const visibleSlots = filterByLocation(data.calendar, location);
+  const visibleSlots = filterBySlotState(
+    filterByLocation(data.calendar, location),
+    show,
+  );
 
   return (
     <div className="stack">
@@ -441,6 +468,7 @@ export default async function CalendarPage({
         hostView={isHost(roles)}
         audience={audience}
         location={location}
+        show={show}
         electorsLabel={pluralLabel(
           roleLabel(settings.roleLabels, "elector"),
         ).toLowerCase()}
@@ -458,6 +486,7 @@ export default async function CalendarPage({
         roleLabels={settings.roleLabels}
         past={past}
         base={base}
+        lensActive={Boolean(audience)}
       />
     </div>
   );

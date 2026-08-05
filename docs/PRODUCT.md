@@ -152,8 +152,12 @@ can also propose off-piste slots at any time/location; those are born
 `proposed` and collect availability immediately.
 
 **Host view.** The page is a compact table (rows fold open via a 💬
-bubble). A topic lens filters every slot's availability meter — elector
-avatars sitting inside their 🟢/🟡/🔴 stretch, host/admin-only — to the
+bubble). The calendar wears two hats — upcoming events and scheduling
+workbench — so a slot-state filter (All slots / Sessions / Open slots,
+2026-08-05) gives each its own view. Availability meters render as slim
+count-only bars while scanning; the full meter — elector avatars sitting
+inside their 🟢/🟡/🔴 stretch, host/admin-only — appears when a topic lens
+is active or a row is folded open. The lens filters every meter to the
 electors who ❤️'d that topic; group availability is hidden from electors,
 who see only their own toggle. Slot discussions ("host chat") support
 claim comments that attach the active lens topic plus a frozen
