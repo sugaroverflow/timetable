@@ -304,18 +304,14 @@ export function DiscussionPanel({
           onChanged={onReload}
         />
       ))}
-      {comments && comments.length === 0 ? (
-        <div className="faint" style={{ fontSize: 12, padding: "4px 0" }}>
-          No messages yet.
-        </div>
-      ) : null}
-      {/* Same composer shape as everywhere else (QA 2026-08-02). */}
+      {/* Same composer shape as everywhere else (QA 2026-08-02). No
+          empty-state line — the composer says it all (QA 2026-08-05). */}
       <form onSubmit={post} className="stack" style={{ gap: 6 }}>
         <div className="inline-form inline-form-nested">
           <GrowingTextarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            placeholder="Add to the discussion…"
+            placeholder="Talk about this timeslot…"
             aria-label="Slot message"
           />
           <button
