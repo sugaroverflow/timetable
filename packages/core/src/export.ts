@@ -20,11 +20,12 @@ import {
 } from "./topics";
 
 /**
- * The read-only data export behind GET /api/timetables/:id/export and the
+ * The read-only data export behind GET /api/forums/:id/export and the
  * forum's "API" page: everything the viewer's role can already read in the
  * app, as one timestamped JSON document. Role filtering reuses the same
  * shared permission checks as the GraphQL resolvers. Timeslot/calendar data
- * is deliberately absent until that feature ships.
+ * is not included yet — adding it is an open todo (docs/PRODUCT.md, Known
+ * gaps).
  */
 
 export type ExportTopic = {

@@ -1,13 +1,13 @@
 # Deployment
 
-Timetable is deployed to DigitalOcean App Platform with two app services, one
+Topic is deployed to DigitalOcean App Platform with two app services, one
 migration job, and managed PostgreSQL. Clerk handles authentication.
 
 ## Environments
 
 | | Local | Dev | Production |
 | --- | --- | --- | --- |
-| URL | `http://localhost:3000` | `https://dev.timetable.love` | `https://timetable.love` |
+| URL | `http://localhost:3000` | `https://dev.timetable.love` | `https://topic.forum` (`timetable.love` is an alias) |
 | DO app | none | `topic-dev` | `topic-prod` |
 | App spec | none | `.do/app.dev.yaml` | `.do/app.yaml` |
 | Database | Docker Postgres | `timetable-db` | `timetable-db-prod` |
@@ -200,8 +200,8 @@ backup or applying a forward fix.
 
 ## Clerk
 
-Use Clerk Development keys for local and dev. Use Clerk Production keys only for
-`timetable.love`.
+Use Clerk Development keys for local and dev. Use Clerk Production keys only
+for the production app (`topic.forum`).
 
 Required app paths:
 
@@ -362,7 +362,7 @@ After deploy:
 Useful anonymous hosted smoke commands:
 
 ```bash
-for host in timetable.love dev.timetable.love; do
+for host in topic.forum dev.timetable.love; do
   curl -sS -L -o /dev/null -w "$host / %{http_code}\n" "https://${host}/"
   curl -sS -L -o /dev/null -w "$host /sign-in %{http_code}\n" "https://${host}/sign-in"
   curl -sS -L -o /dev/null -w "$host /sign-up %{http_code}\n" "https://${host}/sign-up"
@@ -377,7 +377,7 @@ done
 Run a short repeated GraphQL probe when checking the hosted rate limiter:
 
 ```bash
-for host in timetable.love dev.timetable.love; do
+for host in topic.forum dev.timetable.love; do
   for i in 1 2 3 4 5; do
     curl -sS -o /dev/null -w "$host graphql run=$i %{http_code}\n" \
       -X POST "https://${host}/graphql" \

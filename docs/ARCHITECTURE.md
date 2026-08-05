@@ -1,17 +1,21 @@
 # Architecture
 
-Timetable is a TypeScript npm-workspaces monorepo with a Next.js web app, an
+Topic is a TypeScript npm-workspaces monorepo with a Next.js web app, an
 Express/GraphQL API, shared domain services, and a PostgreSQL database managed
 through Drizzle.
 
-Since the 2026-07 rebrand the product is branded **Topic** (future domain
-topic.forum) and the tenant entity is a "forum" in all user-facing copy. Code
-identifiers, the `@timetable/*` package names, the `/timetables` resolver,
-CSS classes, and the DB schema deliberately keep `timetable` naming — but the
-PUBLIC API surface (GraphQL exposed names, `/api/forums/*` REST URLs) says
-forum (2026-07-27; see the GraphQL Surface section), and new user-visible
-strings must say forum/Topic. This document otherwise uses the code names.
-The domain cutover (still timetable.love) happens separately.
+**Naming:** the product was built as "Timetable" and later rebranded to
+**Topic** (topic.forum), with the tenant entity called a **forum** in all
+user-facing copy. The rename was applied outside-in and deliberately stopped
+at the code boundary:
+
+- **Say forum:** UI copy, the public API surface — GraphQL exposed names and
+  `/api/forums/*` REST URLs — and web routes (`/f/[slug]`).
+- **Say timetable:** code identifiers, `@timetable/*` package names, the
+  `/timetables` resolver, CSS classes, and the DB schema.
+
+New user-visible strings must say forum/Topic; this document otherwise uses
+the code names.
 
 ## Repository Shape
 
@@ -104,8 +108,8 @@ Codex/agent workflows are separate from the app runtime.
   userId segment canonically redirects to the member's slug)
 - My Topics (feed-identical cards + manage controls, TipTap editor; admins
   can create a topic on behalf of another host)
-- Pending Topics (the submitted moderation queue; the draft topic status was
-  removed — new topics are created as `submitted`)
+- Pending Topics (the submitted moderation queue — new topics are created
+  as `submitted`; there is no draft status)
 - activity timeline (week/day grouping, date range, actor/role/type filters)
 - notifications pane (comments on your topics, replies to you, unread badge)
 - People page (role-grouped members, bios, admin editing; admins get an
@@ -113,7 +117,7 @@ Codex/agent workflows are separate from the app runtime.
   Edit profile action stack)
 - settings (timetable profile + theme sections, hearts cutoff, invites)
 - user profile (name, avatar, markdown bio, digest preferences)
-- Calendar (v2, 2026-07-31; feature-flagged per forum via
+- Calendar (feature-flagged per forum via
   `settings.calendar.enabled` — nav link and page exist only when on):
   month-grouped slot rows with a topic lens, per-elector avatar groups
   (host/admin), elector weekly-pattern grid, admin pattern×terms setup with
@@ -195,7 +199,7 @@ and the invite email is an explicit second step. `inviteSentAt` on
 
 ## GraphQL Surface
 
-The public surface uses **forum** naming (2026-07-27); the web app's own
+The public surface uses **forum** naming; the web app's own
 queries alias the fields back to internal `timetable` names
 (`timetable: forum(idOrSlug: $s)`), so TypeScript identifiers stay unchanged.
 
@@ -211,7 +215,7 @@ Main queries include:
 - `topicFeed` (sort + seed + host + hearted-by-me filters, offset paging)
 - `topicPermalink`
 - `hostDashboard`
-- `moderationQueue` (submitted topics; the draft topic status was removed)
+- `moderationQueue` (submitted topics)
 - `activityTimeline` (actor, date-range args)
 - `notifications` / `notificationsUnread`
 - `myFeedLastSeenAt`
@@ -297,20 +301,20 @@ Core tables:
 - `timetable_invites`
 - `topics`
 - `hearts`
-- `host_hearts` (host 💙s, 2026-08-04: the host-non-elector parallel
-  gesture, mirrored from `hearts` in its own table so elector weighting
-  never sees it; ignores `heartsCountFrom`)
-- `heart_events` (2026-08-05: append-only ❤️/💙 add/remove ledger — never
-  updated or deleted by the app, unaffected by the cutoff; lets voting
-  history be reconstructed across un-hearts and cutoff resets. Written by
-  both toggles, read only by the admin data export)
+- `host_hearts` (host 💙s: the host-non-elector parallel gesture, mirrored
+  from `hearts` in its own table so elector weighting never sees it;
+  ignores `heartsCountFrom`)
+- `heart_events` (append-only ❤️/💙 add/remove ledger — never updated or
+  deleted by the app, unaffected by the cutoff; lets voting history be
+  reconstructed across un-hearts and cutoff resets. Written by both
+  toggles, read only by the admin data export)
 - `comments`
 - `activity_events`
-- `timeslots` (calendar v2: + `status`, singular `topic_id`, `url`,
+- `timeslots` (one row per slot: `status`, a singular `topic_id`, `url`,
   `created_by_id`, `cell_key` — the pattern-cell provenance for inference —
   and `session_host_id`, THE session-ownership column: the topic's host,
-  or the host themselves for topic-less "office hours" sessions; the
-  `slot_topics` m2m was dropped, simultaneous sessions are separate slots)
+  or the host themselves for topic-less "office hours" sessions;
+  simultaneous sessions are separate slots)
 - `availability` (explicit per-slot answers)
 - `availability_patterns` (one row per forum+user; jsonb cell → state map)
 - `slot_comments` (+ optional claim: `topic_id` and frozen
@@ -331,8 +335,7 @@ for "newest" sorting; memberships carry `lastSeenFeedAt` and
 `lastSeenNotificationsAt` watermarks plus `inviteSentAt` (null = added by an
 admin but never invited). A membership with `inviteSentAt` null AND both
 seen-watermarks null is a pre-created account whose owner doesn't know the
-forum exists — the digest builder skips those forums entirely
-(2026-08-03).
+forum exists — the digest builder skips those forums entirely.
 
 The settings JSON shapes (`TimetableSettings`, `ThemeSettings`, role labels,
 notification defaults) live in `packages/shared/src/settings.ts` as the single
@@ -349,19 +352,17 @@ workflow builds the web Docker image, pushes it to the DigitalOcean container
 registry (`timetable-reg`), and deploys from `.do/app.dev.yaml`. After each
 deploy it prunes the registry to the newest 5 `web` tags and starts a garbage
 collection (the 500 MiB Starter registry otherwise fills in weeks).
-Production deploys are manual-only. Per-PR review apps were removed
-(2026-07-22) — dev is where QA happens. Details in `docs/DEPLOYMENT.md`.
+Production (topic.forum, with timetable.love as an alias) deploys manually
+only. There are no per-PR review apps — dev is where QA happens. Details in
+`docs/DEPLOYMENT.md`.
 
 ## Assets
 
-Static README images live in `docs/assets/readme`.
-
-Web assets live in `apps/web/public/assets`. Next.js serves them from the site
-root. Since the rebrand the logo is the 📚 emoji rendered inline (topbar
-brand and landing page) and the favicon is an emoji data URI (`lib/favicon.ts`
-— forums can override it with their own icon emoji); the old
-`timetable.love-logo-transparent.png` asset is unreferenced and slated for
-deletion at the domain cutover.
+Static README images live in `docs/assets/readme`. The app has no image
+assets of its own: the logo is the 📚 emoji rendered inline (topbar brand
+and landing page) and the favicon is an emoji data URI (`lib/favicon.ts` —
+forums can override it with their own icon emoji). `apps/web/public/` is
+kept (empty) so Next.js serves any future static files from the site root.
 
 ## Architecture Risks
 
