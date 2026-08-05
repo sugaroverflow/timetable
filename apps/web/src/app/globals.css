@@ -1611,6 +1611,11 @@ textarea {
   height: 38px;
   border-radius: 999px;
 }
+/* Counts-only bar for scanning rows (QA 2026-08-05): the avatar meter is
+   workbench apparatus, shown when a lens is active or the row is open. */
+.avail-meter.avail-meter-compact {
+  height: 12px;
+}
 /* Avatars spread EVENLY along the meter (QA 2026-08-03): segment width is
    proportional to its headcount, so space-evenly inside each segment =
    uniform spacing across the whole bar, with the green/yellow/red ground

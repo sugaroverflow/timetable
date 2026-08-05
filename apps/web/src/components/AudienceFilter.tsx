@@ -46,7 +46,7 @@ export function AudienceFilter({
     >
       <option value="all">All {electorsLabel}</option>
       {isHost ? (
-        <option value="hearted_mine">All ❤️s on all my topics</option>
+        <option value="hearted_mine">Anyone who ❤️’d my topics</option>
       ) : null}
       {admin
         ? [...groups.entries()].map(([host, hostTopics]) => (

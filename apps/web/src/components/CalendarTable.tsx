@@ -100,19 +100,47 @@ function CommentButton({
 /** Availability meter with the electors' avatars INSIDE their segment
  * (QA 2026-08-02): 🟢 people on the green stretch, and so on. The audience
  * is the same on every row of a view, so the meter always fills its column
- * width; avatars link to the person's page. */
+ * width; avatars link to the person's page.
+ *
+ * The avatar meter is workbench apparatus, so it renders only in deciding
+ * contexts — a topic lens active, or the row folded open (QA 2026-08-05).
+ * Scanning rows get the compact counts-only bar instead. */
 function AvailabilityMeter({
   perUser,
   counts,
   slug,
+  detailed,
 }: {
   perUser: NonNullable<CalendarSlot["perUser"]>;
   counts: { green: number; yellow: number; red: number };
   slug: string;
+  detailed: boolean;
 }) {
+  const states = ["green", "yellow", "red"] as const;
+
+  if (!detailed) {
+    const total = counts.green + counts.yellow + counts.red;
+    if (total === 0) return null;
+    return (
+      <span
+        className="avail-bar avail-meter avail-meter-compact"
+        title={countsTitle(counts)}
+      >
+        {states.map((state) =>
+          counts[state] === 0 ? null : (
+            <span
+              key={state}
+              className={state[0]}
+              style={{ width: pct(counts[state], total) }}
+            />
+          ),
+        )}
+      </span>
+    );
+  }
+
   const total = perUser.length;
   if (total === 0) return null;
-  const states = ["green", "yellow", "red"] as const;
   return (
     <span className="avail-bar avail-meter" title={countsTitle(counts)}>
       {states.map((state) => {
@@ -211,11 +239,13 @@ function MeterAndYouCells({
   past,
   perms,
   slug,
+  detailed,
 }: {
   slot: CalendarSlot;
   past: boolean;
   perms: CalendarPerms;
   slug: string;
+  detailed: boolean;
 }) {
   return (
     <>
@@ -226,6 +256,7 @@ function MeterAndYouCells({
               perUser={slot.perUser}
               counts={slot.counts}
               slug={slug}
+              detailed={detailed}
             />
           ) : null}
         </td>
@@ -253,6 +284,7 @@ function SlotTableRow({
   perms,
   claimTopics,
   lensTopic,
+  lensActive,
   adminLabel,
   officeHoursLabel,
   roleLabels,
@@ -266,6 +298,7 @@ function SlotTableRow({
   perms: CalendarPerms;
   claimTopics: TopicOption[];
   lensTopic: TopicOption | null;
+  lensActive: boolean;
   adminLabel: string;
   officeHoursLabel: string;
   roleLabels?: RoleLabels;
@@ -305,7 +338,13 @@ function SlotTableRow({
           ) : null}
         </td>
         <WhenCell slot={slot} />
-        <MeterAndYouCells slot={slot} past={past} perms={perms} slug={slug} />
+        <MeterAndYouCells
+          slot={slot}
+          past={past}
+          perms={perms}
+          slug={slug}
+          detailed={lensActive || open}
+        />
       </tr>
       {/* "Author: Topic" / "Host — office hours" + status pill on its own
           line under the row — visually part of the same slot block. */}
@@ -360,6 +399,7 @@ export function CalendarTable({
   perms,
   claimTopics,
   lensTopic,
+  lensActive = false,
   adminLabel = "Admin",
   officeHoursLabel = "Office hours",
   roleLabels,
@@ -371,6 +411,8 @@ export function CalendarTable({
   perms: CalendarPerms;
   claimTopics: TopicOption[];
   lensTopic: TopicOption | null;
+  /** Any lens (a topic or "anyone who ❤️'d mine") — full avatar meters. */
+  lensActive?: boolean;
   adminLabel?: string;
   officeHoursLabel?: string;
   /** Forum role labels for the discussion authors' role pills. */
@@ -439,6 +481,7 @@ export function CalendarTable({
                     perms={perms}
                     claimTopics={claimTopics}
                     lensTopic={lensTopic}
+                    lensActive={lensActive}
                     adminLabel={adminLabel}
                     officeHoursLabel={officeHoursLabel}
                     roleLabels={roleLabels}
