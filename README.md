@@ -1,44 +1,51 @@
 # Topic
 
-Collaborative forums (branded "Topic", topic.forum — formerly "Timetable")
-for proposing topics, voting with hearts, sharing availability, and shaping
-a schedule together.
+[Topic](https://topic.forum) helps a community decide what it wants to talk
+about — and when. Hosts propose topics they could run a session on; electors
+signal what they want with weighted ❤️s; everyone shares their availability;
+and the forum turns the most-wanted topics into a schedule of sessions.
 
 A [Newspeak House](https://newspeak.house/) x
 [Sparkle Bureaucracy](https://www.sparklebureaucracy.org/) production.
 
-![Timetable topic feed showing proposed sessions, hearts, and comments](docs/assets/readme/topics-view.png)
+![Topic feed showing proposed sessions, hearts, and comments](docs/assets/readme/topics-view.png)
 
-![Timetable availability view showing timeslots, availability totals, and voting controls](docs/assets/readme/availability-view.png)
+![Availability view showing timeslots, availability totals, and voting controls](docs/assets/readme/availability-view.png)
 
 ## What It Does
 
-Topic is a multi-tenant web app. Each forum (a "timetable" in code — package
-names, routes, and the GraphQL schema keep the old name on purpose) is its own
-workspace with members, roles, topics, comments, hearts, availability slots,
-moderation, and dashboard analytics.
+Topic is a multi-tenant web app: each forum is an independent workspace with
+its own members, roles, topics, theme, and settings. The heart of the product
+is a decision loop:
 
-Core workflows:
+- **Propose.** Hosts draft topics in a rich-text editor and submit them;
+  admins review and publish (or the forum lets hosts publish directly), with
+  pre-publish feedback in a private drafting thread.
+- **Vote.** Electors ❤️ the topics they want. Votes are weighted — someone
+  who ❤️s everything counts for less per ❤️ than someone who chooses
+  carefully — and hosts and admins see scores under four different
+  normalisations, from raw totals to one-vote-each.
+- **Discuss.** Threaded public comments, an optional host-only thread, and
+  @mentions with in-app notifications and email digests.
+- **Schedule.** Admins define a weekly pattern and term dates; slots are
+  generated from the cross product. Electors mark availability once as a
+  weekly pattern (with per-slot overrides), and hosts use per-topic
+  availability lenses to find, claim, and confirm slots for sessions —
+  which members can subscribe to as an ICS calendar feed.
 
-- Hosts draft topics in a rich-text (TipTap) editor and submit them for review.
-- Admins moderate from Pending Topics, create topics (including on behalf of
-  another host) and reassign them, manage members from the People page —
-  pre-creating accounts silently, populating their profile and topics, then
-  sending the invite email when ready — create slots, and tag topics to slots.
-- Electors heart topics (weighted votes), comment in threaded discussions,
-  collect "My hearted topics", and mark availability.
-- Hosts and admins use weighted-heart scores, a hearts cutoff, elector
-  activity filters, availability breakdowns, and conflict alerts to plan the
-  final schedule.
-- Every member has a markdown bio shown on their person page and the People
-  page; topics get stable permalinks (`/f/{forum}/{host}/{topic}`).
-- A notifications pane collects comments on your topics and replies to you.
-- Each timetable is themeable: colours, fonts, dark-mode palette, custom role
-  labels, icon, and cover image — with per-user light/dark mode.
-- Five visibility levels from fully public to deactivated.
-- Users can subscribe to a timetable's slots through an ICS calendar feed.
-- Profile images, topic covers, icons, and timetable covers can be pasted as
-  URLs or uploaded directly to object storage.
+Around the loop: five visibility levels from fully public to deactivated,
+per-forum theming (colours, fonts, dark palette, custom role labels), a
+People page with markdown bios and per-forum person pages, stable topic
+permalinks, an activity timeline, analytics tables, and an admin add-person
+flow that pre-creates accounts so a new member's first sign-in lands in a
+ready-made profile.
+
+[docs/PRODUCT.md](docs/PRODUCT.md) is the full product tour.
+
+**A note on names:** the product was built as "Timetable", and code
+identifiers — packages, database tables, internal routes — keep that name.
+A "timetable" in code is a **forum** in the UI. See
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for where the boundary sits.
 
 ## Quick Start
 
@@ -68,51 +75,25 @@ Local URLs:
 - API: `http://localhost:4000`
 - GraphQL: `http://localhost:4000/graphql`
 
-For Clerk development instances, test emails using `+clerk_test` can sign in
-with OTP code `424242`.
-
-The seed command reads `dev-sample-data.md` and replaces only the sample
-timetable with slug `spt-test-data`. It creates deterministic local dev users
-with Clerk-compatible test emails, including owner `dev_sample_admin-edwin`
-(`admin-edwin+clerk_test@example.com`), without calling Clerk.
-
-People rows in `dev-sample-data.md` accept an optional `Clerk ID` column.
-When a real Clerk user ID is set, `db:seed` uses that ID directly as the local
-user ID instead of generating a `dev_sample_` ID — that person can sign in with
-their actual Clerk account immediately and will be recognized as the seeded
-timetable owner or admin. People with a real `Clerk ID` are skipped by
-`clerk:seed-dev-users` since they already have a Clerk account.
-
-To mirror the remaining test users into a Clerk development instance, run
-`npm run clerk:seed-dev-users` after `npm run db:seed`. The Clerk script refuses
-non-`sk_test_` keys, creates or updates the sample people with
-`externalId=dev_sample_<label>`, and the API maps that `externalId` back to the
-seeded local memberships when a sample user signs in. Use
-`npm run clerk:seed-dev-users -- --dry-run` to check the target Clerk instance
-without writing users.
-
-Hosted dev can run a destructive fixture refresh as an optional manual
-`Deploy Dev` workflow task. When `seed_sample_data` is checked, the dev
-post-deploy job resets hosted dev app data, reseeds `dev-sample-data.md`, and
-creates or updates the matching Clerk development users. Production deploys
-never run it.
+`npm run db:seed` builds a fully populated sample forum from
+`dev-sample-data.md`, including deterministic local dev users. To sign in as
+one of them, run `npm run clerk:seed-dev-users` (against a Clerk
+*development* instance — the script refuses production keys) and use the OTP
+code `424242` with any `+clerk_test` email. Seeding details, including how
+to map a sample person to a real Clerk account, are in
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#github-actions).
 
 ## Docs
 
-Detailed project docs are tracked in this repository so they can be reviewed in
-pull requests with code changes.
-
-- [Architecture](docs/ARCHITECTURE.md): apps, packages, API surfaces, auth flow,
-  data model, and runtime boundaries.
+- [Product](docs/PRODUCT.md): what the product does, for whom, and its
+  current status and gaps.
+- [Architecture](docs/ARCHITECTURE.md): apps, packages, API surfaces, auth
+  flow, data model, and runtime boundaries.
 - [Deployment](docs/DEPLOYMENT.md): local/dev/prod environments, Clerk,
   DigitalOcean, GitHub Actions, secrets, and cron.
-- [Product](docs/PRODUCT.md): roles, workflows, privacy, notifications, sync,
-  implementation status, go-live checklist, and known gaps.
-
-Static README screenshots live in [docs/assets/readme](docs/assets/readme).
-The logo is the 📚 emoji rendered inline; the old image asset in
-[apps/web/public/assets](apps/web/public/assets) is unreferenced and will be
-removed at the domain cutover.
+- [docs/execution-journal](docs/execution-journal/): one entry per notable
+  change — the project's history lives there, not in the docs above.
+- [CLAUDE.md](CLAUDE.md): working instructions for AI coding agents.
 
 ## Scripts
 
@@ -134,69 +115,16 @@ removed at the domain cutover.
 | `npm run db:studio` | Open Drizzle Studio |
 | `npm run db:up` / `npm run db:down` | Start or stop local Postgres |
 
-## Testing Requirements
+## Testing
 
-Pull requests should keep the full verification path green:
+Pull requests must keep the full verification path green (CI enforces it):
 
-- `npm run build`
-- `npm run typecheck`
-- `npm run lint` (covers every workspace: web's Next config plus the root
-  `eslint.config.mjs` for `apps/api`, `packages/*`, `tests`, and `scripts`)
-- `npm run format:check`
-- `npm run test`
-- `npm run test:e2e`
-- `npm run db:migrate` when migrations or schema-adjacent config change
+```bash
+npm run build && npm run typecheck && npm run lint && \
+npm run format:check && npm run test && npm run test:e2e
+```
 
-Committed audit guardrails now cover API health, REST auth boundaries for
-timetables/invites/memberships/uploads, digest cron protection, ICS responses,
-GraphQL depth/cost limits, shared rate-limit behavior, weighted hearts, and
-anonymous browser smoke for `/`, `/sign-in`, and `/sign-up`.
-
-The remaining testing requirements are richer authenticated browser workflows
-once there is a Clerk test-user/session harness and broader GraphQL role
-fixtures for future permission-sensitive changes.
-
-Hosted post-deploy checks and rate-limit smoke commands live in
-[Deployment](docs/DEPLOYMENT.md#smoke-test).
-
-## Status
-
-Phases 0-4 are substantially implemented, plus two product-owner QA rounds
-(issue #42 → PR #56, issue #59 → PR #60) covering navigation, profiles,
-theming, and moderation UX, and two product-feedback rounds: round 1
-(draft-status removal, vote normalisations, @mention notifications) and
-round 2 (sortable heart-breakdown table, mobile drawer navigation, the
-"Topic"/forum rebrand, and the add-person → populate → send-invite flow).
-The tracked app includes:
-
-- sidebar navigation with a timetable switcher, per-timetable icons, and an
-  in-app notifications pane with unread badge
-- topic permalinks, infinite scroll, feed sorts (hearts / latest comments /
-  newest-including-edits / seeded random), and "new since last visit"
-  highlights
-- TipTap rich-text topic editing with markdown as the source of truth
-- full theming: colour tokens, font pairings, per-user dark mode, and a
-  timetable dark palette
-- People page with role grouping, markdown bios, and admin member editing
-- five-level visibility (public / hosts only / no comments / private /
-  deactivated) enforced server-side
-- dashboard analytics with host-scoped elector activity filters, hearts
-  cutoff, conflict alerts, topic-to-slot tagging, and ICS calendar export
-- digest computation, a protected digest job endpoint, scheduled GitHub
-  Actions caller, and Resend environment plumbing
-- custom-domain routing hooks and separate DigitalOcean dev/prod app specs
-- API hardening with GraphQL depth/cost limits, structured request/error
-  logging, and database-backed hosted rate limiting
-- S3-compatible uploads for profile images, topic covers, icons, and
-  timetable covers
-- admin add-person flow: silently pre-create an account, populate its profile
-  and topics, then explicitly send the invite email (Resend), with per-member
-  invite state on the People page
-
-Remaining major gaps include verified production email delivery, multi-channel
-notifications, hosted media bucket/CDN configuration, production DNS/Clerk
-verification, the topic.forum domain cutover, custom-domain routing
-completion, authenticated browser test coverage, traffic-based tuning, and
-feed/dashboard scalability work.
-
-See [Product](docs/PRODUCT.md) for the full implementation status, go-live checklist, and known gaps.
+plus `npm run db:migrate` when schema or migrations change. Tests are Vitest
+(`packages/shared`, `apps/api`, `apps/web`) and one Playwright smoke suite
+(`tests/e2e/`); known coverage gaps are listed in
+[docs/PRODUCT.md](docs/PRODUCT.md#testing-gaps).
