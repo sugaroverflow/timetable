@@ -116,7 +116,7 @@ export function CommentActions({
         ) : null}
       </div>
       {open ? (
-        <form onSubmit={reply} className="inline-form" style={{ marginTop: 6 }}>
+        <form onSubmit={reply} className="inline-form inline-form-nested">
           <GrowingTextarea
             ref={textareaRef}
             value={body}

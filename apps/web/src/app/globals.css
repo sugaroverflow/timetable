@@ -1303,6 +1303,12 @@ textarea {
   gap: 8px;
   align-items: flex-end;
 }
+/* Reply/edit forms nested inside a comment row (never section-level —
+ * those are spaced by their stack context; card spacing spec 2026-08-05,
+ * replacing per-site inline margins of 4/6px). */
+.inline-form-nested {
+  margin-top: 4px;
+}
 .inline-form textarea {
   height: 40px;
   min-height: 40px;
@@ -1647,6 +1653,10 @@ textarea {
 }
 .section-toggle .section-title {
   margin: 0;
+}
+/* The fold-up section's panel content (was a per-site inline margin). */
+.section-body {
+  margin-top: 10px;
 }
 /* Divider/utility rows sit on the card surface, not the page background
    (QA 2026-08-02 round 4). Month text in the primary colour, with the

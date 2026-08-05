@@ -1,17 +1,31 @@
 "use client";
 
-import { useState } from "react";
-
 import { Avatar } from "@/components/Avatar";
 import { PersonChip } from "@/components/PersonChip";
 import { SortHeader } from "@/components/SortHeader";
 import { formatShortDate } from "@/lib/dates";
 import type { WeightedHeart } from "@/lib/feedTypes";
+import { useTableSort } from "@/lib/useTableSort";
 
 type SortKey = "name" | "l1" | "l2" | "devotion" | "heartedAt";
 
 function fmt(n: number): string {
   return n.toFixed(2);
+}
+
+function compareRows(a: WeightedHeart, b: WeightedHeart, key: SortKey) {
+  switch (key) {
+    case "name":
+      return (a.electorName ?? "").localeCompare(b.electorName ?? "");
+    case "l1":
+      return a.weight - b.weight;
+    case "l2":
+      return a.l2Weight - b.l2Weight;
+    case "devotion":
+      return a.devotionWeight - b.devotionWeight;
+    case "heartedAt":
+      return Date.parse(a.heartedAt) - Date.parse(b.heartedAt);
+  }
 }
 
 /**
@@ -30,50 +44,15 @@ export function BreakdownTable({
   /** The forum's custom role label (QA 2026-07-28). */
   electorLabel?: string;
 }) {
-  const [sortKey, setSortKey] = useState<SortKey>("l1");
-  const [dir, setDir] = useState<"asc" | "desc">("desc");
-
-  function toggleSort(key: SortKey) {
-    if (key === sortKey) {
-      setDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortKey(key);
-      // Text sorts read best ascending; weights/dates descending.
-      setDir(key === "name" ? "asc" : "desc");
-    }
-  }
-
-  const sorted = [...rows].sort((a, b) => {
-    let cmp = 0;
-    switch (sortKey) {
-      case "name":
-        cmp = (a.electorName ?? "").localeCompare(b.electorName ?? "");
-        break;
-      case "l1":
-        cmp = a.weight - b.weight;
-        break;
-      case "l2":
-        cmp = a.l2Weight - b.l2Weight;
-        break;
-      case "devotion":
-        cmp = a.devotionWeight - b.devotionWeight;
-        break;
-      case "heartedAt":
-        cmp = Date.parse(a.heartedAt) - Date.parse(b.heartedAt);
-        break;
-    }
-    return dir === "asc" ? cmp : -cmp;
+  const { sortRows, headerProps } = useTableSort<SortKey, WeightedHeart>({
+    initial: "l1",
+    ascendingKeys: ["name"],
+    compare: compareRows,
   });
+  const sorted = sortRows(rows);
 
   function header(key: SortKey, label: string) {
-    return (
-      <SortHeader
-        label={label}
-        active={sortKey === key}
-        dir={dir}
-        onToggle={() => toggleSort(key)}
-      />
-    );
+    return <SortHeader label={label} {...headerProps(key)} />;
   }
 
   const sum = (pick: (w: WeightedHeart) => number) =>
