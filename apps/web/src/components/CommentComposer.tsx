@@ -102,7 +102,9 @@ export function CommentComposer({
   }
 
   return (
-    <form onSubmit={submit} className="inline-form" style={{ marginTop: 4 }}>
+    // No own margin — the surrounding stack/thread-stack gap spaces it
+    // (card spacing spec, 2026-08-05).
+    <form onSubmit={submit} className="inline-form">
       {mentionsEnabled ? (
         <div style={{ flex: 1 }} onFocus={loadCandidates}>
           <MentionTextarea

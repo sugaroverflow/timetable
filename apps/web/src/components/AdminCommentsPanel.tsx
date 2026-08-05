@@ -69,7 +69,7 @@ export function AdminCommentsPanel({
       </Collapsible.Trigger>
       <Collapsible.Panel>
         {expanded && (
-          <div className="host-thread">
+          <div className="host-thread thread-stack">
             <CommentList
               comments={comments}
               canReply={true}
