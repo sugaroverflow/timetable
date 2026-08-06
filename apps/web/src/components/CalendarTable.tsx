@@ -170,6 +170,7 @@ function FoldAvatars({
 function SlotDetail({
   slot,
   slug,
+  locations,
   perms,
   claimTopics,
   lensTopic,
@@ -181,6 +182,7 @@ function SlotDetail({
 }: {
   slot: CalendarSlot;
   slug: string;
+  locations: string[];
   perms: CalendarPerms;
   claimTopics: TopicOption[];
   lensTopic: TopicOption | null;
@@ -203,6 +205,7 @@ function SlotDetail({
       />
       <SessionControls
         slot={slot}
+        locations={locations}
         perms={perms}
         claimTopics={claimTopics}
         officeHoursLabel={officeHoursLabel}
@@ -246,17 +249,17 @@ function RowLine({
       <span className="cal-when">
         <strong>{formatDate(slot.startsAt)}</strong> {formatTime(slot.startsAt)}{" "}
         – {formatTime(slot.endsAt)}
-        {slot.location ? (
-          <span className="cal-where"> {slot.location}</span>
-        ) : null}
       </span>
-      {slot.topic || slot.sessionHost ? (
+      {slot.sessions.length > 0 ? (
         <div className="cal-row-session">
-          <SessionLine
-            slot={slot}
-            slug={slug}
-            officeHoursLabel={officeHoursLabel}
-          />
+          {slot.sessions.map((session) => (
+            <SessionLine
+              key={session.id}
+              session={session}
+              slug={slug}
+              officeHoursLabel={officeHoursLabel}
+            />
+          ))}
         </div>
       ) : null}
       <span className="cal-row-right">
@@ -328,6 +331,7 @@ function SlotRow({
   past,
   weekStart,
   slug,
+  locations,
   perms,
   claimTopics,
   lensTopic,
@@ -340,6 +344,7 @@ function SlotRow({
   /** True when this slot starts a new (Mon-first) week — bigger gap. */
   weekStart: boolean;
   slug: string;
+  locations: string[];
   perms: CalendarPerms;
   claimTopics: TopicOption[];
   lensTopic: TopicOption | null;
@@ -403,6 +408,7 @@ function SlotRow({
         <SlotDetail
           slot={slot}
           slug={slug}
+          locations={locations}
           perms={perms}
           claimTopics={claimTopics}
           lensTopic={lensTopic}
@@ -427,6 +433,7 @@ function SlotRow({
 export function CalendarTable({
   rows,
   slug,
+  locations = [],
   perms,
   claimTopics,
   lensTopic,
@@ -438,6 +445,8 @@ export function CalendarTable({
 }: {
   rows: CalendarTableRow[];
   slug: string;
+  /** The forum's configured locations (pencil-in suggestions). */
+  locations?: string[];
   perms: CalendarPerms;
   claimTopics: TopicOption[];
   lensTopic: TopicOption | null;
@@ -498,6 +507,7 @@ export function CalendarTable({
                 past={past}
                 weekStart={weekStart}
                 slug={slug}
+                locations={locations}
                 perms={perms}
                 claimTopics={claimTopics}
                 lensTopic={lensTopic}

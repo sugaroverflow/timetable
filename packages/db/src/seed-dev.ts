@@ -16,6 +16,7 @@ import {
   hearts,
   hostHearts,
   slotComments,
+  slotSessions,
   timetableMemberships,
   timetables,
   timeslots,
@@ -30,6 +31,7 @@ import {
   type NewHeart,
   type NewHostHeart,
   type NewSlotComment,
+  type NewSlotSession,
   type NewTimetable,
   type NewTimetableMembership,
   type NewTopic,
@@ -158,6 +160,7 @@ const RESET_DATABASE_TABLES = [
   "slot_comments",
   "availability",
   "availability_patterns",
+  "slot_sessions",
   "timeslots",
   "comments",
   "hearts",
@@ -1162,6 +1165,7 @@ function buildRows(fixture: Fixture): {
   hostHearts: NewHostHeart[];
   activities: NewActivityEvent[];
   timeslotRows: NewTimeslot[];
+  slotSessionRows: NewSlotSession[];
   availabilityRows: NewAvailability[];
   slotCommentRows: NewSlotComment[];
   patternRows: NewAvailabilityPattern[];
@@ -1273,8 +1277,13 @@ function buildRows(fixture: Fixture): {
     commentIds,
   );
 
-  const { timeslotRows, availabilityRows, slotCommentRows, patternRows } =
-    buildSlotRows(fixture, timetableId, userIds, topicIds);
+  const {
+    timeslotRows,
+    slotSessionRows,
+    availabilityRows,
+    slotCommentRows,
+    patternRows,
+  } = buildSlotRows(fixture, timetableId, userIds, topicIds);
 
   return {
     timetableId,
@@ -1288,6 +1297,7 @@ function buildRows(fixture: Fixture): {
     hostHearts: hostHeartRows,
     activities: activityRows,
     timeslotRows,
+    slotSessionRows,
     availabilityRows,
     slotCommentRows,
     patternRows,
@@ -1603,6 +1613,7 @@ function buildSlotRows(
   topicIds: Map<string, string>,
 ): {
   timeslotRows: NewTimeslot[];
+  slotSessionRows: NewSlotSession[];
   availabilityRows: NewAvailability[];
   slotCommentRows: NewSlotComment[];
   patternRows: NewAvailabilityPattern[];
@@ -1610,36 +1621,6 @@ function buildSlotRows(
   const hostByTopicLabel = new Map(
     fixture.topics.map((topic) => [topic.label, topic.host]),
   );
-
-  const toTimeslotRow = (slot: SlotFixture, slotId: string): NewTimeslot => {
-    const topicTag = slot.topicTags[0];
-    const topicId = topicTag ? (topicIds.get(topicTag) ?? null) : null;
-    // Session ownership (the never-displace rule keys off this): the
-    // topic's host for topic sessions, the named host for office hours.
-    const sessionHostLabel = topicTag
-      ? hostByTopicLabel.get(topicTag)
-      : slot.sessionHost;
-    const sessionHostId = sessionHostLabel
-      ? (userIds.get(sessionHostLabel) ?? null)
-      : null;
-    return {
-      id: slotId,
-      timetableId,
-      startsAt: new Date(`${slot.date}T${slot.startTime}:00.000Z`),
-      endsAt: new Date(`${slot.date}T${slot.endTime}:00.000Z`),
-      location: slot.location,
-      topicId,
-      sessionHostId,
-      status: topicId || sessionHostId ? (slot.status ?? "proposed") : "empty",
-      url: slot.url,
-      // Off-grid = a host's off-piste proposal: no pattern provenance, and
-      // recorded as created by that host rather than by admin generation.
-      cellKey: slot.offGrid ? null : slotCellKey(slot),
-      createdById: slot.offGrid ? sessionHostId : null,
-      createdAt: BASE_TIME,
-      updatedAt: SLOT_UPDATED_TIME,
-    };
-  };
 
   const toSlotCommentRow = (
     slot: SlotFixture,
@@ -1662,24 +1643,95 @@ function buildSlotRows(
     createdAt: addMinutes(BASE_TIME, index * 30),
   });
 
+  // Session ownership (the never-displace rule keys off this): the
+  // topic's host for topic sessions, the named host for office hours.
+  const subjectFor = (slot: SlotFixture) => {
+    const topicTag = slot.topicTags[0];
+    const topicId = topicTag ? (topicIds.get(topicTag) ?? null) : null;
+    const sessionHostLabel = topicTag
+      ? hostByTopicLabel.get(topicTag)
+      : slot.sessionHost;
+    const sessionHostId = sessionHostLabel
+      ? (userIds.get(sessionHostLabel) ?? null)
+      : null;
+    return { topicId, sessionHostId };
+  };
+
+  // Bookings model (2026-08-06): one timeslot per (start, end) — fixture
+  // slots sharing a time window share the canonical slot, their sessions
+  // become separate bookings, and availability/discussion merge onto it.
+  const slotIdByTime = new Map<string, string>();
   const timeslotRows: NewTimeslot[] = [];
+  const slotSessionRows: NewSlotSession[] = [];
   const availabilityRows: NewAvailability[] = [];
+  const seenAvailability = new Set<string>();
   const slotCommentRows: NewSlotComment[] = [];
 
-  for (const slot of fixture.slots) {
+  const canonicalSlotId = (
+    slot: SlotFixture,
+    startsAt: Date,
+    endsAt: Date,
+    sessionHostId: string | null,
+  ): string => {
+    const timeKey = `${startsAt.getTime()}|${endsAt.getTime()}`;
+    const existing = slotIdByTime.get(timeKey);
+    if (existing) return existing;
     const slotId = stableUuid("slot", slot.label);
-    timeslotRows.push(toTimeslotRow(slot, slotId));
+    slotIdByTime.set(timeKey, slotId);
+    timeslotRows.push({
+      id: slotId,
+      timetableId,
+      startsAt,
+      endsAt,
+      // Off-grid = a host's off-piste proposal: no pattern provenance,
+      // recorded as created by that host rather than admin generation.
+      cellKey: slot.offGrid ? null : slotCellKey(slot),
+      createdById: slot.offGrid ? sessionHostId : null,
+      createdAt: BASE_TIME,
+      updatedAt: SLOT_UPDATED_TIME,
+    });
+    return slotId;
+  };
 
+  const pushAvailability = (slot: SlotFixture, slotId: string): void => {
     for (const av of slot.availability) {
+      const userId = userIds.get(av.person) ?? "";
+      // Same person answering two same-time fixture slots: first wins.
+      const dedupeKey = `${slotId}|${userId}`;
+      if (seenAvailability.has(dedupeKey)) continue;
+      seenAvailability.add(dedupeKey);
       availabilityRows.push({
         id: stableUuid("slot-avail", `${slot.label}:${av.person}`),
         slotId,
-        userId: userIds.get(av.person) ?? "",
+        userId,
         state: av.state,
         updatedAt: BASE_TIME,
       });
     }
+  };
 
+  for (const slot of fixture.slots) {
+    const startsAt = new Date(`${slot.date}T${slot.startTime}:00.000Z`);
+    const endsAt = new Date(`${slot.date}T${slot.endTime}:00.000Z`);
+    const { topicId, sessionHostId } = subjectFor(slot);
+    const slotId = canonicalSlotId(slot, startsAt, endsAt, sessionHostId);
+
+    if (topicId || sessionHostId) {
+      slotSessionRows.push({
+        id: stableUuid("slot-session", slot.label),
+        slotId,
+        location: slot.location,
+        topicId,
+        sessionHostId,
+        status: slot.status ?? "proposed",
+        url: slot.url,
+        createdById: slot.offGrid ? sessionHostId : null,
+        createdAt: BASE_TIME,
+        updatedAt: SLOT_UPDATED_TIME,
+      });
+    }
+
+    pushAvailability(slot, slotId);
     slotCommentRows.push(
       ...slot.discussion.map((d, i) => toSlotCommentRow(slot, slotId, d, i)),
     );
@@ -1687,6 +1739,7 @@ function buildSlotRows(
 
   return {
     timeslotRows,
+    slotSessionRows,
     availabilityRows,
     slotCommentRows,
     patternRows: buildPatternRows(fixture, timetableId, userIds),
@@ -1793,6 +1846,9 @@ async function insertFixtureRows(
   }
   if (rows.timeslotRows.length > 0) {
     await tx.insert(timeslots).values(rows.timeslotRows);
+  }
+  if (rows.slotSessionRows.length > 0) {
+    await tx.insert(slotSessions).values(rows.slotSessionRows);
   }
   if (rows.availabilityRows.length > 0) {
     await tx.insert(availability).values(rows.availabilityRows);

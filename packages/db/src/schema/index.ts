@@ -11,6 +11,7 @@ import {
   availability,
   availabilityPatterns,
   slotComments,
+  slotSessions,
   timeslots,
 } from "./calendar";
 import {
@@ -52,7 +53,10 @@ export type NewActivityEvent = typeof activityEvents.$inferInsert;
 
 export type Timeslot = typeof timeslots.$inferSelect;
 export type NewTimeslot = typeof timeslots.$inferInsert;
-export type SlotStatus = Timeslot["status"];
+
+export type SlotSession = typeof slotSessions.$inferSelect;
+export type NewSlotSession = typeof slotSessions.$inferInsert;
+export type SlotStatus = SlotSession["status"];
 
 export type Availability = typeof availability.$inferSelect;
 export type NewAvailability = typeof availability.$inferInsert;

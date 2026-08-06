@@ -260,11 +260,14 @@ Main mutations cover:
   server-computed, frozen 🟢🟡🔴 snapshot of that topic's hearters), with
   author edit/delete and admin hide (`updateSlotComment`,
   `deleteSlotComment`, `hideSlotComment`)
-- the session lifecycle (`setSlotSession`: a topic OR an office-hours
-  `sessionHostId`, + `empty`/`proposed`/`confirmed` + URL), gated by the
-  forum's confirm policy and the never-displace rule
-  (`canTouchSlotSession` against `session_host_id`); calendar actions are
-  activity-logged and session events notify the topic's hearters
+- the session lifecycle (`addSlotSession`: a topic, an office-hours
+  `sessionHostId`, or an admin-only custom `title`, at a `location`;
+  `updateSlotSession` for confirm/URL; `clearSlotSession`), gated by the
+  forum's confirm policy and the never-displace rule per booking
+  (`canTouchSlotSession` against `session_host_id`; custom sessions gate
+  on the admin bit). Several bookings can share a slot — the location is
+  the contended resource. Calendar actions are activity-logged and
+  session events notify the topic's hearters
 - topic publishing by the owning host when
   `settings.topics.hostsPublishDirectly` is on (same `moderateTopic`
   mutation; admin review becomes post-hoc)
@@ -310,12 +313,16 @@ Core tables:
   toggles, read only by the admin data export)
 - `comments`
 - `activity_events`
-- `timeslots` (one row per slot: `status`, a singular `topic_id`, `url`,
-  `created_by_id`, `cell_key` — the pattern-cell provenance for inference —
-  and `session_host_id`, THE session-ownership column: the topic's host,
-  or the host themselves for topic-less "office hours" sessions;
-  simultaneous sessions are separate slots)
-- `availability` (explicit per-slot answers)
+- `timeslots` (bookings model, 2026-08-06: a pure TIME WINDOW, unique per
+  forum+start+end; `created_by_id`, `cell_key` — the pattern-cell
+  provenance for inference. Availability and discussion attach here
+  because both are about the time)
+- `slot_sessions` (bookings, zero-to-many per slot, unique per
+  slot+location: `location`, a singular `topic_id` OR `session_host_id`
+  (THE ownership column: the topic's host, or the host themselves for
+  topic-less "office hours") OR an admin-only `custom_title`; `status`
+  `proposed`/`confirmed` + `url` — an empty slot simply has no rows)
+- `availability` (explicit per-slot answers — location-independent)
 - `availability_patterns` (one row per forum+user; jsonb cell → state map)
 - `slot_comments` (+ optional claim: `topic_id` and frozen
   green/yellow/red counts; + `edited_at`/`hidden_at`/`hidden_by_user_id`

@@ -1,15 +1,16 @@
 export type AvailabilityState = "green" | "yellow" | "red";
 
-export type SlotStatus = "empty" | "proposed" | "confirmed";
+export type SessionStatus = "proposed" | "confirmed";
 
-export type CalendarSlot = {
+/** A booking in a slot (bookings model, 2026-08-06): a session subject at
+ * a location. Several can share a slot — different locations, same time. */
+export type CalendarSession = {
   id: string;
-  startsAt: string;
-  endsAt: string;
   location: string;
-  status: SlotStatus;
+  status: SessionStatus;
   url: string;
-  cellKey: string | null;
+  /** Admin-filled custom session title ("" when not custom). */
+  customTitle: string;
   topic: {
     id: string;
     title: string;
@@ -19,6 +20,16 @@ export type CalendarSlot = {
   } | null;
   /** Office-hours sessions (no topic): whose they are. */
   sessionHost: { id: string; name: string | null } | null;
+};
+
+/** A timeslot is a pure time window; availability and discussion attach
+ * here, bookings are `sessions` (location-sorted, empty when open). */
+export type CalendarSlot = {
+  id: string;
+  startsAt: string;
+  endsAt: string;
+  cellKey: string | null;
+  sessions: CalendarSession[];
   viewerState: AvailabilityState | null;
   counts: { green: number; yellow: number; red: number };
   perUser:

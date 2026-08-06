@@ -52,9 +52,12 @@ type Data = {
 };
 
 const SLOT_FIELDS = `
-  id startsAt endsAt location status url cellKey commentCount viewerState
-  topic { id title topicSlug hostId hostName }
-  sessionHost { id name }
+  id startsAt endsAt cellKey commentCount viewerState
+  sessions {
+    id location status url customTitle
+    topic { id title topicSlug hostId hostName }
+    sessionHost { id name }
+  }
   counts { green yellow red }
   perUser { userId name image state }
 `;
@@ -105,7 +108,11 @@ function CalendarToolbar({
   electorsLabel: string;
 }) {
   const locations = [
-    ...new Set(calendar.map((s) => s.location).filter(Boolean)),
+    ...new Set(
+      calendar
+        .flatMap((s) => s.sessions.map((x) => x.location))
+        .filter(Boolean),
+    ),
   ].sort();
 
   if (calendar.length === 0) return null;
@@ -145,15 +152,19 @@ function selectClaimTopics(
   return admin ? topicFeed : topicFeed.filter((t) => t.hostId === viewerId);
 }
 
+/** Bookings model: a "location" filter shows timeslots with a session
+ * booked at that location (open slots have no location of their own). */
 function filterByLocation(
   slots: CalendarSlot[],
   location: string | undefined,
 ): CalendarSlot[] {
-  return location ? slots.filter((s) => s.location === location) : slots;
+  return location
+    ? slots.filter((s) => s.sessions.some((x) => x.location === location))
+    : slots;
 }
 
 function hasSession(slot: CalendarSlot): boolean {
-  return Boolean(slot.topic || slot.sessionHost);
+  return slot.sessions.length > 0;
 }
 
 /** ?show=sessions|open — the calendar's two jobs (what's happening vs
@@ -293,6 +304,7 @@ function CalendarBody({
   slug,
   visibleSlots,
   anySlots,
+  locations,
   perms,
   claimTopics,
   lensTopic,
@@ -305,6 +317,7 @@ function CalendarBody({
   slug: string;
   visibleSlots: CalendarSlot[];
   anySlots: boolean;
+  locations: string[];
   perms: CalendarPerms;
   claimTopics: TopicOption[];
   lensTopic: TopicOption | null;
@@ -322,6 +335,7 @@ function CalendarBody({
       <CalendarTable
         rows={visibleSlots.map((slot) => ({ slot, past: isPast(slot) }))}
         slug={slug}
+        locations={locations}
         perms={perms}
         claimTopics={claimTopics}
         lensTopic={lensTopic}
@@ -420,7 +434,7 @@ export default async function CalendarPage({
   const viewerId = data.me?.id ?? null;
   const perms = buildPerms(roles, viewerId, calendarConfirmPolicy(settings));
   const adminLabel = roleLabel(settings.roleLabels, "admin");
-  const calendarSettings = settings.calendar ?? {};
+  const calendarSettings = { locations: [], ...(settings.calendar ?? {}) };
 
   const claimTopics = selectClaimTopics(
     data.topicFeed,
@@ -474,6 +488,7 @@ export default async function CalendarPage({
         slug={slug}
         visibleSlots={visibleSlots}
         anySlots={data.calendar.length > 0}
+        locations={calendarSettings.locations}
         perms={perms}
         claimTopics={claimTopics}
         lensTopic={lensTopic}

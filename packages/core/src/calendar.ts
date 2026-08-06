@@ -16,11 +16,13 @@ import {
   db,
   hearts,
   slotComments,
+  slotSessions,
   timeslots,
   timetableMemberships,
   topics,
   type AvailabilityState,
   type SlotComment,
+  type SlotSession,
   type SlotStatus,
   type Timeslot,
 } from "@timetable/db";
@@ -41,21 +43,20 @@ export async function getSlotById(slotId: string): Promise<Timeslot | null> {
 export type SlotInput = {
   startsAt: Date;
   endsAt: Date;
-  location?: string;
   /** Pattern-cell provenance "{weekday}-{HH:MM}" for generated slots. */
   cellKey?: string | null;
 };
 
 /** Admin bulk-create (single slots and pattern × terms generation both land
- * here), idempotently: an exact duplicate — same start/end/location — is
- * skipped, and a cell-generated slot is ALSO skipped when its pattern cell
- * already has a slot within 24h. Exact match alone wasn't enough (QA
- * 2026-08-05 — duplicate slots on dev): generation runs on the admin's
- * browser clock, so the same cell×date yields DIFFERENT UTC instants from
- * different clock contexts (the UTC-clocked seed vs a London browser,
- * either side of a DST switch), and "regeneration" doubled the grid.
- * Same-cell slots are ≥7 days apart by construction (the cell pins the
- * weekday), so the 24h window can't collide with legitimate neighbours. */
+ * here), idempotently: an exact duplicate — same start/end — is skipped,
+ * and a cell-generated slot is ALSO skipped when its pattern cell already
+ * has a slot within 24h. Exact match alone wasn't enough (QA 2026-08-05 —
+ * duplicate slots on dev): generation runs on the admin's browser clock,
+ * so the same cell×date yields DIFFERENT UTC instants from different
+ * clock contexts (the UTC-clocked seed vs a London browser, either side
+ * of a DST switch), and "regeneration" doubled the grid. Same-cell slots
+ * are ≥7 days apart by construction (the cell pins the weekday), so the
+ * 24h window can't collide with legitimate neighbours. */
 export async function createSlots(
   timetableId: string,
   inputs: SlotInput[],
@@ -63,9 +64,7 @@ export async function createSlots(
   if (inputs.length === 0) return [];
   const existing = await listSlots(timetableId, { includePast: true });
   const seen = new Set(
-    existing.map(
-      (s) => `${s.startsAt.getTime()}|${s.endsAt.getTime()}|${s.location}`,
-    ),
+    existing.map((s) => `${s.startsAt.getTime()}|${s.endsAt.getTime()}`),
   );
   const cellStarts = new Map<string, number[]>();
   for (const s of existing) {
@@ -76,7 +75,7 @@ export async function createSlots(
   }
   const DAY_MS = 24 * 60 * 60 * 1000;
   const fresh = inputs.filter((s) => {
-    const key = `${s.startsAt.getTime()}|${s.endsAt.getTime()}|${s.location ?? ""}`;
+    const key = `${s.startsAt.getTime()}|${s.endsAt.getTime()}`;
     if (seen.has(key)) return false;
     if (!s.cellKey) return true;
     const starts = cellStarts.get(s.cellKey);
@@ -90,76 +89,67 @@ export async function createSlots(
         timetableId,
         startsAt: s.startsAt,
         endsAt: s.endsAt,
-        location: s.location ?? "",
         cellKey: s.cellKey ?? null,
       })),
     )
     .returning();
 }
 
-/** A host's off-piste slot: born `proposed` with their topic attached —
- * or, with topicId null, an office-hours session owned by sessionHostId. */
+/** A host's off-piste proposal: a session at a time the grid doesn't
+ * offer. Reuses the timeslot if one already exists at that exact window
+ * (slots are unique per time now); the session is born `proposed`. */
 export async function proposeSlot(
   timetableId: string,
   createdById: string,
-  input: SlotInput & { topicId: string | null; sessionHostId: string },
-): Promise<Timeslot> {
-  const [slot] = await db
-    .insert(timeslots)
-    .values({
-      timetableId,
-      startsAt: input.startsAt,
-      endsAt: input.endsAt,
-      location: input.location ?? "",
-      status: "proposed",
-      topicId: input.topicId,
-      sessionHostId: input.sessionHostId,
-      createdById,
-    })
-    .returning();
+  input: SlotInput & {
+    location: string;
+    topicId: string | null;
+    sessionHostId: string;
+  },
+): Promise<{ slot: Timeslot; session: SlotSession }> {
+  const [existing] = await db
+    .select()
+    .from(timeslots)
+    .where(
+      and(
+        eq(timeslots.timetableId, timetableId),
+        eq(timeslots.startsAt, input.startsAt),
+        eq(timeslots.endsAt, input.endsAt),
+      ),
+    )
+    .limit(1);
+  let slot = existing ?? null;
+  if (!slot) {
+    const [created] = await db
+      .insert(timeslots)
+      .values({
+        timetableId,
+        startsAt: input.startsAt,
+        endsAt: input.endsAt,
+        createdById,
+      })
+      .returning();
+    slot = created ?? null;
+  }
   if (!slot) throw new Error("Failed to propose slot");
-  return slot;
+  const session = await addSlotSession(slot.id, {
+    location: input.location,
+    topicId: input.topicId,
+    sessionHostId: input.sessionHostId,
+    createdById,
+  });
+  return { slot, session };
 }
 
 export async function updateSlot(
   slotId: string,
-  patch: { startsAt?: Date; endsAt?: Date; location?: string },
+  patch: { startsAt?: Date; endsAt?: Date },
 ): Promise<Timeslot | null> {
   const [updated] = await db
     .update(timeslots)
     .set({
       ...(patch.startsAt ? { startsAt: patch.startsAt } : {}),
       ...(patch.endsAt ? { endsAt: patch.endsAt } : {}),
-      ...(patch.location !== undefined ? { location: patch.location } : {}),
-      updatedAt: new Date(),
-    })
-    .where(eq(timeslots.id, slotId))
-    .returning();
-  return updated ?? null;
-}
-
-/** Set a slot's session: topic (or office-hours host) + status + url
- * together. Both ids null clears the session back to empty (url cleared
- * too). `sessionHostId` is the ownership column: the topic's host for
- * topic sessions, the host themselves for office hours. Permission rules
- * (confirm policy, never-displace) live in the resolver. */
-export async function setSlotSession(
-  slotId: string,
-  session: {
-    topicId: string | null;
-    sessionHostId: string | null;
-    status?: SlotStatus;
-    url?: string;
-  },
-): Promise<Timeslot | null> {
-  const clearing = session.topicId === null && session.sessionHostId === null;
-  const [updated] = await db
-    .update(timeslots)
-    .set({
-      topicId: session.topicId,
-      sessionHostId: session.sessionHostId,
-      status: clearing ? "empty" : (session.status ?? "proposed"),
-      url: clearing ? "" : (session.url ?? ""),
       updatedAt: new Date(),
     })
     .where(eq(timeslots.id, slotId))
@@ -169,6 +159,91 @@ export async function setSlotSession(
 
 export async function deleteSlot(slotId: string): Promise<void> {
   await db.delete(timeslots).where(eq(timeslots.id, slotId));
+}
+
+// --------------------------------------------------------------------------
+// Bookings (slot sessions): several per slot, unique per (slot, location)
+// --------------------------------------------------------------------------
+
+export async function getSlotSessionById(
+  sessionId: string,
+): Promise<SlotSession | null> {
+  const [session] = await db
+    .select()
+    .from(slotSessions)
+    .where(eq(slotSessions.id, sessionId))
+    .limit(1);
+  return session ?? null;
+}
+
+/** Whether the slot already has a booking at this location — the
+ * pre-flight for addSlotSession's unique (slot, location) constraint. */
+export async function slotLocationTaken(
+  slotId: string,
+  location: string,
+): Promise<boolean> {
+  const [row] = await db
+    .select({ id: slotSessions.id })
+    .from(slotSessions)
+    .where(
+      and(eq(slotSessions.slotId, slotId), eq(slotSessions.location, location)),
+    )
+    .limit(1);
+  return Boolean(row);
+}
+
+/** Book a session into a slot. Ownership (`sessionHostId`) and the
+ * admin-only custom gate are the resolver's job; the unique (slot,
+ * location) index backstops concurrent double-booking. */
+export async function addSlotSession(
+  slotId: string,
+  session: {
+    location: string;
+    topicId: string | null;
+    sessionHostId: string | null;
+    customTitle?: string;
+    status?: SlotStatus;
+    url?: string;
+    createdById?: string;
+  },
+): Promise<SlotSession> {
+  const [created] = await db
+    .insert(slotSessions)
+    .values({
+      slotId,
+      location: session.location,
+      topicId: session.topicId,
+      sessionHostId: session.sessionHostId,
+      customTitle: session.customTitle ?? "",
+      status: session.status ?? "proposed",
+      url: session.url ?? "",
+      createdById: session.createdById ?? null,
+    })
+    .returning();
+  if (!created) throw new Error("Failed to book session");
+  return created;
+}
+
+/** Confirm / URL edits on an existing booking. */
+export async function updateSlotSessionRow(
+  sessionId: string,
+  patch: { status?: SlotStatus; url?: string },
+): Promise<SlotSession | null> {
+  const [updated] = await db
+    .update(slotSessions)
+    .set({
+      ...(patch.status ? { status: patch.status } : {}),
+      ...(patch.url !== undefined ? { url: patch.url } : {}),
+      updatedAt: new Date(),
+    })
+    .where(eq(slotSessions.id, sessionId))
+    .returning();
+  return updated ?? null;
+}
+
+/** Un-pencil: the booking disappears; the timeslot stays. */
+export async function deleteSlotSessionRow(sessionId: string): Promise<void> {
+  await db.delete(slotSessions).where(eq(slotSessions.id, sessionId));
 }
 
 export async function listSlots(
@@ -203,53 +278,76 @@ export async function forumHasSlots(timetableId: string): Promise<boolean> {
 }
 
 export type IcsSlot = {
+  /** Booking id for sessions, slot id for open slots — the VEVENT UID. */
   id: string;
   startsAt: Date;
   endsAt: Date;
   location: string;
+  /** "empty" = an open slot (no bookings). */
   status: SlotStatus;
   url: string;
   topicTitle: string | null;
   /** Office-hours sessions: the host's per-forum name. */
   sessionHostName: string | null;
+  /** Admin-filled custom session title ("" when not custom). */
+  customTitle: string;
 };
 
-/** Slots with their session, for the ICS calendar feed (upcoming + past —
- * calendar apps handle history themselves). */
+/** One event per booking — plus one "Open slot" event per empty slot —
+ * for the ICS calendar feed (upcoming + past; calendar apps handle
+ * history themselves). */
 export async function getSlotsForIcs(timetableId: string): Promise<IcsSlot[]> {
   const rows = await db
     .select({
-      id: timeslots.id,
+      slotId: timeslots.id,
       startsAt: timeslots.startsAt,
       endsAt: timeslots.endsAt,
-      location: timeslots.location,
-      status: timeslots.status,
-      url: timeslots.url,
-      topicId: timeslots.topicId,
+      sessionId: slotSessions.id,
+      location: slotSessions.location,
+      status: slotSessions.status,
+      url: slotSessions.url,
+      topicId: slotSessions.topicId,
       topicTitle: topics.title,
       sessionHostName: timetableMemberships.name,
+      customTitle: slotSessions.customTitle,
     })
     .from(timeslots)
-    .leftJoin(topics, eq(topics.id, timeslots.topicId))
+    .leftJoin(slotSessions, eq(slotSessions.slotId, timeslots.id))
+    .leftJoin(topics, eq(topics.id, slotSessions.topicId))
     .leftJoin(
       timetableMemberships,
       and(
-        eq(timetableMemberships.userId, timeslots.sessionHostId),
+        eq(timetableMemberships.userId, slotSessions.sessionHostId),
         eq(timetableMemberships.timetableId, timeslots.timetableId),
       ),
     )
     .where(eq(timeslots.timetableId, timetableId))
     .orderBy(asc(timeslots.startsAt));
-  return rows.map((r) => ({
-    id: r.id,
-    startsAt: r.startsAt,
-    endsAt: r.endsAt,
-    location: r.location,
-    status: r.status,
-    url: r.url,
-    topicTitle: r.topicTitle,
-    sessionHostName: r.topicId ? null : r.sessionHostName,
-  }));
+  return rows.map((r) =>
+    r.sessionId
+      ? {
+          id: r.sessionId,
+          startsAt: r.startsAt,
+          endsAt: r.endsAt,
+          location: r.location ?? "",
+          status: r.status ?? "proposed",
+          url: r.url ?? "",
+          topicTitle: r.topicTitle,
+          sessionHostName: r.topicId ? null : r.sessionHostName,
+          customTitle: r.customTitle ?? "",
+        }
+      : {
+          id: r.slotId,
+          startsAt: r.startsAt,
+          endsAt: r.endsAt,
+          location: "",
+          status: "empty" as const,
+          url: "",
+          topicTitle: null,
+          sessionHostName: null,
+          customTitle: "",
+        },
+  );
 }
 
 // --------------------------------------------------------------------------
@@ -570,15 +668,12 @@ export async function getAudienceElectorIds(
   return Array.from(new Set(rows.map((r) => r.userId)));
 }
 
-export type CalendarSlot = {
+/** One booking as the calendar renders it. */
+export type CalendarSession = {
   id: string;
-  startsAt: Date;
-  endsAt: Date;
   location: string;
   status: SlotStatus;
   url: string;
-  cellKey: string | null;
-  createdById: string | null;
   topic: {
     id: string;
     title: string;
@@ -588,6 +683,18 @@ export type CalendarSlot = {
   } | null;
   /** Office-hours sessions (topicId null): whose they are. */
   sessionHost: { id: string; name: string | null } | null;
+  /** Admin-filled custom session title ("" when not custom). */
+  customTitle: string;
+};
+
+export type CalendarSlot = {
+  id: string;
+  startsAt: Date;
+  endsAt: Date;
+  cellKey: string | null;
+  createdById: string | null;
+  /** The slot's bookings, location-sorted; empty for an open slot. */
+  sessions: CalendarSession[];
   viewerState: AvailabilityState | null;
   counts: SlotCounts;
   perUser: {
@@ -615,6 +722,7 @@ type SlotRelatedRows = {
     }
   >;
   sessionHostNames: Map<string, string | null>;
+  sessionsBySlot: Map<string, SlotSession[]>;
   commentCountBySlot: Map<string, number>;
 };
 
@@ -665,8 +773,23 @@ async function loadSlotRelatedRows(
   ];
   const patterns = await loadPatternsByUser(timetableId, patternUserIds);
 
+  // The slots' bookings, location-sorted within each slot.
+  const sessionRows = await db
+    .select()
+    .from(slotSessions)
+    .where(inArray(slotSessions.slotId, slotIds))
+    .orderBy(asc(slotSessions.location), asc(slotSessions.createdAt));
+  const sessionsBySlot = new Map<string, SlotSession[]>();
+  for (const s of sessionRows) {
+    const list = sessionsBySlot.get(s.slotId) ?? [];
+    list.push(s);
+    sessionsBySlot.set(s.slotId, list);
+  }
+
   const topicIds = [
-    ...new Set(slots.map((s) => s.topicId).filter((id): id is string => !!id)),
+    ...new Set(
+      sessionRows.map((s) => s.topicId).filter((id): id is string => !!id),
+    ),
   ];
   const topicsById = new Map<
     string,
@@ -717,7 +840,7 @@ async function loadSlotRelatedRows(
   // Office-hours sessions (no topic): the session host's per-forum name.
   const officeHoursHostIds = [
     ...new Set(
-      slots
+      sessionRows
         .filter((s) => !s.topicId && s.sessionHostId)
         .map((s) => s.sessionHostId as string),
     ),
@@ -746,6 +869,7 @@ async function loadSlotRelatedRows(
     viewerPattern: viewerUserId ? patterns.get(viewerUserId) : undefined,
     topicsById,
     sessionHostNames,
+    sessionsBySlot,
     commentCountBySlot: new Map(commentRows.map((c) => [c.slotId, c.n])),
   };
 }
@@ -817,6 +941,29 @@ function slotAvailability(
   return { viewerState, counts, perUser };
 }
 
+function toCalendarSession(
+  session: SlotSession,
+  related: SlotRelatedRows,
+): CalendarSession {
+  return {
+    id: session.id,
+    location: session.location,
+    status: session.status,
+    url: session.url,
+    topic: session.topicId
+      ? (related.topicsById.get(session.topicId) ?? null)
+      : null,
+    sessionHost:
+      !session.topicId && session.sessionHostId
+        ? {
+            id: session.sessionHostId,
+            name: related.sessionHostNames.get(session.sessionHostId) ?? null,
+          }
+        : null,
+    customTitle: session.customTitle,
+  };
+}
+
 function toCalendarSlot(
   slot: Timeslot,
   related: SlotRelatedRows,
@@ -827,19 +974,11 @@ function toCalendarSlot(
     id: slot.id,
     startsAt: slot.startsAt,
     endsAt: slot.endsAt,
-    location: slot.location,
-    status: slot.status,
-    url: slot.url,
     cellKey: slot.cellKey,
     createdById: slot.createdById,
-    topic: slot.topicId ? (related.topicsById.get(slot.topicId) ?? null) : null,
-    sessionHost:
-      !slot.topicId && slot.sessionHostId
-        ? {
-            id: slot.sessionHostId,
-            name: related.sessionHostNames.get(slot.sessionHostId) ?? null,
-          }
-        : null,
+    sessions: (related.sessionsBySlot.get(slot.id) ?? []).map((s) =>
+      toCalendarSession(s, related),
+    ),
     ...slotAvailability(slot, related, audienceIds, viewerUserId),
     commentCount: related.commentCountBySlot.get(slot.id) ?? 0,
   };
@@ -877,20 +1016,21 @@ export async function listUpcomingSessions(
       slotId: timeslots.id,
       startsAt: timeslots.startsAt,
       endsAt: timeslots.endsAt,
-      location: timeslots.location,
-      url: timeslots.url,
-      topicId: timeslots.topicId,
+      location: slotSessions.location,
+      url: slotSessions.url,
+      topicId: slotSessions.topicId,
       topicTitle: topics.title,
       timetableId: timeslots.timetableId,
-      updatedAt: timeslots.updatedAt,
+      updatedAt: slotSessions.updatedAt,
     })
-    .from(timeslots)
-    .innerJoin(topics, eq(topics.id, timeslots.topicId))
+    .from(slotSessions)
+    .innerJoin(timeslots, eq(timeslots.id, slotSessions.slotId))
+    .innerJoin(topics, eq(topics.id, slotSessions.topicId))
     .where(
       and(
         inArray(timeslots.timetableId, timetableIds),
-        eq(timeslots.status, status),
-        isNotNull(timeslots.topicId),
+        eq(slotSessions.status, status),
+        isNotNull(slotSessions.topicId),
         gte(timeslots.startsAt, horizon.from),
         lte(timeslots.startsAt, horizon.to),
       ),

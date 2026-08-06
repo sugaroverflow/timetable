@@ -36,9 +36,10 @@ export function buildIcs(
   for (const slot of slots) {
     const summary =
       slot.topicTitle ??
-      (slot.sessionHostName
-        ? `${slot.sessionHostName} — ${officeHoursLabel}`
-        : "Open slot");
+      (slot.customTitle ||
+        (slot.sessionHostName
+          ? `${slot.sessionHostName} — ${officeHoursLabel}`
+          : "Open slot"));
     // Session state maps straight onto RFC 5545: proposed → TENTATIVE,
     // confirmed → CONFIRMED; empty slots carry no STATUS at all.
     const status =

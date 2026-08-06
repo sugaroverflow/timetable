@@ -16,6 +16,11 @@ import { availabilityStateEnum, slotStatusEnum } from "./enums";
 import { timetables } from "./timetables";
 import { topics } from "./topics";
 
+/** A timeslot is a pure TIME WINDOW (bookings model, 2026-08-06 — split
+ * from the old time×location rows): one row per (forum, start, end).
+ * Availability and discussion attach here, because both are about the
+ * time; what happens in the slot — and where — lives in `slot_sessions`,
+ * zero-to-many per slot. */
 export const timeslots = pgTable(
   "timeslots",
   {
@@ -25,21 +30,6 @@ export const timeslots = pgTable(
       .references(() => timetables.id, { onDelete: "cascade" }),
     startsAt: timestamp({ withTimezone: true }).notNull(),
     endsAt: timestamp({ withTimezone: true }).notNull(),
-    location: text().notNull().default(""),
-    /** Session state (calendar v2): empty → proposed → confirmed. */
-    status: slotStatusEnum().notNull().default("empty"),
-    /** The one pencilled/confirmed topic. Singular by design: simultaneous
-     * sessions are separate slots (same time, different location). Null on
-     * an office-hours session (QA 2026-08-03) — a session whose subject is
-     * the host, not a topic; `sessionHostId` carries who. */
-    topicId: uuid().references(() => topics.id, { onDelete: "set null" }),
-    /** Whose session this is — the topic's host for topic sessions, the
-     * host themselves for office hours. THE ownership column for the
-     * never-displace rule. */
-    sessionHostId: text().references(() => users.id, { onDelete: "set null" }),
-    /** Where the session actually lives once published elsewhere (Luma,
-     * event page…). The calendar points at it; it never becomes it. */
-    url: text().notNull().default(""),
     /** Who created the slot — null for admin/grid slots created before this
      * column; set for host off-piste proposals. */
     createdById: text().references(() => users.id, { onDelete: "set null" }),
@@ -51,7 +41,52 @@ export const timeslots = pgTable(
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("timeslots_timetable_start_idx").on(t.timetableId, t.startsAt)],
+  (t) => [
+    index("timeslots_timetable_start_idx").on(t.timetableId, t.startsAt),
+    // One slot per time window; the DST-wobble dedup in createSlots still
+    // matters (same cell, different UTC instants), this guards exact dupes.
+    uniqueIndex("timeslots_timetable_time_uq").on(
+      t.timetableId,
+      t.startsAt,
+      t.endsAt,
+    ),
+  ],
+);
+
+/** A booking in a timeslot: a session subject (topic, office-hours host,
+ * or an admin's custom title) at a location. Several bookings can share a
+ * slot — different locations, same time; the location is the contended
+ * resource, so (slot, location) is unique. */
+export const slotSessions = pgTable(
+  "slot_sessions",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    slotId: uuid()
+      .notNull()
+      .references(() => timeslots.id, { onDelete: "cascade" }),
+    location: text().notNull().default(""),
+    /** The booked topic; null for office hours and custom sessions. */
+    topicId: uuid().references(() => topics.id, { onDelete: "set null" }),
+    /** Whose session this is — the topic's host for topic sessions, the
+     * host themselves for office hours, null for admin custom sessions.
+     * THE ownership column for the never-displace rule. */
+    sessionHostId: text().references(() => users.id, { onDelete: "set null" }),
+    /** Admin-filled custom session ("Departmental seminar") — a session
+     * whose subject is neither a topic nor a host; admin-only. */
+    customTitle: text().notNull().default(""),
+    /** proposed (pencilled) → confirmed; "empty" is unused here — an empty
+     * slot simply has no session rows. */
+    status: slotStatusEnum().notNull().default("proposed"),
+    /** Where the session actually lives once published elsewhere (Luma,
+     * event page…). The calendar points at it; it never becomes it. */
+    url: text().notNull().default(""),
+    createdById: text().references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("slot_sessions_slot_location_uq").on(t.slotId, t.location),
+  ],
 );
 
 export const availability = pgTable(
@@ -128,16 +163,28 @@ export const timeslotsRelations = relations(timeslots, ({ one, many }) => ({
     fields: [timeslots.timetableId],
     references: [timetables.id],
   }),
-  topic: one(topics, {
-    fields: [timeslots.topicId],
-    references: [topics.id],
-  }),
   createdBy: one(users, {
     fields: [timeslots.createdById],
     references: [users.id],
   }),
+  sessions: many(slotSessions),
   availability: many(availability),
   comments: many(slotComments),
+}));
+
+export const slotSessionsRelations = relations(slotSessions, ({ one }) => ({
+  slot: one(timeslots, {
+    fields: [slotSessions.slotId],
+    references: [timeslots.id],
+  }),
+  topic: one(topics, {
+    fields: [slotSessions.topicId],
+    references: [topics.id],
+  }),
+  sessionHost: one(users, {
+    fields: [slotSessions.sessionHostId],
+    references: [users.id],
+  }),
 }));
 
 export const availabilityRelations = relations(availability, ({ one }) => ({
