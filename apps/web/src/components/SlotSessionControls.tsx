@@ -193,9 +193,9 @@ function PencilInControl({
     <div className="row wrap" style={{ gap: 8 }}>
       <select
         aria-label="Pencil in a session"
+        className="cal-pencil-select"
         value={choice}
         onChange={(e) => setChoice(e.target.value)}
-        style={{ width: "auto" }}
       >
         <option value="">Pencil in…</option>
         <SessionChoiceOptions

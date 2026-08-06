@@ -1612,13 +1612,9 @@ html[data-theme="dark"] .cal-row:hover .cal-row-tint .r,
 html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
   background: color-mix(in srgb, var(--red) 30%, transparent);
 }
-/* Row content rides above the tint on a single line: when | session,
-   with the comment count / elector toggle right-aligned. Vertical padding
-   only matters once the session line wraps — short content still centres
-   in the 52px minimum, wrapped content gets breathing room instead of
-   sitting flush against the row edges (QA 2026-08-06).
-   One type size for the whole line (type rationalisation 2026-08-06 —
-   was: unsized 16px when-text next to a 15px serif session line);
+/* The when-line rides above the tint: datetime, with the comment count /
+   elector toggle right-aligned. Bookings sit BELOW it, one per row (QA
+   2026-08-06 — sharing the line wrapped ugly). One type size, 15px sans;
    emphasis is weight only: bold date, bold topic title. */
 .cal-row-line {
   position: relative;
@@ -1629,6 +1625,21 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
   padding: 8px 14px;
   font-size: var(--text-md);
 }
+/* With bookings below, the when-line gives up its 52px centring — the
+   line and the booking rows make the row's height together. */
+.cal-row-line:has(+ .cal-row-sessions) {
+  min-height: 0;
+  padding-bottom: 0;
+}
+/* One booking per row, indented from the datetime. */
+.cal-row-sessions {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 14px 9px 32px;
+  font-size: var(--text-md);
+}
 .cal-when {
   flex: none;
   white-space: nowrap;
@@ -1636,11 +1647,6 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
 .cal-where {
   font-size: var(--text-xs);
   color: var(--muted);
-}
-/* Long topic titles + pills wrap rather than truncate (QA 2026-08-05);
-   the row grows past its 52px minimum when they do. */
-.cal-row-session {
-  min-width: 0;
 }
 .cal-row-right {
   margin-left: auto;
@@ -1708,13 +1714,14 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
   letter-spacing: normal;
 }
 /* The fold inside the tinted block: avatars in their wash segments, then
-   discussion + controls. Clicks inside are the fold's own. */
+   discussion + controls. Clicks inside are the fold's own. Top padding
+   keeps the first comment off the wash's bottom edge (QA 2026-08-06). */
 .cal-row-detail {
   position: relative;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 0 14px 12px;
+  padding: 10px 14px 12px;
   cursor: auto;
 }
 /* Native selects size to their longest option — topic titles in the
@@ -1724,6 +1731,21 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
 .cal-row-detail input {
   max-width: 100%;
   text-overflow: ellipsis;
+}
+/* The pencil-in select reads as an ACTION, not an input — btn-styled so
+   it can't be mistaken for the composer above it — and capped so select +
+   "Pencil in" button share a row; long titles ellipsize into the popup
+   (QA 2026-08-06). */
+.cal-row-detail .cal-pencil-select {
+  width: auto;
+  max-width: calc(100% - 110px);
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  background: var(--card);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  cursor: pointer;
 }
 .cal-row-detail .host-thread {
   border-top: 0;
@@ -1785,14 +1807,17 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
   color: var(--muted);
 }
 /* The same chip under the composer, previewing what a post attaches —
-   the stack gap already spaces it (QA 2026-08-06). */
+   the stack gap already spaces it (QA 2026-08-06). No dashed separator —
+   it belongs to the posted bubble, where it splits body from chip; under
+   the composer it floated oddly. */
 .cal-claim-preview {
   margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
 }
 
-/* Mobile calendar: the single line can't fit when + session + controls,
-   so the line wraps — when and the right cluster stay on the first line,
-   the session line drops beneath, all still above the tint. */
+/* Mobile calendar: tighter rows; the when-line still wraps if the right
+   cluster can't fit beside the datetime. */
 @media (max-width: 640px) {
   .cal-row {
     min-height: 44px;
@@ -1802,9 +1827,9 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
     row-gap: 2px;
     min-height: 44px;
   }
-  .cal-row-session {
-    flex-basis: 100%;
-    order: 5;
+  /* Bookings already live on their own rows; tighten the indent. */
+  .cal-row-sessions {
+    padding-left: 24px;
   }
   /* No avatar override: --face's 15px clamp floor covers narrow rows. */
 }
