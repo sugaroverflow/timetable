@@ -1529,10 +1529,47 @@ function slotCellKey(slot: SlotFixture): string {
   return `${weekday}-${slot.startTime}`;
 }
 
+/** Group the sorted distinct grid dates into terms: a gap of more than
+ * three weeks between consecutive slots starts a new term. Terms are named
+ * by the season + year they start in ("Autumn term 2025"), with a numeric
+ * suffix if the fixture yields two terms in the same season. */
+function deriveTerms(
+  dates: string[],
+): { name: string; start: string; end: string }[] {
+  const distinct = [...new Set(dates)].sort();
+  const first = distinct[0];
+  if (!first) return [];
+  const runs: string[][] = [[first]];
+  for (const date of distinct.slice(1)) {
+    const previous = runs.at(-1)!.at(-1)!;
+    const gapDays =
+      (Date.parse(`${date}T00:00:00.000Z`) -
+        Date.parse(`${previous}T00:00:00.000Z`)) /
+      DAY_MS;
+    if (gapDays > 21) runs.push([date]);
+    else runs.at(-1)!.push(date);
+  }
+  const seen = new Map<string, number>();
+  return runs.map((run) => {
+    const start = new Date(`${run[0]}T00:00:00.000Z`);
+    const month = start.getUTCMonth();
+    const season = month >= 8 ? "Autumn" : month <= 2 ? "Spring" : "Summer";
+    const base = `${season} term ${start.getUTCFullYear()}`;
+    const n = (seen.get(base) ?? 0) + 1;
+    seen.set(base, n);
+    return {
+      name: n === 1 ? base : `${base} (${n})`,
+      start: run[0]!,
+      end: run.at(-1)!,
+    };
+  });
+}
+
 /** Calendar settings for the seeded forum, derived from the slot fixtures:
- * enabled, hosts-may-propose, the distinct weekly cells as the pattern, one
- * term spanning the fixture dates, and the fixture locations as presets.
- * Off-grid slots (host off-piste proposals) don't shape the pattern. */
+ * enabled, hosts-may-propose, the distinct weekly cells as the pattern,
+ * seasonal terms spanning the fixture dates, and the fixture locations as
+ * presets. Off-grid slots (host off-piste proposals) don't shape the
+ * pattern. */
 function buildCalendarSeedSettings(
   slots: SlotFixture[],
 ): NonNullable<NewTimetable["settings"]>["calendar"] {
@@ -1562,7 +1599,7 @@ function buildCalendarSeedSettings(
     patternCells: [...cells.values()].sort(
       (a, b) => a.weekday - b.weekday || a.start.localeCompare(b.start),
     ),
-    terms: [{ name: "Autumn term", start: dates[0]!, end: dates.at(-1)! }],
+    terms: deriveTerms(dates),
   };
 }
 
