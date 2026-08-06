@@ -919,6 +919,18 @@ describe("createApiApp", () => {
         url: "https://lu.ma/opening-session",
         topicTitle: "Opening Session",
         sessionHostName: null,
+        customTitle: "",
+      },
+      {
+        id: "session-2",
+        startsAt: new Date("2026-02-02T10:00:00.000Z"),
+        endsAt: new Date("2026-02-02T11:00:00.000Z"),
+        location: "",
+        status: "proposed",
+        url: "",
+        topicTitle: null,
+        sessionHostName: null,
+        customTitle: "Departmental seminar",
       },
     ];
 
@@ -939,6 +951,8 @@ describe("createApiApp", () => {
       expect(body).toContain("BEGIN:VCALENDAR");
       expect(body).toContain("X-WR-CALNAME:Public Calendar");
       expect(body).toContain("SUMMARY:Opening Session");
+      // Admin custom sessions carry their own title.
+      expect(body).toContain("SUMMARY:Departmental seminar");
       expect(body).toContain("LOCATION:Main Hall");
       expect(body).toContain("STATUS:CONFIRMED");
       expect(body).toContain("URL:https://lu.ma/opening-session");

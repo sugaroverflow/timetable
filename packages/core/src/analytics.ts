@@ -6,6 +6,7 @@ import {
   db,
   hearts,
   hostHearts,
+  slotSessions,
   timeslots,
   timetableMemberships,
   topics,
@@ -662,16 +663,17 @@ function buildElectorActivity(args: {
     .sort(compareElectorActivity);
 }
 
-/** Published topics with no session pencilled into any slot. (Calendar v2:
- * a slot carries one topic on timeslots.topicId; the conflicts table died
- * with the m2m — competing claims are conversation, not data.) */
+/** Published topics with no session pencilled into any slot. (Bookings
+ * model 2026-08-06: sessions live in slot_sessions, several per slot;
+ * competing claims are conversation, not data.) */
 async function findUnallocated(
   timetableId: string,
   feed: FeedTopic[],
 ): Promise<DashboardData["unallocatedTopics"]> {
   const tagRows = await db
-    .select({ topicId: timeslots.topicId })
-    .from(timeslots)
+    .select({ topicId: slotSessions.topicId })
+    .from(slotSessions)
+    .innerJoin(timeslots, eq(timeslots.id, slotSessions.slotId))
     .where(eq(timeslots.timetableId, timetableId));
   const taggedTopicIds = new Set(
     tagRows.map((r) => r.topicId).filter((id): id is string => id !== null),

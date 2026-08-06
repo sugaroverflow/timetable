@@ -6,6 +6,7 @@ import { ExternalLink } from "lucide-react";
 
 import type {
   CalendarPerms,
+  CalendarSession,
   CalendarSlot,
   TopicOption,
 } from "@/lib/calendarTypes";
@@ -13,66 +14,77 @@ import { groupTopicsByHost } from "@/lib/calendarTypes";
 import { topicPath } from "@/lib/topicPath";
 import { useGqlAction } from "@/lib/useGqlAction";
 
-const SET_SESSION = `mutation($slot: String!, $topic: String, $sh: String, $status: String, $url: String) {
-  setSlotSession(slotId: $slot, topicId: $topic, sessionHostId: $sh, status: $status, url: $url)
+const ADD_SESSION = `mutation($slot: String!, $loc: String, $topic: String, $sh: String, $title: String, $url: String) {
+  addSlotSession(slotId: $slot, location: $loc, topicId: $topic, sessionHostId: $sh, title: $title, url: $url)
 }`;
-const UPDATE_SLOT = `mutation($slot: String!, $a: String, $b: String, $loc: String) {
-  updateTimeslot(slotId: $slot, startsAt: $a, endsAt: $b, location: $loc)
+const UPDATE_SESSION = `mutation($session: String!, $status: String, $url: String) {
+  updateSlotSession(sessionId: $session, status: $status, url: $url)
+}`;
+const CLEAR_SESSION = `mutation($session: String!) {
+  clearSlotSession(sessionId: $session)
+}`;
+const UPDATE_SLOT = `mutation($slot: String!, $a: String, $b: String) {
+  updateTimeslot(slotId: $slot, startsAt: $a, endsAt: $b)
 }`;
 const DELETE_SLOT = `mutation($slot: String!) { deleteTimeslot(slotId: $slot) }`;
 
-/** "Author: **Topic**" — both linked — or "**Hannah** — Office hours" for
- * topic-less host sessions (QA 2026-08-03), plus a status pill:
- * "pencilled", or a clickable "register" pill to the event page when
- * confirmed. Blank when nothing's planned. Plain row type — the wash,
- * the bold title, and the pill carry the emphasis (the serif heading
- * face predated the row-wash design; type rationalisation 2026-08-06). */
+/** One booking's line: "Author: **Topic**" (both linked), "**Hannah** —
+ * Office hours", or an admin custom title — plus its location and a
+ * status pill ("pencilled", or "register"/"confirmed" once confirmed). */
 export function SessionLine({
-  slot,
+  session,
   slug,
   officeHoursLabel,
 }: {
-  slot: CalendarSlot;
+  session: CalendarSession;
   slug: string;
   officeHoursLabel: string;
 }) {
-  if (!slot.topic && !slot.sessionHost) return null;
-  const confirmed = slot.status === "confirmed";
-  const permalink = slot.topic
-    ? topicPath(slug, null, slot.topic.topicSlug, slot.topic.hostId)
+  const confirmed = session.status === "confirmed";
+  const permalink = session.topic
+    ? topicPath(slug, null, session.topic.topicSlug, session.topic.hostId)
     : null;
   return (
     <div className="row wrap" style={{ gap: 8, alignItems: "center" }}>
-      {slot.topic ? (
+      {session.topic ? (
         <span>
-          <Link href={`/f/${slug}/${slot.topic.hostId}`}>
-            {slot.topic.hostName ?? "…"}
+          <Link href={`/f/${slug}/${session.topic.hostId}`}>
+            {session.topic.hostName ?? "…"}
           </Link>
           :{" "}
           {permalink ? (
             <Link href={permalink}>
-              <strong>{slot.topic.title}</strong>
+              <strong>{session.topic.title}</strong>
             </Link>
           ) : (
-            <strong>{slot.topic.title}</strong>
+            <strong>{session.topic.title}</strong>
           )}
+        </span>
+      ) : session.customTitle ? (
+        // Admin custom session: no person to link — the register pill
+        // carries the event URL once confirmed.
+        <span>
+          <strong>{session.customTitle}</strong>
         </span>
       ) : (
         <span>
-          <Link href={`/f/${slug}/${slot.sessionHost!.id}`}>
-            <strong>{slot.sessionHost!.name ?? "…"}</strong>
+          <Link href={`/f/${slug}/${session.sessionHost!.id}`}>
+            <strong>{session.sessionHost!.name ?? "…"}</strong>
           </Link>{" "}
           — {officeHoursLabel}
         </span>
       )}
+      {session.location ? (
+        <span className="cal-where">{session.location}</span>
+      ) : null}
       {!confirmed ? (
         <span className="pill" title="Pencilled in — under discussion">
           ✎ pencilled
         </span>
-      ) : slot.url ? (
+      ) : session.url ? (
         <a
           className="pill pill-host"
-          href={slot.url}
+          href={session.url}
           target="_blank"
           rel="noopener noreferrer"
           title="Register on the event page"
@@ -143,20 +155,39 @@ export function SessionChoiceOptions({
   );
 }
 
-/** "Pencil in…" for an open slot: a topic, or office hours. */
+/** The pencil-in select's custom-event sentinel (admin-only choice). */
+const CUSTOM_CHOICE = "custom:";
+
+/** "Pencil in…" — book a session into the slot: a topic, office hours, or
+ * (admins) a custom event with its own title and link, at a location the
+ * slot doesn't already use. Shown even when the slot has bookings —
+ * several sessions can share a time in different locations. */
 function PencilInControl({
   slot,
+  locations,
   claimTopics,
   perms,
   officeHoursLabel,
 }: {
   slot: CalendarSlot;
+  /** The forum's configured locations, offered as datalist suggestions. */
+  locations: string[];
   claimTopics: TopicOption[];
   perms: CalendarPerms;
   officeHoursLabel: string;
 }) {
   const { run, busy } = useGqlAction();
   const [choice, setChoice] = useState("");
+  const [location, setLocation] = useState("");
+  const [title, setTitle] = useState("");
+  const [url, setUrl] = useState("");
+  const custom = choice === CUSTOM_CHOICE;
+
+  function pencilVars() {
+    return custom
+      ? { topic: null, sh: null, title: title.trim(), url: url.trim() || null }
+      : sessionChoiceVars(choice);
+  }
 
   return (
     <div className="row wrap" style={{ gap: 8 }}>
@@ -173,19 +204,60 @@ function PencilInControl({
           viewerId={perms.viewerId}
           officeHoursLabel={officeHoursLabel}
         />
+        {perms.canAdmin ? (
+          <option value={CUSTOM_CHOICE}>Custom event…</option>
+        ) : null}
       </select>
+      {choice ? (
+        <input
+          aria-label="Location"
+          placeholder="Location"
+          list="cal-locations"
+          value={location}
+          onChange={(e) => setLocation(e.target.value)}
+          style={{ width: 140 }}
+        />
+      ) : null}
+      {custom ? (
+        <>
+          <input
+            aria-label="Event title"
+            placeholder="Event title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            style={{ width: 180 }}
+          />
+          <input
+            aria-label="Event link"
+            placeholder="Link (optional)"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            style={{ width: 180 }}
+          />
+        </>
+      ) : null}
+      <datalist id="cal-locations">
+        {locations.map((l) => (
+          <option key={l} value={l} />
+        ))}
+      </datalist>
       <button
         type="button"
         className="btn"
-        disabled={busy || !choice}
+        disabled={busy || !choice || (custom && !title.trim())}
         onClick={() =>
           void run(
-            SET_SESSION,
-            { slot: slot.id, ...sessionChoiceVars(choice), status: "proposed" },
+            ADD_SESSION,
+            { slot: slot.id, loc: location.trim() || null, ...pencilVars() },
             {
               success: "Pencilled in",
               errorFallback: "Could not pencil in",
-              onSuccess: () => setChoice(""),
+              onSuccess: () => {
+                setChoice("");
+                setLocation("");
+                setTitle("");
+                setUrl("");
+              },
             },
           )
         }
@@ -196,22 +268,17 @@ function PencilInControl({
   );
 }
 
-/** Confirm / URL / clear for a slot that carries a session — a topic
- * session or office hours; the mutation keeps whichever subject is set. */
+/** Confirm / URL / clear for one booking. */
 function ActiveSessionControls({
-  slot,
+  session,
   perms,
 }: {
-  slot: CalendarSlot;
+  session: CalendarSession;
   perms: CalendarPerms;
 }) {
   const { run, busy } = useGqlAction();
-  const [url, setUrl] = useState(slot.url);
-  const confirmed = slot.status === "confirmed";
-  const subject = {
-    topic: slot.topic?.id ?? null,
-    sh: slot.topic ? null : (slot.sessionHost?.id ?? null),
-  };
+  const [url, setUrl] = useState(session.url);
+  const confirmed = session.status === "confirmed";
 
   return (
     <div className="row wrap" style={{ gap: 8 }}>
@@ -231,8 +298,8 @@ function ActiveSessionControls({
           disabled={busy}
           onClick={() =>
             void run(
-              SET_SESSION,
-              { slot: slot.id, ...subject, status: "confirmed", url },
+              UPDATE_SESSION,
+              { session: session.id, status: "confirmed", url },
               {
                 success: "Session confirmed",
                 errorFallback: "Could not confirm",
@@ -247,11 +314,11 @@ function ActiveSessionControls({
         <button
           type="button"
           className="btn"
-          disabled={busy || url === slot.url}
+          disabled={busy || url === session.url}
           onClick={() =>
             void run(
-              SET_SESSION,
-              { slot: slot.id, ...subject, status: "confirmed", url },
+              UPDATE_SESSION,
+              { session: session.id, url },
               { success: "URL saved", errorFallback: "Could not save URL" },
             )
           }
@@ -265,9 +332,9 @@ function ActiveSessionControls({
         disabled={busy}
         onClick={() =>
           void run(
-            SET_SESSION,
-            { slot: slot.id, topic: null, sh: null },
-            { success: "Slot cleared", errorFallback: "Could not clear" },
+            CLEAR_SESSION,
+            { session: session.id },
+            { success: "Session cleared", errorFallback: "Could not clear" },
           )
         }
       >
@@ -277,36 +344,66 @@ function ActiveSessionControls({
   );
 }
 
-/** Pencil/confirm/clear controls, shown only to viewers who may touch this
- * slot's session (admins, or hosts while it's open / theirs). */
+/** Whether the viewer may touch this booking: admins always; the owning
+ * host otherwise; custom sessions are admin-only. */
+function mayTouchSession(
+  session: CalendarSession,
+  perms: CalendarPerms,
+): boolean {
+  if (perms.canAdmin) return true;
+  if (session.customTitle) return false;
+  const owner = session.sessionHost?.id ?? session.topic?.hostId ?? null;
+  return owner !== null && owner === perms.viewerId;
+}
+
+/** The fold's session management: per-booking confirm/URL/clear rows
+ * (labelled by subject when there are several), plus the pencil-in
+ * control — adding another booking never displaces an existing one. */
 export function SessionControls({
   slot,
+  locations,
   perms,
   claimTopics,
   officeHoursLabel,
 }: {
   slot: CalendarSlot;
+  locations: string[];
   perms: CalendarPerms;
   claimTopics: TopicOption[];
   officeHoursLabel: string;
 }) {
-  const owner = slot.sessionHost?.id ?? slot.topic?.hostId ?? null;
-  const mayTouch = perms.canAdmin || owner === null || owner === perms.viewerId;
-  if (!mayTouch || (!perms.canPropose && !perms.canAdmin)) return null;
+  if (!perms.canPropose && !perms.canAdmin) return null;
+  const touchable = slot.sessions.filter((s) => mayTouchSession(s, perms));
 
-  return slot.topic || slot.sessionHost ? (
-    <ActiveSessionControls slot={slot} perms={perms} />
-  ) : (
-    <PencilInControl
-      slot={slot}
-      claimTopics={claimTopics}
-      perms={perms}
-      officeHoursLabel={officeHoursLabel}
-    />
+  return (
+    <>
+      {touchable.map((session) => (
+        <div key={session.id} className="stack" style={{ gap: 4 }}>
+          {slot.sessions.length > 1 ? (
+            <span className="faint" style={{ fontSize: "var(--text-2xs)" }}>
+              {session.topic?.title ??
+                (session.customTitle ||
+                  `${session.sessionHost?.name ?? "…"} — ${officeHoursLabel}`)}
+              {session.location ? ` · ${session.location}` : ""}
+            </span>
+          ) : null}
+          <ActiveSessionControls session={session} perms={perms} />
+        </div>
+      ))}
+      {perms.canPropose ? (
+        <PencilInControl
+          slot={slot}
+          locations={locations}
+          claimTopics={claimTopics}
+          perms={perms}
+          officeHoursLabel={officeHoursLabel}
+        />
+      ) : null}
+    </>
   );
 }
 
-/** Admin-only slot editing (time/location) and deletion. */
+/** Admin-only slot editing (time window) and deletion. */
 export function AdminSlotControls({
   slot,
   label,
@@ -323,7 +420,6 @@ export function AdminSlotControls({
   };
   const [start, setStart] = useState(() => toLocal(slot.startsAt));
   const [end, setEnd] = useState(() => toLocal(slot.endsAt));
-  const [location, setLocation] = useState(slot.location);
 
   return (
     <div className="stack" style={{ gap: 8 }}>
@@ -371,13 +467,6 @@ export function AdminSlotControls({
             onChange={(e) => setEnd(e.target.value)}
             style={{ width: "auto" }}
           />
-          <input
-            aria-label="Location"
-            placeholder="Location"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            style={{ width: 140 }}
-          />
           <button
             type="button"
             className="btn"
@@ -389,7 +478,6 @@ export function AdminSlotControls({
                   slot: slot.id,
                   a: new Date(start).toISOString(),
                   b: new Date(end).toISOString(),
-                  loc: location,
                 },
                 {
                   success: "Slot updated",

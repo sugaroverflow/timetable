@@ -2,14 +2,17 @@ import { GraphQLError } from "graphql";
 
 import {
   addSlotComment,
+  addSlotSession,
   buildCalendar,
   computeSlotCounts,
   createSlots,
   deleteSlot,
   deleteSlotComment,
+  deleteSlotSessionRow,
   getAudienceElectorIds,
   getAvailabilityPattern,
   getSlotCommentById,
+  getSlotSessionById,
   getTopicById,
   getViewerRoles,
   listSlotComments,
@@ -18,9 +21,11 @@ import {
   setAvailability,
   setAvailabilityPattern,
   setSlotCommentHidden,
-  setSlotSession,
+  slotLocationTaken,
   updateSlot,
   updateSlotComment,
+  updateSlotSessionRow,
+  type CalendarSession,
   type CalendarSlot,
   type PatternCells,
   type SlotInput,
@@ -153,6 +158,13 @@ function parseSessionStatus(raw: string | null | undefined): SlotStatus {
   throw new GraphQLError("Invalid session status");
 }
 
+/** An admin's custom session title — trimmed, capped. */
+function parseCustomTitle(raw: string | null | undefined): string {
+  const trimmed = (raw ?? "").trim();
+  if (trimmed.length > 200) badRequest("Session title too long");
+  return trimmed;
+}
+
 /** A session URL must be absolute http(s), and short enough to be sane. */
 function parseSessionUrl(raw: string | null | undefined): string {
   const trimmed = (raw ?? "").trim();
@@ -233,27 +245,44 @@ const SessionHostType = builder
     }),
   });
 
+/** A booking in a slot (bookings model, 2026-08-06): subject + location +
+ * status. Several can share a slot — different locations, same time. */
+const SlotSessionType = builder
+  .objectRef<CalendarSession>("SlotSession")
+  .implement({
+    fields: (t) => ({
+      id: t.exposeID("id"),
+      location: t.exposeString("location"),
+      status: t.exposeString("status"),
+      url: t.exposeString("url"),
+      /** Admin-filled custom session title ("" when not custom). */
+      customTitle: t.exposeString("customTitle"),
+      topic: t.field({
+        type: SlotTopicType,
+        nullable: true,
+        resolve: (s) => s.topic,
+      }),
+      /** Office-hours sessions (no topic): whose they are (QA 2026-08-03). */
+      sessionHost: t.field({
+        type: SessionHostType,
+        nullable: true,
+        resolve: (s) => s.sessionHost,
+      }),
+    }),
+  });
+
 const TimeslotType = builder.objectRef<GqlSlot>("Timeslot").implement({
   fields: (t) => ({
     id: t.exposeID("id"),
     startsAt: t.string({ resolve: (s) => s.startsAt.toISOString() }),
     endsAt: t.string({ resolve: (s) => s.endsAt.toISOString() }),
-    location: t.exposeString("location"),
-    status: t.exposeString("status"),
-    url: t.exposeString("url"),
     cellKey: t.exposeString("cellKey", { nullable: true }),
     commentCount: t.exposeInt("commentCount"),
     viewerState: t.exposeString("viewerState", { nullable: true }),
-    topic: t.field({
-      type: SlotTopicType,
-      nullable: true,
-      resolve: (s) => s.topic,
-    }),
-    /** Office-hours sessions (no topic): whose they are (QA 2026-08-03). */
-    sessionHost: t.field({
-      type: SessionHostType,
-      nullable: true,
-      resolve: (s) => s.sessionHost,
+    /** The slot's bookings, location-sorted; empty for an open slot. */
+    sessions: t.field({
+      type: [SlotSessionType],
+      resolve: (s) => s.sessions,
     }),
     counts: t.field({ type: AvailabilityCountsType, resolve: (s) => s.counts }),
     // Per-elector availability is host/admin-only.
@@ -429,19 +458,22 @@ builder.mutationFields((t) => ({
       if (!canProposeSession(viewer, policy)) {
         forbidden("Slot proposals are admin-only in this forum");
       }
+      // Off-piste proposals are always a person's session (topic or office
+      // hours — no custom subject), so sessionHostId is always set.
       const subject = await resolveSessionSubject(
         viewer,
         readable.timetable,
         args.topicId,
         args.sessionHostId,
+        "",
       );
       const { startsAt, endsAt } = parseSlotWindow(args.startsAt, args.endsAt);
-      const slot = await proposeSlot(readable.timetable.id, user.id, {
+      const { slot } = await proposeSlot(readable.timetable.id, user.id, {
         startsAt,
         endsAt,
-        location: args.location ?? "",
+        location: (args.location ?? "").trim(),
         topicId: subject.topicId,
-        sessionHostId: subject.sessionHostId,
+        sessionHostId: subject.sessionHostId!,
       });
       await logActivity({
         timetableId: readable.timetable.id,
@@ -458,14 +490,13 @@ builder.mutationFields((t) => ({
     },
   }),
 
-  /** Admin: update a timeslot's time/location. */
+  /** Admin: update a timeslot's time window. */
   updateTimeslot: t.field({
     type: "Boolean",
     args: {
       slotId: t.arg.string({ required: true }),
       startsAt: t.arg.string({ required: false }),
       endsAt: t.arg.string({ required: false }),
-      location: t.arg.string({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
       await requireUser(ctx);
@@ -478,7 +509,6 @@ builder.mutationFields((t) => ({
       await updateSlot(slot.id, {
         startsAt: args.startsAt ? new Date(args.startsAt) : undefined,
         endsAt: args.endsAt ? new Date(args.endsAt) : undefined,
-        location: args.location ?? undefined,
       });
       return true;
     },
@@ -542,20 +572,24 @@ async function assertOfficeHoursHost(
 
 type SessionSubject = {
   topicId: string | null;
-  sessionHostId: string;
+  sessionHostId: string | null;
+  /** Admin custom session title ("" otherwise). */
+  customTitle: string;
   /** Extra activity payload — topicId+title auto-link the timeline. */
   payloadExtra: Record<string, unknown>;
   /** Office hours: the forum's label rides as the activity note. */
   note: string | null;
 };
 
-/** Validate a session subject — a topic, or office hours for a host — and
- * derive the ownership column + activity-log fields for it. */
+/** Validate a session subject — a topic, office hours for a host, or an
+ * admin's custom title — and derive the ownership column + activity-log
+ * fields for it. */
 async function resolveSessionSubject(
   viewer: Viewer,
   timetable: { id: string; settings: TimetableSettings },
   topicIdArg: string | null | undefined,
   sessionHostIdArg: string | null | undefined,
+  customTitle: string,
 ): Promise<SessionSubject> {
   if (topicIdArg != null) {
     const topic = await assertOwnTopicInTimetable(
@@ -566,43 +600,63 @@ async function resolveSessionSubject(
     return {
       topicId: topic.id,
       sessionHostId: topic.hostId,
+      customTitle: "",
       payloadExtra: { topicId: topic.id, title: topic.title },
       note: null,
     };
   }
-  if (sessionHostIdArg == null) {
-    badRequest("Pick a topic session or office hours");
+  if (sessionHostIdArg != null) {
+    await assertOfficeHoursHost(viewer, sessionHostIdArg, timetable.id);
+    return {
+      topicId: null,
+      sessionHostId: sessionHostIdArg,
+      customTitle: "",
+      payloadExtra: {},
+      note: officeHoursLabel(timetable.settings),
+    };
   }
-  await assertOfficeHoursHost(viewer, sessionHostIdArg, timetable.id);
+  if (!customTitle) {
+    badRequest("Pick a topic session, office hours, or a custom title");
+  }
+  // Custom sessions ("Departmental seminar") are admin-only: no owner
+  // column, so the never-displace rule can't protect them — the admin
+  // gates (here and on the existing booking) do.
+  if (!canManageCalendar(viewer)) {
+    forbidden("Custom sessions are admin-only");
+  }
   return {
     topicId: null,
-    sessionHostId: sessionHostIdArg,
-    payloadExtra: {},
-    note: officeHoursLabel(timetable.settings),
+    sessionHostId: null,
+    customTitle,
+    payloadExtra: { title: customTitle },
+    note: null,
   };
 }
 
-/** Un-pencil a slot back to empty, logging what was cleared. */
-async function clearSlotSession(
-  ctx: {
-    slot: { id: string; status: string };
-    timetable: { id: string; settings: TimetableSettings };
-    actorId: string;
-  },
-  currentTopic: { id: string; title: string } | null,
-  eventBase: Record<string, unknown>,
-): Promise<void> {
-  await setSlotSession(ctx.slot.id, { topicId: null, sessionHostId: null });
-  if (ctx.slot.status === "empty") return;
-  await logActivity({
-    timetableId: ctx.timetable.id,
-    actorId: ctx.actorId,
-    action: "slot.clear",
-    payload: currentTopic
-      ? { ...eventBase, topicId: currentTopic.id, title: currentTopic.title }
-      : eventBase,
-    ...(currentTopic ? {} : { note: officeHoursLabel(ctx.timetable.settings) }),
-  });
+/** A booking loaded with its slot, forum, and viewer, plus the derived
+ * ownership + activity fields shared by update/clear. */
+async function loadSessionForWrite(
+  ctx: Parameters<typeof loadSlotAndViewer>[0],
+  sessionId: string,
+) {
+  const session = await getSlotSessionById(sessionId);
+  if (!session) notFound("Session not found");
+  const { slot, viewer, timetable } = await loadSlotAndViewer(
+    ctx,
+    session.slotId,
+  );
+  requireCalendarEnabled(timetable.settings);
+  const topic = session.topicId ? await getTopicById(session.topicId) : null;
+  // sessionHostId is THE ownership column; legacy rows fall back to the
+  // topic's host. Custom sessions have no owner — admin-gated below.
+  const owner = session.sessionHostId ?? topic?.hostId ?? null;
+  if (!canTouchSlotSession(viewer, owner)) {
+    forbidden("Another host's session is booked here");
+  }
+  if (session.customTitle !== "" && !canManageCalendar(viewer)) {
+    forbidden("An admin's custom session is booked here");
+  }
+  return { session, slot, viewer, timetable, topic };
 }
 
 /** Pencilling needs the propose gate, confirming the confirm gate. */
@@ -638,17 +692,21 @@ function parseSlotWindow(
 }
 
 builder.mutationFields((t) => ({
-  /** Set (or clear, with both ids null) a slot's session — a topic, or
-   * (QA 2026-08-03) an office-hours session for `sessionHostId`, plus
-   * status and URL. Who may do what depends on the forum's confirm
-   * policy; a host can never displace another host's session. */
-  setSlotSession: t.field({
+  /** Book a session into a slot — a topic, (QA 2026-08-03) office hours
+   * for `sessionHostId`, or an admin's custom `title` — at a location.
+   * Several bookings can share a slot (bookings model, 2026-08-06); the
+   * location is the contended resource. Who may do what depends on the
+   * forum's confirm policy. */
+  addSlotSession: t.field({
     type: "Boolean",
     args: {
       slotId: t.arg.string({ required: true }),
+      location: t.arg.string({ required: false }),
       topicId: t.arg.string({ required: false }),
       /** Office hours: the host the session is for (topicId omitted). */
       sessionHostId: t.arg.string({ required: false }),
+      /** Admin custom session (both ids omitted). */
+      title: t.arg.string({ required: false }),
       status: t.arg.string({ required: false }),
       url: t.arg.string({ required: false }),
     },
@@ -660,34 +718,6 @@ builder.mutationFields((t) => ({
       );
       requireCalendarEnabled(timetable.settings);
       const policy = calendarConfirmPolicy(timetable.settings);
-
-      // sessionHostId is THE ownership column; legacy rows fall back to
-      // the topic's host.
-      const currentTopic = slot.topicId
-        ? await getTopicById(slot.topicId)
-        : null;
-      const currentOwner = slot.sessionHostId ?? currentTopic?.hostId ?? null;
-      if (!canTouchSlotSession(viewer, currentOwner)) {
-        forbidden("Another host's session is pencilled into this slot");
-      }
-
-      const eventBase = {
-        slotId: slot.id,
-        startsAt: slot.startsAt.toISOString(),
-      };
-
-      if (args.topicId == null && args.sessionHostId == null) {
-        // Clearing back to empty ("un-pencil"): admins, or the host whose
-        // own session it is (canTouchSlotSession above already pinned that).
-        if (!canProposeSession(viewer, policy)) forbidden();
-        await clearSlotSession(
-          { slot, timetable, actorId: user.id },
-          currentTopic,
-          eventBase,
-        );
-        return true;
-      }
-
       const status = parseSessionStatus(args.status);
       assertStatusGate(viewer, policy, status);
 
@@ -696,12 +726,61 @@ builder.mutationFields((t) => ({
         timetable,
         args.topicId,
         args.sessionHostId,
+        parseCustomTitle(args.title),
       );
-      await setSlotSession(slot.id, {
+      const location = (args.location ?? "").trim();
+      if (await slotLocationTaken(slot.id, location)) {
+        badRequest(
+          location
+            ? `"${location}" already has a session at this time`
+            : "This slot already has a session with no location — pick a location",
+        );
+      }
+      await addSlotSession(slot.id, {
+        location,
         topicId: subject.topicId,
         sessionHostId: subject.sessionHostId,
+        customTitle: subject.customTitle,
         status,
         url: parseSessionUrl(args.url),
+        createdById: user.id,
+      });
+      await logActivity({
+        timetableId: timetable.id,
+        actorId: user.id,
+        action: status === "confirmed" ? "slot.confirm" : "slot.pencil",
+        payload: {
+          slotId: slot.id,
+          startsAt: slot.startsAt.toISOString(),
+          ...(location ? { location } : {}),
+          ...subject.payloadExtra,
+        },
+        ...(subject.note ? { note: subject.note } : {}),
+      });
+      return true;
+    },
+  }),
+
+  /** Confirm a booking / edit its URL. Owner or admin only; custom
+   * sessions are admin-only. */
+  updateSlotSession: t.field({
+    type: "Boolean",
+    args: {
+      sessionId: t.arg.string({ required: true }),
+      status: t.arg.string({ required: false }),
+      url: t.arg.string({ required: false }),
+    },
+    resolve: async (_p, args, ctx) => {
+      const user = await requireUser(ctx);
+      const { session, slot, viewer, timetable, topic } =
+        await loadSessionForWrite(ctx, args.sessionId);
+      const policy = calendarConfirmPolicy(timetable.settings);
+      const status = parseSessionStatus(args.status ?? session.status);
+      assertStatusGate(viewer, policy, status);
+
+      await updateSlotSessionRow(session.id, {
+        status,
+        url: args.url === undefined ? undefined : parseSessionUrl(args.url),
       });
       // Re-confirming (e.g. a URL edit) still logs slot.confirm — the log
       // is a feed, and the fresh URL is the news.
@@ -709,8 +788,53 @@ builder.mutationFields((t) => ({
         timetableId: timetable.id,
         actorId: user.id,
         action: status === "confirmed" ? "slot.confirm" : "slot.pencil",
-        payload: { ...eventBase, ...subject.payloadExtra },
-        ...(subject.note ? { note: subject.note } : {}),
+        payload: {
+          slotId: slot.id,
+          startsAt: slot.startsAt.toISOString(),
+          ...(session.location ? { location: session.location } : {}),
+          ...(topic
+            ? { topicId: topic.id, title: topic.title }
+            : session.customTitle
+              ? { title: session.customTitle }
+              : {}),
+        },
+        ...(topic || session.customTitle
+          ? {}
+          : { note: officeHoursLabel(timetable.settings) }),
+      });
+      return true;
+    },
+  }),
+
+  /** Un-pencil a booking. Owner or admin only; the timeslot stays. */
+  clearSlotSession: t.field({
+    type: "Boolean",
+    args: { sessionId: t.arg.string({ required: true }) },
+    resolve: async (_p, args, ctx) => {
+      const user = await requireUser(ctx);
+      const { session, slot, viewer, timetable, topic } =
+        await loadSessionForWrite(ctx, args.sessionId);
+      const policy = calendarConfirmPolicy(timetable.settings);
+      if (!canProposeSession(viewer, policy)) forbidden();
+
+      await deleteSlotSessionRow(session.id);
+      await logActivity({
+        timetableId: timetable.id,
+        actorId: user.id,
+        action: "slot.clear",
+        payload: {
+          slotId: slot.id,
+          startsAt: slot.startsAt.toISOString(),
+          ...(session.location ? { location: session.location } : {}),
+          ...(topic
+            ? { topicId: topic.id, title: topic.title }
+            : session.customTitle
+              ? { title: session.customTitle }
+              : {}),
+        },
+        ...(topic || session.customTitle
+          ? {}
+          : { note: officeHoursLabel(timetable.settings) }),
       });
       return true;
     },
