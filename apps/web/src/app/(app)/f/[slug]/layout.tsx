@@ -100,7 +100,7 @@ const UNREAD_QUERY = `
   query Unread($s: String!) {
     notificationsUnread(idOrSlug: $s)
     topicQueue(idOrSlug: $s) { neverSeenCount }
-    moderationQueue(idOrSlug: $s) { id }
+    moderationQueue(idOrSlug: $s) { id readyAt }
   }
 `;
 
@@ -140,7 +140,7 @@ async function loadSwitcherAndUnread(
       ? gqlFetch<{
           notificationsUnread: number;
           topicQueue: { neverSeenCount: number } | null;
-          moderationQueue: { id: string }[];
+          moderationQueue: { id: string; readyAt: string | null }[];
         }>(UNREAD_QUERY, { s: slug })
       : Promise.resolve({
           notificationsUnread: 0,
@@ -163,7 +163,10 @@ async function loadSwitcherAndUnread(
     switcherItems,
     unread: unreadData.notificationsUnread,
     queueNeverSeen: unreadData.topicQueue?.neverSeenCount ?? 0,
-    pendingCount: unreadData.moderationQueue?.length ?? 0,
+    // Only ready-to-publish topics count — the badge must agree with what
+    // the Pending page's default view shows (2026-08-06).
+    pendingCount:
+      unreadData.moderationQueue?.filter((t) => t.readyAt).length ?? 0,
   };
 }
 

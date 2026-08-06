@@ -2,6 +2,8 @@
 export const ACTION_LABELS: Record<string, string> = {
   "topic.create": "created a topic",
   "topic.submit": "submitted a topic",
+  "topic.ready": "marked a topic ready to publish",
+  "topic.unready": "moved a topic back to drafting",
   "topic.publish": "published a topic",
   "topic.reject": "rejected a topic",
   "topic.unpublish": "unpublished a topic",
