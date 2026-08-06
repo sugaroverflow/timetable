@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import { Send } from "lucide-react";
 
@@ -15,6 +14,7 @@ import { useGqlAction } from "@/lib/useGqlAction";
 
 import { Avatar } from "./Avatar";
 import { GrowingTextarea } from "./GrowingTextarea";
+import { PersonChip } from "./PersonChip";
 import { PrimaryRolePill } from "./RolePills";
 
 const COMMENTS_QUERY = `query($id: String!) {
@@ -173,9 +173,32 @@ function SlotCommentEditor({
   );
 }
 
+/** The topic + 🟢🟡🔴 counts chip — on a posted claim it's the frozen
+ * snapshot; under the composer it previews the live counts a post would
+ * attach (QA 2026-08-06). */
+function ClaimChip({
+  title,
+  counts,
+  preview = false,
+}: {
+  title: string;
+  counts: { green: number; yellow: number; red: number } | null;
+  preview?: boolean;
+}) {
+  return (
+    <div className={`cal-claim${preview ? " cal-claim-preview" : ""}`}>
+      📌 {title}
+      {counts
+        ? ` · 🟢 ${counts.green} 🟡 ${counts.yellow} 🔴 ${counts.red}`
+        : ""}
+    </div>
+  );
+}
+
 /** One comment; a session claim renders its topic + frozen snapshot chip.
- * Avatar and name link to the author's person page; the author gets
- * edit/delete and admins hide/unhide, like comments everywhere. */
+ * Same structure and classes as topic comments (CommentList) so the two
+ * chats can't drift (QA 2026-08-06); the author gets edit/delete and
+ * admins hide/unhide, like comments everywhere. */
 function CommentRow({
   comment,
   slug,
@@ -192,52 +215,53 @@ function CommentRow({
   onChanged: () => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
-  const personHref = `/f/${slug}/${comment.authorId}`;
   const isOwn = viewerId !== null && comment.authorId === viewerId;
 
   return (
-    <div className={`hc${comment.hidden ? " cal-comment-hidden" : ""}`}>
-      <Link href={personHref} className="cal-person-link">
+    <div className={`comment${comment.hidden ? " cal-comment-hidden" : ""}`}>
+      <PersonChip slug={slug} userId={comment.authorId}>
         <Avatar name={comment.authorName} image={comment.authorImage} small />
-      </Link>
-      <div style={{ flex: 1 }}>
-        <div className="hc-name">
-          <Link href={personHref}>{comment.authorName ?? "Someone"}</Link>
+      </PersonChip>
+      <div className="comment-main">
+        <div className="c-bubble">
+          <span className="c-name">
+            <PersonChip slug={slug} userId={comment.authorId}>
+              {comment.authorName ?? "Someone"}
+            </PersonChip>
+          </span>
           <PrimaryRolePill roles={comment.authorRoles} labels={roleLabels} />
-          {comment.editedAt ? (
-            <span className="faint" style={{ fontWeight: 400 }}>
-              {" "}
+          {comment.hidden ? (
+            <span className="faint" style={{ marginLeft: 6, fontSize: 11 }}>
+              hidden
+            </span>
+          ) : null}
+          {comment.editedAt && !editing ? (
+            <span className="faint" style={{ marginLeft: 6, fontSize: 11 }}>
               (edited)
             </span>
           ) : null}
-          {comment.hidden ? (
-            <span className="faint" style={{ fontWeight: 400 }}>
-              {" "}
-              (hidden)
-            </span>
-          ) : null}
-        </div>
-        {editing ? (
-          <SlotCommentEditor
-            comment={comment}
-            onDone={async () => {
-              setEditing(false);
-              await onChanged();
-            }}
-          />
-        ) : (
-          <div className="hc-bubble">
-            {comment.body}
-            {comment.topicTitle ? (
-              <div className="cal-claim">
-                📌 {comment.topicTitle}
-                {comment.counts
-                  ? ` · 🟢 ${comment.counts.green} 🟡 ${comment.counts.yellow} 🔴 ${comment.counts.red}`
-                  : ""}
-              </div>
-            ) : null}
+          <div className="c-text">
+            {editing ? (
+              <SlotCommentEditor
+                comment={comment}
+                onDone={async () => {
+                  setEditing(false);
+                  await onChanged();
+                }}
+              />
+            ) : (
+              <>
+                {comment.body}
+                {comment.topicTitle ? (
+                  <ClaimChip
+                    title={comment.topicTitle}
+                    counts={comment.counts}
+                  />
+                ) : null}
+              </>
+            )}
           </div>
-        )}
+        </div>
         <SlotCommentActions
           comment={comment}
           isOwn={isOwn}
@@ -292,7 +316,7 @@ export function DiscussionPanel({
   }
 
   return (
-    <div className="host-thread">
+    <div className="host-thread thread-stack">
       {comments?.map((c) => (
         <CommentRow
           key={c.id}
@@ -324,11 +348,12 @@ export function DiscussionPanel({
             <Send size={16} aria-hidden />
           </button>
         </div>
+        {/* The attachment, as it will appear on the posted comment — the
+            lens audience drives slot.counts, which is the same computation
+            the server snapshots on post (QA 2026-08-06, replaced the
+            "Posting attaches…" sentence). */}
         {lensTopic ? (
-          <span className="faint" style={{ fontSize: 12 }}>
-            Posting attaches <strong>{lensTopic.title}</strong> with its current
-            🟢🟡🔴 counts.
-          </span>
+          <ClaimChip title={lensTopic.title} counts={slot.counts} preview />
         ) : null}
       </form>
     </div>

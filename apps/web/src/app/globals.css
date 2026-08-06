@@ -1539,9 +1539,13 @@ textarea {
   overflow: hidden;
 }
 /* The tinted region: content line + (open) avatar row. The discussion
-   fold below sits outside the washes (QA 2026-08-05). */
+   fold below sits outside the washes (QA 2026-08-05). Rounds + clips its
+   own corners: when the fold is open the washes end mid-row, where the
+   row's overflow can't round their bottom edge (QA 2026-08-06). */
 .cal-row-head {
   position: relative;
+  border-radius: 8px;
+  overflow: hidden;
 }
 .cal-row-expandable {
   cursor: pointer;
@@ -1609,14 +1613,21 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
   background: color-mix(in srgb, var(--red) 30%, transparent);
 }
 /* Row content rides above the tint on a single line: when | session,
-   with the comment count / elector toggle right-aligned. */
+   with the comment count / elector toggle right-aligned. Vertical padding
+   only matters once the session line wraps — short content still centres
+   in the 52px minimum, wrapped content gets breathing room instead of
+   sitting flush against the row edges (QA 2026-08-06).
+   One type size for the whole line (type rationalisation 2026-08-06 —
+   was: unsized 16px when-text next to a 15px serif session line);
+   emphasis is weight only: bold date, bold topic title. */
 .cal-row-line {
   position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
   min-height: 52px;
-  padding: 0 14px;
+  padding: 8px 14px;
+  font-size: var(--text-md);
 }
 .cal-when {
   flex: none;
@@ -1750,17 +1761,10 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
 .cal-fold-avatars .cal-person-link {
   flex: none;
 }
-/* "Host: Topic" in the title face — prominent, but under the card's
-   section heading (QA 2026-08-03). */
-.cal-session-line {
-  font-family: var(--serif);
-  font-size: 15px;
-  font-weight: var(--fw-semibold);
-}
 /* Emoji-only availability segments for table cells. */
 .avseg-compact button {
   padding: 3px 7px;
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1;
 }
 
@@ -1769,7 +1773,7 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
   opacity: 0.6;
 }
 /* Hidden slot comment (admins only see these) — faded like elsewhere. */
-.cal-comment-hidden .hc-bubble {
+.cal-comment-hidden .c-bubble {
   opacity: 0.5;
 }
 /* Frozen availability snapshot on a session-claim comment. */
@@ -1779,6 +1783,11 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
   border-top: 1px dashed var(--line);
   font-size: var(--text-xs);
   color: var(--muted);
+}
+/* The same chip under the composer, previewing what a post attaches —
+   the stack gap already spaces it (QA 2026-08-06). */
+.cal-claim-preview {
+  margin-top: 0;
 }
 
 /* Mobile calendar: the single line can't fit when + session + controls,
@@ -1792,7 +1801,6 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
     flex-wrap: wrap;
     row-gap: 2px;
     min-height: 44px;
-    padding: 8px 14px;
   }
   .cal-row-session {
     flex-basis: 100%;
@@ -1943,26 +1951,6 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
 }
 .slot-expand:hover {
   background: var(--wash);
-}
-
-/* Host chat thread bubbles */
-.hc {
-  display: flex;
-  gap: 9px;
-  padding: 7px 0;
-}
-.hc-bubble {
-  background: var(--card);
-  border: 1px solid var(--host-line);
-  border-radius: 11px;
-  padding: 7px 11px;
-  font-size: 13.5px;
-}
-.hc-name {
-  font-weight: var(--fw-semibold);
-  font-size: 12.5px;
-  color: var(--host-ink);
-  margin-bottom: 2px;
 }
 
 /* Sysadmin operator access to private forums (2026-07-29): the mode must
