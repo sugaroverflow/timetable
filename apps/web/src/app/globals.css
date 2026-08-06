@@ -1616,7 +1616,10 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
    with the comment count / elector toggle right-aligned. Vertical padding
    only matters once the session line wraps — short content still centres
    in the 52px minimum, wrapped content gets breathing room instead of
-   sitting flush against the row edges (QA 2026-08-06). */
+   sitting flush against the row edges (QA 2026-08-06).
+   One type size for the whole line (type rationalisation 2026-08-06 —
+   was: unsized 16px when-text next to a 15px serif session line);
+   emphasis is weight only: bold date, bold topic title. */
 .cal-row-line {
   position: relative;
   display: flex;
@@ -1624,6 +1627,7 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
   gap: 12px;
   min-height: 52px;
   padding: 8px 14px;
+  font-size: var(--text-md);
 }
 .cal-when {
   flex: none;
@@ -1757,17 +1761,10 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
 .cal-fold-avatars .cal-person-link {
   flex: none;
 }
-/* "Host: Topic" in the title face — prominent, but under the card's
-   section heading (QA 2026-08-03). */
-.cal-session-line {
-  font-family: var(--serif);
-  font-size: 15px;
-  font-weight: var(--fw-semibold);
-}
 /* Emoji-only availability segments for table cells. */
 .avseg-compact button {
   padding: 3px 7px;
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1;
 }
 

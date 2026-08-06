@@ -1,6 +1,7 @@
 # 2026-08-06 — Calendar QA: wash corners, claim preview, chat alignment
 
-Four items from Ed's live QA of the row-wash calendar on dev:
+Four items from Ed's live QA of the row-wash calendar on dev, plus a
+type rationalisation pass:
 
 - **Wash bottom corners.** With a row folded open the washes cover only
   `.cal-row-head` and stop above the discussion — but the rounding lived
@@ -30,3 +31,22 @@ Four items from Ed's live QA of the row-wash calendar on dev:
   padding — invisible on single-line rows (still centred in 52px), 8px of
   air once the text wraps. The mobile block's identical padding override
   became redundant and is gone.
+
+## Type rationalisation (same session)
+
+Ed: the serif session text predates the row-wash design — "maybe we
+don't need that anymore". Audit found a patchwork: the when-text had no
+size rule at all (16px browser default) beside a 15px serif semibold
+session line whose `<strong>` title rendered bold-on-bold, plus stray
+hardcoded sizes. Now:
+
+- **One row voice**: `.cal-row-line` sets `--text-md` (15px) sans for
+  the whole line; emphasis is weight only — bold date, bold topic title.
+  `.cal-session-line` (serif/15px/semibold) is deleted from CSS and
+  markup; the wash, the bold title, and the status pill do the
+  distinguishing. Serif stays the heading voice (card/section titles).
+- **Metadata tier unchanged** — already consistent at `--text-xs`:
+  location, 💬 count, legend, month headings, claim chip, pills.
+- **Tokens for the strays**: `.avseg-compact button` 12px →
+  `var(--text-xs)`; the URL input's inline 13px dropped (global input
+  base 14px applies); the admin label's inline 11px → `var(--text-2xs)`.

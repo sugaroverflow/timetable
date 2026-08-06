@@ -24,7 +24,9 @@ const DELETE_SLOT = `mutation($slot: String!) { deleteTimeslot(slotId: $slot) }`
 /** "Author: **Topic**" — both linked — or "**Hannah** — Office hours" for
  * topic-less host sessions (QA 2026-08-03), plus a status pill:
  * "pencilled", or a clickable "register" pill to the event page when
- * confirmed. Blank when nothing's planned. */
+ * confirmed. Blank when nothing's planned. Plain row type — the wash,
+ * the bold title, and the pill carry the emphasis (the serif heading
+ * face predated the row-wash design; type rationalisation 2026-08-06). */
 export function SessionLine({
   slot,
   slug,
@@ -42,7 +44,7 @@ export function SessionLine({
   return (
     <div className="row wrap" style={{ gap: 8, alignItems: "center" }}>
       {slot.topic ? (
-        <span className="cal-session-line">
+        <span>
           <Link href={`/f/${slug}/${slot.topic.hostId}`}>
             {slot.topic.hostName ?? "…"}
           </Link>
@@ -56,7 +58,7 @@ export function SessionLine({
           )}
         </span>
       ) : (
-        <span className="cal-session-line">
+        <span>
           <Link href={`/f/${slug}/${slot.sessionHost!.id}`}>
             <strong>{slot.sessionHost!.name ?? "…"}</strong>
           </Link>{" "}
@@ -219,7 +221,7 @@ function ActiveSessionControls({
           placeholder="Event page URL (optional)"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
-          style={{ width: 220, fontSize: 13 }}
+          style={{ width: 220 }}
         />
       ) : null}
       {!confirmed && perms.canConfirm ? (
@@ -326,7 +328,7 @@ export function AdminSlotControls({
   return (
     <div className="stack" style={{ gap: 8 }}>
       <div className="row wrap" style={{ gap: 8 }}>
-        <span className="faint" style={{ fontSize: 11 }}>
+        <span className="faint" style={{ fontSize: "var(--text-2xs)" }}>
           {label}:
         </span>
         <button
