@@ -227,21 +227,18 @@ function onInteractive(e: { target: EventTarget | null }): boolean {
   );
 }
 
-/** The single content line riding above the tints: when | session | the
- * right cluster (💬 count when non-zero, the elector's own toggle). */
+/** The when-line riding above the tints: datetime | the right cluster
+ * (💬 count when non-zero, the elector's own toggle). Bookings render
+ * BELOW this line (QA 2026-08-06 — sharing it wrapped ugly). */
 function RowLine({
   slot,
   past,
-  slug,
   perms,
-  officeHoursLabel,
   canExpand,
 }: {
   slot: CalendarSlot;
   past: boolean;
-  slug: string;
   perms: CalendarPerms;
-  officeHoursLabel: string;
   canExpand: boolean;
 }) {
   return (
@@ -250,18 +247,6 @@ function RowLine({
         <strong>{formatDate(slot.startsAt)}</strong> {formatTime(slot.startsAt)}{" "}
         – {formatTime(slot.endsAt)}
       </span>
-      {slot.sessions.length > 0 ? (
-        <div className="cal-row-session">
-          {slot.sessions.map((session) => (
-            <SessionLine
-              key={session.id}
-              session={session}
-              slug={slug}
-              officeHoursLabel={officeHoursLabel}
-            />
-          ))}
-        </div>
-      ) : null}
       <span className="cal-row-right">
         {canExpand && slot.commentCount > 0 ? (
           <span
@@ -284,8 +269,8 @@ function RowLine({
   );
 }
 
-/** The tinted region: washes cover the content line and (open) the
- * avatar row, but never the discussion below (QA 2026-08-05). */
+/** The tinted region: washes cover the when-line, the booking lines, and
+ * (open) the avatar row, but never the discussion below (QA 2026-08-05). */
 function RowHead({
   slot,
   past,
@@ -311,14 +296,19 @@ function RowHead({
           avatarCounts={open && slot.perUser ? tallyStates(slot.perUser) : null}
         />
       ) : null}
-      <RowLine
-        slot={slot}
-        past={past}
-        slug={slug}
-        perms={perms}
-        officeHoursLabel={officeHoursLabel}
-        canExpand={canExpand}
-      />
+      <RowLine slot={slot} past={past} perms={perms} canExpand={canExpand} />
+      {slot.sessions.length > 0 ? (
+        <div className="cal-row-sessions">
+          {slot.sessions.map((session) => (
+            <SessionLine
+              key={session.id}
+              session={session}
+              slug={slug}
+              officeHoursLabel={officeHoursLabel}
+            />
+          ))}
+        </div>
+      ) : null}
       {open && slot.perUser ? (
         <FoldAvatars perUser={slot.perUser} slug={slug} />
       ) : null}

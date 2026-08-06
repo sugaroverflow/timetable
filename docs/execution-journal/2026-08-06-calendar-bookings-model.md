@@ -35,6 +35,19 @@ scheduling needed client-side grouping hacks. The fix splits the model:
   from forum settings). The elector toggle stays per-slot — one answer
   per time, no broadcast hack.
 
+## QA round (same day, Ed on dev)
+
+- Bookings moved BELOW the datetime — one per row, indented (32px/24px
+  mobile) — sharing the when-line wrapped ugly. The when-line gives up
+  its 52px centring when bookings follow (`:has(+ .cal-row-sessions)`).
+- 10px top padding on the fold: the first comment sat flush against the
+  wash's bottom edge.
+- The pencil-in select is capped (`calc(100% - 110px)`) so select +
+  button share a row, and btn-styled (card bg, strong border, semibold)
+  so it reads as an action, not another composer input.
+- The composer's claim preview drops the dashed separator — it belongs
+  to the posted bubble, where it splits body from chip.
+
 **Migration 0030** (`0030_familiar_beast.sql`) is data-preserving and
 was verified end-to-end on a scratch Postgres 16 (fixtures covering
 every path, plus a full `db:seed` run): sessions extracted with their
