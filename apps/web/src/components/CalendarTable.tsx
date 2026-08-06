@@ -129,8 +129,16 @@ function FoldAvatars({
   slug: string;
 }) {
   if (perUser.length === 0) return null;
+  // Faces scale to the space (QA 2026-08-05): each head's share of the
+  // row is 100cqw / total (the flex segments distribute exactly evenly
+  // per head — grow and basis are both ∝ n), minus breathing room,
+  // clamped 15–32px. Inline because the count is per-row data.
+  const face = `clamp(15px, calc(100cqw / ${perUser.length} - 5px), 32px)`;
   return (
-    <div className="cal-fold-avatars">
+    <div
+      className="cal-fold-avatars"
+      style={{ "--face": face } as React.CSSProperties}
+    >
       {STATES.map((state) => {
         const people = perUser.filter((u) => u.state === state);
         if (people.length === 0) return null;

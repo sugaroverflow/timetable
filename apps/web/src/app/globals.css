@@ -1727,6 +1727,9 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
   position: relative;
   display: flex;
   padding-bottom: 10px;
+  /* Container so faces can size themselves from the row's real width
+     (--face uses cqw; set inline per row from the audience count). */
+  container-type: inline-size;
 }
 .cal-fold-avatars .cal-fold-seg {
   display: inline-flex;
@@ -1734,10 +1737,13 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
   justify-content: space-evenly;
   min-height: 24px;
 }
+/* Bigger faces when there's space, within reason (QA 2026-08-05):
+   --face = clamp(15px, per-head share of the row, 32px). Browsers
+   without cqw fall back to the avatar-sm base size. */
 .cal-fold-avatars .avatar {
-  width: 17px;
-  height: 17px;
-  font-size: 7px;
+  width: var(--face, 17px);
+  height: var(--face, 17px);
+  font-size: calc(var(--face, 17px) * 0.41);
   flex: none;
   box-shadow: 0 0 0 1px rgb(255 255 255 / 55%);
 }
@@ -1792,12 +1798,7 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
     flex-basis: 100%;
     order: 5;
   }
-  /* Slightly smaller faces so a ~20-elector audience fits one line. */
-  .cal-fold-avatars .avatar {
-    width: 15px;
-    height: 15px;
-    font-size: 6px;
-  }
+  /* No avatar override: --face's 15px clamp floor covers narrow rows. */
 }
 
 /* Host insights panel — collapsible vote breakdown */
