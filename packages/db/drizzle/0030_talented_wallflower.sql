@@ -1,0 +1,1 @@
+ALTER TABLE "timeslots" ADD COLUMN "custom_title" text DEFAULT '' NOT NULL;

@@ -138,26 +138,34 @@ export async function updateSlot(
   return updated ?? null;
 }
 
-/** Set a slot's session: topic (or office-hours host) + status + url
- * together. Both ids null clears the session back to empty (url cleared
- * too). `sessionHostId` is the ownership column: the topic's host for
- * topic sessions, the host themselves for office hours. Permission rules
- * (confirm policy, never-displace) live in the resolver. */
+/** Set a slot's session: topic (or office-hours host, or an admin's
+ * custom title) + status + url together. All subjects empty clears the
+ * session back to empty (url cleared too). `sessionHostId` is the
+ * ownership column: the topic's host for topic sessions, the host
+ * themselves for office hours; custom sessions have no owner (admin-only
+ * by permission). Permission rules (confirm policy, never-displace,
+ * admin-only custom) live in the resolver. */
 export async function setSlotSession(
   slotId: string,
   session: {
     topicId: string | null;
     sessionHostId: string | null;
+    customTitle?: string;
     status?: SlotStatus;
     url?: string;
   },
 ): Promise<Timeslot | null> {
-  const clearing = session.topicId === null && session.sessionHostId === null;
+  const customTitle = session.customTitle ?? "";
+  const clearing =
+    session.topicId === null &&
+    session.sessionHostId === null &&
+    customTitle === "";
   const [updated] = await db
     .update(timeslots)
     .set({
       topicId: session.topicId,
       sessionHostId: session.sessionHostId,
+      customTitle,
       status: clearing ? "empty" : (session.status ?? "proposed"),
       url: clearing ? "" : (session.url ?? ""),
       updatedAt: new Date(),
@@ -212,6 +220,8 @@ export type IcsSlot = {
   topicTitle: string | null;
   /** Office-hours sessions: the host's per-forum name. */
   sessionHostName: string | null;
+  /** Admin-filled custom session title ("" when not custom). */
+  customTitle: string;
 };
 
 /** Slots with their session, for the ICS calendar feed (upcoming + past —
@@ -228,6 +238,7 @@ export async function getSlotsForIcs(timetableId: string): Promise<IcsSlot[]> {
       topicId: timeslots.topicId,
       topicTitle: topics.title,
       sessionHostName: timetableMemberships.name,
+      customTitle: timeslots.customTitle,
     })
     .from(timeslots)
     .leftJoin(topics, eq(topics.id, timeslots.topicId))
@@ -249,6 +260,7 @@ export async function getSlotsForIcs(timetableId: string): Promise<IcsSlot[]> {
     url: r.url,
     topicTitle: r.topicTitle,
     sessionHostName: r.topicId ? null : r.sessionHostName,
+    customTitle: r.customTitle,
   }));
 }
 
@@ -588,6 +600,8 @@ export type CalendarSlot = {
   } | null;
   /** Office-hours sessions (topicId null): whose they are. */
   sessionHost: { id: string; name: string | null } | null;
+  /** Admin-filled custom session — neither a topic nor a host. */
+  customTitle: string;
   viewerState: AvailabilityState | null;
   counts: SlotCounts;
   perUser: {
@@ -840,6 +854,7 @@ function toCalendarSlot(
             name: related.sessionHostNames.get(slot.sessionHostId) ?? null,
           }
         : null,
+    customTitle: slot.customTitle,
     ...slotAvailability(slot, related, audienceIds, viewerUserId),
     commentCount: related.commentCountBySlot.get(slot.id) ?? 0,
   };

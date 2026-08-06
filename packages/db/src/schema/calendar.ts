@@ -37,6 +37,10 @@ export const timeslots = pgTable(
      * host themselves for office hours. THE ownership column for the
      * never-displace rule. */
     sessionHostId: text().references(() => users.id, { onDelete: "set null" }),
+    /** Admin-filled custom session ("Departmental seminar") — a session
+     * whose subject is neither a topic nor a host. topicId and
+     * sessionHostId are null; only admins may set or displace it. */
+    customTitle: text().notNull().default(""),
     /** Where the session actually lives once published elsewhere (Luma,
      * event page…). The calendar points at it; it never becomes it. */
     url: text().notNull().default(""),

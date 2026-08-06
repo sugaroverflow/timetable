@@ -4,6 +4,12 @@ import Link from "next/link";
 import { Fragment, useState } from "react";
 import { ChevronDown, ChevronUp, MessageCircle } from "lucide-react";
 
+import {
+  groupCalendarRows,
+  groupLocations,
+  hasSession,
+  type CalendarRowGroup,
+} from "@/lib/calendarGrouping";
 import type {
   CalendarPerms,
   CalendarSlot,
@@ -166,9 +172,12 @@ function FoldAvatars({
 }
 
 /** The fold under the tinted head: discussion, then controls — outside
- * the washes (QA 2026-08-05). */
+ * the washes (QA 2026-08-05). A grouped row (several open same-time
+ * slots) folds ONE discussion — the representative slot's; the pencil
+ * control chooses the location, and admin slot controls appear per
+ * location. */
 function SlotDetail({
-  slot,
+  slots,
   slug,
   perms,
   claimTopics,
@@ -179,7 +188,7 @@ function SlotDetail({
   comments,
   onReload,
 }: {
-  slot: CalendarSlot;
+  slots: CalendarSlot[];
   slug: string;
   perms: CalendarPerms;
   claimTopics: TopicOption[];
@@ -190,6 +199,7 @@ function SlotDetail({
   comments: SlotComment[] | null;
   onReload: () => Promise<void>;
 }) {
+  const slot = slots[0]!;
   return (
     <div className="cal-row-detail">
       <DiscussionPanel
@@ -202,14 +212,24 @@ function SlotDetail({
         onReload={onReload}
       />
       <SessionControls
-        slot={slot}
+        slots={slots}
         perms={perms}
         claimTopics={claimTopics}
         officeHoursLabel={officeHoursLabel}
       />
-      {perms.canAdmin ? (
-        <AdminSlotControls slot={slot} label={adminLabel} />
-      ) : null}
+      {perms.canAdmin
+        ? slots.map((s) => (
+            <AdminSlotControls
+              key={s.id}
+              slot={s}
+              label={
+                slots.length > 1
+                  ? `${adminLabel} · ${s.location || "No location"}`
+                  : adminLabel
+              }
+            />
+          ))
+        : null}
     </div>
   );
 }
@@ -225,32 +245,34 @@ function onInteractive(e: { target: EventTarget | null }): boolean {
 }
 
 /** The single content line riding above the tints: when | session | the
- * right cluster (💬 count when non-zero, the elector's own toggle). */
+ * right cluster (💬 count when non-zero, the elector's own toggle). A
+ * grouped row lists every open location after the time; the toggle
+ * broadcasts the answer to all of them. */
 function RowLine({
-  slot,
+  slots,
   past,
   slug,
   perms,
   officeHoursLabel,
   canExpand,
 }: {
-  slot: CalendarSlot;
+  slots: CalendarSlot[];
   past: boolean;
   slug: string;
   perms: CalendarPerms;
   officeHoursLabel: string;
   canExpand: boolean;
 }) {
+  const slot = slots[0]!;
+  const locations = groupLocations(slots);
   return (
     <div className="cal-row-line">
       <span className="cal-when">
         <strong>{formatDate(slot.startsAt)}</strong> {formatTime(slot.startsAt)}{" "}
         – {formatTime(slot.endsAt)}
-        {slot.location ? (
-          <span className="cal-where"> {slot.location}</span>
-        ) : null}
+        {locations ? <span className="cal-where"> {locations}</span> : null}
       </span>
-      {slot.topic || slot.sessionHost ? (
+      {hasSession(slot) ? (
         <div className="cal-row-session">
           <SessionLine
             slot={slot}
@@ -271,7 +293,7 @@ function RowLine({
         ) : null}
         {perms.canSetAvailability && !past ? (
           <AvailabilityControl
-            slotId={slot.id}
+            slotIds={slots.map((s) => s.id)}
             state={slot.viewerState}
             compact
           />
@@ -282,9 +304,11 @@ function RowLine({
 }
 
 /** The tinted region: washes cover the content line and (open) the
- * avatar row, but never the discussion below (QA 2026-08-05). */
+ * avatar row, but never the discussion below (QA 2026-08-05). Grouped
+ * rows tint from the representative slot — the toggle broadcast keeps
+ * members converging on the same answers. */
 function RowHead({
-  slot,
+  slots,
   past,
   slug,
   perms,
@@ -292,7 +316,7 @@ function RowHead({
   canExpand,
   open,
 }: {
-  slot: CalendarSlot;
+  slots: CalendarSlot[];
   past: boolean;
   slug: string;
   perms: CalendarPerms;
@@ -300,6 +324,7 @@ function RowHead({
   canExpand: boolean;
   open: boolean;
 }) {
+  const slot = slots[0]!;
   return (
     <div className="cal-row-head">
       {perms.canSeeHostOnly ? (
@@ -309,7 +334,7 @@ function RowHead({
         />
       ) : null}
       <RowLine
-        slot={slot}
+        slots={slots}
         past={past}
         slug={slug}
         perms={perms}
@@ -324,7 +349,7 @@ function RowHead({
 }
 
 function SlotRow({
-  slot,
+  slots,
   past,
   weekStart,
   slug,
@@ -335,7 +360,8 @@ function SlotRow({
   officeHoursLabel,
   roleLabels,
 }: {
-  slot: CalendarSlot;
+  /** One slot, or several open same-time slots collapsed into one row. */
+  slots: CalendarSlot[];
   past: boolean;
   /** True when this slot starts a new (Mon-first) week — bigger gap. */
   weekStart: boolean;
@@ -347,6 +373,7 @@ function SlotRow({
   officeHoursLabel: string;
   roleLabels?: RoleLabels;
 }) {
+  const slot = slots[0]!;
   const [open, setOpen] = useState(false);
   const [comments, setComments] = useState<SlotComment[] | null>(null);
   const canExpand = perms.canSeeHostOnly || perms.canAdmin;
@@ -391,7 +418,7 @@ function SlotRow({
       }}
     >
       <RowHead
-        slot={slot}
+        slots={slots}
         past={past}
         slug={slug}
         perms={perms}
@@ -401,7 +428,7 @@ function SlotRow({
       />
       {open ? (
         <SlotDetail
-          slot={slot}
+          slots={slots}
           slug={slug}
           perms={perms}
           claimTopics={claimTopics}
@@ -448,6 +475,8 @@ export function CalendarTable({
   showingPast: boolean;
   base: string;
 }) {
+  // Open same-time slots (several locations) collapse into one row.
+  const groups = groupCalendarRows(rows);
   const pastToggle = (
     <Link
       className="topic-body-toggle"
@@ -471,18 +500,20 @@ export function CalendarTable({
         Calendar
       </h3>
       <div className="cal-list">
-        {rows.map(({ slot, past }, i) => {
-          const month = monthLabel(slot.startsAt);
+        {groups.map(({ slots, past }, i) => {
+          const startsAt = slots[0]!.startsAt;
+          const prev: CalendarRowGroup | undefined = groups[i - 1];
+          const month = monthLabel(startsAt);
           const divider =
-            i === 0 || month !== monthLabel(rows[i - 1]!.slot.startsAt);
+            i === 0 || month !== monthLabel(prev!.slots[0]!.startsAt);
           // Bigger gap between Sunday and Monday — skipped when a month
           // heading already breaks the run.
           const weekStart =
             !divider &&
             i > 0 &&
-            weekKey(slot.startsAt) !== weekKey(rows[i - 1]!.slot.startsAt);
+            weekKey(startsAt) !== weekKey(prev!.slots[0]!.startsAt);
           return (
-            <Fragment key={slot.id}>
+            <Fragment key={slots[0]!.id}>
               {divider ? (
                 <div className="cal-month-row">
                   <span className="cal-month-inner">
@@ -494,7 +525,7 @@ export function CalendarTable({
                 </div>
               ) : null}
               <SlotRow
-                slot={slot}
+                slots={slots}
                 past={past}
                 weekStart={weekStart}
                 slug={slug}

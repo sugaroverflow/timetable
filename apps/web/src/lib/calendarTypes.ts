@@ -19,6 +19,8 @@ export type CalendarSlot = {
   } | null;
   /** Office-hours sessions (no topic): whose they are. */
   sessionHost: { id: string; name: string | null } | null;
+  /** Admin-filled custom session title ("" when not custom). */
+  customTitle: string;
   viewerState: AvailabilityState | null;
   counts: { green: number; yellow: number; red: number };
   perUser:

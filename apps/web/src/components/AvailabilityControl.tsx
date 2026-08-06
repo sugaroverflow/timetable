@@ -5,9 +5,17 @@ import { ToggleGroup } from "@base-ui/react/toggle-group";
 
 import { useGqlAction } from "@/lib/useGqlAction";
 
-const MUTATION = `mutation($id: String!, $state: String!) {
-  setAvailability(slotId: $id, state: $state)
-}`;
+/** One aliased setAvailability call per slot — a grouped row (same time,
+ * several locations) broadcasts the answer to every member, since the
+ * elector is answering the TIME (multi-location grouping, 2026-08-06). */
+function buildMutation(count: number): string {
+  const params = Array.from({ length: count }, (_, i) => `$s${i}: String!`);
+  const calls = Array.from(
+    { length: count },
+    (_, i) => `a${i}: setAvailability(slotId: $s${i}, state: $state)`,
+  );
+  return `mutation($state: String!, ${params.join(", ")}) { ${calls.join(" ")} }`;
+}
 
 const STATES: {
   value: string;
@@ -21,11 +29,12 @@ const STATES: {
 ];
 
 export function AvailabilityControl({
-  slotId,
+  slotIds,
   state,
   compact = false,
 }: {
-  slotId: string;
+  /** The slot — or every slot of a grouped row — the answer applies to. */
+  slotIds: string[];
   state: string | null;
   /** Emoji-only segments for table cells (calendar table, QA 2026-07-31). */
   compact?: boolean;
@@ -33,11 +42,13 @@ export function AvailabilityControl({
   const { run, busy } = useGqlAction();
 
   function set(value: string) {
-    void run(
-      MUTATION,
-      { id: slotId, state: value },
-      { errorFallback: "Could not set availability" },
-    );
+    const vars: Record<string, string> = { state: value };
+    slotIds.forEach((id, i) => {
+      vars[`s${i}`] = id;
+    });
+    void run(buildMutation(slotIds.length), vars, {
+      errorFallback: "Could not set availability",
+    });
   }
 
   // Unsaved availability counts as "maybe" server-side, so reflect that here.

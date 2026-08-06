@@ -29,6 +29,7 @@ import type {
   CalendarSlot,
   TopicOption,
 } from "@/lib/calendarTypes";
+import { hasSession } from "@/lib/calendarGrouping";
 import { gqlFetch } from "@/lib/graphql";
 import { displayRolesFromCookies } from "@/lib/previewRoles.server";
 import {
@@ -53,6 +54,7 @@ type Data = {
 
 const SLOT_FIELDS = `
   id startsAt endsAt location status url cellKey commentCount viewerState
+  customTitle
   topic { id title topicSlug hostId hostName }
   sessionHost { id name }
   counts { green yellow red }
@@ -150,10 +152,6 @@ function filterByLocation(
   location: string | undefined,
 ): CalendarSlot[] {
   return location ? slots.filter((s) => s.location === location) : slots;
-}
-
-function hasSession(slot: CalendarSlot): boolean {
-  return Boolean(slot.topic || slot.sessionHost);
 }
 
 /** ?show=sessions|open — the calendar's two jobs (what's happening vs
