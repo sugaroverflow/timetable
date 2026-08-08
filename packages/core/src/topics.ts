@@ -108,7 +108,7 @@ export async function updateTopic(
 async function setStatus(
   topicId: string,
   status: TopicStatus,
-  opts: { publishedAt?: Date | null } = {},
+  opts: { publishedAt?: Date | null; readyAt?: Date | null } = {},
 ): Promise<Topic | null> {
   const [updated] = await db
     .update(topics)
@@ -117,6 +117,7 @@ async function setStatus(
       ...(opts.publishedAt !== undefined
         ? { publishedAt: opts.publishedAt }
         : {}),
+      ...(opts.readyAt !== undefined ? { readyAt: opts.readyAt } : {}),
       updatedAt: new Date(),
     })
     .where(eq(topics.id, topicId))
@@ -150,12 +151,16 @@ export async function reassignTopic(
   return updated ?? null;
 }
 
-/** Host submits an unpublished topic (re)back into the moderation queue. */
+/** Host submits an unpublished topic (re)back into the moderation queue.
+ * An explicit resubmit IS the ready signal — the topic arrives marked
+ * ready to publish, unlike a freshly created one (which starts drafting). */
 export async function submitTopic(
   topic: Topic,
   actorId: string,
 ): Promise<Topic | null> {
-  const updated = await setStatus(topic.id, "submitted");
+  const updated = await setStatus(topic.id, "submitted", {
+    readyAt: new Date(),
+  });
   await logActivity({
     timetableId: topic.timetableId,
     actorId,
@@ -165,12 +170,13 @@ export async function submitTopic(
   return updated;
 }
 
-/** Host or admin unpublishes a topic. */
+/** Host or admin unpublishes a topic. Clears the ready signal — a
+ * taken-down topic starts its next round as a draft. */
 export async function unpublishTopic(
   topic: Topic,
   actorId: string,
 ): Promise<Topic | null> {
-  const updated = await setStatus(topic.id, "unpublished");
+  const updated = await setStatus(topic.id, "unpublished", { readyAt: null });
   await logActivity({
     timetableId: topic.timetableId,
     actorId,
@@ -178,6 +184,27 @@ export async function unpublishTopic(
     payload: { topicId: topic.id, title: topic.title },
   });
   return updated;
+}
+
+/** Host (or admin) flips a pending topic's "Ready to publish" switch. The
+ * timestamp is the signal the admin queue's default view filters on. */
+export async function setTopicReady(
+  topic: Topic,
+  actorId: string,
+  ready: boolean,
+): Promise<Topic | null> {
+  const [updated] = await db
+    .update(topics)
+    .set({ readyAt: ready ? new Date() : null, updatedAt: new Date() })
+    .where(eq(topics.id, topic.id))
+    .returning();
+  await logActivity({
+    timetableId: topic.timetableId,
+    actorId,
+    action: ready ? "topic.ready" : "topic.unready",
+    payload: { topicId: topic.id, title: topic.title },
+  });
+  return updated ?? null;
 }
 
 /** Host permanently deletes their own not-yet-published topic (launch QA
@@ -211,6 +238,8 @@ export async function moderateTopic(
   if (action === "publish") {
     const updated = await setStatus(topic.id, "published", {
       publishedAt: topic.publishedAt ?? new Date(),
+      // Leaving the queue: the ready signal has served its purpose.
+      readyAt: null,
     });
     await logActivity({
       timetableId: topic.timetableId,
@@ -221,7 +250,7 @@ export async function moderateTopic(
     return updated;
   }
 
-  const updated = await setStatus(topic.id, "unpublished");
+  const updated = await setStatus(topic.id, "unpublished", { readyAt: null });
   await logActivity({
     timetableId: topic.timetableId,
     actorId,

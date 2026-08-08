@@ -22,6 +22,7 @@ import {
   listTopicHostHearters,
   listViewerHostHeartedTopicIds,
   restartQueueRound,
+  setTopicReady,
   submitTopic,
   toggleHeart,
   toggleHostHeart,
@@ -267,6 +268,11 @@ const ManagedTopicType = builder
       bodyHtml: t.string({ resolve: (tp) => renderMarkdown(tp.bodyMd) }),
       status: t.exposeString("status"),
       updatedAt: t.string({ resolve: (tp) => tp.updatedAt.toISOString() }),
+      /** Host's "Ready to publish" signal — null while still drafting. */
+      readyAt: t.string({
+        nullable: true,
+        resolve: (tp) => tp.readyAt?.toISOString() ?? null,
+      }),
       hostName: t.string({
         nullable: true,
         resolve: async (tp) =>
@@ -710,6 +716,27 @@ builder.mutationFields((t) => ({
       const { topic, viewer } = await loadTopicAndViewer(ctx, args.topicId);
       if (!canEditTopic(viewer, topic.hostId)) forbidden();
       const updated = await unpublishTopic(topic, user.id);
+      if (!updated) notFound("Topic not found");
+      return updated;
+    },
+  }),
+
+  /** Host (or admin) flips a pending topic's "Ready to publish" switch —
+   * the signal the admin Pending queue's default view filters on. */
+  setTopicReady: t.field({
+    type: ManagedTopicType,
+    args: {
+      topicId: t.arg.string({ required: true }),
+      ready: t.arg.boolean({ required: true }),
+    },
+    resolve: async (_p, args, ctx) => {
+      const user = await requireUser(ctx);
+      const { topic, viewer } = await loadTopicAndViewer(ctx, args.topicId);
+      if (!canEditTopic(viewer, topic.hostId)) forbidden();
+      if (topic.status !== "submitted") {
+        throw new GraphQLError("Only a pending topic can be marked ready");
+      }
+      const updated = await setTopicReady(topic, user.id, args.ready);
       if (!updated) notFound("Topic not found");
       return updated;
     },

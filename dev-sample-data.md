@@ -515,6 +515,7 @@ I can help fellows think about how to translate between different incentives, vo
 Title: Reform
 Host: host-hayley
 Status: submitted
+Ready to publish: yes
 Published date, if published:
 Cover image URL, if any:
 
@@ -1131,6 +1132,7 @@ I can help fellows move from a broad ambition to a practical route to change. Th
 Title: Serious Games as Tools for Learning and Strategy
 Host: host-aaron
 Status: submitted
+Ready to publish: yes
 Published date, if published:
 Cover image URL, if any:
 
@@ -16246,7 +16248,9 @@ Discussion:
 
 - **Statuses cover every state**: published (81 topics, ~91% carrying at least one
   ❤️), submitted (topic-reform, topic-open-social-web, topic-serious-games,
-  topic-artificial-collective-intelligence — the moderation-queue examples),
+  topic-artificial-collective-intelligence — the moderation-queue examples;
+  topic-reform and topic-serious-games carry `Ready to publish: yes`, the
+  other two exercise the queue's still-drafting view, 2026-08-06),
   unpublished (topic-software-development, topic-getting-funded), archived
   (topic-how-do-media-organisations-work). Adjust freely.
 - **Every topic has a real body** (2026-08-03): the former `_Draft — body to be

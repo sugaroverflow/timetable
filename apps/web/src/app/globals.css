@@ -1396,6 +1396,16 @@ textarea {
   background: var(--warning-soft);
   color: var(--warning-ink);
 }
+/* Pending-queue readiness (2026-08-06): host-declared signal, not a
+   status — ready reads as "go", drafting stays muted. */
+.status-ready {
+  background: var(--green-soft);
+  color: var(--green-ink);
+}
+.status-drafting {
+  background: var(--status-neutral-bg);
+  color: var(--status-neutral-ink);
+}
 .status-published {
   background: var(--green-soft);
   color: var(--green-ink);

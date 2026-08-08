@@ -151,6 +151,9 @@ const ACTIVITY_WINDOW = [20, 2] as const; // activity log: last day
 /** "Published date, if published: recent" resolves here — inside the digest
  * window, so the topic surfaces as a "New" card for electors. */
 const RECENT_PUBLISH_TIME = hoursAgo(6);
+/** "Ready to publish: yes" resolves here — recent, so the admin queue's
+ * ready view shows fresh signal (2026-08-06). */
+const TOPIC_READY_TIME = hoursAgo(8);
 /** Slot updatedAt: recent, so seeded sessions count as news ("New" pill) in
  * the first digest run after seeding — stale sessions never trigger email. */
 const SLOT_UPDATED_TIME = hoursAgo(3);
@@ -200,6 +203,10 @@ type TopicFixture = {
   /** "Recently assigned: yes" seeds a fresh topic.reassign activity event,
    * so the host's digest shows an "Assigned to you" card. */
   recentlyAssigned: boolean;
+  /** "Ready to publish: yes" (2026-08-06) — the host's readiness signal on
+   * a submitted topic; the admin Pending queue's default view filters on
+   * it. Only valid on submitted topics. */
+  readyToPublish: boolean;
   bodyMd: string;
 };
 
@@ -470,6 +477,11 @@ function parseTopics(markdown: string): TopicFixture[] {
       recentlyAssigned: parseYesNo(
         fieldFromBlock(fields, "Recently assigned"),
         "Recently assigned",
+        label,
+      ),
+      readyToPublish: parseYesNo(
+        fieldFromBlock(fields, "Ready to publish"),
+        "Ready to publish",
         label,
       ),
       bodyMd,
@@ -814,6 +826,11 @@ function validateTopics(
     if (!host.roles.includes("host")) {
       throw new Error(
         `Topic "${topic.label}" host "${topic.host}" does not have the host role`,
+      );
+    }
+    if (topic.readyToPublish && topic.status !== "submitted") {
+      throw new Error(
+        `Topic "${topic.label}" is marked ready to publish but is ${topic.status} — the signal only exists on submitted topics`,
       );
     }
   }
@@ -1241,6 +1258,7 @@ function buildRows(fixture: Fixture): {
       coverImageUrl: topic.coverImageUrl,
       status: topic.status,
       publishedAt: topic.publishedAt,
+      readyAt: topic.readyToPublish ? TOPIC_READY_TIME : null,
       createdAt,
       updatedAt: topic.publishedAt ?? createdAt,
     };

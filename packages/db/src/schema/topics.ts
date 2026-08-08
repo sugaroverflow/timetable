@@ -33,6 +33,11 @@ export const topics = pgTable(
     coverImageUrl: text(),
     status: topicStatusEnum().notNull().default("submitted"),
     publishedAt: timestamp({ withTimezone: true }),
+    // Host's "Ready to publish" signal (2026-08-06): null = still drafting.
+    // Only meaningful while status is "submitted" — the admin Pending queue
+    // filters on it; publish/unpublish clear it. A timestamp (not a bool) so
+    // the queue can show how long a topic has been waiting.
+    readyAt: timestamp({ withTimezone: true }),
     // Bumped only by host/admin edits to title/body/cover — never by status
     // churn. Drives "newest" sorting and the new-since-last-visit highlight
     // (QA #59: an edited topic counts as new; no email is triggered).
