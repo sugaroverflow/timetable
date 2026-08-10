@@ -45,6 +45,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Same Next cache as ci.yml (issue #35): restore-keys hands the
+      # newest previous cache to the cold build.
+      - name: Cache Next.js build cache
+        uses: actions/cache@v4
+        with:
+          path: apps/web/.next/cache
+          key: nextjs-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ hashFiles('apps/web/src/**', 'packages/shared/src/**') }}
+          restore-keys: |
+            nextjs-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
+
       - name: Build web app
         run: npm run build -w @timetable/web
         env:
