@@ -13,5 +13,10 @@ Ed's follow-ups on the glass pill:
   Comments" (values unchanged — `random` stays `random` per the naming
   canon; the By ❤️ optgroup untouched).
 
+- **Wrapped bars keep the same corners**: `border-radius` pinned to
+  19px (half the one-line height — visually identical to the true pill
+  on one line), so the two-line log/notifications bars stop ballooning
+  into stadium ends.
+
 Previewed on live dev via CSS/DOM injection (dark mode) before
 committing.

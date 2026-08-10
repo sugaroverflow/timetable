@@ -1105,7 +1105,10 @@ textarea {
   -webkit-backdrop-filter: blur(14px) saturate(160%);
   backdrop-filter: blur(14px) saturate(160%);
   border: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
-  border-radius: var(--radius-pill);
+  /* Half the bar's one-line height — identical to a true pill on one
+     line, but a wrapped (two-line) bar keeps these same corners instead
+     of ballooning into a stadium (QA 2026-08-10 round 3). */
+  border-radius: 19px;
   box-shadow: var(--shadow);
   padding: 6px 14px;
   margin-bottom: 0;
