@@ -1141,6 +1141,28 @@ textarea {
   color: var(--muted);
 }
 
+/* "Live" marker in the activity log's pill (issue #58). */
+.live-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--text-xs);
+  font-weight: var(--fw-semibold);
+  color: var(--muted);
+}
+.live-dot-pulse {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: live-pulse 2s ease-in-out infinite;
+}
+@keyframes live-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
 /* Minimalist select (All Topics toolbar): no box, no native arrow — a
    chevron sits to the LEFT of the value instead. */
 .select-minimal {
