@@ -1340,6 +1340,11 @@ textarea {
 .comment > .avatar {
   margin-top: 3px;
 }
+/* Composer rows (viewer avatar + form, QA 2026-08-10): centre the 26px
+   avatar on the one-line 40px textarea instead of a username line. */
+.comment-composer > .avatar {
+  margin-top: 7px;
+}
 .comment-main {
   flex: 1;
   min-width: 0;

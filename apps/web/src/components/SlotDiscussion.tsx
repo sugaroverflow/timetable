@@ -14,6 +14,7 @@ import { useGqlAction } from "@/lib/useGqlAction";
 
 import { Avatar } from "./Avatar";
 import { CommentBody } from "./CommentBody";
+import { ComposerRow } from "./ComposerRow";
 import { GrowingTextarea } from "./GrowingTextarea";
 import { PersonChip } from "./PersonChip";
 import { PrimaryRolePill } from "./RolePills";
@@ -330,33 +331,37 @@ export function DiscussionPanel({
         />
       ))}
       {/* Same composer shape as everywhere else (QA 2026-08-02). No
-          empty-state line — the composer says it all (QA 2026-08-05). */}
-      <form onSubmit={post} className="stack" style={{ gap: 6 }}>
-        <div className="inline-form inline-form-nested">
-          <GrowingTextarea
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder="Talk about this timeslot…"
-            aria-label="Slot message"
-          />
-          <button
-            className="btn btn-primary btn-send"
-            type="submit"
-            disabled={busy}
-            aria-label="Send message"
-            title="Send"
-          >
-            <Send size={16} aria-hidden />
-          </button>
-        </div>
-        {/* The attachment, as it will appear on the posted comment — the
-            lens audience drives slot.counts, which is the same computation
-            the server snapshots on post (QA 2026-08-06, replaced the
-            "Posting attaches…" sentence). */}
-        {lensTopic ? (
-          <ClaimChip title={lensTopic.title} counts={slot.counts} preview />
-        ) : null}
-      </form>
+          empty-state line — the composer says it all (QA 2026-08-05).
+          Viewer avatar left, aligned with the comment rows (QA
+          2026-08-10). */}
+      <ComposerRow className="inline-form-nested">
+        <form onSubmit={post} className="stack" style={{ gap: 6 }}>
+          <div className="inline-form">
+            <GrowingTextarea
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              placeholder="Talk about this timeslot…"
+              aria-label="Slot message"
+            />
+            <button
+              className="btn btn-primary btn-send"
+              type="submit"
+              disabled={busy}
+              aria-label="Send message"
+              title="Send"
+            >
+              <Send size={16} aria-hidden />
+            </button>
+          </div>
+          {/* The attachment, as it will appear on the posted comment — the
+              lens audience drives slot.counts, which is the same computation
+              the server snapshots on post (QA 2026-08-06, replaced the
+              "Posting attaches…" sentence). */}
+          {lensTopic ? (
+            <ClaimChip title={lensTopic.title} counts={slot.counts} preview />
+          ) : null}
+        </form>
+      </ComposerRow>
     </div>
   );
 }
