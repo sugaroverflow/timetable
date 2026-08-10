@@ -51,7 +51,7 @@ export function InviteForm({ timetableId }: { timetableId: string }) {
     ).length;
     const invited = data.results.filter((r) => r.status === "invited").length;
     setMessage(
-      `Done — ${added} added now, ${invited} pending invite(s) for users who haven't signed up yet.`,
+      `Done — ${added} added now, ${invited} pending invite(s) for users who haven't signed up yet. No emails sent — use "Send invite" on each card when ready.`,
     );
     setEmails("");
     router.refresh();
@@ -62,7 +62,10 @@ export function InviteForm({ timetableId }: { timetableId: string }) {
       <CollapsibleSection title="Invite people">
         <p className="muted" style={{ marginTop: 0 }}>
           Existing users are added immediately. Unknown emails get a pending
-          invite claimed when they sign up.
+          invite claimed when they sign up.{" "}
+          <strong>Nobody is emailed at this step</strong> — send each person
+          their invite email with the &ldquo;Send invite&rdquo; button on their
+          card below, once their profile and topics are ready.
         </p>
 
         <div className="field">
@@ -87,7 +90,7 @@ export function InviteForm({ timetableId }: { timetableId: string }) {
         ) : null}
 
         <button className="btn btn-primary" type="submit" disabled={busy}>
-          {busy ? "Sending…" : "Send invites"}
+          {busy ? "Adding…" : "Add people"}
         </button>
       </CollapsibleSection>
     </form>

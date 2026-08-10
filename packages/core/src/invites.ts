@@ -48,7 +48,13 @@ async function getDigestDefaults(
     .where(eq(timetables.id, timetableId))
     .limit(1);
   const defaults = tt?.settings?.digestDefaults;
-  if (!defaults || !Object.values(defaults).some(Boolean)) return null;
+  // Digests default ON for new members (QA 2026-08-10): a forum whose
+  // admin never touched the Email digest card seeds digestEnabled; only
+  // an explicitly saved "off" keeps new members unsubscribed.
+  if (!defaults || Object.keys(defaults).length === 0) {
+    return { digestEnabled: true };
+  }
+  if (!Object.values(defaults).some(Boolean)) return null;
   return defaults;
 }
 
