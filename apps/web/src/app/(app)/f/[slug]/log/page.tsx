@@ -9,6 +9,7 @@ import { ActivityRoleFilter } from "@/components/ActivityRoleFilter";
 import { ActorFilter } from "@/components/ActorFilter";
 import { Avatar } from "@/components/Avatar";
 import { EmptyState } from "@/components/EmptyState";
+import { LiveLogSync } from "@/components/LiveLogSync";
 import { PersonChip } from "@/components/PersonChip";
 import { PrimaryRolePill } from "@/components/RolePills";
 import { ACTION_LABELS } from "@/lib/activityLabels";
@@ -243,6 +244,7 @@ function ActivityToolbar({
       <ActorFilter value={filters.actor ?? ""} actors={uniqueActors} />
       <ActivityRoleFilter value={filters.role ?? ""} options={roleOptions} />
       <ActivityDateFilter from={filters.from ?? ""} to={filters.to ?? ""} />
+      <LiveLogSync />
     </div>
   );
 }
