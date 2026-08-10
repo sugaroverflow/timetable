@@ -18,16 +18,19 @@ export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
+/** Forum URL slug shape — shared by creation and the Forum Settings slug
+ * editor (editable slugs, 2026-08-10). */
+export const forumSlugSchema = z
+  .string()
+  .regex(
+    /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+    "Use lowercase letters, numbers, hyphens",
+  )
+  .max(60);
+
 export const createTimetableSchema = z.object({
   name: z.string().min(1, "Name is required").max(120),
-  slug: z
-    .string()
-    .regex(
-      /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
-      "Use lowercase letters, numbers, hyphens",
-    )
-    .max(60)
-    .optional(),
+  slug: forumSlugSchema.optional(),
   privacy: privacyEnum.optional(),
 });
 export type CreateTimetableInput = z.infer<typeof createTimetableSchema>;

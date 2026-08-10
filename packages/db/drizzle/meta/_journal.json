@@ -225,6 +225,13 @@
       "when": 1786040826091,
       "tag": "0031_ambitious_demogoblin",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1786377653394,
+      "tag": "0032_deep_lethal_legion",
+      "breakpoints": true
     }
   ]
 }

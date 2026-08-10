@@ -35,6 +35,21 @@ export const timetables = pgTable("timetables", {
   updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });
 
+/** Old forum slugs (editable slugs, 2026-08-10): each row keeps a
+ * previously-used slug resolving to its forum forever, so links in sent
+ * emails and bookmarks survive a rename. A slug here is globally
+ * reserved — creation and slug edits both refuse it for other forums, so
+ * an old link can never be hijacked. A forum reclaiming its own old slug
+ * deletes the row (the slug goes live again). */
+export const timetableSlugHistory = pgTable("timetable_slug_history", {
+  id: uuid().primaryKey().defaultRandom(),
+  timetableId: uuid()
+    .notNull()
+    .references(() => timetables.id, { onDelete: "cascade" }),
+  slug: text().notNull().unique(),
+  createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+});
+
 /**
  * Joins a global user to a timetable with one or more roles. This is the single
  * source of truth for authorization: a user may be admin in one timetable and

@@ -300,6 +300,10 @@ Core tables:
 
 - `user`
 - `timetables`
+- `timetable_slug_history` (editable slugs, 2026-08-10: every slug a forum
+  has ever had, globally reserved so old links can never be hijacked;
+  resolves via the `getReadableTimetable` fallback and 308-redirects via
+  the web proxy; a forum reclaiming its own old slug deletes the row)
 - `timetable_memberships`
 - `timetable_invites`
 - `topics`
