@@ -50,12 +50,12 @@ type Data = {
 };
 
 const QUERY = `
-  query Feed($s: String!, $sort: String, $seed: String, $host: String, $hearted: Boolean, $hostHearted: Boolean, $heartedBy: String, $limit: Int, $offset: Int) {
+  query Feed($s: String!, $sort: String, $seed: String, $host: String, $hearted: Boolean, $hostHearted: Boolean, $heartedBy: String, $q: String, $limit: Int, $offset: Int) {
     timetable: forum(idOrSlug: $s) { viewerRoles settings viewerHeartedPublishedCount }
     me { id }
     myFeedLastSeenAt(idOrSlug: $s)
     timetableHosts: forumHosts(idOrSlug: $s) { id name }
-    topicFeed(idOrSlug: $s, sort: $sort, seed: $seed, hostId: $host, heartedByMe: $hearted, hostHeartedByMe: $hostHearted, heartedBy: $heartedBy, limit: $limit, offset: $offset) {
+    topicFeed(idOrSlug: $s, sort: $sort, seed: $seed, hostId: $host, heartedByMe: $hearted, hostHeartedByMe: $hostHearted, heartedBy: $heartedBy, q: $q, limit: $limit, offset: $offset) {
       ${TOPIC_FEED_FIELDS}
       contentUpdatedAt
     }
@@ -186,6 +186,7 @@ export async function fetchFeedPage(
   seed = "",
   heartedBy = "",
   hostHearted = false,
+  q = "",
 ): Promise<FeedPage> {
   const data = await gqlFetch<Data>(QUERY, {
     s: slug,
@@ -195,6 +196,7 @@ export async function fetchFeedPage(
     hearted,
     hostHearted,
     heartedBy: heartedBy || null,
+    q: q.trim() || null,
     limit: FEED_PAGE_SIZE + 1,
     offset: Math.max(0, offset),
   });

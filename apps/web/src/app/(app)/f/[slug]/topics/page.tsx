@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { EmptyState } from "@/components/EmptyState";
+import { FeedSearch } from "@/components/FeedSearch";
 import { FeedSortControl } from "@/components/FeedSortControl";
 import { HostFilter } from "@/components/HostFilter";
 import { InfiniteFeed } from "@/components/InfiniteFeed";
@@ -36,12 +37,13 @@ const HOST_CARD_QUERY = `
  * Never returns (redirect throws). */
 function redirectWithFreshSeed(
   slug: string,
-  current: { sort?: string; host?: string; hearted?: string },
+  current: { sort?: string; host?: string; hearted?: string; q?: string },
 ): never {
   const params = new URLSearchParams();
   if (current.sort) params.set("sort", current.sort);
   if (current.host) params.set("host", current.host);
   if (current.hearted) params.set("hearted", current.hearted);
+  if (current.q) params.set("q", current.q);
   params.set("shuffle", Math.random().toString(36).slice(2, 10));
   redirect(`/f/${slug}/topics?${params.toString()}`);
 }
@@ -84,12 +86,23 @@ function FeedEmpty({
   hostHearted,
   hostLabel,
   adminLabel,
+  q,
 }: {
   hearted: boolean;
   hostHearted: boolean;
   hostLabel: string;
   adminLabel: string;
+  q: string;
 }) {
+  if (q) {
+    return (
+      <EmptyState
+        icon="◇"
+        title={`No topics match “${q}”`}
+        hint="Search covers titles, topic text, and author names."
+      />
+    );
+  }
   if (hostHearted) {
     return (
       <EmptyState
@@ -127,6 +140,7 @@ export default async function FeedPage({
     host?: string;
     hearted?: string;
     shuffle?: string;
+    q?: string;
   }>;
 }) {
   const { slug } = await params;
@@ -135,6 +149,7 @@ export default async function FeedPage({
     host: hostParam,
     hearted: heartedParam,
     shuffle: seedParam,
+    q: qParam,
   } = await searchParams;
   // The queue graduated to its own page (QA 2026-07-28); old ?sort=queue
   // links follow it there.
@@ -157,9 +172,11 @@ export default async function FeedPage({
       sort: sortParam,
       host: hostParam,
       hearted: heartedParam,
+      q: qParam,
     });
   }
   const seed = seedParam ?? "";
+  const q = (qParam ?? "").trim();
 
   const page = await fetchFeedPage(
     slug,
@@ -170,6 +187,7 @@ export default async function FeedPage({
     seed,
     "",
     hostHearted,
+    q,
   );
   const hostLabel = roleLabel(page.settings.roleLabels, "host");
   const adminLabel = roleLabel(page.settings.roleLabels, "admin");
@@ -181,6 +199,7 @@ export default async function FeedPage({
       {page.isMember ? <MarkFeedSeen slug={slug} /> : null}
       <GesturePageHead hearted={hearted} hostHearted={hostHearted} />
       <div className="toolbar feed-toolbar">
+        <FeedSearch value={q} />
         {page.hosts.length > 0 ? (
           <HostFilter
             value={host}
@@ -213,15 +232,17 @@ export default async function FeedPage({
           hostHearted={hostHearted}
           hostLabel={hostLabel}
           adminLabel={adminLabel}
+          q={q}
         />
       ) : (
         <InfiniteFeed
-          key={`${sort}|${host}|${hearted}|${hostHearted}|${seed}`}
+          key={`${sort}|${host}|${hearted}|${hostHearted}|${seed}|${q}`}
           slug={slug}
           sort={sort}
           host={host}
           hearted={hearted}
           hostHearted={hostHearted}
+          q={q}
           seed={seed}
           // eslint-disable-next-line react-hooks/purity -- server-only render marker
           refreshToken={Math.random().toString(36).slice(2, 10)}

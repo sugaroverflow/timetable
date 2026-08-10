@@ -641,6 +641,9 @@ export async function buildFeed(
     /** Only topics the viewer currently 💙s (the host's "💙 Topics" page).
      * 💙s ignore the heartsCountFrom cutoff. */
     hostHeartedByViewer?: boolean;
+    /** Case-insensitive substring filter over title, body markdown, and
+     * host name (All Topics search box, 2026-08-10). */
+    q?: string;
     sort?: FeedSort;
     /** Shuffle seed for sort=random (QA #59). */
     seed?: string;
@@ -680,8 +683,17 @@ export async function buildFeed(
         )
       : null;
 
+  const needle = opts.q?.trim().toLowerCase();
   const visibleFeed = feed.filter((t) => {
     if (opts.heartedByViewer && viewerUserId && !t.viewerHasHearted) {
+      return false;
+    }
+    if (
+      needle &&
+      !`${t.title}\n${t.bodyMd}\n${t.hostName ?? ""}`
+        .toLowerCase()
+        .includes(needle)
+    ) {
       return false;
     }
     if (viewerHostHearted && !viewerHostHearted.has(t.id)) {
