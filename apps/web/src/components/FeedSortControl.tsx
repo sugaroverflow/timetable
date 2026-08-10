@@ -30,7 +30,8 @@ export function FeedSortControl({ value }: { value: string }) {
       onChange={(e) => change(e.target.value)}
     >
       <option value="random">🔀 Shuffle</option>
-      <option value="recent">📚 Latest Topics</option>
+      <option value="created">📚 Latest Created</option>
+      <option value="recent">✏️ Latest Updated</option>
       <option value="comments">💬 Latest Comments</option>
       <optgroup label="By ❤️">
         {NORM_MODES.map((mode) => (
