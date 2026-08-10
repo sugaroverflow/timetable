@@ -1,7 +1,12 @@
 import { isForumDigestEmpty, type ForumDigest } from "@timetable/core";
 import { describe, expect, it } from "vitest";
 
-import { renderDigest, sampleDigest } from "./email";
+import {
+  linkBase,
+  renderDigest,
+  sampleDigest,
+  wrapLinksWithSignInTicket,
+} from "./email";
 
 const SAMPLE = sampleDigest({
   email: "admin@example.com",
@@ -199,5 +204,60 @@ describe("renderDigest calendar content (calendar v2)", () => {
     });
     expect(isForumDigestEmpty(staleSession(false))).toBe(true);
     expect(isForumDigestEmpty(staleSession(true))).toBe(false);
+  });
+});
+
+describe("wrapLinksWithSignInTicket (one-click digest links)", () => {
+  const ticket = "tok_abc+/=";
+
+  it("wraps every app link in the rendered digest, preserving destinations", () => {
+    const { html } = renderDigest(SAMPLE);
+    const wrapped = wrapLinksWithSignInTicket(html, ticket);
+    // Every remaining app href goes through /sign-in with the ticket…
+    const appHrefs = [...wrapped.matchAll(/href="([^"]*)"/g)]
+      .map((m) => m[1]!.replace(/&amp;/g, "&"))
+      .filter((u) => u.startsWith(linkBase));
+    expect(appHrefs.length).toBeGreaterThan(0);
+    for (const href of appHrefs) {
+      expect(href).toContain("/sign-in?__clerk_ticket=");
+    }
+    // …and the original destination rides redirect_url, decodable.
+    const first = new URL(appHrefs[0]!);
+    const dest = first.searchParams.get("redirect_url");
+    expect(dest).toMatch(/^\//);
+  });
+
+  it("wraps only linkBase URLs and keeps sign-in links untouched", () => {
+    const html = [
+      `<a href="${linkBase}/f/sparkle/topics?sort=new&amp;q=x">in</a>`,
+      `<a href="https://elsewhere.example/page">out</a>`,
+      `<a href="${linkBase}/sign-in?redirect_url=%2Ff%2Fsparkle">already</a>`,
+    ].join("");
+    const wrapped = wrapLinksWithSignInTicket(html, ticket);
+    expect(wrapped).toContain("https://elsewhere.example/page");
+    expect(wrapped).toContain(
+      `${linkBase}/sign-in?redirect_url=%2Ff%2Fsparkle`,
+    );
+    const inbound = new URL(
+      /href="([^"]*sign-in\?__clerk_ticket[^"]*)"/
+        .exec(wrapped)![1]!
+        .replace(/&amp;/g, "&"),
+    );
+    expect(inbound.searchParams.get("__clerk_ticket")).toBe(ticket);
+    expect(inbound.searchParams.get("redirect_url")).toBe(
+      "/f/sparkle/topics?sort=new&q=x",
+    );
+  });
+
+  it("treats a bare linkBase link as the root path", () => {
+    const wrapped = wrapLinksWithSignInTicket(
+      `<a href="${linkBase}">home</a>`,
+      ticket,
+    );
+    const url = new URL(
+      /href="([^"]*)"/.exec(wrapped)![1]!.replace(/&amp;/g, "&"),
+    );
+    expect(url.pathname).toBe("/sign-in");
+    expect(url.searchParams.get("redirect_url")).toBe("/");
   });
 });

@@ -64,6 +64,7 @@ import {
   renderInvite,
   renderNewForum,
   sendEmail,
+  wrapLinksWithSignInTicket,
 } from "../email";
 import { env } from "../env";
 import { enforceActionLimit } from "../http/action-limits";
@@ -690,8 +691,15 @@ restRouter.post(
           ?.theme?.primary ?? null,
     });
     const { subject, html } = renderDigest(digest);
+    // Test digests get the ticket treatment too, so "Send test digest" QAs
+    // the one-click sign-in links exactly as recipients receive them.
+    const ticket = await createSignInTicket(user.id);
     try {
-      await sendEmail({ to: user.email, subject: `[Test] ${subject}`, html });
+      await sendEmail({
+        to: user.email,
+        subject: `[Test] ${subject}`,
+        html: ticket ? wrapLinksWithSignInTicket(html, ticket) : html,
+      });
     } catch (err) {
       logRequestError(req, err, { component: "digest-test-email" });
       const detail =
@@ -753,7 +761,14 @@ restRouter.post(
           for (const digest of digests) {
             if (!digest.email) continue;
             const { subject, html } = renderDigest(digest);
-            await sendEmail({ to: digest.email, subject, html });
+            // One single-use ticket per email; null (Clerk hiccup) degrades
+            // to plain links, never blocks the send.
+            const ticket = await createSignInTicket(digest.userId);
+            await sendEmail({
+              to: digest.email,
+              subject,
+              html: ticket ? wrapLinksWithSignInTicket(html, ticket) : html,
+            });
             didSend += 1;
           }
           await markDigestSent(recipient.id, now);
