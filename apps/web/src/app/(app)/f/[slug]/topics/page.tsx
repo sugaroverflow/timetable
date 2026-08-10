@@ -200,6 +200,7 @@ export default async function FeedPage({
       {page.isMember ? <MarkFeedSeen slug={slug} /> : null}
       <GesturePageHead hearted={hearted} hostHearted={hostHearted} />
       <div className="toolbar feed-toolbar">
+        <FeedSearch value={q} />
         {page.hosts.length > 0 ? (
           <HostFilter
             value={host}
@@ -208,7 +209,6 @@ export default async function FeedPage({
           />
         ) : null}
         <FeedSortControl value={sort} />
-        <FeedSearch value={q} />
       </div>
 
       {!page.isMember ? (

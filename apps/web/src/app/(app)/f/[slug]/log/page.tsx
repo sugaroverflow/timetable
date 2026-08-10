@@ -240,9 +240,9 @@ function ActivityToolbar({
   );
   return (
     <div className="toolbar feed-toolbar wrap">
-      <ActivityFilter value={filters.action ?? ""} actions={uniqueActions} />
-      <ActorFilter value={filters.actor ?? ""} actors={uniqueActors} />
       <ActivityRoleFilter value={filters.role ?? ""} options={roleOptions} />
+      <ActorFilter value={filters.actor ?? ""} actors={uniqueActors} />
+      <ActivityFilter value={filters.action ?? ""} actions={uniqueActions} />
       <ActivityDateFilter from={filters.from ?? ""} to={filters.to ?? ""} />
       <LiveLogSync />
     </div>

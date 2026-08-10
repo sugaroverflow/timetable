@@ -1094,8 +1094,6 @@ textarea {
   position: sticky;
   top: calc(var(--topbar-h) + 8px);
   z-index: calc(var(--z-sticky) - 1); /* under the topbar and dropdowns */
-  width: fit-content;
-  max-width: 100%;
   /* Page-bg-based glass with a whisper of the forum accent, NOT card-based
      — the pill must read as its own material, distinct from the topic
      cards passing behind it (QA 2026-08-10). */
@@ -1107,7 +1105,10 @@ textarea {
   -webkit-backdrop-filter: blur(14px) saturate(160%);
   backdrop-filter: blur(14px) saturate(160%);
   border: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
-  border-radius: var(--radius-pill);
+  /* Half the bar's one-line height — identical to a true pill on one
+     line, but a wrapped (two-line) bar keeps these same corners instead
+     of ballooning into a stadium (QA 2026-08-10 round 3). */
+  border-radius: 19px;
   box-shadow: var(--shadow);
   padding: 6px 14px;
   margin-bottom: 0;
@@ -1124,9 +1125,10 @@ textarea {
   padding: 5px 8px;
 }
 
-/* Search box inside the glass pill: bare icon-led input in its own inner
-   pill, which washes in on focus (QA 2026-08-10). Padding is constant so
-   focusing never shifts layout. */
+/* Search box inside the glass pill: icon-led input in its own always-washed
+   inner pill (QA 2026-08-10 round 3 — the wash reads as "a search field"
+   at rest, not only on focus). Sits left; everything after it right-aligns
+   across the full-width bar. */
 .feed-search {
   display: inline-flex;
   align-items: center;
@@ -1134,10 +1136,10 @@ textarea {
   color: var(--muted);
   padding: 3px 10px;
   border-radius: var(--radius-pill);
-  transition: background 0.15s ease;
-}
-.feed-search:focus-within {
   background: color-mix(in srgb, var(--ink) 8%, transparent);
+}
+.feed-toolbar > .feed-search {
+  margin-right: auto;
 }
 .feed-search input {
   /* One width focused and blurred — the pill jumping around on focus read
