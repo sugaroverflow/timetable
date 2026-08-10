@@ -23,6 +23,7 @@ jobs:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           EMAIL_FROM: ${{ vars.EMAIL_FROM }}
+          SYSADMIN_EMAILS: ${{ vars.SYSADMIN_EMAILS }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           SPACES_KEY: ${{ secrets.SPACES_KEY }}
