@@ -30,6 +30,7 @@ export const ACTION_LABELS: Record<string, string> = {
   "queue.finish": "finished the topic queue",
   "forum.settings": "changed forum settings",
   "forum.privacy": "changed the forum's visibility",
+  "forum.slug": "changed the forum's URL",
   // Calendar v2 (QA 2026-08-03).
   "calendar.schedule": "updated the calendar schedule",
   "slot.propose": "proposed a session time",

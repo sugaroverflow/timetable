@@ -1,6 +1,7 @@
 import { GraphQLError } from "graphql";
 
 import {
+  getCanonicalTimetableSlug,
   getFeedLastSeen,
   getLastVisitedTimetableSlug,
   getReadableTimetable,
@@ -12,11 +13,13 @@ import {
   setHeartsCountFrom,
   updateTimetableProfile,
   updateTimetableSettings,
+  updateTimetableSlug,
 } from "@timetable/core";
 import type { Timetable, TimetableSettings } from "@timetable/db";
 import {
   canEditSettings,
   canModerate,
+  forumSlugSchema,
   PRIVACY_LEVELS,
   type Privacy,
 } from "@timetable/shared";
@@ -138,11 +141,54 @@ builder.queryFields((t) => ({
       };
     },
   }),
+
+  /** A current-or-historical slug → the forum's canonical slug (editable
+   * slugs, 2026-08-10). Anonymous by design — the web proxy's stale-slug
+   * 308 must fire for signed-out hits on private forums too. Only the slug
+   * mapping is exposed (same trade as forumRouteByDomain). */
+  forumCanonicalSlug: t.string({
+    nullable: true,
+    args: { slug: t.arg.string({ required: true }) },
+    resolve: (_p, args) => getCanonicalTimetableSlug(args.slug),
+  }),
 }));
 
 // ---------------------------------------------------------------------------
 // Mutations
 // ---------------------------------------------------------------------------
+
+/** Editable slugs (2026-08-10): validate + apply a requested slug change.
+ * Returns the fresh row when the slug moved, null on no-op. Format is
+ * checked here, availability in core; the old slug redirects forever via
+ * timetable_slug_history. */
+async function applySlugChange(
+  timetable: Timetable,
+  actorId: string,
+  requestedSlug: string | null | undefined,
+): Promise<Timetable | null> {
+  const slug = requestedSlug?.trim();
+  if (!slug || slug === timetable.slug) return null;
+  const parsed = forumSlugSchema.safeParse(slug);
+  if (!parsed.success) {
+    throw new GraphQLError(
+      "URL can only use lowercase letters, numbers, and hyphens",
+    );
+  }
+  const result = await updateTimetableSlug(timetable.id, parsed.data);
+  if (!result.ok) {
+    if (result.reason === "taken") {
+      throw new GraphQLError("That URL is already taken");
+    }
+    notFound("Forum not found");
+  }
+  await logActivity({
+    timetableId: timetable.id,
+    actorId,
+    action: "forum.slug",
+    note: `/f/${timetable.slug} → /f/${parsed.data}`,
+  });
+  return result.timetable;
+}
 
 builder.mutationFields((t) => ({
   /** Bumps the viewer's feed watermark to now (no-op for non-members). */
@@ -158,7 +204,7 @@ builder.mutationFields((t) => ({
     },
   }),
 
-  /** Admin: update timetable name, visibility, custom domain. */
+  /** Admin: update timetable name, visibility, custom domain, URL slug. */
   updateForumProfile: t.field({
     type: TimetableType,
     args: {
@@ -166,6 +212,7 @@ builder.mutationFields((t) => ({
       name: t.arg.string({ required: false }),
       privacy: t.arg.string({ required: false }),
       customDomain: t.arg.string({ required: false }),
+      slug: t.arg.string({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
       const { user, readable, viewer } = await loadTimetableAndViewer(
@@ -182,13 +229,21 @@ builder.mutationFields((t) => ({
         privacy = args.privacy as Privacy;
       }
 
-      const updated = await updateTimetableProfile(readable.timetable.id, {
+      let updated = await updateTimetableProfile(readable.timetable.id, {
         name: args.name ?? undefined,
         privacy,
         customDomain:
           args.customDomain != null ? args.customDomain.trim() : undefined,
       });
       if (!updated) notFound("Forum not found");
+
+      const renamed = await applySlugChange(
+        readable.timetable,
+        user.id,
+        args.slug,
+      );
+      if (renamed) updated = renamed;
+
       // A privacy change is a distinct, high-signal audit event; a plain
       // name/domain edit is logged as an ordinary settings change.
       const privacyChanged =

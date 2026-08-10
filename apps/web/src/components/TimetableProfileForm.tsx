@@ -7,8 +7,8 @@ import { clientGql } from "@/lib/clientGraphql";
 import type { RoleLabels } from "@/lib/timetableSettings";
 import { useGqlAction } from "@/lib/useGqlAction";
 
-const MUTATION = `mutation($s: String!, $name: String, $privacy: String, $cd: String) {
-  updateTimetableProfile: updateForumProfile(idOrSlug: $s, name: $name, privacy: $privacy, customDomain: $cd) { id }
+const MUTATION = `mutation($s: String!, $name: String, $privacy: String, $cd: String, $slug: String) {
+  updateTimetableProfile: updateForumProfile(idOrSlug: $s, name: $name, privacy: $privacy, customDomain: $cd, slug: $slug) { id slug }
 }`;
 
 const SETTINGS_MUTATION = `mutation Labels(
@@ -26,6 +26,7 @@ type IdentityState = {
   name: string;
   privacy: string;
   customDomain: string;
+  slug: string;
 };
 
 type LabelsState = { admin: string; host: string; elector: string };
@@ -57,9 +58,29 @@ function IdentityFields({
           onChange={(e) => onChange({ name: e.target.value })}
         />
       </div>
-      <p className="faint" style={{ margin: "0 0 12px", fontSize: 12 }}>
-        URL: /f/{slug} (set at creation)
-      </p>
+      <div className="field">
+        <label htmlFor="tt-slug">URL</label>
+        <div className="row" style={{ gap: 6, alignItems: "center" }}>
+          <span className="faint">/f/</span>
+          <input
+            id="tt-slug"
+            value={value.slug}
+            onChange={(e) =>
+              onChange({
+                slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""),
+              })
+            }
+            pattern="[a-z0-9]+(-[a-z0-9]+)*"
+            maxLength={60}
+          />
+        </div>
+        {value.slug !== slug ? (
+          <p className="faint" style={{ margin: "4px 0 0", fontSize: 12 }}>
+            Changing the URL is safe — /f/{slug} will permanently redirect here,
+            so old links and bookmarks keep working.
+          </p>
+        ) : null}
+      </div>
       <div className="field">
         <label htmlFor="tt-privacy">Visibility</label>
         <select
@@ -161,6 +182,7 @@ export function TimetableProfileForm({
     name: initialName,
     privacy: initialPrivacy,
     customDomain: initialCustomDomain ?? "",
+    slug: slug,
   });
   const [labels, setLabels] = useState<LabelsState>(() =>
     initialLabels(roleLabels),
@@ -170,6 +192,7 @@ export function TimetableProfileForm({
   function submit(e: React.FormEvent) {
     e.preventDefault();
     setSaved(false);
+    const newSlug = identity.slug.trim();
     void run(
       MUTATION,
       {
@@ -177,6 +200,7 @@ export function TimetableProfileForm({
         name: identity.name,
         privacy: identity.privacy,
         cd: identity.customDomain,
+        slug: newSlug || null,
       },
       {
         success: "Forum profile saved",
@@ -186,12 +210,19 @@ export function TimetableProfileForm({
         // only fires once both have landed.
         onSuccess: async () => {
           await clientGql(SETTINGS_MUTATION, {
-            s: slug,
+            // The old slug still resolves post-rename (history fallback),
+            // but address the forum by its fresh slug for correctness.
+            s: newSlug || slug,
             ra: labels.admin,
             rh: labels.host,
             re: labels.elector,
           });
           setSaved(true);
+          // A slug change moves the page itself: hard-navigate to the new
+          // settings URL so the router, layout, and sidebar all re-resolve.
+          if (newSlug && newSlug !== slug) {
+            window.location.assign(`/f/${newSlug}/settings`);
+          }
         },
       },
     );

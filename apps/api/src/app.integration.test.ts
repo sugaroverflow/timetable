@@ -44,6 +44,8 @@ vi.mock("@timetable/core", async (importOriginal) => {
     updateCommentBody: vi.fn(),
     updateUserEmail: vi.fn(),
     updateTimetableSettings: vi.fn(),
+    updateTimetableProfile: vi.fn(),
+    updateTimetableSlug: vi.fn(),
   };
 });
 
@@ -267,6 +269,8 @@ afterEach(() => {
   vi.mocked(core.updateUserEmail).mockReset();
   vi.mocked(core.logActivity).mockReset();
   vi.mocked(core.updateTimetableSettings).mockReset();
+  vi.mocked(core.updateTimetableProfile).mockReset();
+  vi.mocked(core.updateTimetableSlug).mockReset();
   vi.mocked(clerk.getOrCreateClerkUser).mockReset();
   vi.mocked(clerk.createSignInTicket).mockReset();
   vi.mocked(clerk.replaceClerkEmail).mockReset();
@@ -1110,6 +1114,109 @@ describe("createApiApp", () => {
       expect(res.status).toBe(200);
       expect(core.updateTimetableSettings).toHaveBeenCalledWith(timetable.id, {
         digestDefaults: { digestEnabled: true },
+      });
+    });
+  });
+
+  describe("updateForumProfile slug change (editable slugs)", () => {
+    const RENAME = `mutation($s: String!, $slug: String) {
+      updateForumProfile(idOrSlug: $s, slug: $slug) { id slug }
+    }`;
+
+    async function requestRename(baseUrl: string, s: string, slug: string) {
+      const res = await fetch(`${baseUrl}/graphql`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: RENAME, variables: { s, slug } }),
+      });
+      return (await res.json()) as {
+        data: { updateForumProfile: { id: string; slug: string } | null };
+        errors?: { message: string }[];
+      };
+    }
+
+    function mockAdminOnForum(timetable: Timetable) {
+      mockSession("admin-1", ["admin"]);
+      vi.mocked(core.getReadableTimetable).mockResolvedValue({
+        timetable,
+        roles: ["admin"],
+      });
+      vi.mocked(core.updateTimetableProfile).mockResolvedValue(timetable);
+    }
+
+    it("renames for admins, returns the new slug, logs forum.slug", async () => {
+      const timetable = timetableFixture({ slug: "old-name" });
+      mockAdminOnForum(timetable);
+      vi.mocked(core.updateTimetableSlug).mockResolvedValue({
+        ok: true,
+        timetable: { ...timetable, slug: "new-name" },
+      });
+
+      await withTestServer(async (baseUrl) => {
+        const body = await requestRename(baseUrl, "old-name", "new-name");
+        expect(body.errors).toBeUndefined();
+        expect(body.data.updateForumProfile?.slug).toBe("new-name");
+        expect(core.updateTimetableSlug).toHaveBeenCalledWith(
+          timetable.id,
+          "new-name",
+        );
+        expect(core.logActivity).toHaveBeenCalledWith(
+          expect.objectContaining({
+            action: "forum.slug",
+            note: "/f/old-name → /f/new-name",
+          }),
+        );
+      });
+    });
+
+    it("surfaces a taken slug as a user-readable error", async () => {
+      const timetable = timetableFixture({ slug: "old-name" });
+      mockAdminOnForum(timetable);
+      vi.mocked(core.updateTimetableSlug).mockResolvedValue({
+        ok: false,
+        reason: "taken",
+      });
+
+      await withTestServer(async (baseUrl) => {
+        const body = await requestRename(baseUrl, "old-name", "someone-elses");
+        expect(body.errors?.[0]?.message).toContain("already taken");
+      });
+    });
+
+    it("rejects malformed slugs before touching core", async () => {
+      const timetable = timetableFixture({ slug: "old-name" });
+      mockAdminOnForum(timetable);
+
+      await withTestServer(async (baseUrl) => {
+        const body = await requestRename(baseUrl, "old-name", "Bad Slug!");
+        expect(body.errors?.length).toBeGreaterThan(0);
+        expect(core.updateTimetableSlug).not.toHaveBeenCalled();
+      });
+    });
+
+    it("treats the unchanged slug as a no-op (no history row)", async () => {
+      const timetable = timetableFixture({ slug: "old-name" });
+      mockAdminOnForum(timetable);
+
+      await withTestServer(async (baseUrl) => {
+        const body = await requestRename(baseUrl, "old-name", "old-name");
+        expect(body.errors).toBeUndefined();
+        expect(core.updateTimetableSlug).not.toHaveBeenCalled();
+      });
+    });
+
+    it("refuses non-admins", async () => {
+      const timetable = timetableFixture({ slug: "old-name" });
+      mockSession("host-1", ["host"]);
+      vi.mocked(core.getReadableTimetable).mockResolvedValue({
+        timetable,
+        roles: ["host"],
+      });
+
+      await withTestServer(async (baseUrl) => {
+        const body = await requestRename(baseUrl, "old-name", "new-name");
+        expect(body.errors?.length).toBeGreaterThan(0);
+        expect(core.updateTimetableSlug).not.toHaveBeenCalled();
       });
     });
   });
