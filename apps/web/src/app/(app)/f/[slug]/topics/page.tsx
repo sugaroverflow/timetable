@@ -12,6 +12,7 @@ import {
   PersonProfileCard,
   type ProfileCardPerson,
 } from "@/components/PersonProfileCard";
+import { SearchHighlight } from "@/components/SearchHighlight";
 import { TopicCard } from "@/components/TopicCard";
 import {
   FEED_PAGE_SIZE,
@@ -199,7 +200,6 @@ export default async function FeedPage({
       {page.isMember ? <MarkFeedSeen slug={slug} /> : null}
       <GesturePageHead hearted={hearted} hostHearted={hostHearted} />
       <div className="toolbar feed-toolbar">
-        <FeedSearch value={q} />
         {page.hosts.length > 0 ? (
           <HostFilter
             value={host}
@@ -208,6 +208,7 @@ export default async function FeedPage({
           />
         ) : null}
         <FeedSortControl value={sort} />
+        <FeedSearch value={q} />
       </div>
 
       {!page.isMember ? (
@@ -235,25 +236,27 @@ export default async function FeedPage({
           q={q}
         />
       ) : (
-        <InfiniteFeed
-          key={`${sort}|${host}|${hearted}|${hostHearted}|${seed}|${q}`}
-          slug={slug}
-          sort={sort}
-          host={host}
-          hearted={hearted}
-          hostHearted={hostHearted}
-          q={q}
-          seed={seed}
-          // eslint-disable-next-line react-hooks/purity -- server-only render marker
-          refreshToken={Math.random().toString(36).slice(2, 10)}
-          pageSize={FEED_PAGE_SIZE}
-          initialHasNext={page.hasNext}
-          loadMore={loadMoreFeed}
-        >
-          {page.topics.map((topic) => (
-            <TopicCard key={topic.id} {...topicCardProps(page, topic)} />
-          ))}
-        </InfiniteFeed>
+        <SearchHighlight q={q}>
+          <InfiniteFeed
+            key={`${sort}|${host}|${hearted}|${hostHearted}|${seed}|${q}`}
+            slug={slug}
+            sort={sort}
+            host={host}
+            hearted={hearted}
+            hostHearted={hostHearted}
+            q={q}
+            seed={seed}
+            // eslint-disable-next-line react-hooks/purity -- server-only render marker
+            refreshToken={Math.random().toString(36).slice(2, 10)}
+            pageSize={FEED_PAGE_SIZE}
+            initialHasNext={page.hasNext}
+            loadMore={loadMoreFeed}
+          >
+            {page.topics.map((topic) => (
+              <TopicCard key={topic.id} {...topicCardProps(page, topic)} />
+            ))}
+          </InfiniteFeed>
+        </SearchHighlight>
       )}
     </div>
   );

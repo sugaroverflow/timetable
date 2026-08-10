@@ -1096,7 +1096,14 @@ textarea {
   z-index: calc(var(--z-sticky) - 1); /* under the topbar and dropdowns */
   width: fit-content;
   max-width: 100%;
-  background: color-mix(in srgb, var(--card) 62%, transparent);
+  /* Page-bg-based glass with a whisper of the forum accent, NOT card-based
+     — the pill must read as its own material, distinct from the topic
+     cards passing behind it (QA 2026-08-10). */
+  background: color-mix(
+    in srgb,
+    var(--primary) 6%,
+    color-mix(in srgb, var(--bg) 60%, transparent)
+  );
   -webkit-backdrop-filter: blur(14px) saturate(160%);
   backdrop-filter: blur(14px) saturate(160%);
   border: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
@@ -1109,7 +1116,7 @@ textarea {
    to a solid pill. */
 @supports not (backdrop-filter: blur(1px)) {
   .feed-toolbar {
-    background: var(--card);
+    background: color-mix(in srgb, var(--primary) 6%, var(--bg));
   }
 }
 .feed-toolbar select {
@@ -1117,28 +1124,41 @@ textarea {
   padding: 5px 8px;
 }
 
-/* Search box inside the glass pill: bare icon-led input, grows on focus. */
+/* Search box inside the glass pill: bare icon-led input in its own inner
+   pill, which washes in on focus (QA 2026-08-10). Padding is constant so
+   focusing never shifts layout. */
 .feed-search {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   color: var(--muted);
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  transition: background 0.15s ease;
+}
+.feed-search:focus-within {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
 }
 .feed-search input {
-  width: 84px;
+  /* One width focused and blurred — the pill jumping around on focus read
+     badly (search QA 2026-08-10). */
+  width: 140px;
   border: 0;
   background: transparent;
   outline: none;
   color: var(--ink);
   font-size: var(--text-sm);
   padding: 2px 0;
-  transition: width 0.15s ease;
-}
-.feed-search input:focus {
-  width: 170px;
 }
 .feed-search input::placeholder {
   color: var(--muted);
+}
+
+/* Search-match highlight (CSS Custom Highlight API — ranges are marked
+   without touching the DOM, so the markdown-rendered bodies stay inert).
+   Browsers without support simply skip it. */
+::highlight(topic-search) {
+  background: var(--primary-soft);
 }
 
 /* "Live" marker in the activity log's pill (issue #58). */
