@@ -34,8 +34,10 @@ export function useSetSearchParam() {
       opts?.mutate?.(params);
       const query = params.toString();
       const url = query ? `${pathname}?${query}` : pathname;
-      if (opts?.replace) router.replace(url);
-      else router.push(url);
+      // Filters refine the view in place — never yank the user back to
+      // the top of the page (Analysis activity table, QA 2026-08-10).
+      if (opts?.replace) router.replace(url, { scroll: false });
+      else router.push(url, { scroll: false });
     },
     [router, pathname, searchParams],
   );

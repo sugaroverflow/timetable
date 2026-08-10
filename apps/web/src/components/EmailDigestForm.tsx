@@ -31,8 +31,12 @@ export function EmailDigestForm({
 }) {
   const { run, busy } = useGqlAction();
   const { toast, toastError } = useToast();
+  // Default ON (QA 2026-08-10): an untouched card means new members get
+  // digests — mirrors getDigestDefaults in core/invites.ts.
   const [enabled, setEnabled] = useState(
-    digestDefaults ? isDigestEnabled(digestDefaults) : false,
+    digestDefaults && Object.keys(digestDefaults).length > 0
+      ? isDigestEnabled(digestDefaults)
+      : true,
   );
   const [saved, setSaved] = useState(false);
   const [sendingTest, setSendingTest] = useState(false);

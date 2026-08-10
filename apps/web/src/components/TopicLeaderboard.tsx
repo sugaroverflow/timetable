@@ -222,9 +222,9 @@ export function TopicLeaderboard({
             marginBottom: 4,
           }}
         >
-          <p className="faint" style={{ margin: "2px 0 0", fontSize: 12 }}>
-            {subtitle}
-          </p>
+          {/* Normal body type, not small print (QA 2026-08-10) — the
+              sentence IS the table's summary statistics. */}
+          <p style={{ margin: "2px 0 0" }}>{subtitle}</p>
           <span className="row wrap" style={{ gap: 10, alignItems: "center" }}>
             {hostFilter}
             <SelectMinimal
