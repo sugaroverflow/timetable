@@ -406,6 +406,7 @@ builder.queryFields((t) => ({
         "l1",
         "devotion",
         "comments",
+        "created",
         "recent",
         "random",
       ]);

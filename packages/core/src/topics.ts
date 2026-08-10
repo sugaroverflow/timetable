@@ -392,6 +392,7 @@ export type FeedSort =
   | "l1"
   | "devotion"
   | "comments"
+  | "created"
   | "recent"
   | "random";
 
@@ -436,12 +437,17 @@ function seededRank(seed: string, id: string): number {
 
 type FeedComparator = (a: FeedTopic, b: FeedTopic) => number;
 
-/** "Newest" counts content edits, not just publication (QA #59). */
+/** "Latest Updated" counts content edits, not just publication (QA #59);
+ * "Latest Created" (below) is publication order alone (QA 2026-08-10). */
 function recency(t: FeedTopic): number {
   return Math.max(
     t.publishedAt?.getTime() ?? t.createdAt.getTime(),
     t.contentUpdatedAt?.getTime() ?? 0,
   );
+}
+
+function publishedTime(t: FeedTopic): number {
+  return t.publishedAt?.getTime() ?? t.createdAt.getTime();
 }
 
 /** Normalisation sorts share a stable recency tie-break so equal scores
@@ -466,6 +472,7 @@ const FEED_COMPARATORS: Record<FeedSort, (seed: string) => FeedComparator> = {
     if (bt !== at) return bt - at;
     return b.commentCount - a.commentCount;
   },
+  created: () => (a, b) => publishedTime(b) - publishedTime(a),
   recent: () => (a, b) => recency(b) - recency(a),
   random: (seed) => (a, b) => seededRank(seed, a.id) - seededRank(seed, b.id),
 };
