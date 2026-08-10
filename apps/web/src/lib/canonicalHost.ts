@@ -1,8 +1,10 @@
+import { env } from "@/env";
+
 /** Hosts the app itself answers on — everything else is (potentially) a
  * customer's custom forum domain. The aliases stay in this set even though
  * they now redirect: the set also powers the "not a custom domain" check. */
 export function canonicalHosts(): Set<string> {
-  const configured = process.env.NEXT_PUBLIC_CANONICAL_HOSTS ?? "";
+  const configured = env.canonicalHostsCsv;
   return new Set(
     [
       "localhost",
