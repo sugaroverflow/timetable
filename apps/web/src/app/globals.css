@@ -1085,26 +1085,32 @@ textarea {
   padding: 6px 9px;
 }
 
-/* Feed variant: a sticky header pinned under the topbar, flush on the page
-   background — no card surface, border, or radius — with compact controls. */
+/* Feed variant: a sticky frosted-glass pill floating over the cards
+   (QA 2026-08-10 — the old opaque full-width bar read as "background",
+   so scrolling cards seemed to slide under nothing). Translucent surface
+   + backdrop blur means cards visibly pass BEHIND glass, and the gap
+   under the topbar keeps them visible around the pill. */
 .feed-toolbar {
   position: sticky;
-  top: var(--topbar-h);
+  top: calc(var(--topbar-h) + 8px);
   z-index: calc(var(--z-sticky) - 1); /* under the topbar and dropdowns */
-  background: var(--bg);
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-  /* Cards' box-shadow (8px blur) bleeds past their edges — widen the
-     pinned bar's opaque background so scrolled-under card shadows can't
-     peek out its sides (QA 2026-07-29). The .container's 20px side
-     padding absorbs the overhang at every viewport. */
-  margin-inline: -14px;
-  padding: 8px 14px;
-  /* Pull the list up: with the .stack gap (14px) this nets 14px between
-     the controls and the first card — the same rhythm as card-to-card
-     (QA 2026-07-28: "the feed needs to be higher"). */
-  margin-bottom: -8px;
+  width: fit-content;
+  max-width: 100%;
+  background: color-mix(in srgb, var(--card) 62%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  backdrop-filter: blur(14px) saturate(160%);
+  border: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow);
+  padding: 6px 14px;
+  margin-bottom: 0;
+}
+/* No blur support → the glass would be unreadably see-through; fall back
+   to a solid pill. */
+@supports not (backdrop-filter: blur(1px)) {
+  .feed-toolbar {
+    background: var(--card);
+  }
 }
 .feed-toolbar select {
   font-size: var(--text-xs);
