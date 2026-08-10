@@ -1094,14 +1094,10 @@ textarea {
   position: sticky;
   top: calc(var(--topbar-h) + 8px);
   z-index: calc(var(--z-sticky) - 1); /* under the topbar and dropdowns */
-  /* Page-bg-based glass with a whisper of the forum accent, NOT card-based
-     — the pill must read as its own material, distinct from the topic
-     cards passing behind it (QA 2026-08-10). */
-  background: color-mix(
-    in srgb,
-    var(--primary) 6%,
-    color-mix(in srgb, var(--bg) 60%, transparent)
-  );
+  /* --glass (tokens.css): lighter than the page in light mode, darker
+     than the cards in dark mode — its own material either way, with a
+     soft accent glow lifting it off the page (QA 2026-08-10). */
+  background: var(--glass);
   -webkit-backdrop-filter: blur(14px) saturate(160%);
   backdrop-filter: blur(14px) saturate(160%);
   border: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
@@ -1109,15 +1105,17 @@ textarea {
      line, but a wrapped (two-line) bar keeps these same corners instead
      of ballooning into a stadium (QA 2026-08-10 round 3). */
   border-radius: 19px;
-  box-shadow: var(--shadow);
+  box-shadow:
+    var(--shadow),
+    0 6px 24px -4px color-mix(in srgb, var(--primary) 16%, transparent);
   padding: 6px 14px;
   margin-bottom: 0;
 }
 /* No blur support → the glass would be unreadably see-through; fall back
-   to a solid pill. */
+   to a solid fill in the same spirit. */
 @supports not (backdrop-filter: blur(1px)) {
   .feed-toolbar {
-    background: color-mix(in srgb, var(--primary) 6%, var(--bg));
+    background: color-mix(in srgb, var(--primary) 5%, var(--card));
   }
 }
 .feed-toolbar select {
@@ -1138,8 +1136,20 @@ textarea {
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--ink) 8%, transparent);
 }
+/* Desktop rhythm (QA 2026-08-10): the search field GROWS into the bar's
+   middle (toolbar pattern — the field is the bar's main affordance) and
+   the filters keep to the right; the void between them stays bounded by
+   the search cap. */
 .feed-toolbar > .feed-search {
   margin-right: auto;
+  flex: 1 1 auto;
+  max-width: 420px;
+  min-width: 150px;
+}
+.feed-toolbar > .feed-search input {
+  flex: 1;
+  width: auto;
+  min-width: 0;
 }
 .feed-search input {
   /* One width focused and blurred — the pill jumping around on focus read
@@ -1183,6 +1193,17 @@ textarea {
   50% {
     opacity: 0.35;
   }
+}
+
+/* Native select popups: Windows/Linux Chrome render styleable popups whose
+   labels inherit the select's ink while the popup bg stays light — in dark
+   mode the "By ❤️" optgroup label went light-on-light (QA 2026-08-10).
+   Pin both explicitly; macOS uses system popups and ignores this (they
+   already follow color-scheme). */
+option,
+optgroup {
+  color: var(--ink);
+  background: var(--card);
 }
 
 /* Minimalist select (All Topics toolbar): no box, no native arrow — a

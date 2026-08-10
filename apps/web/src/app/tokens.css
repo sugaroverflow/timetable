@@ -98,6 +98,15 @@
   color-scheme: light; /* native UI (scrollbars, form controls) follows mode */
   --bg: #eceef3; /* page background (themeable) */
   --card: #ffffff; /* raised surface: cards, inputs, menus */
+  /* Frosted-glass toolbar fill (over backdrop blur). Light mode mixes from
+     WHITE so the pill sits lighter than the grey page behind it; dark mode
+     mixes from the page bg so it sits darker than the cards. Both carry a
+     whisper of the forum accent (QA 2026-08-10). */
+  --glass: color-mix(
+    in srgb,
+    var(--primary) 5%,
+    color-mix(in srgb, #ffffff 70%, transparent)
+  );
   --wash: #f4f5f8; /* subtle fill / hover on cards */
   --wash-strong: #e4e7ef; /* stronger hover (nav) */
   --scrim: rgba(20, 22, 30, 0.45); /* modal backdrop */
@@ -250,6 +259,11 @@ html[data-theme="dark"] {
   color-scheme: dark; /* native UI (scrollbars, form controls) follows mode */
   --bg: #14171e;
   --card: #1d222c;
+  --glass: color-mix(
+    in srgb,
+    var(--primary) 6%,
+    color-mix(in srgb, var(--bg) 60%, transparent)
+  );
   --wash: #262b35;
   --wash-strong: #2f3644;
   --scrim: rgba(0, 0, 0, 0.6);
