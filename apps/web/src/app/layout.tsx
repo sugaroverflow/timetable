@@ -19,6 +19,31 @@ export const metadata: Metadata = {
   icons: { icon: emojiFavicon("📚") },
 };
 
+// Clerk's prebuilt UI (sign-in/sign-up cards, the account modal) themed to
+// the app's tokens — CSS-variable values track per-forum themes and
+// light/dark automatically. The modal's own "Profile" (name/photo) section
+// is hidden: identity lives in per-forum Topic profiles, and Clerk's copy
+// is only mirrored once at first sign-in, so edits there change nothing in
+// the app and it read as a confusing second profile (QA 2026-08-10).
+const clerkAppearance = {
+  variables: {
+    colorPrimary: "var(--primary)",
+    colorPrimaryForeground: "var(--primary-ink)",
+    colorBackground: "var(--card)",
+    colorForeground: "var(--ink)",
+    colorMutedForeground: "var(--muted)",
+    colorNeutral: "var(--ink)",
+    colorInput: "var(--card)",
+    colorInputForeground: "var(--ink)",
+    colorBorder: "var(--line)",
+    borderRadius: "var(--radius-md)",
+    fontFamily: "var(--sans)",
+  },
+  elements: {
+    profileSection__profile: { display: "none" },
+  },
+};
+
 export default function RootLayout({
   children,
 }: {
@@ -48,5 +73,5 @@ export default function RootLayout({
 
   if (process.env.E2E_TEST_MODE === "1") return content;
 
-  return <ClerkProvider>{content}</ClerkProvider>;
+  return <ClerkProvider appearance={clerkAppearance}>{content}</ClerkProvider>;
 }
