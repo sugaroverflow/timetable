@@ -5,6 +5,9 @@ import {
   type NextRequest,
 } from "next/server";
 
+import { env } from "@/env";
+import { canonicalHosts, redirectTargetHost } from "@/lib/canonicalHost";
+
 // Next 16 renamed the "middleware" convention to "proxy". Clerk attaches auth
 // to every request; route-level access control is enforced in layouts/pages
 // (public timetables stay readable while anonymous).
@@ -25,23 +28,10 @@ function normalizeHost(host: string | null): string {
   return (host ?? "").split(":")[0]?.toLowerCase() ?? "";
 }
 
-function canonicalHosts(): Set<string> {
-  const configured = process.env.NEXT_PUBLIC_CANONICAL_HOSTS ?? "";
-  return new Set(
-    [
-      "localhost",
-      "127.0.0.1",
-      "0.0.0.0",
-      "topic.forum",
-      "www.topic.forum",
-      // Old domain — kept canonical through the transition so existing
-      // links keep working; remove once timetable.love redirects/lapses.
-      "timetable.love",
-      "dev.timetable.love",
-      ...configured.split(","),
-    ]
-      .map((h) => h.trim().toLowerCase())
-      .filter(Boolean),
+function requestHost(request: NextRequest): string {
+  return (
+    normalizeHost(request.headers.get("x-forwarded-host")) ||
+    normalizeHost(request.headers.get("host"))
   );
 }
 
@@ -114,9 +104,7 @@ async function lookupDomainSlug(host: string): Promise<string | null> {
 }
 
 async function customDomainRewrite(request: NextRequest) {
-  const host =
-    normalizeHost(request.headers.get("x-forwarded-host")) ||
-    normalizeHost(request.headers.get("host"));
+  const host = requestHost(request);
   const pathname = request.nextUrl.pathname;
   if (!isCustomHost(host) || !shouldRewritePath(pathname)) return undefined;
 
@@ -133,6 +121,18 @@ const clerkProxy = clerkMiddleware(async (_auth, request) => {
 });
 
 export default function proxy(request: NextRequest, event: NextFetchEvent) {
+  // Clerk sessions exist per host, so our www/legacy aliases redirect to the
+  // deployment's own origin before anything else runs (issue #230). 308
+  // preserves method and query, and calendar/feed clients follow it.
+  const target = redirectTargetHost(requestHost(request), env.webOrigin);
+  if (target) {
+    const url = request.nextUrl.clone();
+    url.protocol = "https:";
+    url.host = target;
+    url.port = "";
+    return NextResponse.redirect(url, 308);
+  }
+
   // Playwright smoke tests render anonymous shell routes without Clerk's
   // development-browser handshake or real Clerk credentials.
   if (process.env.E2E_TEST_MODE === "1") {
