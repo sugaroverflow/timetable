@@ -1225,6 +1225,15 @@ optgroup {
   background: var(--card);
 }
 
+/* Toolbar dropdowns never wear the focus ring (QA 2026-08-10): Chrome
+   marks a clicked select :focus-visible, so the global ring appeared on
+   every click — the open dropdown is feedback enough. Scoped here;
+   standard form selects elsewhere keep the ring for keyboard users. */
+.select-minimal select:focus-visible,
+.feed-toolbar select:focus-visible {
+  outline: none;
+}
+
 /* Minimalist select (All Topics toolbar): no box, no native arrow — a
    chevron sits to the LEFT of the value instead. */
 .select-minimal {
