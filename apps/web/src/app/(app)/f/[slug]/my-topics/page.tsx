@@ -28,7 +28,7 @@ const QUERY = `
     me { id }
     timetableHosts: forumHosts(idOrSlug: $s) { id name }
     hostDashboard(idOrSlug: $s) {
-      id title slug hostId hostSlug status bodyMd bodyHtml coverImageUrl updatedAt
+      id title slug hostId hostSlug status bodyMd bodyHtml coverImageUrl updatedAt readyAt
       hostHearters { userId name image slug }
       ${commentTree()}
       ${commentTree("hostOnlyComments")}

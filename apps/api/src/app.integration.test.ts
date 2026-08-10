@@ -38,6 +38,7 @@ vi.mock("@timetable/core", async (importOriginal) => {
     markInviteSent: vi.fn(),
     logActivity: vi.fn(),
     setMemberRoles: vi.fn(),
+    setTopicReady: vi.fn(),
     softDeleteComment: vi.fn(),
     toggleHostHeart: vi.fn(),
     updateCommentBody: vi.fn(),
@@ -189,6 +190,7 @@ function topicFixture(patch: Partial<Topic> = {}): Topic {
     coverImageUrl: null,
     status: "submitted",
     publishedAt: null,
+    readyAt: null,
     contentUpdatedAt: null,
     createdAt: new Date("2026-01-01T00:00:00.000Z"),
     updatedAt: new Date("2026-01-01T00:00:00.000Z"),
@@ -258,6 +260,7 @@ afterEach(() => {
   vi.mocked(core.markInviteSent).mockReset();
   vi.mocked(core.getCommentById).mockReset();
   vi.mocked(core.setMemberRoles).mockReset();
+  vi.mocked(core.setTopicReady).mockReset();
   vi.mocked(core.softDeleteComment).mockReset();
   vi.mocked(core.toggleHostHeart).mockReset();
   vi.mocked(core.updateCommentBody).mockReset();
@@ -1164,6 +1167,96 @@ describe("createApiApp", () => {
         const body = await requestDelete(baseUrl, topic.id);
         expect(body.errors?.length).toBeGreaterThan(0);
         expect(core.deleteTopic).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("setTopicReady", () => {
+    const SET_READY = `mutation($id: String!, $ready: Boolean!){ setTopicReady(topicId: $id, ready: $ready){ id readyAt } }`;
+
+    async function requestSetReady(
+      baseUrl: string,
+      topicId: string,
+      ready: boolean,
+    ) {
+      const res = await fetch(`${baseUrl}/graphql`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: SET_READY,
+          variables: { id: topicId, ready },
+        }),
+      });
+      return (await res.json()) as {
+        data: { setTopicReady: { id: string; readyAt: string | null } | null };
+        errors?: unknown[];
+      };
+    }
+
+    it("lets the owning host mark their pending topic ready", async () => {
+      const topic = topicFixture({ status: "submitted" });
+      const readyAt = new Date("2026-08-06T12:00:00.000Z");
+      mockSession("host-1", ["host"]);
+      vi.mocked(core.getTopicById).mockResolvedValue(topic);
+      vi.mocked(core.setTopicReady).mockResolvedValue({ ...topic, readyAt });
+
+      await withTestServer(async (baseUrl) => {
+        const body = await requestSetReady(baseUrl, topic.id, true);
+        expect(body.errors).toBeUndefined();
+        expect(body.data?.setTopicReady?.readyAt).toBe(readyAt.toISOString());
+        expect(core.setTopicReady).toHaveBeenCalledWith(topic, "host-1", true);
+      });
+    });
+
+    it("lets an admin move someone else's topic back to drafting", async () => {
+      const topic = topicFixture({
+        status: "submitted",
+        hostId: "host-2",
+        readyAt: new Date("2026-08-01T00:00:00.000Z"),
+      });
+      mockSession("admin-1", ["admin"]);
+      vi.mocked(core.getTopicById).mockResolvedValue(topic);
+      vi.mocked(core.setTopicReady).mockResolvedValue({
+        ...topic,
+        readyAt: null,
+      });
+
+      await withTestServer(async (baseUrl) => {
+        const body = await requestSetReady(baseUrl, topic.id, false);
+        expect(body.errors).toBeUndefined();
+        expect(body.data?.setTopicReady?.readyAt).toBeNull();
+        expect(core.setTopicReady).toHaveBeenCalledWith(
+          topic,
+          "admin-1",
+          false,
+        );
+      });
+    });
+
+    it("refuses for a host who does not own the topic", async () => {
+      const topic = topicFixture({ status: "submitted", hostId: "host-2" });
+      mockSession("host-1", ["host"]);
+      vi.mocked(core.getTopicById).mockResolvedValue(topic);
+
+      await withTestServer(async (baseUrl) => {
+        const body = await requestSetReady(baseUrl, topic.id, true);
+        expect(body.errors?.length).toBeGreaterThan(0);
+        expect(core.setTopicReady).not.toHaveBeenCalled();
+      });
+    });
+
+    it("refuses on topics that are not pending review", async () => {
+      const topic = topicFixture({
+        status: "published",
+        publishedAt: new Date("2026-02-01T00:00:00.000Z"),
+      });
+      mockSession("host-1", ["host"]);
+      vi.mocked(core.getTopicById).mockResolvedValue(topic);
+
+      await withTestServer(async (baseUrl) => {
+        const body = await requestSetReady(baseUrl, topic.id, true);
+        expect(body.errors?.length).toBeGreaterThan(0);
+        expect(core.setTopicReady).not.toHaveBeenCalled();
       });
     });
   });

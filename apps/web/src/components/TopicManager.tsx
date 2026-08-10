@@ -9,6 +9,7 @@ import { CollapsibleTopicBody } from "@/components/CollapsibleTopicBody";
 import { CommentComposer } from "@/components/CommentComposer";
 import { CommentList } from "@/components/CommentList";
 import { HostOnlyPanel } from "@/components/HostOnlyPanel";
+import { ReadySwitch } from "@/components/ReadySwitch";
 import { TopicEditScope, useTopicEditing } from "@/components/TopicEditScope";
 import type { ManagedTopic } from "@/lib/feedTypes";
 import { topicPath } from "@/lib/topicPath";
@@ -198,11 +199,10 @@ function StatusAction({
       </button>
     );
   }
-  return (
-    <span className="faint" style={{ fontSize: 13 }}>
-      Pending review…
-    </span>
-  );
+  // Submitted: the host's readiness switch — flips the signal the admin
+  // Pending queue filters on (2026-08-06). Stays visible while editing,
+  // since TopicEditScope keeps this row mounted under the form.
+  return <ReadySwitch topicId={topic.id} ready={Boolean(topic.readyAt)} />;
 }
 
 function permalinkFor(topic: ManagedTopic, slug: string): string | null {

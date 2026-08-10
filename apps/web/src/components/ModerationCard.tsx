@@ -57,6 +57,14 @@ function ModerationContent({
             by {chip(topic.hostName ?? hostLabel)}
           </div>
         </div>
+        {/* Readiness badge — earns its keep in the "All" view, where ready
+            and still-drafting topics sit together (2026-08-06). */}
+        <span
+          className={`status-badge ${topic.readyAt ? "status-ready" : "status-drafting"}`}
+          style={{ marginLeft: "auto" }}
+        >
+          {topic.readyAt ? "ready to publish" : "still drafting"}
+        </span>
       </div>
       {topic.coverImageUrl ? (
         <div

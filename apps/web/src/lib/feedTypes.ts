@@ -89,6 +89,9 @@ export type ManagedTopic = {
   bodyHtml: string;
   coverImageUrl: string | null;
   updatedAt: string;
+  /** Host's "Ready to publish" signal — null/absent while still drafting
+   * (only meaningful on submitted topics; 2026-08-06). */
+  readyAt?: string | null;
   hostName?: string | null;
   hostImage?: string | null;
   /** Public thread — My Topics renders feed-identical cards (QA #59). */

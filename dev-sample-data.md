@@ -515,6 +515,7 @@ I can help fellows think about how to translate between different incentives, vo
 Title: Reform
 Host: host-hayley
 Status: submitted
+Ready to publish: yes
 Published date, if published:
 Cover image URL, if any:
 
@@ -1131,6 +1132,7 @@ I can help fellows move from a broad ambition to a practical route to change. Th
 Title: Serious Games as Tools for Learning and Strategy
 Host: host-aaron
 Status: submitted
+Ready to publish: yes
 Published date, if published:
 Cover image URL, if any:
 
@@ -9910,7 +9912,7 @@ List the people who hearted each topic.
 | topic-cryptocurrencies | elector-farah, elector-oscar, elector-marcus, elector-rosa, elector-tariq, elector-grace, elector-noah, elector-daniel, elector-kwame, elector-priya, elector-ella, elector-maya |
 | topic-knowledge-infrastructure | elector-oscar, elector-amara, elector-kwame, elector-marcus, elector-ella, elector-tariq, elector-leila, elector-sofia, elector-priya, elector-noah, elector-yuki, elector-daniel |
 | topic-digital-protocols | elector-tom, elector-ella, elector-farah, elector-hana, elector-leila, elector-ben, elector-sofia, elector-marcus, elector-oscar, elector-noah, elector-amara, elector-tariq |
-| topic-ai | elector-maya, elector-kwame, elector-sofia, elector-oscar, elector-noah, elector-ben, elector-tariq, elector-leila, elector-hana, elector-ella, elector-marcus, elector-yuki, elector-farah, elector-priya |
+| topic-ai | elector-maya, elector-kwame, elector-sofia, elector-oscar, elector-noah, elector-ben, elector-tariq, elector-leila, elector-hana, elector-ella, elector-marcus, elector-yuki, elector-farah, elector-priya, elector-amara, elector-rosa, elector-tom, elector-daniel, elector-grace, host-eli |
 | topic-encrypted-communications | elector-ella, elector-oscar, elector-farah, elector-kwame, elector-priya, elector-rosa, elector-tariq, elector-noah, elector-marcus, elector-sofia |
 | topic-digital-deliberative-spaces | elector-farah, elector-maya, elector-hana, elector-grace, elector-amara, elector-ella, elector-leila, elector-oscar, elector-noah, elector-kwame, elector-tariq, elector-tom |
 | topic-learning-intentional-communities | elector-tariq, elector-sofia, elector-daniel, elector-grace, elector-farah, elector-marcus, elector-oscar, elector-noah, elector-leila, elector-hana, elector-rosa |
@@ -9934,12 +9936,12 @@ List the people who hearted each topic.
 | topic-politics-of-social-media | elector-grace, elector-ella, elector-kwame, elector-noah, elector-yuki, elector-marcus, elector-tariq, elector-tom, elector-oscar, elector-farah |
 | topic-moderation-and-social-media | elector-yuki, elector-oscar, elector-ella, elector-tom, elector-sofia, elector-marcus, elector-noah, elector-farah |
 | topic-how-governance-works-in-britain | elector-grace, elector-farah, elector-noah, elector-yuki, elector-rosa, elector-daniel, elector-amara, elector-maya, elector-marcus, elector-ella, elector-sofia |
-| topic-the-nature-of-voting | elector-grace, elector-tariq, elector-maya, elector-leila, elector-farah, elector-tom, elector-ella, elector-amara, elector-daniel, elector-noah, elector-hana, host-eli |
+| topic-the-nature-of-voting | elector-grace, elector-tariq, elector-maya, elector-leila, elector-farah, elector-tom, elector-ella, elector-amara, elector-daniel, elector-noah, elector-hana, elector-ben, elector-yuki, elector-rosa, elector-sofia, host-eli |
 | topic-demography-voting-and-numbers | elector-grace, elector-leila, elector-daniel, elector-ella, elector-noah, elector-priya, elector-yuki, elector-marcus, elector-tom, elector-sofia, elector-tariq, host-eli |
 | topic-audience-participation | elector-farah, elector-amara, elector-noah, elector-ben, elector-grace, elector-marcus, elector-ella, elector-maya, elector-tariq |
 | topic-designing-rituals-of-participation | elector-maya, elector-tariq, elector-ella, elector-marcus, elector-rosa, elector-ben, elector-daniel, elector-noah, elector-oscar, elector-priya, elector-sofia, elector-amara |
 | topic-herds-birds-and-words | elector-amara, elector-tariq, elector-maya, elector-marcus, elector-sofia, elector-grace, elector-noah, elector-farah, elector-kwame |
-| topic-data-visualisation-nash | elector-amara, elector-farah, elector-tariq, elector-priya, elector-noah, elector-hana, elector-marcus, elector-yuki, elector-maya, elector-ella, elector-oscar, elector-tom, elector-ben |
+| topic-data-visualisation-nash | elector-amara, elector-farah, elector-tariq, elector-priya, elector-noah, elector-hana, elector-marcus, elector-yuki, elector-maya, elector-ella, elector-oscar, elector-tom, elector-ben, elector-grace, elector-sofia, elector-daniel, elector-kwame |
 | topic-the-basics-of-polling | elector-priya, elector-marcus, elector-daniel, elector-maya, elector-ella, elector-noah, elector-amara |
 | topic-low-hanging-fruit | elector-ben, elector-grace, elector-amara, elector-sofia, elector-noah, elector-rosa, elector-maya, elector-tom, elector-farah, elector-tariq, elector-marcus |
 | topic-how-do-media-organisations-work | elector-leila, elector-tariq, elector-maya, elector-ella, elector-oscar, elector-tom, elector-daniel, elector-noah, elector-amara, elector-grace, elector-rosa |
@@ -9947,23 +9949,23 @@ List the people who hearted each topic.
 | topic-bridgebuilding-political-conflict | elector-sofia, elector-daniel, elector-noah, elector-amara, elector-rosa, elector-marcus |
 | topic-complex-adaptive-systems | elector-farah, elector-oscar, elector-kwame, elector-yuki, elector-ella |
 | topic-crisis-escalation-decision-making | elector-tom, elector-noah, elector-daniel, elector-grace, elector-hana, elector-tariq, elector-sofia |
-| topic-cryptography-threat-modeling | elector-sofia, elector-hana, elector-marcus, elector-kwame |
+| topic-cryptography-threat-modeling | elector-sofia, elector-hana |
 | topic-data-pipelines | elector-priya, elector-hana, elector-oscar, elector-daniel, elector-ben |
 | topic-designing-civic-interventions | elector-amara, elector-maya, elector-ella, elector-ben, elector-rosa, elector-noah, elector-grace |
 | topic-experimental-governance-in-the-wild | elector-grace, elector-tariq, elector-yuki, elector-marcus, elector-farah, elector-tom |
 | topic-leadership-convening-stewardship | elector-leila, elector-rosa, elector-ben, elector-noah |
 | topic-legitimacy-authority-consent | elector-hana, elector-sofia, elector-kwame, elector-daniel, elector-ella, elector-tariq |
 | topic-mechanics-of-political-attention | elector-yuki, elector-marcus, elector-farah, elector-maya, elector-tom, elector-amara, elector-noah |
-| topic-metaphors-of-the-collective | elector-grace, elector-leila, elector-priya |
+| topic-metaphors-of-the-collective | elector-grace |
 | topic-mps-offices | elector-ben, elector-rosa, elector-daniel, elector-farah, elector-hana |
 | topic-postcolonial-futurism | elector-amara, elector-kwame, elector-leila, elector-maya, elector-tariq, elector-grace |
 | topic-running-experiments-uk-campaigns | elector-yuki, elector-ben, elector-noah, elector-ella, elector-priya |
-| topic-security-and-privacy-in-ml | elector-hana, elector-oscar, elector-sofia, elector-farah |
+| topic-security-and-privacy-in-ml | elector-hana |
 | topic-separatist-utopias | elector-tom, elector-grace, elector-marcus |
 | topic-software-supply-chains | elector-daniel, elector-kwame, elector-oscar, elector-noah, elector-priya |
 | topic-state-capacity-institutional-failure | elector-sofia, elector-ella, elector-amara, elector-daniel, elector-rosa, elector-noah, elector-marcus, elector-grace |
 | topic-strategy-getting-big-things-done | elector-tom, elector-ben, elector-yuki, elector-farah, elector-tariq, elector-kwame |
-| topic-structured-data-extraction | elector-priya, elector-hana, elector-daniel |
+| topic-structured-data-extraction | elector-priya, elector-hana |
 | topic-threat-modelling | elector-farah, elector-sofia, elector-noah, elector-kwame, elector-hana |
 | topic-training-and-serving-local-ai-models | elector-oscar, elector-yuki, elector-kwame, elector-maya, elector-ben, elector-priya |
 | topic-utopian-family | elector-grace, elector-rosa, elector-leila, elector-maya |
@@ -9992,7 +9994,13 @@ List the people who hearted each topic.
      Coverage (2026-08-03): 79 of 87 topics carry at least one heart (~91%).
      Unhearted by design: the 4 submitted queue examples, the 2 unpublished
      topics, and topic-programming-sarah / topic-online-help-seeking
-     (published but heartless — the sad-empty-state case). -->
+     (published but heartless — the sad-empty-state case).
+     ❤️ spread (2026-08-06): counts deliberately run from 1 to 20 —
+     topic-metaphors-of-the-collective and topic-security-and-privacy-in-ml
+     sit at a single heart, topic-structured-data-extraction and
+     topic-cryptography-threat-modeling at two, while topic-ai carries every
+     eligible hearter (19 electors + host-eli) — so both extremes of the
+     tally UI stay covered. -->
 
 
 ## Host hearts
@@ -10029,7 +10037,15 @@ No self-💙s: interest is for colleagues' topics.
      Electors grace/oscar/yuki/ben deliberately have NO explicit availability
      below (one exception) — their standing patterns supply inferred states.
      "Off-grid: yes" slots are host off-piste proposals: no pattern cell.
-     "Session host:" with no Topics is an office-hours session. -->
+     "Session host:" with no Topics is an office-hours session.
+
+     The hand-authored slots below cover the current window (weeks 0..+3)
+     with carefully chosen QA states — edit freely. Below the GENERATED
+     marker, scripts/generate-seed-slots.mjs fills in ~3 years of history
+     (ten terms, weeks -110..+47, ~570 slots): mostly-booked past terms,
+     mixed booked/pencilled/open future terms, parallel bookings sharing a
+     time window in different rooms, office hours, and off-grid extras.
+     Rerun that script to regenerate; never hand-edit the generated part. -->
 
 ### Slot: slot-w0-mon
 Date: mon+0
@@ -10419,12 +10435,5822 @@ Discussion:
 - Author: admin-edwin
   Text: End-of-week slot held open for whatever the cohort wants to run themselves.
 
+<!-- GENERATED SLOTS (scripts/generate-seed-slots.mjs) — do not hand-edit below this line -->
+
+### Slot: slot-gm110-mon
+Date: mon-110
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-matrix-protocol
+Status: confirmed
+
+### Slot: slot-gm110-tue
+Date: tue-110
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-cryptocurrencies
+Status: confirmed
+Url: https://lu.ma/spt-cryptocurrencies
+
+### Slot: slot-gm110-wed
+Date: wed-110
+Start: 10:00
+End: 11:30
+Location: Classroom
+Topics: topic-zero-knowledge-proofs
+Status: confirmed
+Url: https://lu.ma/spt-zero-knowledge-proofs
+
+### Slot: slot-gm110-thu
+Date: thu-110
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics:
+
+### Slot: slot-gm110-fri
+Date: fri-110
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-parties-lobbying-power-uk
+Status: confirmed
+
+### Slot: slot-gm109-mon
+Date: mon-109
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-iad-framework-ostrom
+Status: confirmed
+
+### Slot: slot-gm109-tue
+Date: tue-109
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics:
+
+### Slot: slot-gm109-wed
+Date: wed-109
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-self-determination-theory
+Status: confirmed
+Url: https://lu.ma/spt-self-determination-theory
+
+### Slot: slot-gm109-thu
+Date: thu-109
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics:
+
+### Slot: slot-gm109-fri
+Date: fri-109
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-maps
+Status: confirmed
+
+### Slot: slot-gm108-mon
+Date: mon-108
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-training-and-serving-local-ai-models
+Status: confirmed
+Url: https://lu.ma/spt-training-and-serving-local-ai-models
+
+### Slot: slot-gm108-tue
+Date: tue-108
+Start: 14:00
+End: 16:00
+Location: Lounge
+Topics: topic-sources-of-social-power
+Status: confirmed
+Url: https://lu.ma/spt-sources-of-social-power
+
+### Slot: slot-gm108-wed
+Date: wed-108
+Start: 10:00
+End: 11:30
+Location: Classroom
+Topics:
+Session host: host-teddy
+Status: confirmed
+
+Discussion:
+- Author: host-teddy
+  Text: Drop-in hours — questions, prototypes, half-formed ideas all welcome.
+
+### Slot: slot-gm108-thu
+Date: thu-108
+Start: 16:00
+End: 18:00
+Location: Lounge
+Topics:
+
+### Slot: slot-gm108-fri
+Date: fri-108
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-legitimacy-authority-consent
+Status: confirmed
+Url: https://lu.ma/spt-legitimacy-authority-consent
+
+### Slot: slot-gm107-mon
+Date: mon-107
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-crisis-escalation-decision-making
+Status: proposed
+
+### Slot: slot-gm107-tue
+Date: tue-107
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-elections-in-the-uk
+Status: confirmed
+
+Discussion:
+- Author: host-hayley
+  Text: Smaller group than expected but a really good discussion.
+
+### Slot: slot-gm107-wed
+Date: wed-107
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics:
+
+### Slot: slot-gm107-thu
+Date: thu-107
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-cryptographic-transparency
+Status: confirmed
+Url: https://lu.ma/spt-cryptographic-transparency
+
+### Slot: slot-gm107-fri
+Date: fri-107
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-utopian-family
+Status: confirmed
+
+### Slot: slot-gm106-mon
+Date: mon-106
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-arhuaco-philosophy
+Status: confirmed
+Url: https://lu.ma/spt-arhuaco-philosophy
+
+### Slot: slot-gm106-tue
+Date: tue-106
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics:
+
+### Slot: slot-gm106-wed
+Date: wed-106
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-politics-of-social-media
+Status: confirmed
+Url: https://lu.ma/spt-politics-of-social-media
+
+### Slot: slot-gm106-thu
+Date: thu-106
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-designing-campaign-tools
+Status: confirmed
+Url: https://lu.ma/spt-designing-campaign-tools
+
+### Slot: slot-gm106-fri
+Date: fri-106
+Start: 13:00
+End: 15:00
+Location: Library
+Topics: topic-utopian-justice
+Status: confirmed
+
+### Slot: slot-gm105-mon
+Date: mon-105
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-state-capacity-institutional-failure
+Status: confirmed
+
+### Slot: slot-gm105-tue
+Date: tue-105
+Start: 14:00
+End: 16:00
+Location: Auditorium
+Topics:
+
+### Slot: slot-gm105-wed
+Date: wed-105
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-cryptography-threat-modeling
+Status: confirmed
+
+### Slot: slot-gm105-thu
+Date: thu-105
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-experimental-governance-in-the-wild
+Status: confirmed
+Url: https://lu.ma/spt-experimental-governance-in-the-wild
+
+### Slot: slot-gm105-fri
+Date: fri-105
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics:
+
+### Slot: slot-gm105-thu-b
+Date: thu-105
+Start: 16:00
+End: 18:00
+Location: Terrace
+Topics: topic-xenofeminism
+Status: confirmed
+Url: https://lu.ma/spt-xenofeminism
+
+### Slot: slot-gm104-mon
+Date: mon-104
+Start: 10:00
+End: 12:00
+Location: Hall
+Topics:
+
+### Slot: slot-gm104-tue
+Date: tue-104
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-your-responsibilities
+Status: confirmed
+
+### Slot: slot-gm104-wed
+Date: wed-104
+Start: 10:00
+End: 11:30
+Location: Terrace
+Topics: topic-online-security-and-privacy
+Status: confirmed
+
+### Slot: slot-gm104-thu
+Date: thu-104
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-visual-information-design
+Status: proposed
+
+### Slot: slot-gm104-fri
+Date: fri-104
+Start: 13:00
+End: 15:00
+Location: Hall
+Topics:
+
+### Slot: slot-gm103-mon
+Date: mon-103
+Start: 10:00
+End: 12:00
+Location: Seminar Room
+Topics: topic-designing-civic-interventions
+Status: confirmed
+Url: https://lu.ma/spt-designing-civic-interventions
+
+### Slot: slot-gm103-tue
+Date: tue-103
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics:
+Session host: host-harvey
+Status: confirmed
+
+Discussion:
+- Author: host-harvey
+  Text: Office hours — drop in with whatever you're working on.
+
+### Slot: slot-gm103-wed
+Date: wed-103
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-low-hanging-fruit
+Status: confirmed
+Url: https://lu.ma/spt-low-hanging-fruit
+
+### Slot: slot-gm103-thu
+Date: thu-103
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-the-basics-of-polling
+Status: confirmed
+Url: https://lu.ma/spt-the-basics-of-polling
+
+### Slot: slot-gm103-fri
+Date: fri-103
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-the-nature-of-voting
+Status: confirmed
+Url: https://lu.ma/spt-the-nature-of-voting
+
+### Slot: slot-gm103-mon-b
+Date: mon-103
+Start: 10:00
+End: 12:00
+Location: Library
+Topics: topic-mechanics-of-political-attention
+Status: confirmed
+
+### Slot: slot-gm102-mon
+Date: mon-102
+Start: 10:00
+End: 12:00
+Location: Hall
+Topics: topic-constructing-legitimacy
+Status: confirmed
+
+### Slot: slot-gm102-tue
+Date: tue-102
+Start: 14:00
+End: 16:00
+Location: Seminar Room
+Topics: topic-models-of-group-development
+Status: confirmed
+Url: https://lu.ma/spt-models-of-group-development
+
+### Slot: slot-gm102-wed
+Date: wed-102
+Start: 10:00
+End: 11:30
+Location: Hall
+Topics: topic-programming-sarah
+Status: confirmed
+Url: https://lu.ma/spt-programming-sarah
+
+### Slot: slot-gm102-thu
+Date: thu-102
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics:
+Session host: host-jordan
+Status: confirmed
+
+Discussion:
+- Author: host-jordan
+  Text: Open surgery: bring a problem, leave with a plan. No agenda.
+
+### Slot: slot-gm102-fri
+Date: fri-102
+Start: 13:00
+End: 15:00
+Location: Seminar Room
+Topics: topic-leadership-convening-stewardship
+Status: confirmed
+Url: https://lu.ma/spt-leadership-convening-stewardship
+
+### Slot: slot-gm101-mon
+Date: mon-101
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-online-help-seeking
+Status: confirmed
+Url: https://lu.ma/spt-online-help-seeking
+
+### Slot: slot-gm101-tue
+Date: tue-101
+Start: 14:00
+End: 16:00
+Location: Terrace
+Topics: topic-moderation-and-social-media
+Status: confirmed
+
+### Slot: slot-gm101-wed
+Date: wed-101
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics:
+
+### Slot: slot-gm101-thu
+Date: thu-101
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-comparative-chat-architecture
+Status: confirmed
+
+### Slot: slot-gm101-fri
+Date: fri-101
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-metaphors-of-the-collective
+Status: confirmed
+Url: https://lu.ma/spt-metaphors-of-the-collective
+
+### Slot: slot-gm100-mon
+Date: mon-100
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-digital-deliberative-spaces
+Status: confirmed
+Url: https://lu.ma/spt-digital-deliberative-spaces
+
+### Slot: slot-gm100-tue
+Date: tue-100
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-land-registry-data
+Status: confirmed
+
+### Slot: slot-gm100-wed
+Date: wed-100
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-organisers-needs-from-whatsapp
+Status: confirmed
+Url: https://lu.ma/spt-organisers-needs-from-whatsapp
+
+Discussion:
+- Author: host-jake
+  Text: Smaller group than expected but a really good discussion.
+
+### Slot: slot-gm100-thu
+Date: thu-100
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-data-pipelines
+Status: confirmed
+Url: https://lu.ma/spt-data-pipelines
+
+### Slot: slot-gm100-fri
+Date: fri-100
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-separatist-utopias
+Status: confirmed
+Url: https://lu.ma/spt-separatist-utopias
+
+### Slot: slot-gm96-mon
+Date: mon-96
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics:
+
+### Slot: slot-gm96-tue
+Date: tue-96
+Start: 14:00
+End: 16:00
+Location: Terrace
+Topics:
+
+### Slot: slot-gm96-wed
+Date: wed-96
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics:
+Session host: host-anya
+Status: confirmed
+
+Discussion:
+- Author: host-anya
+  Text: Office hours — drop in with whatever you're working on.
+
+### Slot: slot-gm96-thu
+Date: thu-96
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-postcolonial-futurism
+Status: confirmed
+Url: https://lu.ma/spt-postcolonial-futurism
+
+### Slot: slot-gm96-fri
+Date: fri-96
+Start: 13:00
+End: 15:00
+Location: Seminar Room
+Topics:
+
+### Slot: slot-gm95-mon
+Date: mon-95
+Start: 10:00
+End: 12:00
+Location: Seminar Room
+Topics: topic-presentation-of-self
+Status: confirmed
+Url: https://lu.ma/spt-presentation-of-self
+
+### Slot: slot-gm95-tue
+Date: tue-95
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-leadership-six
+Status: proposed
+
+### Slot: slot-gm95-wed
+Date: wed-95
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-psychology-of-power-and-hierarchy
+Status: confirmed
+Url: https://lu.ma/spt-psychology-of-power-and-hierarchy
+
+### Slot: slot-gm95-thu
+Date: thu-95
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-ecotopia-techno-utopia
+Status: confirmed
+
+### Slot: slot-gm95-fri
+Date: fri-95
+Start: 13:00
+End: 15:00
+Location: Hall
+Topics: topic-sociocracy
+Status: confirmed
+
+### Slot: slot-gm95-sat-og
+Date: sat-95
+Start: 15:00
+End: 17:00
+Location: The Park
+Topics: topic-future-crafting
+Status: confirmed
+Url: https://lu.ma/spt-future-crafting
+Off-grid: yes
+
+Discussion:
+- Author: host-zara
+  Text: Evening experiment: same format, different energy. Who's in?
+
+### Slot: slot-gm94-mon
+Date: mon-94
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-herds-birds-and-words
+Status: confirmed
+
+### Slot: slot-gm94-tue
+Date: tue-94
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-ai-in-campaigning-2026
+Status: confirmed
+
+Discussion:
+- Author: host-hayley
+  Text: Notes from the session are in the shared drive.
+
+### Slot: slot-gm94-wed
+Date: wed-94
+Start: 10:00
+End: 11:30
+Location: Auditorium
+Topics:
+Session host: host-anya
+Status: proposed
+
+Discussion:
+- Author: host-anya
+  Text: Open surgery: bring a problem, leave with a plan. No agenda.
+
+### Slot: slot-gm94-thu
+Date: thu-94
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics:
+
+### Slot: slot-gm94-fri
+Date: fri-94
+Start: 13:00
+End: 15:00
+Location: Lounge
+Topics: topic-front-end-development
+Status: confirmed
+Url: https://lu.ma/spt-front-end-development
+
+### Slot: slot-gm93-mon
+Date: mon-93
+Start: 10:00
+End: 12:00
+Location: Hall
+Topics: topic-digital-protocols
+Status: confirmed
+Url: https://lu.ma/spt-digital-protocols
+
+### Slot: slot-gm93-tue
+Date: tue-93
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-threat-modelling
+Status: proposed
+
+Discussion:
+- Author: host-liam
+  Text: Smaller group than expected but a really good discussion.
+
+### Slot: slot-gm93-wed
+Date: wed-93
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics:
+
+### Slot: slot-gm93-thu
+Date: thu-93
+Start: 16:00
+End: 18:00
+Location: Lounge
+Topics: topic-learning-intentional-communities
+Status: proposed
+
+### Slot: slot-gm93-fri
+Date: fri-93
+Start: 13:00
+End: 15:00
+Location: Lounge
+Topics: topic-how-governance-works-in-britain
+Status: confirmed
+Url: https://lu.ma/spt-how-governance-works-in-britain
+
+Discussion:
+- Author: host-aaron
+  Text: Recording link is in the usual place.
+
+### Slot: slot-gm92-mon
+Date: mon-92
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-demography-voting-and-numbers
+Status: confirmed
+
+### Slot: slot-gm92-tue
+Date: tue-92
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-designing-rituals-of-participation
+Status: confirmed
+Url: https://lu.ma/spt-designing-rituals-of-participation
+
+### Slot: slot-gm92-wed
+Date: wed-92
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-mps-offices
+Status: proposed
+
+### Slot: slot-gm92-thu
+Date: thu-92
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-bridgebuilding-political-conflict
+Status: confirmed
+
+### Slot: slot-gm92-fri
+Date: fri-92
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-encrypted-communications
+Status: proposed
+
+### Slot: slot-gm91-mon
+Date: mon-91
+Start: 10:00
+End: 12:00
+Location: Hall
+Topics: topic-structured-data-extraction
+Status: confirmed
+Url: https://lu.ma/spt-structured-data-extraction
+
+### Slot: slot-gm91-tue
+Date: tue-91
+Start: 14:00
+End: 16:00
+Location: Library
+Topics:
+Session host: host-sam
+Status: confirmed
+
+Discussion:
+- Author: host-sam
+  Text: Drop-in hours — questions, prototypes, half-formed ideas all welcome.
+
+### Slot: slot-gm91-wed
+Date: wed-91
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-knowledge-infrastructure
+Status: proposed
+
+### Slot: slot-gm91-thu
+Date: thu-91
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics:
+
+### Slot: slot-gm91-fri
+Date: fri-91
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-running-experiments-uk-campaigns
+Status: confirmed
+Url: https://lu.ma/spt-running-experiments-uk-campaigns
+
+### Slot: slot-gm90-mon
+Date: mon-90
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-software-supply-chains
+Status: confirmed
+
+### Slot: slot-gm90-tue
+Date: tue-90
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-data-visualisation-nash
+Status: confirmed
+Url: https://lu.ma/spt-data-visualisation-nash
+
+### Slot: slot-gm90-wed
+Date: wed-90
+Start: 10:00
+End: 11:30
+Location: Library
+Topics: topic-hyperlocal-politics
+Status: confirmed
+
+### Slot: slot-gm90-thu
+Date: thu-90
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-web-data
+Status: confirmed
+Url: https://lu.ma/spt-web-data
+
+### Slot: slot-gm90-fri
+Date: fri-90
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics:
+
+### Slot: slot-gm89-mon
+Date: mon-89
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-healthy-relationships-to-work
+Status: confirmed
+Url: https://lu.ma/spt-healthy-relationships-to-work
+
+### Slot: slot-gm89-tue
+Date: tue-89
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-commoning-theory-and-praxis
+Status: confirmed
+Url: https://lu.ma/spt-commoning-theory-and-praxis
+
+### Slot: slot-gm89-wed
+Date: wed-89
+Start: 10:00
+End: 11:30
+Location: Library
+Topics:
+
+### Slot: slot-gm89-thu
+Date: thu-89
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-security-and-privacy-in-ml
+Status: confirmed
+
+### Slot: slot-gm89-fri
+Date: fri-89
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-complex-adaptive-systems
+Status: confirmed
+Url: https://lu.ma/spt-complex-adaptive-systems
+
+### Slot: slot-gm89-thu-b
+Date: thu-89
+Start: 16:00
+End: 18:00
+Location: Seminar Room
+Topics: topic-worker-coops
+Status: confirmed
+Url: https://lu.ma/spt-worker-coops
+
+### Slot: slot-gm88-mon
+Date: mon-88
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-metaphors-of-the-collective
+Status: confirmed
+
+### Slot: slot-gm88-tue
+Date: tue-88
+Start: 14:00
+End: 16:00
+Location: Classroom
+Topics: topic-crisis-escalation-decision-making
+Status: confirmed
+
+Discussion:
+- Author: host-aaron
+  Text: This ran long — we should book a double slot next time.
+
+### Slot: slot-gm88-wed
+Date: wed-88
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-comparative-chat-architecture
+Status: confirmed
+Url: https://lu.ma/spt-comparative-chat-architecture
+
+### Slot: slot-gm88-thu
+Date: thu-88
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-separatist-utopias
+Status: confirmed
+Url: https://lu.ma/spt-separatist-utopias
+
+### Slot: slot-gm88-fri
+Date: fri-88
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics:
+Session host: host-liam
+Status: proposed
+
+Discussion:
+- Author: host-liam
+  Text: Drop-in hours — questions, prototypes, half-formed ideas all welcome.
+
+### Slot: slot-gm88-wed-b
+Date: wed-88
+Start: 10:00
+End: 11:30
+Location: Hall
+Topics: topic-cryptography-threat-modeling
+Status: confirmed
+Url: https://lu.ma/spt-cryptography-threat-modeling
+
+Discussion:
+- Author: host-sadie
+  Text: Smaller group than expected but a really good discussion.
+
+### Slot: slot-gm87-mon
+Date: mon-87
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-legitimacy-authority-consent
+Status: confirmed
+Url: https://lu.ma/spt-legitimacy-authority-consent
+
+### Slot: slot-gm87-tue
+Date: tue-87
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics:
+
+### Slot: slot-gm87-wed
+Date: wed-87
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics:
+Session host: host-harvey
+Status: confirmed
+
+Discussion:
+- Author: host-harvey
+  Text: Drop-in hours — questions, prototypes, half-formed ideas all welcome.
+
+### Slot: slot-gm87-thu
+Date: thu-87
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-cryptocurrencies
+Status: confirmed
+
+### Slot: slot-gm87-fri
+Date: fri-87
+Start: 13:00
+End: 15:00
+Location: Classroom
+Topics: topic-programming-sarah
+Status: confirmed
+Url: https://lu.ma/spt-programming-sarah
+
+### Slot: slot-gm87-wed-b
+Date: wed-87
+Start: 10:00
+End: 11:30
+Location: Auditorium
+Topics: topic-strategy-getting-big-things-done
+Status: confirmed
+Url: https://lu.ma/spt-strategy-getting-big-things-done
+
+### Slot: slot-gm86-mon
+Date: mon-86
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-parties-lobbying-power-uk
+Status: confirmed
+Url: https://lu.ma/spt-parties-lobbying-power-uk
+
+### Slot: slot-gm86-tue
+Date: tue-86
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-organisers-needs-from-whatsapp
+Status: confirmed
+Url: https://lu.ma/spt-organisers-needs-from-whatsapp
+
+### Slot: slot-gm86-wed
+Date: wed-86
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-the-basics-of-polling
+Status: confirmed
+Url: https://lu.ma/spt-the-basics-of-polling
+
+### Slot: slot-gm86-thu
+Date: thu-86
+Start: 16:00
+End: 18:00
+Location: Hall
+Topics: topic-iad-framework-ostrom
+Status: confirmed
+Url: https://lu.ma/spt-iad-framework-ostrom
+
+### Slot: slot-gm86-fri
+Date: fri-86
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-the-nature-of-voting
+Status: confirmed
+Url: https://lu.ma/spt-the-nature-of-voting
+
+### Slot: slot-gm82-mon
+Date: mon-82
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-utopian-family
+Status: confirmed
+
+### Slot: slot-gm82-tue
+Date: tue-82
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-knowledge-infrastructure
+Status: confirmed
+Url: https://lu.ma/spt-knowledge-infrastructure
+
+### Slot: slot-gm82-wed
+Date: wed-82
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-designing-civic-interventions
+Status: confirmed
+
+### Slot: slot-gm82-thu
+Date: thu-82
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics:
+Session host: host-aaron
+Status: confirmed
+
+Discussion:
+- Author: host-aaron
+  Text: Drop-in hours — questions, prototypes, half-formed ideas all welcome.
+
+### Slot: slot-gm82-fri
+Date: fri-82
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-healthy-institutions
+Status: confirmed
+Url: https://lu.ma/spt-healthy-institutions
+
+### Slot: slot-gm81-mon
+Date: mon-81
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics:
+
+### Slot: slot-gm81-tue
+Date: tue-81
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-mps-offices
+Status: proposed
+
+Discussion:
+- Author: host-hayley
+  Text: Recording link is in the usual place.
+
+### Slot: slot-gm81-wed
+Date: wed-81
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-ai-in-campaigning-2026
+Status: confirmed
+Url: https://lu.ma/spt-ai-in-campaigning-2026
+
+### Slot: slot-gm81-thu
+Date: thu-81
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-visual-information-design
+Status: confirmed
+Url: https://lu.ma/spt-visual-information-design
+
+### Slot: slot-gm81-fri
+Date: fri-81
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-presentation-of-self
+Status: proposed
+
+### Slot: slot-gm80-mon
+Date: mon-80
+Start: 10:00
+End: 12:00
+Location: Seminar Room
+Topics: topic-politics-of-social-media
+Status: confirmed
+
+### Slot: slot-gm80-tue
+Date: tue-80
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-maps
+Status: confirmed
+Url: https://lu.ma/spt-maps
+
+### Slot: slot-gm80-wed
+Date: wed-80
+Start: 10:00
+End: 11:30
+Location: Auditorium
+Topics: topic-state-capacity-institutional-failure
+Status: confirmed
+Url: https://lu.ma/spt-state-capacity-institutional-failure
+
+### Slot: slot-gm80-thu
+Date: thu-80
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-digital-protocols
+Status: confirmed
+Url: https://lu.ma/spt-digital-protocols
+
+### Slot: slot-gm80-fri
+Date: fri-80
+Start: 13:00
+End: 15:00
+Location: Classroom
+Topics: topic-low-hanging-fruit
+Status: confirmed
+Url: https://lu.ma/spt-low-hanging-fruit
+
+### Slot: slot-gm80-tue-b
+Date: tue-80
+Start: 14:00
+End: 16:00
+Location: Classroom
+Topics: topic-online-security-and-privacy
+Status: confirmed
+Url: https://lu.ma/spt-online-security-and-privacy
+
+### Slot: slot-gm79-mon
+Date: mon-79
+Start: 10:00
+End: 12:00
+Location: Seminar Room
+Topics:
+
+### Slot: slot-gm79-tue
+Date: tue-79
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-software-supply-chains
+Status: confirmed
+Url: https://lu.ma/spt-software-supply-chains
+
+### Slot: slot-gm79-wed
+Date: wed-79
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics:
+
+### Slot: slot-gm79-thu
+Date: thu-79
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-your-responsibilities
+Status: proposed
+
+### Slot: slot-gm79-fri
+Date: fri-79
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-mechanics-of-political-attention
+Status: confirmed
+
+### Slot: slot-gm79-fri-b
+Date: fri-79
+Start: 13:00
+End: 15:00
+Location: Auditorium
+Topics: topic-cryptographic-transparency
+Status: confirmed
+
+### Slot: slot-gm78-mon
+Date: mon-78
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics:
+
+### Slot: slot-gm78-tue
+Date: tue-78
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-commoning-theory-and-praxis
+Status: confirmed
+Url: https://lu.ma/spt-commoning-theory-and-praxis
+
+### Slot: slot-gm78-wed
+Date: wed-78
+Start: 10:00
+End: 11:30
+Location: Seminar Room
+Topics: topic-telling-stories-with-data
+Status: confirmed
+Url: https://lu.ma/spt-telling-stories-with-data
+
+### Slot: slot-gm78-thu
+Date: thu-78
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-online-help-seeking
+Status: confirmed
+
+### Slot: slot-gm78-fri
+Date: fri-78
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-experimental-governance-in-the-wild
+Status: confirmed
+
+### Slot: slot-gm77-mon
+Date: mon-77
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics:
+
+### Slot: slot-gm77-tue
+Date: tue-77
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-self-determination-theory
+Status: proposed
+
+### Slot: slot-gm77-wed
+Date: wed-77
+Start: 10:00
+End: 11:30
+Location: Terrace
+Topics: topic-moderation-and-social-media
+Status: confirmed
+Url: https://lu.ma/spt-moderation-and-social-media
+
+### Slot: slot-gm77-thu
+Date: thu-77
+Start: 16:00
+End: 18:00
+Location: Seminar Room
+Topics: topic-learning-intentional-communities
+Status: confirmed
+Url: https://lu.ma/spt-learning-intentional-communities
+
+### Slot: slot-gm77-fri
+Date: fri-77
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-worker-coops
+Status: confirmed
+Url: https://lu.ma/spt-worker-coops
+
+### Slot: slot-gm76-mon
+Date: mon-76
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-security-and-privacy-in-ml
+Status: confirmed
+
+### Slot: slot-gm76-tue
+Date: tue-76
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-science-of-collectivity
+Status: confirmed
+
+### Slot: slot-gm76-wed
+Date: wed-76
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics:
+
+### Slot: slot-gm76-thu
+Date: thu-76
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-training-and-serving-local-ai-models
+Status: confirmed
+
+### Slot: slot-gm76-fri
+Date: fri-76
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-designing-campaign-tools
+Status: proposed
+
+### Slot: slot-gm75-mon
+Date: mon-75
+Start: 10:00
+End: 12:00
+Location: Lounge
+Topics: topic-sources-of-social-power
+Status: confirmed
+Url: https://lu.ma/spt-sources-of-social-power
+
+### Slot: slot-gm75-tue
+Date: tue-75
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics:
+
+### Slot: slot-gm75-wed
+Date: wed-75
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-herds-birds-and-words
+Status: confirmed
+
+### Slot: slot-gm75-thu
+Date: thu-75
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-leadership-six
+Status: confirmed
+Url: https://lu.ma/spt-leadership-six
+
+### Slot: slot-gm75-fri
+Date: fri-75
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics:
+Session host: host-zara
+Status: confirmed
+
+Discussion:
+- Author: host-zara
+  Text: Open surgery: bring a problem, leave with a plan. No agenda.
+
+### Slot: slot-gm74-mon
+Date: mon-74
+Start: 10:00
+End: 12:00
+Location: Hall
+Topics: topic-complex-adaptive-systems
+Status: proposed
+
+### Slot: slot-gm74-tue
+Date: tue-74
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-leadership-convening-stewardship
+Status: confirmed
+Url: https://lu.ma/spt-leadership-convening-stewardship
+
+### Slot: slot-gm74-wed
+Date: wed-74
+Start: 10:00
+End: 11:30
+Location: Terrace
+Topics: topic-zero-knowledge-proofs
+Status: proposed
+
+### Slot: slot-gm74-thu
+Date: thu-74
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-web-data
+Status: confirmed
+
+### Slot: slot-gm74-fri
+Date: fri-74
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-land-registry-data
+Status: confirmed
+
+### Slot: slot-gm74-mon-b
+Date: mon-74
+Start: 10:00
+End: 12:00
+Location: Auditorium
+Topics: topic-ai
+Status: confirmed
+Url: https://lu.ma/spt-ai
+
+### Slot: slot-gm73-mon
+Date: mon-73
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-models-of-group-development
+Status: confirmed
+
+### Slot: slot-gm73-tue
+Date: tue-73
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-constructing-legitimacy
+Status: confirmed
+Url: https://lu.ma/spt-constructing-legitimacy
+
+### Slot: slot-gm73-wed
+Date: wed-73
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-hyperlocal-politics
+Status: confirmed
+
+### Slot: slot-gm73-thu
+Date: thu-73
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-xenofeminism
+Status: proposed
+
+### Slot: slot-gm73-fri
+Date: fri-73
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics:
+
+### Slot: slot-gm73-thu-b
+Date: thu-73
+Start: 16:00
+End: 18:00
+Location: Auditorium
+Topics: topic-digital-deliberative-spaces
+Status: confirmed
+Url: https://lu.ma/spt-digital-deliberative-spaces
+
+### Slot: slot-gm72-mon
+Date: mon-72
+Start: 10:00
+End: 12:00
+Location: Seminar Room
+Topics: topic-matrix-protocol
+Status: confirmed
+Url: https://lu.ma/spt-matrix-protocol
+
+### Slot: slot-gm72-tue
+Date: tue-72
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-encrypted-communications
+Status: confirmed
+Url: https://lu.ma/spt-encrypted-communications
+
+### Slot: slot-gm72-wed
+Date: wed-72
+Start: 10:00
+End: 11:30
+Location: Library
+Topics:
+Session host: host-liam
+Status: confirmed
+
+Discussion:
+- Author: host-liam
+  Text: Office hours — drop in with whatever you're working on.
+
+### Slot: slot-gm72-thu
+Date: thu-72
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics:
+Session host: host-jordan
+Status: confirmed
+
+Discussion:
+- Author: host-jordan
+  Text: Office hours — drop in with whatever you're working on.
+
+### Slot: slot-gm72-fri
+Date: fri-72
+Start: 13:00
+End: 15:00
+Location: Hall
+Topics: topic-audience-participation
+Status: confirmed
+Url: https://lu.ma/spt-audience-participation
+
+### Slot: slot-gm58-mon
+Date: mon-58
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-front-end-development
+Status: confirmed
+
+### Slot: slot-gm58-tue
+Date: tue-58
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics:
+Session host: host-jake
+Status: confirmed
+
+Discussion:
+- Author: host-jake
+  Text: Office hours — drop in with whatever you're working on.
+
+### Slot: slot-gm58-wed
+Date: wed-58
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-psychology-of-power-and-hierarchy
+Status: confirmed
+Url: https://lu.ma/spt-psychology-of-power-and-hierarchy
+
+### Slot: slot-gm58-thu
+Date: thu-58
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-designing-rituals-of-participation
+Status: confirmed
+
+### Slot: slot-gm58-fri
+Date: fri-58
+Start: 13:00
+End: 15:00
+Location: Lounge
+Topics:
+
+### Slot: slot-gm57-mon
+Date: mon-57
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics:
+
+### Slot: slot-gm57-tue
+Date: tue-57
+Start: 14:00
+End: 16:00
+Location: Auditorium
+Topics: topic-how-governance-works-in-britain
+Status: proposed
+
+### Slot: slot-gm57-wed
+Date: wed-57
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-running-experiments-uk-campaigns
+Status: confirmed
+Url: https://lu.ma/spt-running-experiments-uk-campaigns
+
+### Slot: slot-gm57-thu
+Date: thu-57
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-bridgebuilding-political-conflict
+Status: confirmed
+
+### Slot: slot-gm57-fri
+Date: fri-57
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-demography-voting-and-numbers
+Status: confirmed
+Url: https://lu.ma/spt-demography-voting-and-numbers
+
+### Slot: slot-gm56-mon
+Date: mon-56
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics:
+
+### Slot: slot-gm56-tue
+Date: tue-56
+Start: 14:00
+End: 16:00
+Location: Library
+Topics: topic-future-crafting
+Status: confirmed
+
+### Slot: slot-gm56-wed
+Date: wed-56
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-postcolonial-futurism
+Status: proposed
+
+### Slot: slot-gm56-thu
+Date: thu-56
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics:
+
+### Slot: slot-gm56-fri
+Date: fri-56
+Start: 13:00
+End: 15:00
+Location: Hall
+Topics: topic-structured-data-extraction
+Status: confirmed
+Url: https://lu.ma/spt-structured-data-extraction
+
+### Slot: slot-gm55-mon
+Date: mon-55
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-data-visualisation-nash
+Status: confirmed
+Url: https://lu.ma/spt-data-visualisation-nash
+
+Discussion:
+- Author: host-jordan
+  Text: Great turnout for this one.
+
+### Slot: slot-gm55-tue
+Date: tue-55
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-threat-modelling
+Status: confirmed
+Url: https://lu.ma/spt-threat-modelling
+
+Discussion:
+- Author: admin-edwin
+  Text: This ran long — we should book a double slot next time.
+
+### Slot: slot-gm55-wed
+Date: wed-55
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-leadership-six
+Status: confirmed
+Url: https://lu.ma/spt-leadership-six
+
+### Slot: slot-gm55-thu
+Date: thu-55
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics:
+Session host: host-jordan
+Status: confirmed
+
+Discussion:
+- Author: host-jordan
+  Text: Office hours — drop in with whatever you're working on.
+
+### Slot: slot-gm55-fri
+Date: fri-55
+Start: 13:00
+End: 15:00
+Location: Hall
+Topics: topic-mps-offices
+Status: proposed
+
+### Slot: slot-gm54-mon
+Date: mon-54
+Start: 10:00
+End: 12:00
+Location: Terrace
+Topics:
+
+### Slot: slot-gm54-tue
+Date: tue-54
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-worker-coops
+Status: confirmed
+Url: https://lu.ma/spt-worker-coops
+
+### Slot: slot-gm54-wed
+Date: wed-54
+Start: 10:00
+End: 11:30
+Location: Classroom
+Topics:
+
+### Slot: slot-gm54-thu
+Date: thu-54
+Start: 16:00
+End: 18:00
+Location: Library
+Topics: topic-web-data
+Status: confirmed
+Url: https://lu.ma/spt-web-data
+
+### Slot: slot-gm54-fri
+Date: fri-54
+Start: 13:00
+End: 15:00
+Location: Lounge
+Topics:
+
+### Slot: slot-gm53-mon
+Date: mon-53
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-presentation-of-self
+Status: proposed
+
+### Slot: slot-gm53-tue
+Date: tue-53
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics:
+
+### Slot: slot-gm53-wed
+Date: wed-53
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-parties-lobbying-power-uk
+Status: confirmed
+Url: https://lu.ma/spt-parties-lobbying-power-uk
+
+### Slot: slot-gm53-thu
+Date: thu-53
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-the-nature-of-voting
+Status: confirmed
+Url: https://lu.ma/spt-the-nature-of-voting
+
+### Slot: slot-gm53-fri
+Date: fri-53
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-science-of-collectivity
+Status: confirmed
+
+### Slot: slot-gm52-mon
+Date: mon-52
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-the-basics-of-polling
+Status: confirmed
+Url: https://lu.ma/spt-the-basics-of-polling
+
+### Slot: slot-gm52-tue
+Date: tue-52
+Start: 14:00
+End: 16:00
+Location: Auditorium
+Topics:
+
+### Slot: slot-gm52-wed
+Date: wed-52
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-zero-knowledge-proofs
+Status: confirmed
+Url: https://lu.ma/spt-zero-knowledge-proofs
+
+Discussion:
+- Author: admin-edwin
+  Text: Recording link is in the usual place.
+
+### Slot: slot-gm52-thu
+Date: thu-52
+Start: 16:00
+End: 18:00
+Location: Hall
+Topics: topic-cryptography-threat-modeling
+Status: confirmed
+Url: https://lu.ma/spt-cryptography-threat-modeling
+
+### Slot: slot-gm52-fri
+Date: fri-52
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-self-determination-theory
+Status: confirmed
+Url: https://lu.ma/spt-self-determination-theory
+
+### Slot: slot-gm51-mon
+Date: mon-51
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-matrix-protocol
+Status: confirmed
+Url: https://lu.ma/spt-matrix-protocol
+
+### Slot: slot-gm51-tue
+Date: tue-51
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics:
+
+### Slot: slot-gm51-wed
+Date: wed-51
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-cryptographic-transparency
+Status: confirmed
+Url: https://lu.ma/spt-cryptographic-transparency
+
+### Slot: slot-gm51-thu
+Date: thu-51
+Start: 16:00
+End: 18:00
+Location: Lounge
+Topics: topic-complex-adaptive-systems
+Status: proposed
+
+### Slot: slot-gm51-fri
+Date: fri-51
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-cryptocurrencies
+Status: confirmed
+Url: https://lu.ma/spt-cryptocurrencies
+
+### Slot: slot-gm50-mon
+Date: mon-50
+Start: 10:00
+End: 12:00
+Location: Library
+Topics: topic-knowledge-infrastructure
+Status: confirmed
+
+### Slot: slot-gm50-tue
+Date: tue-50
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics:
+Session host: host-liam
+Status: confirmed
+
+Discussion:
+- Author: host-liam
+  Text: Office hours — drop in with whatever you're working on.
+
+### Slot: slot-gm50-wed
+Date: wed-50
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-programming-sarah
+Status: confirmed
+
+### Slot: slot-gm50-thu
+Date: thu-50
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-digital-protocols
+Status: confirmed
+
+### Slot: slot-gm50-fri
+Date: fri-50
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics:
+
+### Slot: slot-gm49-mon
+Date: mon-49
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-low-hanging-fruit
+Status: confirmed
+Url: https://lu.ma/spt-low-hanging-fruit
+
+### Slot: slot-gm49-tue
+Date: tue-49
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-utopian-family
+Status: confirmed
+Url: https://lu.ma/spt-utopian-family
+
+Discussion:
+- Author: admin-edwin
+  Text: This ran long — we should book a double slot next time.
+
+### Slot: slot-gm49-wed
+Date: wed-49
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-constructing-legitimacy
+Status: confirmed
+Url: https://lu.ma/spt-constructing-legitimacy
+
+### Slot: slot-gm49-thu
+Date: thu-49
+Start: 16:00
+End: 18:00
+Location: Lounge
+Topics:
+Session host: host-jordan
+Status: proposed
+
+Discussion:
+- Author: host-jordan
+  Text: Office hours — drop in with whatever you're working on.
+
+### Slot: slot-gm49-fri
+Date: fri-49
+Start: 13:00
+End: 15:00
+Location: Classroom
+Topics:
+Session host: host-sadie
+Status: confirmed
+
+Discussion:
+- Author: host-sadie
+  Text: Office hours — drop in with whatever you're working on.
+
+### Slot: slot-gm48-mon
+Date: mon-48
+Start: 10:00
+End: 12:00
+Location: Hall
+Topics: topic-commoning-theory-and-praxis
+Status: confirmed
+
+Discussion:
+- Author: host-zara
+  Text: Recording link is in the usual place.
+
+### Slot: slot-gm48-tue
+Date: tue-48
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-designing-civic-interventions
+Status: confirmed
+Url: https://lu.ma/spt-designing-civic-interventions
+
+### Slot: slot-gm48-wed
+Date: wed-48
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-learning-intentional-communities
+Status: confirmed
+Url: https://lu.ma/spt-learning-intentional-communities
+
+### Slot: slot-gm48-thu
+Date: thu-48
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics:
+Session host: host-harvey
+Status: confirmed
+
+Discussion:
+- Author: host-harvey
+  Text: Open surgery: bring a problem, leave with a plan. No agenda.
+
+### Slot: slot-gm48-fri
+Date: fri-48
+Start: 13:00
+End: 15:00
+Location: Hall
+Topics:
+Session host: host-sadie
+Status: confirmed
+
+Discussion:
+- Author: host-sadie
+  Text: Drop-in hours — questions, prototypes, half-formed ideas all welcome.
+
+### Slot: slot-gm44-mon
+Date: mon-44
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-metaphors-of-the-collective
+Status: confirmed
+Url: https://lu.ma/spt-metaphors-of-the-collective
+
+### Slot: slot-gm44-tue
+Date: tue-44
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-hyperlocal-politics
+Status: confirmed
+Url: https://lu.ma/spt-hyperlocal-politics
+
+### Slot: slot-gm44-wed
+Date: wed-44
+Start: 10:00
+End: 11:30
+Location: Terrace
+Topics:
+Session host: host-zara
+Status: confirmed
+
+Discussion:
+- Author: host-zara
+  Text: Open surgery: bring a problem, leave with a plan. No agenda.
+
+### Slot: slot-gm44-thu
+Date: thu-44
+Start: 16:00
+End: 18:00
+Location: Library
+Topics: topic-maps
+Status: confirmed
+Url: https://lu.ma/spt-maps
+
+### Slot: slot-gm44-fri
+Date: fri-44
+Start: 13:00
+End: 15:00
+Location: Hall
+Topics: topic-leadership-convening-stewardship
+Status: confirmed
+Url: https://lu.ma/spt-leadership-convening-stewardship
+
+Discussion:
+- Author: admin-edwin
+  Text: Notes from the session are in the shared drive.
+
+### Slot: slot-gm43-mon
+Date: mon-43
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics:
+
+### Slot: slot-gm43-tue
+Date: tue-43
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-utopian-justice
+Status: confirmed
+Url: https://lu.ma/spt-utopian-justice
+
+### Slot: slot-gm43-wed
+Date: wed-43
+Start: 10:00
+End: 11:30
+Location: Seminar Room
+Topics:
+
+### Slot: slot-gm43-thu
+Date: thu-43
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-models-of-group-development
+Status: confirmed
+Url: https://lu.ma/spt-models-of-group-development
+
+### Slot: slot-gm43-fri
+Date: fri-43
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-ecotopia-techno-utopia
+Status: confirmed
+Url: https://lu.ma/spt-ecotopia-techno-utopia
+
+### Slot: slot-gm42-mon
+Date: mon-42
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-software-supply-chains
+Status: confirmed
+Url: https://lu.ma/spt-software-supply-chains
+
+### Slot: slot-gm42-tue
+Date: tue-42
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-sources-of-social-power
+Status: confirmed
+Url: https://lu.ma/spt-sources-of-social-power
+
+### Slot: slot-gm42-wed
+Date: wed-42
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-how-governance-works-in-britain
+Status: confirmed
+Url: https://lu.ma/spt-how-governance-works-in-britain
+
+### Slot: slot-gm42-thu
+Date: thu-42
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-legitimacy-authority-consent
+Status: proposed
+
+### Slot: slot-gm42-fri
+Date: fri-42
+Start: 13:00
+End: 15:00
+Location: Library
+Topics: topic-arhuaco-philosophy
+Status: confirmed
+
+### Slot: slot-gm41-mon
+Date: mon-41
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-moderation-and-social-media
+Status: confirmed
+Url: https://lu.ma/spt-moderation-and-social-media
+
+### Slot: slot-gm41-tue
+Date: tue-41
+Start: 14:00
+End: 16:00
+Location: Seminar Room
+Topics: topic-land-registry-data
+Status: confirmed
+Url: https://lu.ma/spt-land-registry-data
+
+### Slot: slot-gm41-wed
+Date: wed-41
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-state-capacity-institutional-failure
+Status: confirmed
+
+### Slot: slot-gm41-thu
+Date: thu-41
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-visual-information-design
+Status: proposed
+
+### Slot: slot-gm41-fri
+Date: fri-41
+Start: 13:00
+End: 15:00
+Location: Auditorium
+Topics:
+
+### Slot: slot-gm40-mon
+Date: mon-40
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-comparative-chat-architecture
+Status: confirmed
+Url: https://lu.ma/spt-comparative-chat-architecture
+
+### Slot: slot-gm40-tue
+Date: tue-40
+Start: 14:00
+End: 16:00
+Location: Library
+Topics: topic-ai
+Status: proposed
+
+### Slot: slot-gm40-wed
+Date: wed-40
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-training-and-serving-local-ai-models
+Status: proposed
+
+### Slot: slot-gm40-thu
+Date: thu-40
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics:
+
+### Slot: slot-gm40-fri
+Date: fri-40
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-your-responsibilities
+Status: confirmed
+Url: https://lu.ma/spt-your-responsibilities
+
+### Slot: slot-gm39-mon
+Date: mon-39
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-separatist-utopias
+Status: confirmed
+Url: https://lu.ma/spt-separatist-utopias
+
+### Slot: slot-gm39-tue
+Date: tue-39
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics:
+
+### Slot: slot-gm39-wed
+Date: wed-39
+Start: 10:00
+End: 11:30
+Location: Hall
+Topics: topic-sociocracy
+Status: confirmed
+
+### Slot: slot-gm39-thu
+Date: thu-39
+Start: 16:00
+End: 18:00
+Location: Hall
+Topics:
+
+### Slot: slot-gm39-fri
+Date: fri-39
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-data-pipelines
+Status: confirmed
+Url: https://lu.ma/spt-data-pipelines
+
+### Slot: slot-gm38-mon
+Date: mon-38
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-designing-rituals-of-participation
+Status: confirmed
+Url: https://lu.ma/spt-designing-rituals-of-participation
+
+Discussion:
+- Author: host-eli
+  Text: This ran long — we should book a double slot next time.
+
+### Slot: slot-gm38-tue
+Date: tue-38
+Start: 14:00
+End: 16:00
+Location: Auditorium
+Topics:
+
+### Slot: slot-gm38-wed
+Date: wed-38
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics:
+Session host: host-anya
+Status: confirmed
+
+Discussion:
+- Author: host-anya
+  Text: Open surgery: bring a problem, leave with a plan. No agenda.
+
+### Slot: slot-gm38-thu
+Date: thu-38
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-online-help-seeking
+Status: confirmed
+Url: https://lu.ma/spt-online-help-seeking
+
+### Slot: slot-gm38-fri
+Date: fri-38
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-iad-framework-ostrom
+Status: confirmed
+Url: https://lu.ma/spt-iad-framework-ostrom
+
+### Slot: slot-gm38-thu-b
+Date: thu-38
+Start: 16:00
+End: 18:00
+Location: Hall
+Topics: topic-experimental-governance-in-the-wild
+Status: confirmed
+
+### Slot: slot-gm37-mon
+Date: mon-37
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-structured-data-extraction
+Status: confirmed
+
+### Slot: slot-gm37-tue
+Date: tue-37
+Start: 14:00
+End: 16:00
+Location: Terrace
+Topics: topic-crisis-escalation-decision-making
+Status: confirmed
+Url: https://lu.ma/spt-crisis-escalation-decision-making
+
+### Slot: slot-gm37-wed
+Date: wed-37
+Start: 10:00
+End: 11:30
+Location: Classroom
+Topics: topic-demography-voting-and-numbers
+Status: confirmed
+Url: https://lu.ma/spt-demography-voting-and-numbers
+
+### Slot: slot-gm37-thu
+Date: thu-37
+Start: 16:00
+End: 18:00
+Location: Hall
+Topics: topic-data-visualisation-nash
+Status: confirmed
+Url: https://lu.ma/spt-data-visualisation-nash
+
+### Slot: slot-gm37-fri
+Date: fri-37
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-healthy-relationships-to-work
+Status: confirmed
+
+Discussion:
+- Author: host-sam
+  Text: This ran long — we should book a double slot next time.
+
+### Slot: slot-gm37-mon-b
+Date: mon-37
+Start: 10:00
+End: 12:00
+Location: Seminar Room
+Topics: topic-healthy-institutions
+Status: confirmed
+
+### Slot: slot-gm37-sat-og
+Date: sat-37
+Start: 15:00
+End: 17:00
+Location: The Park
+Topics: topic-organisers-needs-from-whatsapp
+Status: confirmed
+Off-grid: yes
+
+Discussion:
+- Author: host-jake
+  Text: Off-piste proposal — this one wants a different kind of space.
+
+### Slot: slot-gm36-mon
+Date: mon-36
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-herds-birds-and-words
+Status: confirmed
+Url: https://lu.ma/spt-herds-birds-and-words
+
+### Slot: slot-gm36-tue
+Date: tue-36
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-elections-in-the-uk
+Status: confirmed
+Url: https://lu.ma/spt-elections-in-the-uk
+
+### Slot: slot-gm36-wed
+Date: wed-36
+Start: 10:00
+End: 11:30
+Location: Terrace
+Topics: topic-strategy-getting-big-things-done
+Status: confirmed
+Url: https://lu.ma/spt-strategy-getting-big-things-done
+
+Discussion:
+- Author: admin-edwin
+  Text: Notes from the session are in the shared drive.
+
+### Slot: slot-gm36-thu
+Date: thu-36
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-digital-deliberative-spaces
+Status: confirmed
+
+### Slot: slot-gm36-fri
+Date: fri-36
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-mechanics-of-political-attention
+Status: confirmed
+Url: https://lu.ma/spt-mechanics-of-political-attention
+
+### Slot: slot-gm36-thu-b
+Date: thu-36
+Start: 16:00
+End: 18:00
+Location: Terrace
+Topics: topic-designing-campaign-tools
+Status: confirmed
+Url: https://lu.ma/spt-designing-campaign-tools
+
+### Slot: slot-gm35-mon
+Date: mon-35
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-bridgebuilding-political-conflict
+Status: confirmed
+Url: https://lu.ma/spt-bridgebuilding-political-conflict
+
+### Slot: slot-gm35-tue
+Date: tue-35
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics:
+
+### Slot: slot-gm35-wed
+Date: wed-35
+Start: 10:00
+End: 11:30
+Location: Auditorium
+Topics: topic-running-experiments-uk-campaigns
+Status: confirmed
+
+### Slot: slot-gm35-thu
+Date: thu-35
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-psychology-of-power-and-hierarchy
+Status: confirmed
+Url: https://lu.ma/spt-psychology-of-power-and-hierarchy
+
+### Slot: slot-gm35-fri
+Date: fri-35
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-postcolonial-futurism
+Status: confirmed
+Url: https://lu.ma/spt-postcolonial-futurism
+
+### Slot: slot-gm35-sat-og
+Date: sat-35
+Start: 15:00
+End: 17:00
+Location: The Park
+Topics: topic-future-crafting
+Status: confirmed
+Url: https://lu.ma/spt-future-crafting
+Off-grid: yes
+
+Discussion:
+- Author: host-zara
+  Text: Evening experiment: same format, different energy. Who's in?
+
+### Slot: slot-gm34-mon
+Date: mon-34
+Start: 10:00
+End: 12:00
+Location: Auditorium
+Topics:
+
+### Slot: slot-gm34-tue
+Date: tue-34
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-threat-modelling
+Status: confirmed
+Url: https://lu.ma/spt-threat-modelling
+
+### Slot: slot-gm34-wed
+Date: wed-34
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-front-end-development
+Status: confirmed
+Url: https://lu.ma/spt-front-end-development
+
+### Slot: slot-gm34-thu
+Date: thu-34
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-programming-sarah
+Status: confirmed
+Url: https://lu.ma/spt-programming-sarah
+
+### Slot: slot-gm34-fri
+Date: fri-34
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-matrix-protocol
+Status: confirmed
+Url: https://lu.ma/spt-matrix-protocol
+
+### Slot: slot-gm30-mon
+Date: mon-30
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-your-responsibilities
+Status: proposed
+
+### Slot: slot-gm30-tue
+Date: tue-30
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-online-security-and-privacy
+Status: confirmed
+Url: https://lu.ma/spt-online-security-and-privacy
+
+### Slot: slot-gm30-wed
+Date: wed-30
+Start: 10:00
+End: 11:30
+Location: Auditorium
+Topics: topic-learning-intentional-communities
+Status: confirmed
+
+Discussion:
+- Author: admin-edwin
+  Text: Great turnout for this one.
+
+### Slot: slot-gm30-thu
+Date: thu-30
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-constructing-legitimacy
+Status: confirmed
+Url: https://lu.ma/spt-constructing-legitimacy
+
+### Slot: slot-gm30-fri
+Date: fri-30
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics:
+Session host: host-jordan
+Status: confirmed
+
+Discussion:
+- Author: host-jordan
+  Text: Drop-in hours — questions, prototypes, half-formed ideas all welcome.
+
+### Slot: slot-gm30-mon-b
+Date: mon-30
+Start: 10:00
+End: 12:00
+Location: Terrace
+Topics: topic-designing-rituals-of-participation
+Status: confirmed
+
+### Slot: slot-gm29-mon
+Date: mon-29
+Start: 10:00
+End: 12:00
+Location: Auditorium
+Topics: topic-presentation-of-self
+Status: confirmed
+Url: https://lu.ma/spt-presentation-of-self
+
+### Slot: slot-gm29-tue
+Date: tue-29
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-web-data
+Status: confirmed
+Url: https://lu.ma/spt-web-data
+
+### Slot: slot-gm29-wed
+Date: wed-29
+Start: 10:00
+End: 11:30
+Location: Library
+Topics:
+
+### Slot: slot-gm29-thu
+Date: thu-29
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-arhuaco-philosophy
+Status: confirmed
+Url: https://lu.ma/spt-arhuaco-philosophy
+
+Discussion:
+- Author: host-eli
+  Text: Great turnout for this one.
+
+### Slot: slot-gm29-fri
+Date: fri-29
+Start: 13:00
+End: 15:00
+Location: Seminar Room
+Topics: topic-legitimacy-authority-consent
+Status: confirmed
+Url: https://lu.ma/spt-legitimacy-authority-consent
+
+### Slot: slot-gm29-wed-og
+Date: wed-29
+Start: 18:30
+End: 20:00
+Location: Lounge
+Topics: topic-leadership-convening-stewardship
+Status: confirmed
+Off-grid: yes
+
+Discussion:
+- Author: host-aaron
+  Text: Proposing an extra slot outside the usual grid; daytimes are full.
+
+### Slot: slot-gm28-mon
+Date: mon-28
+Start: 10:00
+End: 12:00
+Location: Terrace
+Topics: topic-telling-stories-with-data
+Status: confirmed
+Url: https://lu.ma/spt-telling-stories-with-data
+
+### Slot: slot-gm28-tue
+Date: tue-28
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-bridgebuilding-political-conflict
+Status: confirmed
+Url: https://lu.ma/spt-bridgebuilding-political-conflict
+
+Discussion:
+- Author: admin-edwin
+  Text: Notes from the session are in the shared drive.
+
+### Slot: slot-gm28-wed
+Date: wed-28
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-audience-participation
+Status: confirmed
+Url: https://lu.ma/spt-audience-participation
+
+### Slot: slot-gm28-thu
+Date: thu-28
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-future-crafting
+Status: confirmed
+Url: https://lu.ma/spt-future-crafting
+
+### Slot: slot-gm28-fri
+Date: fri-28
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-ecotopia-techno-utopia
+Status: confirmed
+
+### Slot: slot-gm27-mon
+Date: mon-27
+Start: 10:00
+End: 12:00
+Location: Library
+Topics: topic-healthy-relationships-to-work
+Status: confirmed
+Url: https://lu.ma/spt-healthy-relationships-to-work
+
+### Slot: slot-gm27-tue
+Date: tue-27
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-software-supply-chains
+Status: proposed
+
+### Slot: slot-gm27-wed
+Date: wed-27
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-strategy-getting-big-things-done
+Status: confirmed
+Url: https://lu.ma/spt-strategy-getting-big-things-done
+
+### Slot: slot-gm27-thu
+Date: thu-27
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics:
+
+### Slot: slot-gm27-fri
+Date: fri-27
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-elections-in-the-uk
+Status: confirmed
+Url: https://lu.ma/spt-elections-in-the-uk
+
+### Slot: slot-gm26-mon
+Date: mon-26
+Start: 10:00
+End: 12:00
+Location: Auditorium
+Topics: topic-politics-of-social-media
+Status: confirmed
+Url: https://lu.ma/spt-politics-of-social-media
+
+### Slot: slot-gm26-tue
+Date: tue-26
+Start: 14:00
+End: 16:00
+Location: Auditorium
+Topics: topic-the-nature-of-voting
+Status: proposed
+
+### Slot: slot-gm26-wed
+Date: wed-26
+Start: 10:00
+End: 11:30
+Location: Terrace
+Topics: topic-psychology-of-power-and-hierarchy
+Status: confirmed
+Url: https://lu.ma/spt-psychology-of-power-and-hierarchy
+
+### Slot: slot-gm26-thu
+Date: thu-26
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-threat-modelling
+Status: confirmed
+Url: https://lu.ma/spt-threat-modelling
+
+### Slot: slot-gm26-fri
+Date: fri-26
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-sources-of-social-power
+Status: confirmed
+Url: https://lu.ma/spt-sources-of-social-power
+
+### Slot: slot-gm26-wed-b
+Date: wed-26
+Start: 10:00
+End: 11:30
+Location: Seminar Room
+Topics: topic-sociocracy
+Status: confirmed
+
+### Slot: slot-gm25-mon
+Date: mon-25
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics:
+
+### Slot: slot-gm25-tue
+Date: tue-25
+Start: 14:00
+End: 16:00
+Location: Auditorium
+Topics:
+
+### Slot: slot-gm25-wed
+Date: wed-25
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-herds-birds-and-words
+Status: confirmed
+
+### Slot: slot-gm25-thu
+Date: thu-25
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-separatist-utopias
+Status: confirmed
+
+### Slot: slot-gm25-fri
+Date: fri-25
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-security-and-privacy-in-ml
+Status: confirmed
+Url: https://lu.ma/spt-security-and-privacy-in-ml
+
+### Slot: slot-gm25-wed-b
+Date: wed-25
+Start: 10:00
+End: 11:30
+Location: Seminar Room
+Topics: topic-science-of-collectivity
+Status: confirmed
+Url: https://lu.ma/spt-science-of-collectivity
+
+### Slot: slot-gm24-mon
+Date: mon-24
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-cryptographic-transparency
+Status: confirmed
+Url: https://lu.ma/spt-cryptographic-transparency
+
+### Slot: slot-gm24-tue
+Date: tue-24
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-running-experiments-uk-campaigns
+Status: confirmed
+Url: https://lu.ma/spt-running-experiments-uk-campaigns
+
+### Slot: slot-gm24-wed
+Date: wed-24
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics:
+
+### Slot: slot-gm24-thu
+Date: thu-24
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-mps-offices
+Status: confirmed
+Url: https://lu.ma/spt-mps-offices
+
+### Slot: slot-gm24-fri
+Date: fri-24
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-encrypted-communications
+Status: confirmed
+Url: https://lu.ma/spt-encrypted-communications
+
+### Slot: slot-gm23-mon
+Date: mon-23
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-comparative-chat-architecture
+Status: proposed
+
+### Slot: slot-gm23-tue
+Date: tue-23
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-parties-lobbying-power-uk
+Status: confirmed
+
+### Slot: slot-gm23-wed
+Date: wed-23
+Start: 10:00
+End: 11:30
+Location: Auditorium
+Topics: topic-designing-campaign-tools
+Status: confirmed
+
+### Slot: slot-gm23-thu
+Date: thu-23
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-maps
+Status: confirmed
+Url: https://lu.ma/spt-maps
+
+### Slot: slot-gm23-fri
+Date: fri-23
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-zero-knowledge-proofs
+Status: confirmed
+Url: https://lu.ma/spt-zero-knowledge-proofs
+
+Discussion:
+- Author: host-sadie
+  Text: Notes from the session are in the shared drive.
+
+### Slot: slot-gm22-mon
+Date: mon-22
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-models-of-group-development
+Status: proposed
+
+### Slot: slot-gm22-tue
+Date: tue-22
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics:
+
+### Slot: slot-gm22-wed
+Date: wed-22
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-self-determination-theory
+Status: confirmed
+
+Discussion:
+- Author: admin-edwin
+  Text: This ran long — we should book a double slot next time.
+
+### Slot: slot-gm22-thu
+Date: thu-22
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-ai-in-campaigning-2026
+Status: proposed
+
+### Slot: slot-gm22-fri
+Date: fri-22
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-low-hanging-fruit
+Status: confirmed
+Url: https://lu.ma/spt-low-hanging-fruit
+
+### Slot: slot-gm21-mon
+Date: mon-21
+Start: 10:00
+End: 12:00
+Location: Library
+Topics: topic-demography-voting-and-numbers
+Status: confirmed
+Url: https://lu.ma/spt-demography-voting-and-numbers
+
+### Slot: slot-gm21-tue
+Date: tue-21
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics:
+
+### Slot: slot-gm21-wed
+Date: wed-21
+Start: 10:00
+End: 11:30
+Location: Seminar Room
+Topics: topic-knowledge-infrastructure
+Status: confirmed
+Url: https://lu.ma/spt-knowledge-infrastructure
+
+### Slot: slot-gm21-thu
+Date: thu-21
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-commoning-theory-and-praxis
+Status: confirmed
+
+### Slot: slot-gm21-fri
+Date: fri-21
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-moderation-and-social-media
+Status: confirmed
+Url: https://lu.ma/spt-moderation-and-social-media
+
+### Slot: slot-gm20-mon
+Date: mon-20
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-ai
+Status: confirmed
+Url: https://lu.ma/spt-ai
+
+### Slot: slot-gm20-tue
+Date: tue-20
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-structured-data-extraction
+Status: confirmed
+
+### Slot: slot-gm20-wed
+Date: wed-20
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-designing-civic-interventions
+Status: confirmed
+Url: https://lu.ma/spt-designing-civic-interventions
+
+### Slot: slot-gm20-thu
+Date: thu-20
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-state-capacity-institutional-failure
+Status: confirmed
+Url: https://lu.ma/spt-state-capacity-institutional-failure
+
+### Slot: slot-gm20-fri
+Date: fri-20
+Start: 13:00
+End: 15:00
+Location: Seminar Room
+Topics: topic-utopian-family
+Status: confirmed
+Url: https://lu.ma/spt-utopian-family
+
+### Slot: slot-gm7-mon
+Date: mon-7
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics:
+
+### Slot: slot-gm7-tue
+Date: tue-7
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-data-pipelines
+Status: confirmed
+Url: https://lu.ma/spt-data-pipelines
+
+### Slot: slot-gm7-wed
+Date: wed-7
+Start: 10:00
+End: 11:30
+Location: Hall
+Topics: topic-cryptocurrencies
+Status: confirmed
+
+### Slot: slot-gm7-thu
+Date: thu-7
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics:
+
+### Slot: slot-gm7-fri
+Date: fri-7
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics:
+
+### Slot: slot-gm7-tue-b
+Date: tue-7
+Start: 14:00
+End: 16:00
+Location: Auditorium
+Topics: topic-online-help-seeking
+Status: confirmed
+
+### Slot: slot-gm6-mon
+Date: mon-6
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-the-basics-of-polling
+Status: confirmed
+
+### Slot: slot-gm6-tue
+Date: tue-6
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics:
+
+### Slot: slot-gm6-wed
+Date: wed-6
+Start: 10:00
+End: 11:30
+Location: Hall
+Topics: topic-healthy-institutions
+Status: confirmed
+Url: https://lu.ma/spt-healthy-institutions
+
+### Slot: slot-gm6-thu
+Date: thu-6
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics:
+
+### Slot: slot-gm6-fri
+Date: fri-6
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-how-governance-works-in-britain
+Status: proposed
+
+### Slot: slot-gm6-wed-b
+Date: wed-6
+Start: 10:00
+End: 11:30
+Location: Library
+Topics: topic-experimental-governance-in-the-wild
+Status: confirmed
+Url: https://lu.ma/spt-experimental-governance-in-the-wild
+
+Discussion:
+- Author: admin-edwin
+  Text: Smaller group than expected but a really good discussion.
+
+### Slot: slot-gm5-mon
+Date: mon-5
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-data-visualisation-nash
+Status: proposed
+
+### Slot: slot-gm5-tue
+Date: tue-5
+Start: 14:00
+End: 16:00
+Location: Terrace
+Topics: topic-crisis-escalation-decision-making
+Status: confirmed
+Url: https://lu.ma/spt-crisis-escalation-decision-making
+
+### Slot: slot-gm5-wed
+Date: wed-5
+Start: 10:00
+End: 11:30
+Location: Hall
+Topics: topic-land-registry-data
+Status: confirmed
+Url: https://lu.ma/spt-land-registry-data
+
+Discussion:
+- Author: admin-edwin
+  Text: Notes from the session are in the shared drive.
+
+### Slot: slot-gm5-thu
+Date: thu-5
+Start: 16:00
+End: 18:00
+Location: Hall
+Topics: topic-xenofeminism
+Status: confirmed
+
+Discussion:
+- Author: host-zara
+  Text: This ran long — we should book a double slot next time.
+
+### Slot: slot-gm5-fri
+Date: fri-5
+Start: 13:00
+End: 15:00
+Location: Classroom
+Topics: topic-digital-protocols
+Status: confirmed
+
+### Slot: slot-gm5-fri-b
+Date: fri-5
+Start: 13:00
+End: 15:00
+Location: Auditorium
+Topics: topic-metaphors-of-the-collective
+Status: confirmed
+
+### Slot: slot-gm4-mon
+Date: mon-4
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-digital-deliberative-spaces
+Status: confirmed
+
+### Slot: slot-gm4-tue
+Date: tue-4
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-leadership-six
+Status: confirmed
+Url: https://lu.ma/spt-leadership-six
+
+Discussion:
+- Author: admin-edwin
+  Text: Notes from the session are in the shared drive.
+
+### Slot: slot-gm4-wed
+Date: wed-4
+Start: 10:00
+End: 11:30
+Location: Auditorium
+Topics:
+Session host: host-eli
+Status: confirmed
+
+Discussion:
+- Author: host-eli
+  Text: Open surgery: bring a problem, leave with a plan. No agenda.
+
+### Slot: slot-gm4-thu
+Date: thu-4
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-complex-adaptive-systems
+Status: confirmed
+Url: https://lu.ma/spt-complex-adaptive-systems
+
+### Slot: slot-gm4-fri
+Date: fri-4
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-worker-coops
+Status: confirmed
+Url: https://lu.ma/spt-worker-coops
+
+### Slot: slot-gm3-mon
+Date: mon-3
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics:
+Session host: host-jordan
+Status: confirmed
+
+Discussion:
+- Author: host-jordan
+  Text: Drop-in hours — questions, prototypes, half-formed ideas all welcome.
+
+### Slot: slot-gm3-tue
+Date: tue-3
+Start: 14:00
+End: 16:00
+Location: Classroom
+Topics: topic-postcolonial-futurism
+Status: confirmed
+Url: https://lu.ma/spt-postcolonial-futurism
+
+### Slot: slot-gm3-wed
+Date: wed-3
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-mechanics-of-political-attention
+Status: confirmed
+Url: https://lu.ma/spt-mechanics-of-political-attention
+
+### Slot: slot-gm3-thu
+Date: thu-3
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-training-and-serving-local-ai-models
+Status: confirmed
+Url: https://lu.ma/spt-training-and-serving-local-ai-models
+
+### Slot: slot-gm3-fri
+Date: fri-3
+Start: 13:00
+End: 15:00
+Location: Hall
+Topics: topic-utopian-justice
+Status: confirmed
+Url: https://lu.ma/spt-utopian-justice
+
+### Slot: slot-gm2-mon
+Date: mon-2
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-hyperlocal-politics
+Status: confirmed
+Url: https://lu.ma/spt-hyperlocal-politics
+
+### Slot: slot-gm2-tue
+Date: tue-2
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-iad-framework-ostrom
+Status: confirmed
+Url: https://lu.ma/spt-iad-framework-ostrom
+
+### Slot: slot-gm2-wed
+Date: wed-2
+Start: 10:00
+End: 11:30
+Location: Seminar Room
+Topics: topic-front-end-development
+Status: confirmed
+Url: https://lu.ma/spt-front-end-development
+
+Discussion:
+- Author: admin-edwin
+  Text: Great turnout for this one.
+
+### Slot: slot-gm2-thu
+Date: thu-2
+Start: 16:00
+End: 18:00
+Location: Auditorium
+Topics: topic-maps
+Status: confirmed
+
+### Slot: slot-gm2-fri
+Date: fri-2
+Start: 13:00
+End: 15:00
+Location: Seminar Room
+Topics: topic-mps-offices
+Status: confirmed
+Url: https://lu.ma/spt-mps-offices
+
+### Slot: slot-gm1-mon
+Date: mon-1
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-programming-sarah
+Status: confirmed
+
+### Slot: slot-gm1-tue
+Date: tue-1
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-learning-intentional-communities
+Status: confirmed
+Url: https://lu.ma/spt-learning-intentional-communities
+
+### Slot: slot-gm1-wed
+Date: wed-1
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics:
+Session host: host-anya
+Status: confirmed
+
+Discussion:
+- Author: host-anya
+  Text: Office hours — drop in with whatever you're working on.
+
+### Slot: slot-gm1-thu
+Date: thu-1
+Start: 16:00
+End: 18:00
+Location: Auditorium
+Topics: topic-psychology-of-power-and-hierarchy
+Status: confirmed
+Url: https://lu.ma/spt-psychology-of-power-and-hierarchy
+
+### Slot: slot-gm1-fri
+Date: fri-1
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics:
+
+### Slot: slot-gp4-mon
+Date: mon+4
+Start: 10:00
+End: 12:00
+Location: Seminar Room
+Topics: topic-commoning-theory-and-praxis
+Status: confirmed
+Url: https://lu.ma/spt-commoning-theory-and-praxis
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-maya | red |
+| elector-sofia | yellow |
+| elector-leila | green |
+
+Discussion:
+- Author: admin-edwin
+  Text: Confirmed and announced.
+
+### Slot: slot-gp4-tue
+Date: tue+4
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-demography-voting-and-numbers
+Status: proposed
+
+### Slot: slot-gp4-wed
+Date: wed+4
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-presentation-of-self
+Status: proposed
+
+### Slot: slot-gp4-thu
+Date: thu+4
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics:
+Session host: host-hayley
+Status: confirmed
+
+Discussion:
+- Author: host-hayley
+  Text: Drop-in hours — questions, prototypes, half-formed ideas all welcome.
+
+### Slot: slot-gp4-fri
+Date: fri+4
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-running-experiments-uk-campaigns
+Status: confirmed
+Url: https://lu.ma/spt-running-experiments-uk-campaigns
+
+Discussion:
+- Author: admin-edwin
+  Text: Booked. Add it to your calendars.
+
+### Slot: slot-gp5-mon
+Date: mon+5
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics:
+
+### Slot: slot-gp5-tue
+Date: tue+5
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-knowledge-infrastructure
+Status: confirmed
+Url: https://lu.ma/spt-knowledge-infrastructure
+
+### Slot: slot-gp5-wed
+Date: wed+5
+Start: 10:00
+End: 11:30
+Location: Seminar Room
+Topics: topic-herds-birds-and-words
+Status: proposed
+
+Discussion:
+- Author: host-eli
+  Claim: topic-herds-birds-and-words
+  Counts: 6 green, 4 yellow, 2 red
+  Text: Herds, Birds, and Words wants exactly this kind of slot. Claiming.
+- Author: admin-edwin
+  Text: Looks good — I'll confirm once the room booking is checked.
+
+### Slot: slot-gp5-thu
+Date: thu+5
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-future-crafting
+Status: proposed
+
+Discussion:
+- Author: host-zara
+  Claim: topic-future-crafting
+  Counts: 8 green, 3 yellow, 0 red
+  Text: Future Crafting wants exactly this kind of slot. Claiming.
+- Author: admin-edwin
+  Text: Looks good — I'll confirm once the room booking is checked.
+
+### Slot: slot-gp5-fri
+Date: fri+5
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics:
+Session host: host-zara
+Status: proposed
+
+Discussion:
+- Author: host-zara
+  Text: Office hours — drop in with whatever you're working on.
+
+### Slot: slot-gp9-mon
+Date: mon+9
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-worker-coops
+Status: confirmed
+Url: https://lu.ma/spt-worker-coops
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-daniel | yellow |
+| elector-leila | yellow |
+| host-eli | green |
+| elector-hana | green |
+| elector-priya | red |
+| elector-farah | yellow |
+
+### Slot: slot-gp9-tue
+Date: tue+9
+Start: 14:00
+End: 16:00
+Location: Seminar Room
+Topics: topic-experimental-governance-in-the-wild
+Status: proposed
+
+Discussion:
+- Author: host-zara
+  Claim: topic-experimental-governance-in-the-wild
+  Counts: 7 green, 4 yellow, 1 red
+  Text: Proposing Experimental Governance in the Wild for this one — the counts look workable.
+
+### Slot: slot-gp9-wed
+Date: wed+9
+Start: 10:00
+End: 11:30
+Location: Terrace
+Topics: topic-postcolonial-futurism
+Status: proposed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-leila | green |
+| elector-rosa | red |
+| elector-noah | red |
+| elector-sofia | green |
+
+Discussion:
+- Author: host-zara
+  Claim: topic-postcolonial-futurism
+  Counts: 9 green, 3 yellow, 0 red
+  Text: Proposing Postcolonial Futurism for this one — the counts look workable.
+
+### Slot: slot-gp9-thu
+Date: thu+9
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics:
+
+### Slot: slot-gp9-fri
+Date: fri+9
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics:
+
+### Slot: slot-gp10-mon
+Date: mon+10
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-telling-stories-with-data
+Status: confirmed
+
+### Slot: slot-gp10-tue
+Date: tue+10
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-organisers-needs-from-whatsapp
+Status: proposed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-kwame | green |
+| elector-sofia | green |
+| elector-ella | yellow |
+
+Discussion:
+- Author: host-jake
+  Claim: topic-organisers-needs-from-whatsapp
+  Counts: 7 green, 5 yellow, 1 red
+  Text: Claiming this for Organisers' Needs from WhatsApp; most of my hearters are free at this time.
+- Author: admin-edwin
+  Text: Noted. Give it a few days for objections, then I'll book it.
+
+### Slot: slot-gp10-wed
+Date: wed+10
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-leadership-convening-stewardship
+Status: confirmed
+Url: https://lu.ma/spt-leadership-convening-stewardship
+
+### Slot: slot-gp10-thu
+Date: thu+10
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-healthy-relationships-to-work
+Status: confirmed
+Url: https://lu.ma/spt-healthy-relationships-to-work
+
+### Slot: slot-gp10-fri
+Date: fri+10
+Start: 13:00
+End: 15:00
+Location: Hall
+Topics: topic-front-end-development
+Status: proposed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-sofia | yellow |
+| elector-ella | green |
+| elector-marcus | yellow |
+| elector-leila | green |
+| elector-amara | green |
+
+### Slot: slot-gp11-mon
+Date: mon+11
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-audience-participation
+Status: confirmed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-kwame | green |
+| elector-leila | green |
+| elector-farah | red |
+| elector-priya | green |
+| elector-marcus | yellow |
+| elector-tariq | green |
+
+### Slot: slot-gp11-tue
+Date: tue+11
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics:
+
+### Slot: slot-gp11-wed
+Date: wed+11
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-separatist-utopias
+Status: confirmed
+Url: https://lu.ma/spt-separatist-utopias
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-tariq | red |
+| elector-daniel | green |
+| elector-priya | red |
+| elector-marcus | green |
+| elector-maya | green |
+
+### Slot: slot-gp11-thu
+Date: thu+11
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-visual-information-design
+Status: proposed
+
+Discussion:
+- Author: host-anya
+  Claim: topic-visual-information-design
+  Counts: 9 green, 4 yellow, 0 red
+  Text: Visual Information Design wants exactly this kind of slot. Claiming.
+
+### Slot: slot-gp11-fri
+Date: fri+11
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics:
+
+### Slot: slot-gp11-mon-b
+Date: mon+11
+Start: 10:00
+End: 12:00
+Location: Hall
+Topics: topic-zero-knowledge-proofs
+Status: proposed
+
+Discussion:
+- Author: host-sadie
+  Claim: topic-zero-knowledge-proofs
+  Counts: 6 green, 5 yellow, 3 red
+  Text: Pencilling Zero-Knowledge Proofs in here — happy to move if someone needs the room more.
+
+### Slot: slot-gp12-mon
+Date: mon+12
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-structured-data-extraction
+Status: proposed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-tom | yellow |
+| elector-noah | yellow |
+| elector-maya | green |
+
+Discussion:
+- Author: host-harvey
+  Claim: topic-structured-data-extraction
+  Counts: 8 green, 2 yellow, 0 red
+  Text: Claiming this for Structured Data Extraction; most of my hearters are free at this time.
+- Author: admin-edwin
+  Text: Noted. Give it a few days for objections, then I'll book it.
+
+### Slot: slot-gp12-tue
+Date: tue+12
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-metaphors-of-the-collective
+Status: proposed
+
+### Slot: slot-gp12-wed
+Date: wed+12
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-online-security-and-privacy
+Status: proposed
+
+Discussion:
+- Author: host-sadie
+  Claim: topic-online-security-and-privacy
+  Counts: 10 green, 5 yellow, 2 red
+  Text: Online Security and Privacy wants exactly this kind of slot. Claiming.
+
+### Slot: slot-gp12-thu
+Date: thu+12
+Start: 16:00
+End: 18:00
+Location: Auditorium
+Topics:
+
+### Slot: slot-gp12-fri
+Date: fri+12
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-politics-of-social-media
+Status: proposed
+
+Discussion:
+- Author: host-anya
+  Claim: topic-politics-of-social-media
+  Counts: 10 green, 3 yellow, 1 red
+  Text: The Politics of Social Media wants exactly this kind of slot. Claiming.
+
+### Slot: slot-gp13-mon
+Date: mon+13
+Start: 10:00
+End: 12:00
+Location: Terrace
+Topics: topic-complex-adaptive-systems
+Status: confirmed
+
+Discussion:
+- Author: admin-edwin
+  Text: Confirmed — event page is up.
+
+### Slot: slot-gp13-tue
+Date: tue+13
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-cryptographic-transparency
+Status: confirmed
+
+### Slot: slot-gp13-wed
+Date: wed+13
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-crisis-escalation-decision-making
+Status: confirmed
+Url: https://lu.ma/spt-crisis-escalation-decision-making
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-leila | green |
+| elector-daniel | yellow |
+| elector-tom | red |
+
+### Slot: slot-gp13-thu
+Date: thu+13
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-models-of-group-development
+Status: proposed
+
+Discussion:
+- Author: host-sam
+  Claim: topic-models-of-group-development
+  Counts: 9 green, 6 yellow, 3 red
+  Text: Proposing Models of Group Development for this one — the counts look workable.
+- Author: admin-edwin
+  Text: Looks good — I'll confirm once the room booking is checked.
+
+### Slot: slot-gp13-fri
+Date: fri+13
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-arhuaco-philosophy
+Status: confirmed
+Url: https://lu.ma/spt-arhuaco-philosophy
+
+### Slot: slot-gp13-mon-b
+Date: mon+13
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-matrix-protocol
+Status: confirmed
+Url: https://lu.ma/spt-matrix-protocol
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-rosa | red |
+| elector-leila | green |
+| elector-noah | green |
+
+### Slot: slot-gp14-mon
+Date: mon+14
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics:
+
+### Slot: slot-gp14-tue
+Date: tue+14
+Start: 14:00
+End: 16:00
+Location: Terrace
+Topics: topic-land-registry-data
+Status: proposed
+
+Discussion:
+- Author: host-jake
+  Claim: topic-land-registry-data
+  Counts: 6 green, 3 yellow, 1 red
+  Text: Claiming this for Land Registry Data in England and Wales; most of my hearters are free at this time.
+
+### Slot: slot-gp14-wed
+Date: wed+14
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-ecotopia-techno-utopia
+Status: confirmed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-noah | green |
+| elector-kwame | yellow |
+| elector-maya | green |
+| elector-ella | green |
+
+### Slot: slot-gp14-thu
+Date: thu+14
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-mechanics-of-political-attention
+Status: proposed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-marcus | red |
+| elector-hana | yellow |
+| elector-tariq | green |
+| elector-farah | green |
+| elector-leila | yellow |
+
+### Slot: slot-gp14-fri
+Date: fri+14
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-healthy-institutions
+Status: proposed
+
+### Slot: slot-gp15-mon
+Date: mon+15
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics:
+
+### Slot: slot-gp15-tue
+Date: tue+15
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-parties-lobbying-power-uk
+Status: confirmed
+Url: https://lu.ma/spt-parties-lobbying-power-uk
+
+Discussion:
+- Author: admin-edwin
+  Text: Locked in — see the event link for details.
+
+### Slot: slot-gp15-wed
+Date: wed+15
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-strategy-getting-big-things-done
+Status: proposed
+
+Discussion:
+- Author: host-aaron
+  Claim: topic-strategy-getting-big-things-done
+  Counts: 4 green, 5 yellow, 2 red
+  Text: Strategy and Getting Big Things Done wants exactly this kind of slot. Claiming.
+
+### Slot: slot-gp15-thu
+Date: thu+15
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-online-help-seeking
+Status: proposed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-kwame | green |
+| elector-farah | yellow |
+| elector-amara | red |
+| elector-rosa | green |
+
+### Slot: slot-gp15-fri
+Date: fri+15
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-legitimacy-authority-consent
+Status: proposed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-sofia | red |
+| elector-tariq | yellow |
+| elector-daniel | green |
+
+### Slot: slot-gp16-mon
+Date: mon+16
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-science-of-collectivity
+Status: proposed
+
+Discussion:
+- Author: host-zara
+  Claim: topic-science-of-collectivity
+  Counts: 11 green, 5 yellow, 3 red
+  Text: Claiming this for The Science of Collectivity; most of my hearters are free at this time.
+- Author: admin-edwin
+  Text: Works for me, pending the projector situation.
+
+### Slot: slot-gp16-tue
+Date: tue+16
+Start: 14:00
+End: 16:00
+Location: Classroom
+Topics: topic-ai-in-campaigning-2026
+Status: proposed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-priya | red |
+| elector-hana | green |
+| elector-daniel | red |
+| elector-farah | green |
+| elector-kwame | green |
+| elector-ella | red |
+
+### Slot: slot-gp16-wed
+Date: wed+16
+Start: 10:00
+End: 11:30
+Location: Classroom
+Topics: topic-designing-rituals-of-participation
+Status: proposed
+
+Discussion:
+- Author: host-eli
+  Claim: topic-designing-rituals-of-participation
+  Counts: 7 green, 2 yellow, 2 red
+  Text: Claiming this for Designing Rituals of Participation; most of my hearters are free at this time.
+- Author: admin-edwin
+  Text: Works for me, pending the projector situation.
+
+### Slot: slot-gp16-thu
+Date: thu+16
+Start: 16:00
+End: 18:00
+Location: Terrace
+Topics: topic-data-pipelines
+Status: proposed
+
+Discussion:
+- Author: host-harvey
+  Claim: topic-data-pipelines
+  Counts: 6 green, 6 yellow, 0 red
+  Text: Claiming this for Data Pipelines; most of my hearters are free at this time.
+
+### Slot: slot-gp16-fri
+Date: fri+16
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-hyperlocal-politics
+Status: confirmed
+Url: https://lu.ma/spt-hyperlocal-politics
+
+### Slot: slot-gp17-mon
+Date: mon+17
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-cryptography-threat-modeling
+Status: proposed
+
+Discussion:
+- Author: host-sadie
+  Claim: topic-cryptography-threat-modeling
+  Counts: 9 green, 6 yellow, 3 red
+  Text: Claiming this for Cryptography / Threat Modeling; most of my hearters are free at this time.
+- Author: admin-edwin
+  Text: Noted. Give it a few days for objections, then I'll book it.
+
+### Slot: slot-gp17-tue
+Date: tue+17
+Start: 14:00
+End: 16:00
+Location: Seminar Room
+Topics: topic-state-capacity-institutional-failure
+Status: proposed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-daniel | green |
+| elector-marcus | red |
+| elector-farah | red |
+
+Discussion:
+- Author: host-aaron
+  Claim: topic-state-capacity-institutional-failure
+  Counts: 4 green, 6 yellow, 2 red
+  Text: Proposing State Capacity and Institutional Failure for this one — the counts look workable.
+- Author: admin-edwin
+  Text: Works for me, pending the projector situation.
+
+### Slot: slot-gp17-wed
+Date: wed+17
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics:
+
+### Slot: slot-gp17-thu
+Date: thu+17
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-ai
+Status: confirmed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-maya | yellow |
+| elector-ella | yellow |
+| elector-tariq | yellow |
+
+### Slot: slot-gp17-fri
+Date: fri+17
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-designing-campaign-tools
+Status: proposed
+
+### Slot: slot-gp18-mon
+Date: mon+18
+Start: 10:00
+End: 12:00
+Location: Hall
+Topics:
+
+### Slot: slot-gp18-tue
+Date: tue+18
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-iad-framework-ostrom
+Status: confirmed
+Url: https://lu.ma/spt-iad-framework-ostrom
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-ella | green |
+| elector-kwame | red |
+| elector-maya | yellow |
+| elector-hana | green |
+| elector-marcus | yellow |
+| elector-farah | yellow |
+
+Discussion:
+- Author: admin-edwin
+  Text: Confirmed — event page is up.
+
+### Slot: slot-gp18-wed
+Date: wed+18
+Start: 10:00
+End: 11:30
+Location: Classroom
+Topics: topic-low-hanging-fruit
+Status: confirmed
+Url: https://lu.ma/spt-low-hanging-fruit
+
+### Slot: slot-gp18-thu
+Date: thu+18
+Start: 16:00
+End: 18:00
+Location: Library
+Topics: topic-security-and-privacy-in-ml
+Status: proposed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-sofia | red |
+| elector-amara | green |
+| elector-ella | green |
+| elector-farah | green |
+| elector-priya | yellow |
+| elector-daniel | yellow |
+
+### Slot: slot-gp18-fri
+Date: fri+18
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics:
+Session host: host-eli
+Status: proposed
+
+Discussion:
+- Author: host-eli
+  Text: Open surgery: bring a problem, leave with a plan. No agenda.
+
+### Slot: slot-gp19-mon
+Date: mon+19
+Start: 10:00
+End: 12:00
+Location: Terrace
+Topics: topic-encrypted-communications
+Status: proposed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-leila | red |
+| elector-sofia | green |
+| elector-noah | green |
+| host-eli | yellow |
+| elector-tariq | green |
+| elector-priya | yellow |
+
+Discussion:
+- Author: host-teddy
+  Claim: topic-encrypted-communications
+  Counts: 4 green, 5 yellow, 3 red
+  Text: Proposing Encrypted Communications for this one — the counts look workable.
+- Author: admin-edwin
+  Text: Works for me, pending the projector situation.
+
+### Slot: slot-gp19-tue
+Date: tue+19
+Start: 14:00
+End: 16:00
+Location: Library
+Topics: topic-elections-in-the-uk
+Status: proposed
+
+Discussion:
+- Author: host-hayley
+  Claim: topic-elections-in-the-uk
+  Counts: 4 green, 2 yellow, 0 red
+  Text: I'd like this slot for Elections in the UK — the availability here looks strong.
+
+### Slot: slot-gp19-wed
+Date: wed+19
+Start: 10:00
+End: 11:30
+Location: Auditorium
+Topics: topic-web-data
+Status: proposed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-priya | green |
+| elector-hana | green |
+| host-eli | green |
+| elector-daniel | green |
+
+Discussion:
+- Author: host-harvey
+  Claim: topic-web-data
+  Counts: 5 green, 2 yellow, 1 red
+  Text: I'd like this slot for Web Data — the availability here looks strong.
+
+### Slot: slot-gp19-thu
+Date: thu+19
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics:
+
+### Slot: slot-gp19-fri
+Date: fri+19
+Start: 13:00
+End: 15:00
+Location: Hall
+Topics: topic-the-nature-of-voting
+Status: confirmed
+Url: https://lu.ma/spt-the-nature-of-voting
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-hana | green |
+| elector-kwame | green |
+| elector-daniel | yellow |
+| elector-ella | green |
+
+### Slot: slot-gp23-mon
+Date: mon+23
+Start: 10:00
+End: 12:00
+Location: Hall
+Topics: topic-designing-civic-interventions
+Status: confirmed
+Url: https://lu.ma/spt-designing-civic-interventions
+
+Discussion:
+- Author: admin-edwin
+  Text: Confirmed and announced.
+
+### Slot: slot-gp23-tue
+Date: tue+23
+Start: 14:00
+End: 16:00
+Location: Lounge
+Topics:
+
+### Slot: slot-gp23-wed
+Date: wed+23
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics:
+
+### Slot: slot-gp23-thu
+Date: thu+23
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics:
+
+### Slot: slot-gp23-fri
+Date: fri+23
+Start: 13:00
+End: 15:00
+Location: Seminar Room
+Topics: topic-digital-protocols
+Status: proposed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-noah | red |
+| elector-hana | green |
+| elector-amara | green |
+| elector-ella | green |
+| elector-farah | green |
+| elector-tom | yellow |
+
+Discussion:
+- Author: host-teddy
+  Claim: topic-digital-protocols
+  Counts: 5 green, 5 yellow, 3 red
+  Text: Digital Protocols wants exactly this kind of slot. Claiming.
+
+### Slot: slot-gp23-fri-b
+Date: fri+23
+Start: 13:00
+End: 15:00
+Location: Auditorium
+Topics: topic-moderation-and-social-media
+Status: proposed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-tariq | red |
+| elector-rosa | green |
+| elector-noah | green |
+| elector-ella | green |
+| elector-marcus | yellow |
+
+Discussion:
+- Author: host-anya
+  Claim: topic-moderation-and-social-media
+  Counts: 8 green, 2 yellow, 1 red
+  Text: I'd like this slot for Moderation and Social Media — the availability here looks strong.
+
+### Slot: slot-gp24-mon
+Date: mon+24
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics:
+
+### Slot: slot-gp24-tue
+Date: tue+24
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-threat-modelling
+Status: proposed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-tom | green |
+| elector-marcus | yellow |
+| elector-amara | green |
+
+### Slot: slot-gp24-wed
+Date: wed+24
+Start: 10:00
+End: 11:30
+Location: Terrace
+Topics:
+
+### Slot: slot-gp24-thu
+Date: thu+24
+Start: 16:00
+End: 18:00
+Location: Library
+Topics:
+
+### Slot: slot-gp24-fri
+Date: fri+24
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-comparative-chat-architecture
+Status: confirmed
+Url: https://lu.ma/spt-comparative-chat-architecture
+
+Availability:
+| Person label | State |
+| --- | --- |
+| host-eli | green |
+| elector-ella | green |
+| elector-amara | green |
+| elector-tariq | yellow |
+
+### Slot: slot-gp25-mon
+Date: mon+25
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-the-basics-of-polling
+Status: confirmed
+Url: https://lu.ma/spt-the-basics-of-polling
+
+### Slot: slot-gp25-tue
+Date: tue+25
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics:
+Session host: host-sadie
+Status: proposed
+
+Discussion:
+- Author: host-sadie
+  Text: Drop-in hours — questions, prototypes, half-formed ideas all welcome.
+
+### Slot: slot-gp25-wed
+Date: wed+25
+Start: 10:00
+End: 11:30
+Location: Library
+Topics: topic-self-determination-theory
+Status: confirmed
+Url: https://lu.ma/spt-self-determination-theory
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-tom | yellow |
+| elector-rosa | green |
+| elector-tariq | red |
+
+Discussion:
+- Author: admin-edwin
+  Text: Confirmed and announced.
+
+### Slot: slot-gp25-thu
+Date: thu+25
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-sources-of-social-power
+Status: proposed
+
+### Slot: slot-gp25-fri
+Date: fri+25
+Start: 13:00
+End: 15:00
+Location: Library
+Topics: topic-constructing-legitimacy
+Status: confirmed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-kwame | green |
+| elector-priya | red |
+| elector-hana | green |
+
+### Slot: slot-gp25-sat-og
+Date: sat+25
+Start: 15:00
+End: 17:00
+Location: The Park
+Topics: topic-how-governance-works-in-britain
+Status: proposed
+Off-grid: yes
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-noah | green |
+| elector-marcus | yellow |
+| elector-tariq | green |
+| elector-daniel | yellow |
+
+Discussion:
+- Author: host-aaron
+  Text: Off-piste proposal — this one wants a different kind of space.
+
+### Slot: slot-gp26-mon
+Date: mon+26
+Start: 10:00
+End: 12:00
+Location: Seminar Room
+Topics:
+
+### Slot: slot-gp26-tue
+Date: tue+26
+Start: 14:00
+End: 16:00
+Location: Classroom
+Topics:
+
+### Slot: slot-gp26-wed
+Date: wed+26
+Start: 10:00
+End: 11:30
+Location: Library
+Topics: topic-training-and-serving-local-ai-models
+Status: confirmed
+Url: https://lu.ma/spt-training-and-serving-local-ai-models
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-marcus | green |
+| elector-rosa | red |
+| elector-noah | green |
+| elector-tom | green |
+| elector-kwame | green |
+
+Discussion:
+- Author: admin-edwin
+  Text: Confirmed — event page is up.
+
+### Slot: slot-gp26-thu
+Date: thu+26
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics:
+
+### Slot: slot-gp26-fri
+Date: fri+26
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics:
+
+### Slot: slot-gp27-mon
+Date: mon+27
+Start: 10:00
+End: 12:00
+Location: Lounge
+Topics:
+
+### Slot: slot-gp27-tue
+Date: tue+27
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-xenofeminism
+Status: confirmed
+
+### Slot: slot-gp27-wed
+Date: wed+27
+Start: 10:00
+End: 11:30
+Location: Seminar Room
+Topics:
+
+### Slot: slot-gp27-thu
+Date: thu+27
+Start: 16:00
+End: 18:00
+Location: Auditorium
+Topics: topic-leadership-six
+Status: confirmed
+Url: https://lu.ma/spt-leadership-six
+
+Discussion:
+- Author: admin-edwin
+  Text: Booked. Add it to your calendars.
+
+### Slot: slot-gp27-fri
+Date: fri+27
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics:
+Session host: host-eli
+Status: proposed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| host-eli | green |
+| elector-farah | green |
+| elector-hana | green |
+| elector-ella | red |
+| elector-priya | red |
+
+Discussion:
+- Author: host-eli
+  Text: Drop-in hours — questions, prototypes, half-formed ideas all welcome.
+
+### Slot: slot-gp28-mon
+Date: mon+28
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-digital-deliberative-spaces
+Status: confirmed
+Url: https://lu.ma/spt-digital-deliberative-spaces
+
+### Slot: slot-gp28-tue
+Date: tue+28
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-utopian-justice
+Status: proposed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-tariq | red |
+| elector-daniel | yellow |
+| elector-ella | green |
+| elector-hana | green |
+| elector-leila | green |
+
+### Slot: slot-gp28-wed
+Date: wed+28
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics:
+Session host: host-harvey
+Status: confirmed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-tariq | red |
+| elector-sofia | yellow |
+| elector-ella | green |
+
+Discussion:
+- Author: host-harvey
+  Text: Office hours — drop in with whatever you're working on.
+
+### Slot: slot-gp28-thu
+Date: thu+28
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-your-responsibilities
+Status: confirmed
+
+### Slot: slot-gp28-fri
+Date: fri+28
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-sociocracy
+Status: proposed
+
+### Slot: slot-gp29-mon
+Date: mon+29
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-worker-coops
+Status: confirmed
+Url: https://lu.ma/spt-worker-coops
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-tom | red |
+| host-eli | yellow |
+| elector-farah | yellow |
+| elector-hana | yellow |
+
+### Slot: slot-gp29-tue
+Date: tue+29
+Start: 14:00
+End: 16:00
+Location: Lounge
+Topics: topic-knowledge-infrastructure
+Status: confirmed
+Url: https://lu.ma/spt-knowledge-infrastructure
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-maya | red |
+| elector-daniel | green |
+| host-eli | green |
+| elector-marcus | green |
+
+### Slot: slot-gp29-wed
+Date: wed+29
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-ai-in-campaigning-2026
+Status: proposed
+
+Discussion:
+- Author: host-hayley
+  Claim: topic-ai-in-campaigning-2026
+  Counts: 6 green, 1 yellow, 2 red
+  Text: AI in Campaigning in 2026 wants exactly this kind of slot. Claiming.
+
+### Slot: slot-gp29-thu
+Date: thu+29
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics:
+
+### Slot: slot-gp29-fri
+Date: fri+29
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-presentation-of-self
+Status: proposed
+
+### Slot: slot-gp30-mon
+Date: mon+30
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-mps-offices
+Status: confirmed
+Url: https://lu.ma/spt-mps-offices
+
+### Slot: slot-gp30-tue
+Date: tue+30
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics:
+
+### Slot: slot-gp30-wed
+Date: wed+30
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics:
+
+### Slot: slot-gp30-thu
+Date: thu+30
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-models-of-group-development
+Status: proposed
+
+### Slot: slot-gp30-fri
+Date: fri+30
+Start: 13:00
+End: 15:00
+Location: Library
+Topics: topic-web-data
+Status: confirmed
+Url: https://lu.ma/spt-web-data
+
+### Slot: slot-gp31-mon
+Date: mon+31
+Start: 10:00
+End: 12:00
+Location: Hall
+Topics: topic-experimental-governance-in-the-wild
+Status: proposed
+
+Discussion:
+- Author: host-zara
+  Claim: topic-experimental-governance-in-the-wild
+  Counts: 12 green, 4 yellow, 0 red
+  Text: Proposing Experimental Governance in the Wild for this one — the counts look workable.
+
+### Slot: slot-gp31-tue
+Date: tue+31
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-complex-adaptive-systems
+Status: proposed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-ella | yellow |
+| elector-daniel | red |
+| elector-maya | yellow |
+| elector-amara | green |
+| elector-rosa | green |
+
+### Slot: slot-gp31-wed
+Date: wed+31
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-state-capacity-institutional-failure
+Status: confirmed
+Url: https://lu.ma/spt-state-capacity-institutional-failure
+
+### Slot: slot-gp31-thu
+Date: thu+31
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics:
+
+### Slot: slot-gp31-fri
+Date: fri+31
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-science-of-collectivity
+Status: confirmed
+Url: https://lu.ma/spt-science-of-collectivity
+
+Discussion:
+- Author: admin-edwin
+  Text: Confirmed — event page is up.
+
+### Slot: slot-gp31-wed-og
+Date: wed+31
+Start: 18:30
+End: 20:00
+Location: Lounge
+Topics: topic-structured-data-extraction
+Status: proposed
+Off-grid: yes
+
+Discussion:
+- Author: host-harvey
+  Text: Off-piste proposal — this one wants a different kind of space.
+
+### Slot: slot-gp32-mon
+Date: mon+32
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics:
+
+### Slot: slot-gp32-tue
+Date: tue+32
+Start: 14:00
+End: 16:00
+Location: Terrace
+Topics: topic-herds-birds-and-words
+Status: confirmed
+Url: https://lu.ma/spt-herds-birds-and-words
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-priya | red |
+| elector-maya | red |
+| elector-marcus | green |
+| elector-sofia | green |
+| elector-leila | yellow |
+| elector-ella | green |
+
+### Slot: slot-gp32-wed
+Date: wed+32
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-ai
+Status: proposed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| host-eli | green |
+| elector-priya | red |
+| elector-hana | green |
+| elector-sofia | red |
+| elector-rosa | red |
+
+### Slot: slot-gp32-thu
+Date: thu+32
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-low-hanging-fruit
+Status: confirmed
+Url: https://lu.ma/spt-low-hanging-fruit
+
+### Slot: slot-gp32-fri
+Date: fri+32
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics:
+
+### Slot: slot-gp33-mon
+Date: mon+33
+Start: 10:00
+End: 12:00
+Location: Terrace
+Topics:
+
+### Slot: slot-gp33-tue
+Date: tue+33
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics:
+Session host: host-sadie
+Status: proposed
+
+Discussion:
+- Author: host-sadie
+  Text: Drop-in hours — questions, prototypes, half-formed ideas all welcome.
+
+### Slot: slot-gp33-wed
+Date: wed+33
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics:
+
+### Slot: slot-gp33-thu
+Date: thu+33
+Start: 16:00
+End: 18:00
+Location: Hall
+Topics: topic-arhuaco-philosophy
+Status: proposed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-tom | yellow |
+| elector-kwame | red |
+| elector-priya | yellow |
+| elector-daniel | green |
+| elector-rosa | yellow |
+
+### Slot: slot-gp33-fri
+Date: fri+33
+Start: 13:00
+End: 15:00
+Location: Seminar Room
+Topics: topic-matrix-protocol
+Status: proposed
+
+Discussion:
+- Author: host-jake
+  Claim: topic-matrix-protocol
+  Counts: 9 green, 5 yellow, 2 red
+  Text: Claiming this for Matrix Protocol; most of my hearters are free at this time.
+
+### Slot: slot-gp37-mon
+Date: mon+37
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics:
+Session host: host-liam
+Status: confirmed
+
+Discussion:
+- Author: host-liam
+  Text: Open surgery: bring a problem, leave with a plan. No agenda.
+
+### Slot: slot-gp37-tue
+Date: tue+37
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-land-registry-data
+Status: confirmed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-rosa | green |
+| elector-kwame | yellow |
+| elector-maya | green |
+| host-eli | green |
+| elector-priya | green |
+
+Discussion:
+- Author: admin-edwin
+  Text: Booked. Add it to your calendars.
+
+### Slot: slot-gp37-wed
+Date: wed+37
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-organisers-needs-from-whatsapp
+Status: proposed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-priya | yellow |
+| elector-ella | red |
+| elector-hana | yellow |
+
+Discussion:
+- Author: host-jake
+  Claim: topic-organisers-needs-from-whatsapp
+  Counts: 6 green, 3 yellow, 2 red
+  Text: Proposing Organisers' Needs from WhatsApp for this one — the counts look workable.
+
+### Slot: slot-gp37-thu
+Date: thu+37
+Start: 16:00
+End: 18:00
+Location: Seminar Room
+Topics: topic-future-crafting
+Status: confirmed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-farah | green |
+| elector-tariq | red |
+| elector-rosa | yellow |
+| elector-hana | green |
+
+Discussion:
+- Author: admin-edwin
+  Text: Booked. Add it to your calendars.
+
+### Slot: slot-gp37-fri
+Date: fri+37
+Start: 13:00
+End: 15:00
+Location: Lounge
+Topics: topic-online-security-and-privacy
+Status: proposed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-hana | yellow |
+| elector-daniel | green |
+| elector-farah | red |
+| elector-marcus | yellow |
+| elector-amara | yellow |
+
+### Slot: slot-gp38-mon
+Date: mon+38
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics:
+Session host: host-teddy
+Status: proposed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-tariq | yellow |
+| elector-kwame | red |
+| elector-marcus | yellow |
+| elector-amara | green |
+| elector-priya | green |
+| elector-leila | green |
+
+Discussion:
+- Author: host-teddy
+  Text: Drop-in hours — questions, prototypes, half-formed ideas all welcome.
+
+### Slot: slot-gp38-tue
+Date: tue+38
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-crisis-escalation-decision-making
+Status: proposed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-maya | yellow |
+| elector-priya | green |
+| elector-rosa | yellow |
+| elector-daniel | green |
+| elector-hana | yellow |
+| elector-noah | red |
+
+### Slot: slot-gp38-wed
+Date: wed+38
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics:
+Session host: host-jake
+Status: confirmed
+
+Discussion:
+- Author: host-jake
+  Text: Open surgery: bring a problem, leave with a plan. No agenda.
+
+### Slot: slot-gp38-thu
+Date: thu+38
+Start: 16:00
+End: 18:00
+Location: Library
+Topics: topic-postcolonial-futurism
+Status: proposed
+
+Discussion:
+- Author: host-zara
+  Claim: topic-postcolonial-futurism
+  Counts: 10 green, 3 yellow, 0 red
+  Text: Pencilling Postcolonial Futurism in here — happy to move if someone needs the room more.
+
+### Slot: slot-gp38-fri
+Date: fri+38
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics:
+Session host: host-liam
+Status: confirmed
+
+Discussion:
+- Author: host-liam
+  Text: Drop-in hours — questions, prototypes, half-formed ideas all welcome.
+
+### Slot: slot-gp39-mon
+Date: mon+39
+Start: 10:00
+End: 12:00
+Location: Hall
+Topics:
+
+### Slot: slot-gp39-tue
+Date: tue+39
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-commoning-theory-and-praxis
+Status: proposed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-tariq | red |
+| elector-hana | yellow |
+| elector-sofia | yellow |
+
+Discussion:
+- Author: host-zara
+  Claim: topic-commoning-theory-and-praxis
+  Counts: 4 green, 2 yellow, 1 red
+  Text: I'd like this slot for Commoning: Theory & Praxis behind Experimental Spaces — the availability here looks strong.
+
+### Slot: slot-gp39-wed
+Date: wed+39
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics:
+
+### Slot: slot-gp39-thu
+Date: thu+39
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics:
+Session host: host-liam
+Status: proposed
+
+Discussion:
+- Author: host-liam
+  Text: Open surgery: bring a problem, leave with a plan. No agenda.
+
+### Slot: slot-gp39-fri
+Date: fri+39
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-constructing-legitimacy
+Status: confirmed
+Url: https://lu.ma/spt-constructing-legitimacy
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-priya | yellow |
+| elector-sofia | yellow |
+| elector-maya | red |
+| elector-daniel | green |
+
+### Slot: slot-gp40-mon
+Date: mon+40
+Start: 10:00
+End: 12:00
+Location: Lounge
+Topics:
+
+### Slot: slot-gp40-tue
+Date: tue+40
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-front-end-development
+Status: proposed
+
+### Slot: slot-gp40-wed
+Date: wed+40
+Start: 10:00
+End: 11:30
+Location: Library
+Topics: topic-sources-of-social-power
+Status: confirmed
+
+Discussion:
+- Author: admin-edwin
+  Text: Locked in — see the event link for details.
+
+### Slot: slot-gp40-thu
+Date: thu+40
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics:
+
+### Slot: slot-gp40-fri
+Date: fri+40
+Start: 13:00
+End: 15:00
+Location: Auditorium
+Topics: topic-xenofeminism
+Status: proposed
+
+Discussion:
+- Author: host-zara
+  Claim: topic-xenofeminism
+  Counts: 7 green, 4 yellow, 0 red
+  Text: Claiming this for Xenofeminism: Futurity, Gender & Technology; most of my hearters are free at this time.
+
+### Slot: slot-gp41-mon
+Date: mon+41
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics:
+
+### Slot: slot-gp41-tue
+Date: tue+41
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics:
+
+### Slot: slot-gp41-wed
+Date: wed+41
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-self-determination-theory
+Status: confirmed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-sofia | green |
+| elector-rosa | green |
+| elector-hana | green |
+
+Discussion:
+- Author: admin-edwin
+  Text: Confirmed and announced.
+
+### Slot: slot-gp41-thu
+Date: thu+41
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-cryptocurrencies
+Status: proposed
+
+### Slot: slot-gp41-fri
+Date: fri+41
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-strategy-getting-big-things-done
+Status: proposed
+
+### Slot: slot-gp42-mon
+Date: mon+42
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics:
+
+### Slot: slot-gp42-tue
+Date: tue+42
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-security-and-privacy-in-ml
+Status: confirmed
+Url: https://lu.ma/spt-security-and-privacy-in-ml
+
+### Slot: slot-gp42-wed
+Date: wed+42
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-telling-stories-with-data
+Status: confirmed
+Url: https://lu.ma/spt-telling-stories-with-data
+
+Availability:
+| Person label | State |
+| --- | --- |
+| host-eli | green |
+| elector-noah | green |
+| elector-priya | green |
+| elector-maya | green |
+| elector-daniel | green |
+
+### Slot: slot-gp42-thu
+Date: thu+42
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-cryptography-threat-modeling
+Status: confirmed
+Url: https://lu.ma/spt-cryptography-threat-modeling
+
+### Slot: slot-gp42-fri
+Date: fri+42
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-encrypted-communications
+Status: confirmed
+
+Discussion:
+- Author: admin-edwin
+  Text: Booked. Add it to your calendars.
+
+### Slot: slot-gp43-mon
+Date: mon+43
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-elections-in-the-uk
+Status: confirmed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-farah | green |
+| elector-maya | red |
+| elector-kwame | green |
+| elector-marcus | green |
+
+### Slot: slot-gp43-tue
+Date: tue+43
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics:
+
+### Slot: slot-gp43-wed
+Date: wed+43
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics:
+
+### Slot: slot-gp43-thu
+Date: thu+43
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-mechanics-of-political-attention
+Status: proposed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-ella | yellow |
+| elector-leila | yellow |
+| elector-kwame | red |
+| elector-sofia | green |
+
+Discussion:
+- Author: host-hayley
+  Claim: topic-mechanics-of-political-attention
+  Counts: 7 green, 6 yellow, 1 red
+  Text: Claiming this for The Mechanics of Political Attention; most of my hearters are free at this time.
+- Author: admin-edwin
+  Text: Looks good — I'll confirm once the room booking is checked.
+
+### Slot: slot-gp43-fri
+Date: fri+43
+Start: 13:00
+End: 15:00
+Location: Seminar Room
+Topics: topic-the-nature-of-voting
+Status: confirmed
+
+### Slot: slot-gp44-mon
+Date: mon+44
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-parties-lobbying-power-uk
+Status: proposed
+
+Discussion:
+- Author: host-hayley
+  Claim: topic-parties-lobbying-power-uk
+  Counts: 8 green, 2 yellow, 2 red
+  Text: Pencilling How Political Parties, Lobbying and Power Work in the UK in here — happy to move if someone needs the room more.
+- Author: admin-edwin
+  Text: Looks good — I'll confirm once the room booking is checked.
+
+### Slot: slot-gp44-tue
+Date: tue+44
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-learning-intentional-communities
+Status: confirmed
+
+### Slot: slot-gp44-wed
+Date: wed+44
+Start: 10:00
+End: 11:30
+Location: Terrace
+Topics: topic-designing-rituals-of-participation
+Status: confirmed
+Url: https://lu.ma/spt-designing-rituals-of-participation
+
+### Slot: slot-gp44-thu
+Date: thu+44
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-leadership-convening-stewardship
+Status: confirmed
+Url: https://lu.ma/spt-leadership-convening-stewardship
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-maya | red |
+| elector-sofia | green |
+| elector-ella | green |
+| elector-marcus | red |
+| elector-tariq | green |
+
+### Slot: slot-gp44-fri
+Date: fri+44
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-how-governance-works-in-britain
+Status: confirmed
+
+Discussion:
+- Author: admin-edwin
+  Text: Confirmed and announced.
+
+### Slot: slot-gp45-mon
+Date: mon+45
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-healthy-relationships-to-work
+Status: proposed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-tariq | green |
+| elector-noah | red |
+| elector-maya | green |
+| elector-daniel | yellow |
+| elector-rosa | yellow |
+
+### Slot: slot-gp45-tue
+Date: tue+45
+Start: 14:00
+End: 16:00
+Location: Library
+Topics: topic-the-basics-of-polling
+Status: proposed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-sofia | green |
+| elector-hana | green |
+| elector-tom | green |
+
+### Slot: slot-gp45-wed
+Date: wed+45
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-healthy-institutions
+Status: confirmed
+Url: https://lu.ma/spt-healthy-institutions
+
+### Slot: slot-gp45-thu
+Date: thu+45
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-cryptographic-transparency
+Status: confirmed
+
+Discussion:
+- Author: admin-edwin
+  Text: Booked. Add it to your calendars.
+
+### Slot: slot-gp45-fri
+Date: fri+45
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-designing-campaign-tools
+Status: confirmed
+
+Discussion:
+- Author: admin-edwin
+  Text: Booked. Add it to your calendars.
+
+### Slot: slot-gp46-mon
+Date: mon+46
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-zero-knowledge-proofs
+Status: confirmed
+Url: https://lu.ma/spt-zero-knowledge-proofs
+
+### Slot: slot-gp46-tue
+Date: tue+46
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-visual-information-design
+Status: proposed
+
+Discussion:
+- Author: host-anya
+  Claim: topic-visual-information-design
+  Counts: 7 green, 1 yellow, 1 red
+  Text: Visual Information Design wants exactly this kind of slot. Claiming.
+
+### Slot: slot-gp46-wed
+Date: wed+46
+Start: 10:00
+End: 11:30
+Location: Lounge
+Topics: topic-running-experiments-uk-campaigns
+Status: proposed
+
+Discussion:
+- Author: host-hayley
+  Claim: topic-running-experiments-uk-campaigns
+  Counts: 10 green, 3 yellow, 3 red
+  Text: Claiming this for Running Experiments in UK Electoral and Campaign Contexts; most of my hearters are free at this time.
+- Author: admin-edwin
+  Text: Noted. Give it a few days for objections, then I'll book it.
+
+### Slot: slot-gp46-thu
+Date: thu+46
+Start: 16:00
+End: 18:00
+Location: Lounge
+Topics: topic-digital-protocols
+Status: confirmed
+Url: https://lu.ma/spt-digital-protocols
+
+Discussion:
+- Author: admin-edwin
+  Text: Booked. Add it to your calendars.
+
+### Slot: slot-gp46-fri
+Date: fri+46
+Start: 13:00
+End: 15:00
+Location: Terrace
+Topics: topic-audience-participation
+Status: proposed
+
+### Slot: slot-gp46-fri-b
+Date: fri+46
+Start: 13:00
+End: 15:00
+Location: Lounge
+Topics: topic-demography-voting-and-numbers
+Status: proposed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-ella | green |
+| elector-daniel | green |
+| elector-sofia | green |
+| elector-amara | red |
+| elector-marcus | green |
+| elector-priya | red |
+
+### Slot: slot-gp47-mon
+Date: mon+47
+Start: 10:00
+End: 12:00
+Location: Classroom
+Topics: topic-politics-of-social-media
+Status: confirmed
+Url: https://lu.ma/spt-politics-of-social-media
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-amara | green |
+| host-eli | yellow |
+| elector-daniel | green |
+| elector-tom | green |
+| elector-farah | green |
+
+### Slot: slot-gp47-tue
+Date: tue+47
+Start: 14:00
+End: 16:00
+Location: Hall
+Topics: topic-psychology-of-power-and-hierarchy
+Status: confirmed
+Url: https://lu.ma/spt-psychology-of-power-and-hierarchy
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-leila | green |
+| elector-noah | green |
+| elector-daniel | green |
+| elector-marcus | green |
+| elector-kwame | red |
+| host-eli | yellow |
+
+### Slot: slot-gp47-wed
+Date: wed+47
+Start: 10:00
+End: 11:30
+Location: Auditorium
+Topics: topic-maps
+Status: proposed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| elector-leila | yellow |
+| elector-priya | green |
+| elector-marcus | green |
+| elector-sofia | red |
+| elector-farah | green |
+| elector-rosa | green |
+
+### Slot: slot-gp47-thu
+Date: thu+47
+Start: 16:00
+End: 18:00
+Location: Classroom
+Topics: topic-online-help-seeking
+Status: proposed
+
+Availability:
+| Person label | State |
+| --- | --- |
+| host-eli | yellow |
+| elector-tariq | green |
+| elector-daniel | green |
+
+Discussion:
+- Author: host-sadie
+  Claim: topic-online-help-seeking
+  Counts: 8 green, 6 yellow, 2 red
+  Text: Claiming this for Online Help Seeking for Digital Privacy, Safety, and Security; most of my hearters are free at this time.
+
+### Slot: slot-gp47-fri
+Date: fri+47
+Start: 13:00
+End: 15:00
+Location: Seminar Room
+Topics: topic-metaphors-of-the-collective
+Status: proposed
+
+Discussion:
+- Author: host-eli
+  Claim: topic-metaphors-of-the-collective
+  Counts: 6 green, 3 yellow, 3 red
+  Text: Proposing Metaphors of the Collective for this one — the counts look workable.
 
 ## Notes for engineers
 
 - **Statuses cover every state**: published (81 topics, ~91% carrying at least one
   ❤️), submitted (topic-reform, topic-open-social-web, topic-serious-games,
-  topic-artificial-collective-intelligence — the moderation-queue examples),
+  topic-artificial-collective-intelligence — the moderation-queue examples;
+  topic-reform and topic-serious-games carry `Ready to publish: yes`, the
+  other two exercise the queue's still-drafting view, 2026-08-06),
   unpublished (topic-software-development, topic-getting-funded), archived
   (topic-how-do-media-organisations-work). Adjust freely.
 - **Every topic has a real body** (2026-08-03): the former `_Draft — body to be
@@ -10438,12 +16264,22 @@ Discussion:
   the recent ❤️s/comments they exercise every digest card type. Run
   `POST /api/jobs/digests` locally right after seeding to see full digests
   (no `RESEND_API_KEY` → emails print to the API console).
-- **Calendar v2 coverage**: a 4-week rolling schedule (confirmed sessions with
-  Luma URLs, proposed sessions with claim comments + frozen 🟢🟡🔴 counts, empty
-  slots), an office-hours session (`Session host:` — host-sadie, plus an off-grid
-  evening one from host-harvey), an off-piste Saturday park slot (`Off-grid: yes`),
-  and standing availability patterns (grace all-green, oscar all-red — with one
-  explicit green override on slot-w1-mon — yuki mixed, ben partial).
+- **Calendar v2 coverage**: a hand-authored 4-week rolling window (confirmed
+  sessions with Luma URLs, proposed sessions with claim comments + frozen
+  🟢🟡🔴 counts, empty slots), an office-hours session (`Session host:` —
+  host-sadie, plus an off-grid evening one from host-harvey), an off-piste
+  Saturday park slot (`Off-grid: yes`), and standing availability patterns
+  (grace all-green, oscar all-red — with one explicit green override on
+  slot-w1-mon — yuki mixed, ben partial).
+- **Multi-year schedule** (2026-08-06): `scripts/generate-seed-slots.mjs`
+  generates ~570 further slots across ten terms (weeks -110..+47, all
+  relative dates, so the history rolls with the seed run): past terms mostly
+  booked, future terms a mix of booked/pencilled/open, parallel bookings
+  (two sessions sharing a time window in different rooms — the bookings
+  model merges them onto one timeslot), office hours, and off-grid slots.
+  Locations span Classroom/Hall/Lounge/Terrace plus Seminar Room, Library,
+  and Auditorium. The seed derives one seasonal term per contiguous run of
+  slot dates (gaps >3 weeks split terms).
 - **Harvey / Zara split**: the source doc had a duplicate host heading. The first set
   (web data, structured extraction, local AI, data pipelines) is Harvey Dunmore's; the
   second (collective-intelligence / utopias series) is Zara Ashworth's (host-zara).
