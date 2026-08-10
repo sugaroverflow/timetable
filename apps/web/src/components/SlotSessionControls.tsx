@@ -190,7 +190,9 @@ function PencilInControl({
   }
 
   return (
-    <div className="row wrap" style={{ gap: 8 }}>
+    // Full-width row matching the comments composer: the select flexes so
+    // {dropdown, Pencil in} span the column exactly (QA 2026-08-10).
+    <div className="row wrap cal-controls-row" style={{ gap: 8 }}>
       <select
         aria-label="Pencil in a session"
         className="cal-pencil-select"
@@ -215,7 +217,6 @@ function PencilInControl({
           list="cal-locations"
           value={location}
           onChange={(e) => setLocation(e.target.value)}
-          style={{ width: 140 }}
         />
       ) : null}
       {custom ? (
@@ -225,14 +226,12 @@ function PencilInControl({
             placeholder="Event title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            style={{ width: 180 }}
           />
           <input
             aria-label="Event link"
             placeholder="Link (optional)"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            style={{ width: 180 }}
           />
         </>
       ) : null}
@@ -281,14 +280,15 @@ function ActiveSessionControls({
   const confirmed = session.status === "confirmed";
 
   return (
-    <div className="row wrap" style={{ gap: 8 }}>
+    // Full-width row matching the comments composer: the URL input flexes
+    // and {input, Save URL, Clear} span the column (QA 2026-08-10).
+    <div className="row wrap cal-controls-row" style={{ gap: 8 }}>
       {perms.canConfirm || confirmed ? (
         <input
           aria-label="Event page URL"
           placeholder="Event page URL (optional)"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
-          style={{ width: 220 }}
         />
       ) : null}
       {!confirmed && perms.canConfirm ? (
@@ -377,6 +377,16 @@ export function SessionControls({
 
   return (
     <>
+      {/* Pencil-in sits ABOVE the per-booking URL rows (QA 2026-08-10). */}
+      {perms.canPropose ? (
+        <PencilInControl
+          slot={slot}
+          locations={locations}
+          claimTopics={claimTopics}
+          perms={perms}
+          officeHoursLabel={officeHoursLabel}
+        />
+      ) : null}
       {touchable.map((session) => (
         <div key={session.id} className="stack" style={{ gap: 4 }}>
           {slot.sessions.length > 1 ? (
@@ -390,15 +400,6 @@ export function SessionControls({
           <ActiveSessionControls session={session} perms={perms} />
         </div>
       ))}
-      {perms.canPropose ? (
-        <PencilInControl
-          slot={slot}
-          locations={locations}
-          claimTopics={claimTopics}
-          perms={perms}
-          officeHoursLabel={officeHoursLabel}
-        />
-      ) : null}
     </>
   );
 }
