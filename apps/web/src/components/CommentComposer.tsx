@@ -3,6 +3,7 @@
 import { Send } from "lucide-react";
 import { useState } from "react";
 
+import { ComposerRow } from "@/components/ComposerRow";
 import { GrowingTextarea } from "@/components/GrowingTextarea";
 import {
   MentionTextarea,
@@ -103,37 +104,40 @@ export function CommentComposer({
 
   return (
     // No own margin — the surrounding stack/thread-stack gap spaces it
-    // (card spacing spec, 2026-08-05).
-    <form onSubmit={submit} className="inline-form">
-      {mentionsEnabled ? (
-        <div style={{ flex: 1 }} onFocus={loadCandidates}>
-          <MentionTextarea
+    // (card spacing spec, 2026-08-05). The viewer's avatar sits left so
+    // the composer aligns with posted comments (QA 2026-08-10).
+    <ComposerRow>
+      <form onSubmit={submit} className="inline-form">
+        {mentionsEnabled ? (
+          <div style={{ flex: 1 }} onFocus={loadCandidates}>
+            <MentionTextarea
+              value={body}
+              onChange={setBody}
+              candidates={candidates}
+              placeholder="Add a comment… (@ to mention)"
+              ariaLabel="Comment"
+              dataTopicComposer={topicId}
+            />
+          </div>
+        ) : (
+          <GrowingTextarea
             value={body}
-            onChange={setBody}
-            candidates={candidates}
-            placeholder="Add a comment… (@ to mention)"
-            ariaLabel="Comment"
-            dataTopicComposer={topicId}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder={copy.placeholder}
+            aria-label={scopeLabel ? `${scopeLabel} comment` : "Comment"}
+            data-topic-composer={scopeLabel ? undefined : topicId}
           />
-        </div>
-      ) : (
-        <GrowingTextarea
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          placeholder={copy.placeholder}
-          aria-label={scopeLabel ? `${scopeLabel} comment` : "Comment"}
-          data-topic-composer={scopeLabel ? undefined : topicId}
-        />
-      )}
-      <button
-        className="btn btn-primary btn-send"
-        type="submit"
-        disabled={busy}
-        aria-label={scopeLabel ? `Post ${scopeLabel} note` : "Post comment"}
-        title="Post"
-      >
-        <Send size={16} aria-hidden />
-      </button>
-    </form>
+        )}
+        <button
+          className="btn btn-primary btn-send"
+          type="submit"
+          disabled={busy}
+          aria-label={scopeLabel ? `Post ${scopeLabel} note` : "Post comment"}
+          title="Post"
+        >
+          <Send size={16} aria-hidden />
+        </button>
+      </form>
+    </ComposerRow>
   );
 }

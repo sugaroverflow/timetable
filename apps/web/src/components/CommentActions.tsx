@@ -4,6 +4,7 @@ import { Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
+import { ComposerRow } from "@/components/ComposerRow";
 import { GrowingTextarea } from "@/components/GrowingTextarea";
 import { useGqlAction } from "@/lib/useGqlAction";
 
@@ -116,24 +117,26 @@ export function CommentActions({
         ) : null}
       </div>
       {open ? (
-        <form onSubmit={reply} className="inline-form inline-form-nested">
-          <GrowingTextarea
-            ref={textareaRef}
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder="Write a reply…"
-            aria-label="Reply"
-          />
-          <button
-            className="btn btn-primary btn-send"
-            type="submit"
-            disabled={busy}
-            aria-label="Post reply"
-            title="Reply"
-          >
-            <Send size={16} aria-hidden />
-          </button>
-        </form>
+        <ComposerRow className="inline-form-nested">
+          <form onSubmit={reply} className="inline-form">
+            <GrowingTextarea
+              ref={textareaRef}
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              placeholder="Write a reply…"
+              aria-label="Reply"
+            />
+            <button
+              className="btn btn-primary btn-send"
+              type="submit"
+              disabled={busy}
+              aria-label="Post reply"
+              title="Reply"
+            >
+              <Send size={16} aria-hidden />
+            </button>
+          </form>
+        </ComposerRow>
       ) : null}
     </>
   );
