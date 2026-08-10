@@ -61,6 +61,29 @@ const linked = (label: string, path: string | null): string =>
     ? `<a href="${esc(`${linkBase}${path}`)}">${esc(label)}</a>`
     : esc(label);
 
+/** Rewrite every app link in a rendered email to hop through /sign-in with
+ * a single-use Clerk ticket, so ANY link signs the recipient in (issue
+ * #230). The ticket is single-use but one per email is enough: the first
+ * click consumes it and establishes a session, after which /sign-in passes
+ * straight through to redirect_url; a burnt ticket on a signed-out device
+ * falls back to the OTP form with the same destination. Links outside
+ * linkBase and /sign-in links (the invite CTA) are left alone. */
+export function wrapLinksWithSignInTicket(
+  html: string,
+  ticket: string,
+): string {
+  return html.replace(/href="([^"]*)"/g, (full, raw: string) => {
+    const url = raw.replace(/&amp;/g, "&");
+    if (url !== linkBase && !url.startsWith(`${linkBase}/`)) return full;
+    const path = url.slice(linkBase.length) || "/";
+    if (path.startsWith("/sign-in")) return full;
+    const wrapped = `${linkBase}/sign-in?__clerk_ticket=${encodeURIComponent(
+      ticket,
+    )}&redirect_url=${encodeURIComponent(path)}`;
+    return `href="${esc(wrapped)}"`;
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Email shell (2026-07-29): one branded wrapper for every outbound email.
 // Email clients ignore stylesheets, so styles are inline and colours are
