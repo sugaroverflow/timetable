@@ -1125,20 +1125,25 @@ textarea {
   color: var(--muted);
 }
 .feed-search input {
-  width: 84px;
+  /* One width focused and blurred — the pill jumping around on focus read
+     badly (search QA 2026-08-10). */
+  width: 140px;
   border: 0;
   background: transparent;
   outline: none;
   color: var(--ink);
   font-size: var(--text-sm);
   padding: 2px 0;
-  transition: width 0.15s ease;
-}
-.feed-search input:focus {
-  width: 170px;
 }
 .feed-search input::placeholder {
   color: var(--muted);
+}
+
+/* Search-match highlight (CSS Custom Highlight API — ranges are marked
+   without touching the DOM, so the markdown-rendered bodies stay inert).
+   Browsers without support simply skip it. */
+::highlight(topic-search) {
+  background: var(--primary-soft);
 }
 
 /* "Live" marker in the activity log's pill (issue #58). */
