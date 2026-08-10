@@ -984,7 +984,20 @@ textarea {
   padding: 10px 12px;
   min-height: inherit;
   outline: none;
-  font-size: var(--text-base);
+  /* Match the published rich-text typography so editing is genuinely
+     WYSIWYG for wrapping and vertical rhythm. */
+  font-size: var(--text-md);
+  line-height: var(--lh-relaxed);
+}
+/* Profile bios on the People page render as a nested list, whose first level
+   uses hollow markers. Match that appearance in the editor, and remove the
+   paragraph margins TipTap adds inside each list item so its rhythm matches
+   the compact Markdown output. */
+.rte-content .tiptap > ul {
+  list-style-type: circle;
+}
+.rte-content .tiptap li > p {
+  margin-block: 0;
 }
 .rte-content .tiptap p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
