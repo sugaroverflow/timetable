@@ -1114,11 +1114,11 @@ textarea {
   padding: 6px 14px;
   margin-bottom: 0;
 }
-/* Desktop: the bar floats 20px in from the feed's edges (QA 2026-08-10),
+/* Desktop: the bar floats 15px in from the feed's edges (QA 2026-08-10),
    underlining that cards slide under it rather than butting against it. */
 @media (min-width: 640px) {
   .feed-toolbar {
-    margin-inline: 20px;
+    margin-inline: 15px;
   }
 }
 /* No blur support → the glass would be unreadably see-through; fall back
@@ -1870,11 +1870,12 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
    "Pencil in" button share a row; long titles ellipsize into the popup
    (QA 2026-08-06). */
 /* Slot control rows (QA 2026-08-10): both the pencil-in row and the
-   per-booking URL row span the discussion column like the comments
-   composer — their flexible element (select / URL input) grows to fill,
-   buttons keep natural width. */
+   per-booking URL row align with the COMPOSE BOX ("Talk about this
+   timeslot…"), not the full column — indented past the composer's
+   avatar (26px .avatar-sm + 10px .comment gap). Their flexible element
+   (select / URL input) grows to fill, buttons keep natural width. */
 .cal-controls-row {
-  width: 100%;
+  margin-left: 36px;
 }
 .cal-controls-row > select,
 .cal-controls-row > input {

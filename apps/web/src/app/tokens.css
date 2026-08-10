@@ -105,7 +105,7 @@
   --glass: color-mix(
     in srgb,
     var(--primary) 4%,
-    color-mix(in srgb, #ffffff 84%, transparent)
+    color-mix(in srgb, #ffffff 75%, transparent)
   );
   --wash: #f4f5f8; /* subtle fill / hover on cards */
   --wash-strong: #e4e7ef; /* stronger hover (nav) */
