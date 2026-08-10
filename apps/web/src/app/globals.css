@@ -865,7 +865,10 @@ textarea {
   text-decoration: none;
 }
 .nav a.on {
-  background: var(--primary-soft);
+  /* Deepened with a dash of the accent so the selection reads against
+     the page bg — bare --primary-soft was light-blue-on-light-grey in
+     light mode (QA 2026-08-10). */
+  background: color-mix(in srgb, var(--primary) 10%, var(--primary-soft));
   color: var(--primary);
 }
 
@@ -1110,6 +1113,13 @@ textarea {
     0 6px 24px -4px color-mix(in srgb, var(--primary) 16%, transparent);
   padding: 6px 14px;
   margin-bottom: 0;
+}
+/* Desktop: the bar floats 20px in from the feed's edges (QA 2026-08-10),
+   underlining that cards slide under it rather than butting against it. */
+@media (min-width: 640px) {
+  .feed-toolbar {
+    margin-inline: 20px;
+  }
 }
 /* No blur support → the glass would be unreadably see-through; fall back
    to a solid fill in the same spirit. */
@@ -1859,6 +1869,25 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
    it can't be mistaken for the composer above it — and capped so select +
    "Pencil in" button share a row; long titles ellipsize into the popup
    (QA 2026-08-06). */
+/* Slot control rows (QA 2026-08-10): both the pencil-in row and the
+   per-booking URL row span the discussion column like the comments
+   composer — their flexible element (select / URL input) grows to fill,
+   buttons keep natural width. */
+.cal-controls-row {
+  width: 100%;
+}
+.cal-controls-row > select,
+.cal-controls-row > input {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+.cal-controls-row > input[aria-label="Location"],
+.cal-controls-row > input[aria-label="Event title"],
+.cal-controls-row > input[aria-label="Event link"] {
+  flex: 0 1 160px;
+}
+
 .cal-row-detail .cal-pencil-select {
   width: auto;
   max-width: calc(100% - 110px);
@@ -2324,6 +2353,16 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
   gap: 6px;
   padding: 8px 0;
   border-top: 1px solid var(--line);
+}
+/* Equal air around the ❤️ pill (QA 2026-08-10): above it sits 8px pad +
+   1px rule; below, the card's 14px stack gap stacked onto the 8px pad
+   made 22px to the comments rule. Pull the comments rule up so both
+   sides read 9px. Thread-stack panels have no rules — reset there. */
+.card-actions + .comments {
+  margin-top: -13px;
+}
+.thread-stack .card-actions + .comments {
+  margin-top: 0;
 }
 .act {
   display: inline-flex;
