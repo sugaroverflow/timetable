@@ -11,6 +11,7 @@ type LoadMore = (
   seed?: string,
   heartedBy?: string,
   hostHearted?: boolean,
+  q?: string,
 ) => Promise<{ cards: React.ReactNode; hasNext: boolean }>;
 
 /** The scroller's tail: retry button on failure, sentinel while more
@@ -61,6 +62,7 @@ export function InfiniteFeed({
   seed = "",
   heartedBy = "",
   hostHearted = false,
+  q = "",
   refreshToken = "",
   pageSize,
   initialHasNext,
@@ -74,6 +76,7 @@ export function InfiniteFeed({
   seed?: string;
   heartedBy?: string;
   hostHearted?: boolean;
+  q?: string;
   /** Server-render marker: pass a fresh value on every server render so
    * appended pages can re-sync after a router.refresh() (see below). */
   refreshToken?: string;
@@ -104,6 +107,7 @@ export function InfiniteFeed({
         seed,
         heartedBy,
         hostHearted,
+        q,
       );
       offsetRef.current += pageSize;
       setPages((prev) => [...prev, res.cards]);
@@ -122,6 +126,7 @@ export function InfiniteFeed({
     seed,
     heartedBy,
     hostHearted,
+    q,
     pageSize,
   ]);
 
@@ -151,6 +156,7 @@ export function InfiniteFeed({
             seed,
             heartedBy,
             hostHearted,
+            q,
           );
           if (cancelled) return;
           fresh.push(res.cards);
@@ -177,6 +183,7 @@ export function InfiniteFeed({
     seed,
     heartedBy,
     hostHearted,
+    q,
     pageSize,
   ]);
 

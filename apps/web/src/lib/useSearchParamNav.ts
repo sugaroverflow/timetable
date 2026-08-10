@@ -9,6 +9,9 @@ export type SetSearchParamOptions = {
   /** Extra params to mutate in the same navigation (e.g. the feed's
    * random-sort shuffle seed). Runs after the key/resetPage updates. */
   mutate?: (params: URLSearchParams) => void;
+  /** router.replace instead of push — for keystroke-driven params (the
+   * search box), so typing doesn't pile up history entries. */
+  replace?: boolean;
 };
 
 /**
@@ -30,7 +33,9 @@ export function useSetSearchParam() {
       if (opts?.resetPage) params.delete("page");
       opts?.mutate?.(params);
       const query = params.toString();
-      router.push(query ? `${pathname}?${query}` : pathname);
+      const url = query ? `${pathname}?${query}` : pathname;
+      if (opts?.replace) router.replace(url);
+      else router.push(url);
     },
     [router, pathname, searchParams],
   );

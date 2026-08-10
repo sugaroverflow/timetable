@@ -1117,6 +1117,30 @@ textarea {
   padding: 5px 8px;
 }
 
+/* Search box inside the glass pill: bare icon-led input, grows on focus. */
+.feed-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+}
+.feed-search input {
+  width: 84px;
+  border: 0;
+  background: transparent;
+  outline: none;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  padding: 2px 0;
+  transition: width 0.15s ease;
+}
+.feed-search input:focus {
+  width: 170px;
+}
+.feed-search input::placeholder {
+  color: var(--muted);
+}
+
 /* Minimalist select (All Topics toolbar): no box, no native arrow — a
    chevron sits to the LEFT of the value instead. */
 .select-minimal {
