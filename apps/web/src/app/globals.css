@@ -1977,6 +1977,10 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
 .c-text {
   font-size: var(--text-base);
   margin-top: 2px;
+  /* Bodies are plain text: honor typed newlines, and break long pasted URLs
+     so they can't push the bubble past its container. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 /* Slot discussion expand row */

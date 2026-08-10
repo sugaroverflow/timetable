@@ -13,6 +13,7 @@ import type { RoleLabels } from "@/lib/timetableSettings";
 import { useGqlAction } from "@/lib/useGqlAction";
 
 import { Avatar } from "./Avatar";
+import { CommentBody } from "./CommentBody";
 import { GrowingTextarea } from "./GrowingTextarea";
 import { PersonChip } from "./PersonChip";
 import { PrimaryRolePill } from "./RolePills";
@@ -251,7 +252,7 @@ function CommentRow({
               />
             ) : (
               <>
-                {comment.body}
+                <CommentBody body={comment.body} />
                 {comment.topicTitle ? (
                   <ClaimChip
                     title={comment.topicTitle}
