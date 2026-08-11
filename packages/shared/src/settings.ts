@@ -15,9 +15,38 @@ export type RoleLabels = {
  * digest defaults seeded onto new members who haven't customized theirs. */
 export type DigestFrequency = "daily" | "weekly";
 
+/** The digest's activity types, each individually switchable PER FORUM
+ * (2026-08-11) — the digest is one email per forum, so each membership
+ * carries its own switch set. One entry per thing a digest can carry. */
+export const DIGEST_KINDS = [
+  "comments",
+  "replies",
+  "hearts",
+  "hostHearts",
+  "sessions",
+  "availabilityAsks",
+  "newTopics",
+  "assignments",
+  "drafts",
+] as const;
+export type DigestKind = (typeof DIGEST_KINDS)[number];
+
+/** Per-kind defaults — what an untouched account receives. Everything the
+ * digest carried before per-kind switches existed stays on. */
+export const DIGEST_KIND_DEFAULTS: Record<DigestKind, boolean> = {
+  comments: true,
+  replies: true,
+  hearts: true,
+  hostHearts: true,
+  sessions: true,
+  availabilityAsks: true,
+  newTopics: true,
+  assignments: true,
+  drafts: true,
+};
+
 export type NotificationSettings = {
-  /** Master switch (2026-07-29): a digest always includes every section —
-   * there are no per-section choices. */
+  /** Master switch (2026-07-29): off means no digest at all. */
   digestEnabled?: boolean;
   /** @deprecated Pre-2026-07-29 per-section flags, kept only so stored
    * settings still parse. Any of them true reads as enabled — use
@@ -35,6 +64,53 @@ export type NotificationSettings = {
   /** Sysadmins only: email when any new forum is created. */
   newForumEmails?: boolean;
 };
+
+/** A membership's per-forum digest switch set ({} = all defaults). */
+export type DigestKinds = Partial<Record<DigestKind, boolean>>;
+
+/** Whether one activity kind belongs in a forum's digest for this member —
+ * `kinds` is the membership's switch set; absent keys keep the default. */
+export function isDigestKindEnabled(
+  kinds: DigestKinds | null | undefined,
+  kind: DigestKind,
+): boolean {
+  return kinds?.[kind] ?? DIGEST_KIND_DEFAULTS[kind];
+}
+
+/** A membership's digest preferences (2026-08-11): the digest is one email
+ * per forum, so EVERYTHING about it — on/off, cadence, and the kind
+ * switches — is a per-forum choice. Absent fields fall back to the user's
+ * stored global settings (the pre-per-forum layer, also where forum
+ * defaults are seeded at join), then to daily/Monday. */
+export type MembershipDigestSettings = {
+  enabled?: boolean;
+  frequency?: DigestFrequency;
+  /** Weekly only: day to send on, 0 = Sunday … 6 = Saturday (UTC). */
+  weekday?: number;
+  kinds?: DigestKinds;
+};
+
+export type EffectiveDigestSettings = {
+  enabled: boolean;
+  frequency: DigestFrequency;
+  weekday: number;
+  kinds: DigestKinds;
+};
+
+/** Resolve one membership's effective digest settings: the membership's
+ * own values, falling back to the user's global settings (which keeps
+ * everyone's pre-per-forum behaviour without a data migration). */
+export function effectiveDigestSettings(
+  membership: MembershipDigestSettings | null | undefined,
+  userFallback: NotificationSettings,
+): EffectiveDigestSettings {
+  return {
+    enabled: membership?.enabled ?? isDigestEnabled(userFallback),
+    frequency: membership?.frequency ?? userFallback.digestFrequency ?? "daily",
+    weekday: membership?.weekday ?? userFallback.digestWeekday ?? 1,
+    kinds: membership?.kinds ?? {},
+  };
+}
 
 /** Whether this user (or a forum's defaults) opt into digest emails. An
  * explicit `digestEnabled` wins; otherwise any legacy per-section flag

@@ -9,7 +9,10 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-import type { TimetableSettings } from "@timetable/shared";
+import type {
+  MembershipDigestSettings,
+  TimetableSettings,
+} from "@timetable/shared";
 
 import { users } from "./auth";
 import { inviteStatusEnum, privacyEnum, roleEnum } from "./enums";
@@ -90,6 +93,18 @@ export const timetableMemberships = pgTable(
     // instant come around again; topics published after it are 🆕 and jump
     // the queue. Null = first round (nothing is "new", all seen rows count).
     queueRoundStartedAt: timestamp({ withTimezone: true }),
+    /** Per-forum digest preferences (2026-08-11): on/off, cadence, and
+     * the kind switches — the digest is one email per forum, so all of it
+     * is a membership choice. Absent fields fall back to the user's
+     * stored global settings (see shared effectiveDigestSettings). */
+    digestSettings: jsonb()
+      .$type<MembershipDigestSettings>()
+      .notNull()
+      .default({}),
+    /** Per-forum digest send watermark (2026-08-11) — each forum's digest
+     * runs on its own cadence. Null falls back to users.lastDigestAt so
+     * the rollout doesn't resend old windows. */
+    lastDigestAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },

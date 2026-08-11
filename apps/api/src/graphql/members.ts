@@ -6,6 +6,7 @@ import {
   listPeople,
   logActivity,
   updateMemberProfile,
+  updateMembershipDigestSettings,
   updateUserNotificationSettings,
   type Person,
 } from "@timetable/core";
@@ -13,6 +14,8 @@ import {
   canManageMembers,
   canModerate,
   canSeePersonProfile,
+  DIGEST_KINDS,
+  type DigestKinds,
   type Privacy,
   type Role as SharedRole,
   type Viewer,
@@ -223,6 +226,29 @@ function validDigestWeekday(
     ? value
     : undefined;
 }
+/** Per-forum digest switches (2026-08-11): a JSON {kind: boolean} object.
+ * The parsed object REPLACES the stored set (the form always sends every
+ * switch); unknown kinds are dropped, malformed JSON yields undefined. */
+function parseDigestKinds(
+  raw: string | null | undefined,
+): DigestKinds | undefined {
+  if (!raw) return undefined;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return undefined;
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return undefined;
+  }
+  const kinds: DigestKinds = {};
+  for (const kind of DIGEST_KINDS) {
+    const value = (parsed as Record<string, unknown>)[kind];
+    if (typeof value === "boolean") kinds[kind] = value;
+  }
+  return kinds;
+}
 
 builder.mutationFields((t) => ({
   /** Audit trail for the view-as-user preview (QA #59 round 3): called
@@ -305,8 +331,7 @@ builder.mutationFields((t) => ({
   updateMyNotificationSettings: t.field({
     type: UserType,
     args: {
-      /** Digests are all-or-nothing (2026-07-29) — every section is
-       * always included, this just switches them on or off. */
+      /** The master switch — off means no digest at all. */
       digestEnabled: t.arg.boolean({ required: false }),
       /** "daily" or "weekly" (digest v2, 2026-07-29). */
       digestFrequency: t.arg.string({ required: false }),
@@ -337,6 +362,40 @@ builder.mutationFields((t) => ({
         name: updated.name,
         image: updated.image,
       };
+    },
+  }),
+}));
+
+builder.mutationFields((t) => ({
+  /** Update the viewer's PER-FORUM digest settings (2026-08-11) — the
+   * digest is one email per forum, so on/off, cadence, AND the kind
+   * switches are all membership settings. Absent args leave their stored
+   * value; kindsJson (a {kind: boolean} object) replaces the stored set. */
+  updateMyForumDigestSettings: t.field({
+    type: "Boolean",
+    args: {
+      idOrSlug: t.arg.string({ required: true }),
+      enabled: t.arg.boolean({ required: false }),
+      /** "daily" or "weekly". */
+      frequency: t.arg.string({ required: false }),
+      /** Weekly send day, 0 = Sunday … 6 = Saturday (UTC). */
+      weekday: t.arg.int({ required: false }),
+      kindsJson: t.arg.string({ required: false }),
+    },
+    resolve: async (_p, args, ctx) => {
+      const { user, readable } = await loadTimetableAndViewer(
+        ctx,
+        args.idOrSlug,
+      );
+      const frequency = validDigestFrequency(args.frequency);
+      const weekday = validDigestWeekday(args.weekday);
+      const kinds = parseDigestKinds(args.kindsJson);
+      return updateMembershipDigestSettings(readable.timetable.id, user.id, {
+        ...(args.enabled != null ? { enabled: args.enabled } : {}),
+        ...(frequency ? { frequency } : {}),
+        ...(weekday != null ? { weekday } : {}),
+        ...(kinds ? { kinds } : {}),
+      });
     },
   }),
 

@@ -23,11 +23,9 @@ import {
   getUserById,
   getUserByIcsToken,
   inviteEmails,
-  digestWindowDays,
-  isDigestDue,
   listDigestRecipients,
   listHostTopics,
-  markDigestSent,
+  markForumDigestsSent,
   markInviteSent,
   removeMembership,
   setMemberRoles,
@@ -734,13 +732,13 @@ restRouter.post(
     }
 
     const now = new Date();
-    const dayMs = 24 * 60 * 60 * 1000;
-    // Weekly recipients are only due on their chosen weekday; skipping
-    // leaves lastDigestAt untouched so their window keeps accumulating.
-    const recipients = (await listDigestRecipients()).filter((r) =>
-      isDigestDue(r.notificationSettings, now),
-    );
+    // Per-forum digests (2026-08-11): which forums are enabled, due today,
+    // and how far back each window reaches all resolve per MEMBERSHIP
+    // inside computeUserForumDigests. A skipped (not-due) forum keeps its
+    // watermark untouched so its window keeps accumulating.
+    const recipients = await listDigestRecipients();
     let sent = 0;
+    let processed = 0;
 
     // Recipients are independent, so process them in concurrent chunks of
     // 10. Failure semantics match the old sequential loop as closely as
@@ -751,12 +749,12 @@ restRouter.post(
       const chunk = recipients.slice(i, i + chunkSize);
       const results = await Promise.all(
         chunk.map(async (recipient) => {
-          const windowMs =
-            digestWindowDays(recipient.notificationSettings) * dayMs;
-          const since =
-            recipient.lastDigestAt ?? new Date(now.getTime() - windowMs);
-          // Digest v2: one email per forum with news.
-          const digests = await computeUserForumDigests(recipient, since);
+          // One email per forum with news.
+          const { digests, dueForumIds } = await computeUserForumDigests(
+            recipient,
+            now,
+          );
+          if (dueForumIds.length === 0) return null;
           let didSend = 0;
           for (const digest of digests) {
             if (!digest.email) continue;
@@ -771,14 +769,20 @@ restRouter.post(
             });
             didSend += 1;
           }
-          await markDigestSent(recipient.id, now);
+          // Every due forum advances, sent or quiet — matching the old
+          // per-user markDigestSent semantics.
+          await markForumDigestsSent(recipient.id, dueForumIds, now);
           return didSend;
         }),
       );
-      sent += results.reduce((a, b) => a + b, 0);
+      for (const result of results) {
+        if (result === null) continue;
+        processed += 1;
+        sent += result;
+      }
     }
 
-    res.json({ processed: recipients.length, sent });
+    res.json({ processed, sent });
   }),
 );
 

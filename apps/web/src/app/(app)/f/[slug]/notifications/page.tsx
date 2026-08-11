@@ -12,6 +12,7 @@ import { PersonChip } from "@/components/PersonChip";
 import { gqlFetch } from "@/lib/graphql";
 import {
   parseDigestSettings,
+  parseMembershipDigestSettings,
   parseTimetableSettings,
   roleLabel,
 } from "@/lib/timetableSettings";
@@ -39,14 +40,18 @@ type Notification = {
 };
 
 type Data = {
-  timetable: { viewerRoles: string[]; settings: string } | null;
+  timetable: {
+    viewerRoles: string[];
+    settings: string;
+    viewerDigestSettings: string;
+  } | null;
   me: { notificationSettings: string } | null;
   notifications: Notification[];
 };
 
 const QUERY = `
   query Notifications($s: String!) {
-    timetable: forum(idOrSlug: $s) { viewerRoles settings }
+    timetable: forum(idOrSlug: $s) { viewerRoles settings viewerDigestSettings }
     me { notificationSettings }
     notifications(idOrSlug: $s) {
       commentId kind authorId authorName authorImage authorRoles body
@@ -166,6 +171,22 @@ function NotificationCard({
   );
 }
 
+/** The digest card — fully per-forum (2026-08-11): on/off, cadence, and
+ * the kind switches are this forum's; the user's stored globals are the
+ * display fallback for untouched memberships. */
+function DigestCard({ slug, data }: { slug: string; data: Data }) {
+  if (!data.me) return null;
+  return (
+    <DigestSettingsForm
+      slug={slug}
+      current={parseDigestSettings(data.me.notificationSettings)}
+      currentForum={parseMembershipDigestSettings(
+        data.timetable?.viewerDigestSettings,
+      )}
+    />
+  );
+}
+
 /** Notifications pane (QA #59; sectioned 2026-07-29): a "Settings" section
  * holding the email-digest card, then "Notifications" with user and role
  * filters (same controls as the activity log). Opening the page clears the
@@ -217,11 +238,7 @@ export default async function NotificationsPage({
       <h3 className="section-title">Settings</h3>
       {/* Email digest preferences live with the notifications they gate
           (QA 2026-07-28 — moved off the profile page). */}
-      {data.me ? (
-        <DigestSettingsForm
-          current={parseDigestSettings(data.me.notificationSettings)}
-        />
-      ) : null}
+      <DigestCard slug={slug} data={data} />
 
       <h3 className="section-title">Notifications</h3>
       {data.notifications.length > 0 ? (

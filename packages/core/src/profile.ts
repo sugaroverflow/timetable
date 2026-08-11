@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 
 import { and, eq } from "drizzle-orm";
 
+import type { MembershipDigestSettings } from "@timetable/shared";
+
 import {
   db,
   timetableMemberships,
@@ -110,4 +112,44 @@ export async function updateUserNotificationSettings(
     .where(eq(users.id, userId))
     .returning();
   return user ?? null;
+}
+
+/** The member's per-forum digest settings ({} = all fallbacks). */
+export async function getMembershipDigestSettings(
+  timetableId: string,
+  userId: string,
+): Promise<MembershipDigestSettings> {
+  const [membership] = await db
+    .select({ digestSettings: timetableMemberships.digestSettings })
+    .from(timetableMemberships)
+    .where(
+      and(
+        eq(timetableMemberships.timetableId, timetableId),
+        eq(timetableMemberships.userId, userId),
+      ),
+    )
+    .limit(1);
+  return membership?.digestSettings ?? {};
+}
+
+/** Patch the member's per-forum digest settings (2026-08-11): provided
+ * fields overwrite, absent fields keep their stored value ({} clears
+ * nothing). */
+export async function updateMembershipDigestSettings(
+  timetableId: string,
+  userId: string,
+  patch: MembershipDigestSettings,
+): Promise<boolean> {
+  const current = await getMembershipDigestSettings(timetableId, userId);
+  const [updated] = await db
+    .update(timetableMemberships)
+    .set({ digestSettings: { ...current, ...patch }, updatedAt: new Date() })
+    .where(
+      and(
+        eq(timetableMemberships.timetableId, timetableId),
+        eq(timetableMemberships.userId, userId),
+      ),
+    )
+    .returning({ id: timetableMemberships.id });
+  return Boolean(updated);
 }

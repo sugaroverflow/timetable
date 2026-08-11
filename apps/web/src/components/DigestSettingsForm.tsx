@@ -2,15 +2,25 @@
 
 import { useState } from "react";
 
-import { isDigestEnabled } from "@timetable/shared";
+import {
+  DIGEST_KIND_DEFAULTS,
+  DIGEST_KINDS,
+  effectiveDigestSettings,
+  isDigestKindEnabled,
+  type DigestKind,
+  type MembershipDigestSettings,
+} from "@timetable/shared";
 
+import { Switch } from "@/components/Switch";
 import type { DigestSettings } from "@/lib/timetableSettings";
 import { useGqlAction } from "@/lib/useGqlAction";
 
-const MUTATION = `mutation($e: Boolean, $f: String, $w: Int) {
-  updateMyNotificationSettings(
-    digestEnabled: $e, digestFrequency: $f, digestWeekday: $w
-  ) { id }
+// Fully per-forum (2026-08-11): on/off, cadence, and the kind switches
+// all live on this forum's membership.
+const MUTATION = `mutation($s: String!, $e: Boolean, $f: String, $w: Int, $k: String!) {
+  updateMyForumDigestSettings(
+    idOrSlug: $s, enabled: $e, frequency: $f, weekday: $w, kindsJson: $k
+  )
 }`;
 
 export type { DigestSettings };
@@ -25,16 +35,73 @@ const WEEKDAYS = [
   "Saturday",
 ];
 
+/** Per-kind switch labels (2026-08-11). The "(host)"/"(elector)" and
+ * "(on/off by default)" suffixes are scaffolding while the option set is
+ * being pruned — remove once the final set is configured. */
+const KIND_LABELS: Record<DigestKind, string> = {
+  comments: "Comments on your topics",
+  replies: "Replies to your comments",
+  hearts: "❤️s on your topics",
+  hostHearts: "💙s from fellow hosts on your topics",
+  sessions: "Upcoming sessions for topics you ❤️'d",
+  availabilityAsks: "“Can you make it?” availability asks",
+  newTopics: "Newly published topics",
+  assignments: "Topics assigned to you",
+  drafts: "Reminders about your unpublished drafts",
+};
+
+/** Which role a kind can ever fire for: topic-owner kinds are host-only;
+ * ❤️-driven and new-topic kinds are elector-only; replies (absent here)
+ * apply to anyone who comments. */
+const KIND_ROLES: Partial<Record<DigestKind, "host" | "elector">> = {
+  comments: "host",
+  hearts: "host",
+  hostHearts: "host",
+  assignments: "host",
+  drafts: "host",
+  sessions: "elector",
+  availabilityAsks: "elector",
+  newTopics: "elector",
+};
+
+function kindLabel(kind: DigestKind): string {
+  const role = KIND_ROLES[kind] ? ` (${KIND_ROLES[kind]})` : "";
+  const suffix = DIGEST_KIND_DEFAULTS[kind]
+    ? " (on by default)"
+    : " (off by default)";
+  return KIND_LABELS[kind] + role + suffix;
+}
+
 type Cadence = "never" | "daily" | "weekly";
 
-export function DigestSettingsForm({ current }: { current: DigestSettings }) {
+export function DigestSettingsForm({
+  slug,
+  current,
+  currentForum,
+}: {
+  slug: string;
+  /** The user's stored global settings — the fallback layer. */
+  current: DigestSettings;
+  /** This forum's stored membership settings. */
+  currentForum: MembershipDigestSettings;
+}) {
   const { run, busy } = useGqlAction();
+  const effective = effectiveDigestSettings(currentForum, current);
   // "Never" folds the enabled flag into the same dropdown as the cadence
   // (2026-07-30) — one control instead of a checkbox + frequency select.
   const [cadence, setCadence] = useState<Cadence>(
-    isDigestEnabled(current) ? (current.digestFrequency ?? "daily") : "never",
+    effective.enabled ? effective.frequency : "never",
   );
-  const [weekday, setWeekday] = useState(current.digestWeekday ?? 1);
+  const [weekday, setWeekday] = useState(effective.weekday);
+  const [kinds, setKinds] = useState<Record<DigestKind, boolean>>(
+    () =>
+      Object.fromEntries(
+        DIGEST_KINDS.map((kind) => [
+          kind,
+          isDigestKindEnabled(effective.kinds, kind),
+        ]),
+      ) as Record<DigestKind, boolean>,
+  );
   const [saved, setSaved] = useState(false);
 
   function submit(e: React.FormEvent) {
@@ -45,7 +112,13 @@ export function DigestSettingsForm({ current }: { current: DigestSettings }) {
       MUTATION,
       // Leave the stored frequency untouched when Never is picked (the
       // mutation ignores an absent frequency) so re-enabling remembers it.
-      { e: enabled, f: enabled ? cadence : undefined, w: weekday },
+      {
+        s: slug,
+        e: enabled,
+        f: enabled ? cadence : undefined,
+        w: weekday,
+        k: JSON.stringify(kinds),
+      },
       {
         success: "Digest settings saved",
         errorFallback: "Could not save settings",
@@ -60,8 +133,9 @@ export function DigestSettingsForm({ current }: { current: DigestSettings }) {
         Email digests
       </h2>
       <p className="faint" style={{ marginTop: 0, fontSize: "var(--text-xs)" }}>
-        One email per forum with what you haven&rsquo;t seen — comments on your
-        topics, replies, and new topics.
+        One email with what you haven&rsquo;t seen in this forum — comments on
+        your topics, replies, and new topics. All of it is your choice per
+        forum.
       </p>
       <div className="row wrap" style={{ marginBottom: 12 }}>
         <div className="field" style={{ marginBottom: 0 }}>
@@ -95,6 +169,19 @@ export function DigestSettingsForm({ current }: { current: DigestSettings }) {
           </div>
         ) : null}
       </div>
+      {cadence !== "never" ? (
+        <div className="stack" style={{ gap: 8, marginBottom: 12 }}>
+          <strong style={{ fontSize: 13 }}>What to include</strong>
+          {DIGEST_KINDS.map((kind) => (
+            <Switch
+              key={kind}
+              checked={kinds[kind]}
+              onChange={(next) => setKinds({ ...kinds, [kind]: next })}
+              label={kindLabel(kind)}
+            />
+          ))}
+        </div>
+      ) : null}
       <button className="btn btn-primary" type="submit" disabled={busy}>
         {busy ? "Saving…" : saved ? "Saved" : "Save preferences"}
       </button>

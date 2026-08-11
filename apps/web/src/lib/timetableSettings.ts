@@ -1,4 +1,5 @@
 import type {
+  MembershipDigestSettings,
   NotificationSettings,
   RoleLabels,
   ThemeSettings,
@@ -30,6 +31,19 @@ export function parseDigestSettings(
   if (!raw) return {};
   try {
     return JSON.parse(raw) as DigestSettings;
+  } catch {
+    return {};
+  }
+}
+
+/** Parse a membership's serialized per-forum digest settings
+ * (2026-08-11); {} (all fallbacks) on missing/bad JSON. */
+export function parseMembershipDigestSettings(
+  raw: string | null | undefined,
+): MembershipDigestSettings {
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw) as MembershipDigestSettings;
   } catch {
     return {};
   }

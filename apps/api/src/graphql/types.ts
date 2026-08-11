@@ -5,6 +5,7 @@
 import {
   countViewerPublishedHearts,
   forumHasSlots,
+  getMembershipDigestSettings,
   getPerson,
   type CommentNode,
   type WeightedHeartEntry,
@@ -60,6 +61,17 @@ export const TimetableType = builder
         nullable: true,
         resolve: (tt, _args, ctx) =>
           ctx.user ? countViewerPublishedHearts(tt.id, ctx.user.id) : null,
+      }),
+      /** The viewer's per-forum digest settings (2026-08-11) as JSON
+       * (on/off, cadence, kind switches); "{}" (all fallbacks) for
+       * anonymous viewers and non-members. */
+      viewerDigestSettings: t.string({
+        resolve: async (tt, _args, ctx) =>
+          JSON.stringify(
+            ctx.user
+              ? await getMembershipDigestSettings(tt.id, ctx.user.id)
+              : {},
+          ),
       }),
       /** The viewer's own membership profile here; null for anonymous
        * viewers and non-members. */
