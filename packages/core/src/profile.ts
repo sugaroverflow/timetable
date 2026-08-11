@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { and, eq } from "drizzle-orm";
 
-import type { DigestKinds } from "@timetable/shared";
+import type { MembershipDigestSettings } from "@timetable/shared";
 
 import {
   db,
@@ -114,13 +114,13 @@ export async function updateUserNotificationSettings(
   return user ?? null;
 }
 
-/** The member's per-forum digest kind switches ({} = all defaults). */
-export async function getMembershipDigestKinds(
+/** The member's per-forum digest settings ({} = all fallbacks). */
+export async function getMembershipDigestSettings(
   timetableId: string,
   userId: string,
-): Promise<DigestKinds> {
+): Promise<MembershipDigestSettings> {
   const [membership] = await db
-    .select({ digestKinds: timetableMemberships.digestKinds })
+    .select({ digestSettings: timetableMemberships.digestSettings })
     .from(timetableMemberships)
     .where(
       and(
@@ -129,18 +129,21 @@ export async function getMembershipDigestKinds(
       ),
     )
     .limit(1);
-  return membership?.digestKinds ?? {};
+  return membership?.digestSettings ?? {};
 }
 
-/** Replace the member's per-forum digest kind switches (2026-08-11). */
-export async function updateMembershipDigestKinds(
+/** Patch the member's per-forum digest settings (2026-08-11): provided
+ * fields overwrite, absent fields keep their stored value ({} clears
+ * nothing). */
+export async function updateMembershipDigestSettings(
   timetableId: string,
   userId: string,
-  kinds: DigestKinds,
+  patch: MembershipDigestSettings,
 ): Promise<boolean> {
+  const current = await getMembershipDigestSettings(timetableId, userId);
   const [updated] = await db
     .update(timetableMemberships)
-    .set({ digestKinds: kinds, updatedAt: new Date() })
+    .set({ digestSettings: { ...current, ...patch }, updatedAt: new Date() })
     .where(
       and(
         eq(timetableMemberships.timetableId, timetableId),

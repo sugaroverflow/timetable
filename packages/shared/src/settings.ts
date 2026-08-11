@@ -77,6 +77,41 @@ export function isDigestKindEnabled(
   return kinds?.[kind] ?? DIGEST_KIND_DEFAULTS[kind];
 }
 
+/** A membership's digest preferences (2026-08-11): the digest is one email
+ * per forum, so EVERYTHING about it — on/off, cadence, and the kind
+ * switches — is a per-forum choice. Absent fields fall back to the user's
+ * stored global settings (the pre-per-forum layer, also where forum
+ * defaults are seeded at join), then to daily/Monday. */
+export type MembershipDigestSettings = {
+  enabled?: boolean;
+  frequency?: DigestFrequency;
+  /** Weekly only: day to send on, 0 = Sunday … 6 = Saturday (UTC). */
+  weekday?: number;
+  kinds?: DigestKinds;
+};
+
+export type EffectiveDigestSettings = {
+  enabled: boolean;
+  frequency: DigestFrequency;
+  weekday: number;
+  kinds: DigestKinds;
+};
+
+/** Resolve one membership's effective digest settings: the membership's
+ * own values, falling back to the user's global settings (which keeps
+ * everyone's pre-per-forum behaviour without a data migration). */
+export function effectiveDigestSettings(
+  membership: MembershipDigestSettings | null | undefined,
+  userFallback: NotificationSettings,
+): EffectiveDigestSettings {
+  return {
+    enabled: membership?.enabled ?? isDigestEnabled(userFallback),
+    frequency: membership?.frequency ?? userFallback.digestFrequency ?? "daily",
+    weekday: membership?.weekday ?? userFallback.digestWeekday ?? 1,
+    kinds: membership?.kinds ?? {},
+  };
+}
+
 /** Whether this user (or a forum's defaults) opt into digest emails. An
  * explicit `digestEnabled` wins; otherwise any legacy per-section flag
  * counts as opted in, so nobody subscribed before the switch loses their

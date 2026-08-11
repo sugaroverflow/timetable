@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   DIGEST_KIND_DEFAULTS,
   DIGEST_KINDS,
+  effectiveDigestSettings,
   isDigestEnabled,
   isDigestKindEnabled,
   isHostCommentsEnabled,
@@ -51,6 +52,44 @@ describe("isDigestKindEnabled", () => {
     // Other kinds keep their defaults around an explicit neighbour.
     expect(isDigestKindEnabled({ hearts: false }, "replies")).toBe(
       DIGEST_KIND_DEFAULTS.replies,
+    );
+  });
+});
+
+describe("effectiveDigestSettings", () => {
+  it("falls back to the user's globals, then daily/Monday", () => {
+    expect(effectiveDigestSettings({}, {})).toEqual({
+      enabled: false,
+      frequency: "daily",
+      weekday: 1,
+      kinds: {},
+    });
+    expect(
+      effectiveDigestSettings(null, {
+        digestEnabled: true,
+        digestFrequency: "weekly",
+        digestWeekday: 4,
+      }),
+    ).toEqual({ enabled: true, frequency: "weekly", weekday: 4, kinds: {} });
+  });
+
+  it("lets the membership override each field independently", () => {
+    expect(
+      effectiveDigestSettings(
+        { enabled: false, kinds: { hearts: false } },
+        { digestEnabled: true, digestFrequency: "weekly" },
+      ),
+    ).toEqual({
+      enabled: false,
+      frequency: "weekly",
+      weekday: 1,
+      kinds: { hearts: false },
+    });
+  });
+
+  it("honours the legacy per-section opt-in through the fallback", () => {
+    expect(effectiveDigestSettings({}, { digestReplies: true }).enabled).toBe(
+      true,
     );
   });
 });

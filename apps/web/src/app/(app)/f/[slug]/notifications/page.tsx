@@ -11,8 +11,8 @@ import { MarkNotificationsSeen } from "@/components/MarkNotificationsSeen";
 import { PersonChip } from "@/components/PersonChip";
 import { gqlFetch } from "@/lib/graphql";
 import {
-  parseDigestKinds,
   parseDigestSettings,
+  parseMembershipDigestSettings,
   parseTimetableSettings,
   roleLabel,
 } from "@/lib/timetableSettings";
@@ -43,7 +43,7 @@ type Data = {
   timetable: {
     viewerRoles: string[];
     settings: string;
-    viewerDigestKinds: string;
+    viewerDigestSettings: string;
   } | null;
   me: { notificationSettings: string } | null;
   notifications: Notification[];
@@ -51,7 +51,7 @@ type Data = {
 
 const QUERY = `
   query Notifications($s: String!) {
-    timetable: forum(idOrSlug: $s) { viewerRoles settings viewerDigestKinds }
+    timetable: forum(idOrSlug: $s) { viewerRoles settings viewerDigestSettings }
     me { notificationSettings }
     notifications(idOrSlug: $s) {
       commentId kind authorId authorName authorImage authorRoles body
@@ -171,15 +171,18 @@ function NotificationCard({
   );
 }
 
-/** The digest card: cadence is the user's, the kind switches are this
- * forum's (per-forum digests, 2026-08-11). */
+/** The digest card — fully per-forum (2026-08-11): on/off, cadence, and
+ * the kind switches are this forum's; the user's stored globals are the
+ * display fallback for untouched memberships. */
 function DigestCard({ slug, data }: { slug: string; data: Data }) {
   if (!data.me) return null;
   return (
     <DigestSettingsForm
       slug={slug}
       current={parseDigestSettings(data.me.notificationSettings)}
-      currentKinds={parseDigestKinds(data.timetable?.viewerDigestKinds)}
+      currentForum={parseMembershipDigestSettings(
+        data.timetable?.viewerDigestSettings,
+      )}
     />
   );
 }

@@ -1,12 +1,12 @@
 import { and, eq, gt, inArray, isNull, ne, sql } from "drizzle-orm";
 
 import {
+  effectiveDigestSettings,
   isCalendarEnabled,
-  isDigestEnabled,
   isDigestKindEnabled,
   isHostCommentsEnabled,
   type DigestKind,
-  type DigestKinds,
+  type EffectiveDigestSettings,
 } from "@timetable/shared";
 
 import type { NotificationSettings, TimetableSettings } from "@timetable/db";
@@ -148,7 +148,9 @@ function topicPath(
   return `/f/${timetableSlug}/${hostSlug}/${topicSlug}`;
 }
 
-/** Users who have digests switched on and have an email. */
+/** Everyone with an email — whether any of their forums' digests are due
+ * and enabled is a PER-MEMBERSHIP question (2026-08-11), answered inside
+ * computeUserForumDigests. */
 export async function listDigestRecipients(): Promise<DigestRecipient[]> {
   const rows = await db
     .select({
@@ -160,32 +162,41 @@ export async function listDigestRecipients(): Promise<DigestRecipient[]> {
     })
     .from(users);
 
-  return rows.filter((u) => u.email && isDigestEnabled(u.notificationSettings));
+  return rows.filter((u) => u.email);
 }
 
-/** Whether this recipient's digest should go out on `now`'s (UTC) day:
- * daily always; weekly only on their chosen weekday (default Monday). */
+/** Whether a forum's digest should go out on `now`'s (UTC) day: daily
+ * always; weekly only on the chosen weekday. */
 export function isDigestDue(
-  settings: NotificationSettings,
+  settings: EffectiveDigestSettings,
   now: Date,
 ): boolean {
-  if ((settings.digestFrequency ?? "daily") === "daily") return true;
-  return now.getUTCDay() === (settings.digestWeekday ?? 1);
+  if (settings.frequency === "daily") return true;
+  return now.getUTCDay() === settings.weekday;
 }
 
 /** First-digest lookback when there's no lastDigestAt watermark. */
-export function digestWindowDays(settings: NotificationSettings): number {
-  return (settings.digestFrequency ?? "daily") === "weekly" ? 7 : 1;
+export function digestWindowDays(settings: EffectiveDigestSettings): number {
+  return settings.frequency === "weekly" ? 7 : 1;
 }
 
-export async function markDigestSent(
+/** Advance the per-forum send watermarks (2026-08-11) — every DUE forum,
+ * sent or empty, so a quiet window never re-accumulates. */
+export async function markForumDigestsSent(
   userId: string,
+  timetableIds: string[],
   when: Date,
 ): Promise<void> {
+  if (timetableIds.length === 0) return;
   await db
-    .update(users)
+    .update(timetableMemberships)
     .set({ lastDigestAt: when })
-    .where(eq(users.id, userId));
+    .where(
+      and(
+        eq(timetableMemberships.userId, userId),
+        inArray(timetableMemberships.timetableId, timetableIds),
+      ),
+    );
 }
 
 /** Everything the per-forum builders need, loaded once. */
@@ -210,13 +221,25 @@ type DigestContext = {
   /** Forums with the host-only thread on — the only ones whose 💙s may
    * appear in digests (same visibility rule as the thread's 💙 row). */
   hostCommentsTimetableIds: string[];
-  /** Per-forum digest kind switches (2026-08-11), from the membership. */
-  digestKindsByForum: Map<string, DigestKinds>;
+  /** Per-forum effective digest settings (2026-08-11): on/off, cadence,
+   * kinds — membership values over the user's stored globals. */
+  effectiveByForum: Map<string, EffectiveDigestSettings>;
+  /** Per-forum digest window start (2026-08-11): the membership's own
+   * lastDigestAt, then the user's legacy watermark, then the cadence
+   * lookback. Collectors prefilter on the earliest and cut per forum. */
+  sinceByForum: Map<string, Date>;
+  /** The earliest per-forum window start — the SQL prefilter bound. */
+  minSince: Date;
 };
 
 /** The later of the digest window start and an in-app seen watermark. */
 function afterSeen(since: Date, seen: Date | null | undefined): Date {
   return seen && seen > since ? seen : since;
+}
+
+/** This forum's window start (minSince when the forum is unknown). */
+function sinceFor(ctx: DigestContext, timetableId: string): Date {
+  return ctx.sinceByForum.get(timetableId) ?? ctx.minSince;
 }
 
 /**
@@ -239,6 +262,7 @@ function membershipIsEmailable(m: {
 
 async function loadDigestContext(
   recipient: DigestRecipient,
+  now: Date,
 ): Promise<DigestContext> {
   const rows = await db
     .select({
@@ -247,7 +271,8 @@ async function loadDigestContext(
       inviteSentAt: timetableMemberships.inviteSentAt,
       lastSeenFeedAt: timetableMemberships.lastSeenFeedAt,
       lastSeenNotificationsAt: timetableMemberships.lastSeenNotificationsAt,
-      digestKinds: timetableMemberships.digestKinds,
+      digestSettings: timetableMemberships.digestSettings,
+      lastDigestAt: timetableMemberships.lastDigestAt,
       name: timetables.name,
       slug: timetables.slug,
       settings: timetables.settings,
@@ -256,7 +281,27 @@ async function loadDigestContext(
     .innerJoin(timetables, eq(timetables.id, timetableMemberships.timetableId))
     .where(eq(timetableMemberships.userId, recipient.id));
 
-  const memberships = rows.filter(membershipIsEmailable);
+  // Per-forum digests (2026-08-11): a forum is in this run only when its
+  // membership's effective settings say enabled AND due today.
+  const dayMs = 24 * 60 * 60 * 1000;
+  const withEffective = rows.filter(membershipIsEmailable).map((m) => ({
+    ...m,
+    effective: effectiveDigestSettings(
+      m.digestSettings,
+      recipient.notificationSettings,
+    ),
+  }));
+  const memberships = withEffective.filter(
+    (m) => m.effective.enabled && isDigestDue(m.effective, now),
+  );
+  const sinceByForum = new Map(
+    memberships.map((m) => [
+      m.timetableId,
+      m.lastDigestAt ??
+        recipient.lastDigestAt ??
+        new Date(now.getTime() - digestWindowDays(m.effective) * dayMs),
+    ]),
+  );
 
   return {
     recipient,
@@ -300,8 +345,12 @@ async function loadDigestContext(
         isHostCommentsEnabled((m.settings as TimetableSettings | null) ?? {}),
       )
       .map((m) => m.timetableId),
-    digestKindsByForum: new Map(
-      memberships.map((m) => [m.timetableId, m.digestKinds]),
+    effectiveByForum: new Map(
+      memberships.map((m) => [m.timetableId, m.effective]),
+    ),
+    sinceByForum,
+    minSince: new Date(
+      Math.min(now.getTime(), ...[...sinceByForum.values()].map(Number)),
     ),
   };
 }
@@ -317,11 +366,10 @@ const SESSION_HORIZON_DAYS = 14;
  * you make it?"), both scoped to topics the recipient ❤️'d (QA 2026-08-03
  * — a hearter's digest always carries their upcoming confirmed sessions),
  * across the recipient's calendar-enabled forums. `isNew` = session
- * changed since the window start; only fresh sessions can trigger an
- * email by themselves. */
+ * changed since the forum's window start; only fresh sessions can trigger
+ * an email by themselves. */
 async function loadSessionSections(
   ctx: DigestContext,
-  since: Date,
   now: Date,
 ): Promise<{
   upcoming: DigestSessionLine[];
@@ -353,7 +401,7 @@ async function loadSessionSections(
   const heartedTopicIds = new Set(heartRows.map((r) => r.topicId));
   const heartedLine = (s: DigestSession) => ({
     ...s,
-    isNew: s.updatedAt > since,
+    isNew: s.updatedAt > sinceFor(ctx, s.timetableId),
   });
 
   return {
@@ -558,7 +606,11 @@ async function commentActivities(
   const fresh = rows.filter((r) => {
     const timetableId = timetableByTopic.get(r.topicId) ?? "";
     return (
-      r.createdAt > afterSeen(since, ctx.seenNotificationsAt.get(timetableId))
+      r.createdAt >
+      afterSeen(
+        sinceFor(ctx, timetableId),
+        ctx.seenNotificationsAt.get(timetableId),
+      )
     );
   });
   const chains = await loadAncestorChains(
@@ -634,7 +686,10 @@ async function replyActivities(
   const fresh = rows.filter(
     (r) =>
       r.createdAt >
-      afterSeen(since, ctx.seenNotificationsAt.get(r.timetableId)),
+      afterSeen(
+        sinceFor(ctx, r.timetableId),
+        ctx.seenNotificationsAt.get(r.timetableId),
+      ),
   );
   const chains = await loadAncestorChains(fresh);
 
@@ -691,7 +746,10 @@ async function heartActivities(
   >();
   for (const row of rows) {
     const timetableId = timetableByTopic.get(row.topicId) ?? "";
-    const cutoff = afterSeen(since, ctx.seenFeedAt.get(timetableId));
+    const cutoff = afterSeen(
+      sinceFor(ctx, timetableId),
+      ctx.seenFeedAt.get(timetableId),
+    );
     if (row.createdAt <= cutoff) continue;
     const entry = byTopic.get(row.topicId) ?? {
       hearters: [],
@@ -756,7 +814,10 @@ async function hostHeartActivities(
   for (const row of rows) {
     const timetableId = timetableByTopic.get(row.topicId) ?? "";
     if (!enabled.has(timetableId)) continue;
-    const cutoff = afterSeen(since, ctx.seenFeedAt.get(timetableId));
+    const cutoff = afterSeen(
+      sinceFor(ctx, timetableId),
+      ctx.seenFeedAt.get(timetableId),
+    );
     if (row.createdAt <= cutoff) continue;
     const entry = byTopic.get(row.topicId) ?? {
       hearters: [],
@@ -818,7 +879,11 @@ async function newTopicActivities(
   const seen = new Set(seenRows.map((r) => r.topicId));
 
   return rows
-    .filter((r) => !seen.has(r.id))
+    .filter(
+      (r) =>
+        !seen.has(r.id) &&
+        (r.publishedAt ?? since) > sinceFor(ctx, r.timetableId),
+    )
     .map((r) => ({
       topicId: r.id,
       timetableId: r.timetableId,
@@ -850,8 +915,9 @@ async function assignmentActivities(
       const payload = r.payload as { topicId?: string } | null;
       return { topicId: payload?.topicId, r };
     })
-    .filter((x): x is { topicId: string; r: (typeof rows)[number] } =>
-      Boolean(x.topicId),
+    .filter(
+      (x): x is { topicId: string; r: (typeof rows)[number] } =>
+        Boolean(x.topicId) && x.r.createdAt > sinceFor(ctx, x.r.timetableId),
     )
     .map(({ topicId, r }) => ({
       topicId,
@@ -902,26 +968,37 @@ function cardRecency(card: DigestTopicCard): number {
   return Math.max(...card.activities.map((a) => a.at.getTime()));
 }
 
+/** One run's output: the non-empty digests plus every forum whose window
+ * was due (sent or quiet) — the caller advances those watermarks. */
+export type UserDigestRun = {
+  digests: ForumDigest[];
+  dueForumIds: string[];
+};
+
 /**
  * Digest v3 (2026-07-30): one digest PER FORUM, built as topic cards.
  * Every activity is grouped under its topic, cards ordered your-content
  * first (replies/comments/❤️s) → assignments → new topics, drafts last.
- * Forums with no non-draft news yield no digest.
+ * Forums with no non-draft news yield no digest. Fully per-forum
+ * (2026-08-11): enabled, cadence, window, and kind switches all resolve
+ * from the membership (user globals as fallback) — only due forums are
+ * computed at all.
  */
 export async function computeUserForumDigests(
   recipient: DigestRecipient,
-  since: Date,
   now: Date = new Date(),
-): Promise<ForumDigest[]> {
-  const ctx = await loadDigestContext(recipient);
-  // Per-FORUM kind switches (2026-08-11), from the membership: a kind is
-  // only collected if some forum wants it, and each activity then filters
+): Promise<UserDigestRun> {
+  const ctx = await loadDigestContext(recipient, now);
+  if (ctx.forumIds.length === 0) return { digests: [], dueForumIds: [] };
+  const since = ctx.minSince;
+  // Per-FORUM kind switches, from the membership: a kind is only
+  // collected if some forum wants it, and each activity then filters
   // against its own forum's switches — absent keys keep the defaults.
   const wantsIn = (forumId: string, kind: DigestKind) =>
-    isDigestKindEnabled(ctx.digestKindsByForum.get(forumId), kind);
+    isDigestKindEnabled(ctx.effectiveByForum.get(forumId)?.kinds, kind);
   const wants = (kind: DigestKind) =>
     ctx.forumIds.some((id) => wantsIn(id, kind));
-  const sessions = await loadSessionSections(ctx, since, now);
+  const sessions = await loadSessionSections(ctx, now);
 
   const myTopics = await db
     .select({
@@ -1007,7 +1084,10 @@ export async function computeUserForumDigests(
     };
   });
 
-  return digests.filter((d) => !isForumDigestEmpty(d));
+  return {
+    digests: digests.filter((d) => !isForumDigestEmpty(d)),
+    dueForumIds: ctx.forumIds,
+  };
 }
 
 /** Group raw activities into ordered topic cards. */

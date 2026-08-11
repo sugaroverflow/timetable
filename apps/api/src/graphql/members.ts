@@ -6,7 +6,7 @@ import {
   listPeople,
   logActivity,
   updateMemberProfile,
-  updateMembershipDigestKinds,
+  updateMembershipDigestSettings,
   updateUserNotificationSettings,
   type Person,
 } from "@timetable/core";
@@ -26,7 +26,6 @@ import { renderMarkdown } from "../markdown";
 import { isSysadmin } from "../auth/sysadmin";
 import { builder } from "./builder";
 import {
-  badRequest,
   forbidden,
   loadTimetableAndViewer,
   notFound,
@@ -365,25 +364,38 @@ builder.mutationFields((t) => ({
       };
     },
   }),
+}));
 
-  /** Update the viewer's PER-FORUM digest kind switches (2026-08-11) —
-   * the digest is one email per forum, so what goes in it is a membership
-   * setting; cadence stays on the user (one send schedule). The JSON
-   * {kind: boolean} object replaces the stored set. */
-  updateMyDigestKinds: t.field({
+builder.mutationFields((t) => ({
+  /** Update the viewer's PER-FORUM digest settings (2026-08-11) — the
+   * digest is one email per forum, so on/off, cadence, AND the kind
+   * switches are all membership settings. Absent args leave their stored
+   * value; kindsJson (a {kind: boolean} object) replaces the stored set. */
+  updateMyForumDigestSettings: t.field({
     type: "Boolean",
     args: {
       idOrSlug: t.arg.string({ required: true }),
-      kindsJson: t.arg.string({ required: true }),
+      enabled: t.arg.boolean({ required: false }),
+      /** "daily" or "weekly". */
+      frequency: t.arg.string({ required: false }),
+      /** Weekly send day, 0 = Sunday … 6 = Saturday (UTC). */
+      weekday: t.arg.int({ required: false }),
+      kindsJson: t.arg.string({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
       const { user, readable } = await loadTimetableAndViewer(
         ctx,
         args.idOrSlug,
       );
+      const frequency = validDigestFrequency(args.frequency);
+      const weekday = validDigestWeekday(args.weekday);
       const kinds = parseDigestKinds(args.kindsJson);
-      if (!kinds) badRequest("Invalid digest kinds JSON");
-      return updateMembershipDigestKinds(readable.timetable.id, user.id, kinds);
+      return updateMembershipDigestSettings(readable.timetable.id, user.id, {
+        ...(args.enabled != null ? { enabled: args.enabled } : {}),
+        ...(frequency ? { frequency } : {}),
+        ...(weekday != null ? { weekday } : {}),
+        ...(kinds ? { kinds } : {}),
+      });
     },
   }),
 

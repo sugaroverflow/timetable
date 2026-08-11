@@ -1,5 +1,5 @@
 {
-  "id": "18d981a8-7028-46e6-9f15-6c2a93e105ff",
+  "id": "19a877dd-7bc7-4d2a-83d0-84fedd4bfe56",
   "prevId": "5b9d81f4-78f7-486f-9276-f2633d49eecb",
   "version": "7",
   "dialect": "postgresql",
@@ -329,12 +329,18 @@
           "primaryKey": false,
           "notNull": false
         },
-        "digest_kinds": {
-          "name": "digest_kinds",
+        "digest_settings": {
+          "name": "digest_settings",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
           "default": "'{}'::jsonb"
+        },
+        "last_digest_at": {
+          "name": "last_digest_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",

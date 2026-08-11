@@ -1,0 +1,2 @@
+ALTER TABLE "timetable_memberships" ADD COLUMN "digest_settings" jsonb DEFAULT '{}'::jsonb NOT NULL;--> statement-breakpoint
+ALTER TABLE "timetable_memberships" ADD COLUMN "last_digest_at" timestamp with time zone;

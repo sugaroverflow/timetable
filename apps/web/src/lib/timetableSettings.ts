@@ -1,5 +1,5 @@
 import type {
-  DigestKinds,
+  MembershipDigestSettings,
   NotificationSettings,
   RoleLabels,
   ThemeSettings,
@@ -36,12 +36,14 @@ export function parseDigestSettings(
   }
 }
 
-/** Parse a membership's serialized per-forum digest kind switches
- * (2026-08-11); {} (all defaults) on missing/bad JSON. */
-export function parseDigestKinds(raw: string | null | undefined): DigestKinds {
+/** Parse a membership's serialized per-forum digest settings
+ * (2026-08-11); {} (all fallbacks) on missing/bad JSON. */
+export function parseMembershipDigestSettings(
+  raw: string | null | undefined,
+): MembershipDigestSettings {
   if (!raw) return {};
   try {
-    return JSON.parse(raw) as DigestKinds;
+    return JSON.parse(raw) as MembershipDigestSettings;
   } catch {
     return {};
   }

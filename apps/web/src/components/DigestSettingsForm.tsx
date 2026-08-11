@@ -5,23 +5,22 @@ import { useState } from "react";
 import {
   DIGEST_KIND_DEFAULTS,
   DIGEST_KINDS,
-  isDigestEnabled,
+  effectiveDigestSettings,
   isDigestKindEnabled,
   type DigestKind,
-  type DigestKinds,
+  type MembershipDigestSettings,
 } from "@timetable/shared";
 
 import { Switch } from "@/components/Switch";
 import type { DigestSettings } from "@/lib/timetableSettings";
 import { useGqlAction } from "@/lib/useGqlAction";
 
-// Cadence is per USER (one send schedule); the kind switches are per
-// FORUM (the digest is one email per forum) — both saved in one request.
+// Fully per-forum (2026-08-11): on/off, cadence, and the kind switches
+// all live on this forum's membership.
 const MUTATION = `mutation($s: String!, $e: Boolean, $f: String, $w: Int, $k: String!) {
-  updateMyNotificationSettings(
-    digestEnabled: $e, digestFrequency: $f, digestWeekday: $w
-  ) { id }
-  updateMyDigestKinds(idOrSlug: $s, kindsJson: $k)
+  updateMyForumDigestSettings(
+    idOrSlug: $s, enabled: $e, frequency: $f, weekday: $w, kindsJson: $k
+  )
 }`;
 
 export type { DigestSettings };
@@ -63,26 +62,28 @@ type Cadence = "never" | "daily" | "weekly";
 export function DigestSettingsForm({
   slug,
   current,
-  currentKinds,
+  currentForum,
 }: {
   slug: string;
+  /** The user's stored global settings — the fallback layer. */
   current: DigestSettings;
-  /** This forum's stored switch set (from the viewer's membership). */
-  currentKinds: DigestKinds;
+  /** This forum's stored membership settings. */
+  currentForum: MembershipDigestSettings;
 }) {
   const { run, busy } = useGqlAction();
+  const effective = effectiveDigestSettings(currentForum, current);
   // "Never" folds the enabled flag into the same dropdown as the cadence
   // (2026-07-30) — one control instead of a checkbox + frequency select.
   const [cadence, setCadence] = useState<Cadence>(
-    isDigestEnabled(current) ? (current.digestFrequency ?? "daily") : "never",
+    effective.enabled ? effective.frequency : "never",
   );
-  const [weekday, setWeekday] = useState(current.digestWeekday ?? 1);
+  const [weekday, setWeekday] = useState(effective.weekday);
   const [kinds, setKinds] = useState<Record<DigestKind, boolean>>(
     () =>
       Object.fromEntries(
         DIGEST_KINDS.map((kind) => [
           kind,
-          isDigestKindEnabled(currentKinds, kind),
+          isDigestKindEnabled(effective.kinds, kind),
         ]),
       ) as Record<DigestKind, boolean>,
   );
@@ -117,9 +118,9 @@ export function DigestSettingsForm({
         Email digests
       </h2>
       <p className="faint" style={{ marginTop: 0, fontSize: "var(--text-xs)" }}>
-        One email per forum with what you haven&rsquo;t seen — comments on your
-        topics, replies, and new topics. How often applies everywhere; what to
-        include is your choice for this forum.
+        One email with what you haven&rsquo;t seen in this forum — comments on
+        your topics, replies, and new topics. All of it is your choice per
+        forum.
       </p>
       <div className="row wrap" style={{ marginBottom: 12 }}>
         <div className="field" style={{ marginBottom: 0 }}>
@@ -155,9 +156,7 @@ export function DigestSettingsForm({
       </div>
       {cadence !== "never" ? (
         <div className="stack" style={{ gap: 8, marginBottom: 12 }}>
-          <strong style={{ fontSize: 13 }}>
-            What to include from this forum
-          </strong>
+          <strong style={{ fontSize: 13 }}>What to include</strong>
           {DIGEST_KINDS.map((kind) => (
             <Switch
               key={kind}
