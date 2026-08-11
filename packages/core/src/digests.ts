@@ -216,6 +216,9 @@ type DigestContext = {
   seenFeedAt: Map<string, Date | null>;
   seenNotificationsAt: Map<string, Date | null>;
   electorTimetableIds: string[];
+  /** Forums where the recipient holds the host role (round 2: host
+   * variants of the new-topic and follow kinds). */
+  hostTimetableIds: string[];
   /** Forums with the calendar feature switched on (calendar v2). */
   calendarTimetableIds: string[];
   /** Forums with the host-only thread on — the only ones whose 💙s may
@@ -335,6 +338,9 @@ async function loadDigestContext(
     electorTimetableIds: memberships
       .filter((m) => m.roles.includes("elector"))
       .map((m) => m.timetableId),
+    hostTimetableIds: memberships
+      .filter((m) => m.roles.includes("host"))
+      .map((m) => m.timetableId),
     calendarTimetableIds: memberships
       .filter((m) =>
         isCalendarEnabled((m.settings as TimetableSettings | null) ?? {}),
@@ -362,17 +368,26 @@ async function loadDigestContext(
 /** How far ahead the digest looks for sessions. */
 const SESSION_HORIZON_DAYS = 14;
 
+/** An upcoming session plus HOW the recipient qualifies for it: their ❤️
+ * (elector follow) and/or their 💙 (host follow, round 2) — the two ride
+ * different per-forum switches. */
+type QualifiedSessionLine = DigestSessionLine & {
+  viaHeart: boolean;
+  viaHostHeart: boolean;
+};
+
 /** Upcoming confirmed sessions ("Coming up") and proposed sessions ("Can
- * you make it?"), both scoped to topics the recipient ❤️'d (QA 2026-08-03
- * — a hearter's digest always carries their upcoming confirmed sessions),
- * across the recipient's calendar-enabled forums. `isNew` = session
- * changed since the forum's window start; only fresh sessions can trigger
- * an email by themselves. */
+ * you make it?"), scoped to topics the recipient follows — ❤️ (QA
+ * 2026-08-03) or 💙 (round 2, confirmed sessions only; asks are an
+ * availability question, which is elector business) — across the
+ * recipient's calendar-enabled forums. `isNew` = session changed since
+ * the forum's window start; only fresh sessions can trigger an email by
+ * themselves. */
 async function loadSessionSections(
   ctx: DigestContext,
   now: Date,
 ): Promise<{
-  upcoming: DigestSessionLine[];
+  upcoming: QualifiedSessionLine[];
   asks: DigestSessionLine[];
 }> {
   if (ctx.calendarTimetableIds.length === 0) return { upcoming: [], asks: [] };
@@ -385,20 +400,30 @@ async function loadSessionSections(
     listUpcomingSessions(ctx.calendarTimetableIds, "proposed", horizon),
   ]);
 
-  // Both sections go to the people who ❤️'d the session's topic — the
-  // ones the session is for / whose availability the host is waiting on.
   const allTopicIds = [...confirmed, ...proposed].map((s) => s.topicId);
   if (allTopicIds.length === 0) return { upcoming: [], asks: [] };
-  const heartRows = await db
-    .select({ topicId: hearts.topicId })
-    .from(hearts)
-    .where(
-      and(
-        eq(hearts.userId, ctx.recipient.id),
-        inArray(hearts.topicId, allTopicIds),
+  const [heartRows, hostHeartRows] = await Promise.all([
+    db
+      .select({ topicId: hearts.topicId })
+      .from(hearts)
+      .where(
+        and(
+          eq(hearts.userId, ctx.recipient.id),
+          inArray(hearts.topicId, allTopicIds),
+        ),
       ),
-    );
+    db
+      .select({ topicId: hostHearts.topicId })
+      .from(hostHearts)
+      .where(
+        and(
+          eq(hostHearts.userId, ctx.recipient.id),
+          inArray(hostHearts.topicId, allTopicIds),
+        ),
+      ),
+  ]);
   const heartedTopicIds = new Set(heartRows.map((r) => r.topicId));
+  const hostHeartedTopicIds = new Set(hostHeartRows.map((r) => r.topicId));
   const heartedLine = (s: DigestSession) => ({
     ...s,
     isNew: s.updatedAt > sinceFor(ctx, s.timetableId),
@@ -406,19 +431,30 @@ async function loadSessionSections(
 
   return {
     upcoming: confirmed
-      .filter((s) => heartedTopicIds.has(s.topicId))
-      .map(heartedLine),
+      .filter(
+        (s) =>
+          heartedTopicIds.has(s.topicId) || hostHeartedTopicIds.has(s.topicId),
+      )
+      .map((s) => ({
+        ...heartedLine(s),
+        viaHeart: heartedTopicIds.has(s.topicId),
+        viaHostHeart: hostHeartedTopicIds.has(s.topicId),
+      })),
     asks: proposed
       .filter((s) => heartedTopicIds.has(s.topicId))
       .map(heartedLine),
   };
 }
 
-/** One raw activity tagged with its topic + forum, before cards are built. */
+/** One raw activity tagged with its topic + forum, before cards are built.
+ * `switch` names the per-forum setting that gates it when the activity
+ * kind alone is ambiguous (round 2: a "comment" may be governed by
+ * comments, commentsHearted, or commentsHostHearted). */
 type RawActivity = {
   topicId: string;
   timetableId: string;
   activity: DigestActivity;
+  switch?: DigestKind;
 };
 
 /** Topic display fields resolved once for every referenced topic. */
@@ -839,13 +875,132 @@ async function hostHeartActivities(
   }));
 }
 
-/** Topics newly published in the recipient's elector forums, still unseen
- * in the queue. */
+/** Comments on topics the recipient follows with a ❤️ (elector) or 💙
+ * (host) — round 2 of the digest kinds (2026-08-11). The public thread
+ * for ❤️ follows; 💙 follows also carry the host-only thread where that
+ * feature is on. The recipient's own topics (the `comments` kind), their
+ * own comments, and replies to them (the `replies` kind) are excluded, so
+ * nothing lands twice. Ambient discussion, so the FEED watermark covers
+ * it, like ❤️s. */
+async function followedCommentActivities(
+  ctx: DigestContext,
+  since: Date,
+  follow: "heart" | "hostHeart",
+): Promise<RawActivity[]> {
+  const followTable = follow === "heart" ? hearts : hostHearts;
+  const followed = await db
+    .select({ topicId: followTable.topicId, timetableId: topics.timetableId })
+    .from(followTable)
+    .innerJoin(topics, eq(topics.id, followTable.topicId))
+    .where(
+      and(
+        eq(followTable.userId, ctx.recipient.id),
+        inArray(topics.timetableId, ctx.forumIds),
+        ne(topics.hostId, ctx.recipient.id),
+      ),
+    );
+  if (followed.length === 0) return [];
+  const timetableByTopic = new Map(
+    followed.map((f) => [f.topicId, f.timetableId]),
+  );
+
+  const myComments = await db
+    .select({ id: comments.id })
+    .from(comments)
+    .where(eq(comments.authorId, ctx.recipient.id));
+  const myCommentIds = new Set(myComments.map((c) => c.id));
+
+  const hostThreadOn = new Set(ctx.hostCommentsTimetableIds);
+  const rows = await db
+    .select({
+      id: comments.id,
+      parentId: comments.parentId,
+      topicId: comments.topicId,
+      authorId: comments.authorId,
+      visibility: comments.visibility,
+      by: timetableMemberships.name,
+      body: comments.body,
+      createdAt: comments.createdAt,
+    })
+    .from(comments)
+    .innerJoin(topics, eq(topics.id, comments.topicId))
+    .leftJoin(
+      timetableMemberships,
+      and(
+        eq(timetableMemberships.userId, comments.authorId),
+        eq(timetableMemberships.timetableId, topics.timetableId),
+      ),
+    )
+    .where(
+      and(
+        inArray(
+          comments.topicId,
+          followed.map((f) => f.topicId),
+        ),
+        gt(comments.createdAt, since),
+        inArray(
+          comments.visibility,
+          follow === "hostHeart" ? ["public", "host_only"] : ["public"],
+        ),
+        ne(comments.authorId, ctx.recipient.id),
+        isNull(comments.hiddenAt),
+        isNull(comments.deletedAt),
+      ),
+    );
+
+  const fresh = rows.filter((r) => {
+    const timetableId = timetableByTopic.get(r.topicId) ?? "";
+    if (r.visibility === "host_only" && !hostThreadOn.has(timetableId)) {
+      return false;
+    }
+    // Replies to the recipient already ride the `replies` kind.
+    if (r.parentId && myCommentIds.has(r.parentId)) return false;
+    return (
+      r.createdAt >
+      afterSeen(sinceFor(ctx, timetableId), ctx.seenFeedAt.get(timetableId))
+    );
+  });
+  const chains = await loadAncestorChains(
+    fresh.map((r) => ({
+      id: r.id,
+      parentId: r.parentId,
+      timetableId: timetableByTopic.get(r.topicId) ?? "",
+    })),
+  );
+  return fresh.map((r) => ({
+    topicId: r.topicId,
+    timetableId: timetableByTopic.get(r.topicId) ?? "",
+    switch:
+      follow === "heart"
+        ? ("commentsHearted" as const)
+        : ("commentsHostHearted" as const),
+    activity: {
+      kind: "comment" as const,
+      visibility: r.visibility,
+      comment: {
+        id: r.id,
+        parentId: r.parentId,
+        author: { name: r.by, userId: r.authorId, image: null },
+        body: r.body,
+      },
+      ancestors: chains.get(r.id) ?? [],
+      at: r.createdAt,
+    },
+  }));
+}
+
+/** Topics newly published in forums where the recipient is an elector
+ * (their queue-review work) or — round 2 — a host (faculty awareness of
+ * colleagues' topics), still unseen and never their own. Each row rides
+ * whichever switch its roles allow. */
 async function newTopicActivities(
   ctx: DigestContext,
   since: Date,
 ): Promise<RawActivity[]> {
-  if (ctx.electorTimetableIds.length === 0) return [];
+  const electorSet = new Set(ctx.electorTimetableIds);
+  const hostSet = new Set(ctx.hostTimetableIds);
+  const eligible = [...new Set([...electorSet, ...hostSet])];
+  if (eligible.length === 0) return [];
   const rows = await db
     .select({
       id: topics.id,
@@ -855,9 +1010,10 @@ async function newTopicActivities(
     .from(topics)
     .where(
       and(
-        inArray(topics.timetableId, ctx.electorTimetableIds),
+        inArray(topics.timetableId, eligible),
         eq(topics.status, "published"),
         gt(topics.publishedAt, since),
+        ne(topics.hostId, ctx.recipient.id),
       ),
     );
   if (rows.length === 0) return [];
@@ -878,17 +1034,44 @@ async function newTopicActivities(
     );
   const seen = new Set(seenRows.map((r) => r.topicId));
 
+  // A dual-role member gets the card when EITHER applicable switch is on,
+  // so the passing switch resolves here against the forum's settings; the
+  // post-filter then re-checks the same switch (a no-op by construction).
+  const passingSwitch = (timetableId: string): DigestKind | null => {
+    const kinds = ctx.effectiveByForum.get(timetableId)?.kinds;
+    if (
+      electorSet.has(timetableId) &&
+      isDigestKindEnabled(kinds, "newTopics")
+    ) {
+      return "newTopics";
+    }
+    if (
+      hostSet.has(timetableId) &&
+      isDigestKindEnabled(kinds, "newTopicsHost")
+    ) {
+      return "newTopicsHost";
+    }
+    return null;
+  };
+
   return rows
     .filter(
       (r) =>
         !seen.has(r.id) &&
         (r.publishedAt ?? since) > sinceFor(ctx, r.timetableId),
     )
-    .map((r) => ({
-      topicId: r.id,
-      timetableId: r.timetableId,
-      activity: { kind: "new" as const, at: r.publishedAt ?? since },
-    }));
+    .flatMap((r) => {
+      const via = passingSwitch(r.timetableId);
+      if (!via) return [];
+      return [
+        {
+          topicId: r.id,
+          timetableId: r.timetableId,
+          switch: via,
+          activity: { kind: "new" as const, at: r.publishedAt ?? since },
+        },
+      ];
+    });
 }
 
 /** Topics an admin (re)assigned to the recipient. */
@@ -975,6 +1158,71 @@ export type UserDigestRun = {
   dueForumIds: string[];
 };
 
+type WantsIn = (forumId: string, kind: DigestKind) => boolean;
+
+/** Fan out the activity collectors, skipping any kind no forum wants. */
+async function collectActivities(
+  ctx: DigestContext,
+  since: Date,
+  wantsIn: WantsIn,
+  myTopicIds: string[],
+  timetableByTopic: Map<string, string>,
+): Promise<RawActivity[]> {
+  const wants = (kind: DigestKind) =>
+    ctx.forumIds.some((id) => wantsIn(id, kind));
+  const none: RawActivity[] = [];
+  const collected = await Promise.all([
+    wants("comments")
+      ? commentActivities(ctx, since, myTopicIds, timetableByTopic)
+      : none,
+    wants("commentsHearted")
+      ? followedCommentActivities(ctx, since, "heart")
+      : none,
+    wants("commentsHostHearted")
+      ? followedCommentActivities(ctx, since, "hostHeart")
+      : none,
+    wants("replies") ? replyActivities(ctx, since) : none,
+    wants("hearts")
+      ? heartActivities(ctx, since, myTopicIds, timetableByTopic)
+      : none,
+    wants("hostHearts")
+      ? hostHeartActivities(ctx, since, myTopicIds, timetableByTopic)
+      : none,
+    wants("newTopics") || wants("newTopicsHost")
+      ? newTopicActivities(ctx, since)
+      : none,
+    wants("assignments") ? assignmentActivities(ctx, since) : none,
+  ]);
+  return collected.flat();
+}
+
+/** Confirmed sessions ride their topic's card (QA 2026-08-03) — present
+ * in every digest a follower receives until the session happens. Each
+ * line rides whichever follow switch (❤️/💙) qualifies it. */
+function sessionActivities(
+  upcoming: QualifiedSessionLine[],
+  wantsIn: WantsIn,
+): RawActivity[] {
+  return upcoming.flatMap((s) => {
+    const via =
+      s.viaHeart && wantsIn(s.timetableId, "sessions")
+        ? ("sessions" as const)
+        : s.viaHostHeart && wantsIn(s.timetableId, "sessionsHostHearted")
+          ? ("sessionsHostHearted" as const)
+          : null;
+    if (!via) return [];
+    const { viaHeart: _h, viaHostHeart: _hh, ...line } = s;
+    return [
+      {
+        topicId: s.topicId,
+        timetableId: s.timetableId,
+        switch: via,
+        activity: { kind: "session" as const, session: line, at: s.updatedAt },
+      },
+    ];
+  });
+}
+
 /**
  * Digest v3 (2026-07-30): one digest PER FORUM, built as topic cards.
  * Every activity is grouped under its topic, cards ordered your-content
@@ -994,7 +1242,7 @@ export async function computeUserForumDigests(
   // Per-FORUM kind switches, from the membership: a kind is only
   // collected if some forum wants it, and each activity then filters
   // against its own forum's switches — absent keys keep the defaults.
-  const wantsIn = (forumId: string, kind: DigestKind) =>
+  const wantsIn: WantsIn = (forumId, kind) =>
     isDigestKindEnabled(ctx.effectiveByForum.get(forumId)?.kinds, kind);
   const wants = (kind: DigestKind) =>
     ctx.forumIds.some((id) => wantsIn(id, kind));
@@ -1011,22 +1259,13 @@ export async function computeUserForumDigests(
   const myTopicIds = myTopics.map((t) => t.id);
   const timetableByTopic = new Map(myTopics.map((t) => [t.id, t.timetableId]));
 
-  const none: RawActivity[] = [];
-  const [commentsA, repliesA, heartsA, hostHeartsA, newA, assignedA] =
-    await Promise.all([
-      wants("comments")
-        ? commentActivities(ctx, since, myTopicIds, timetableByTopic)
-        : none,
-      wants("replies") ? replyActivities(ctx, since) : none,
-      wants("hearts")
-        ? heartActivities(ctx, since, myTopicIds, timetableByTopic)
-        : none,
-      wants("hostHearts")
-        ? hostHeartActivities(ctx, since, myTopicIds, timetableByTopic)
-        : none,
-      wants("newTopics") ? newTopicActivities(ctx, since) : none,
-      wants("assignments") ? assignmentActivities(ctx, since) : none,
-    ]);
+  const collectedA = await collectActivities(
+    ctx,
+    since,
+    wantsIn,
+    myTopicIds,
+    timetableByTopic,
+  );
 
   const draftsA: RawActivity[] = wants("drafts")
     ? myTopics
@@ -1038,26 +1277,28 @@ export async function computeUserForumDigests(
         }))
     : [];
 
-  // Confirmed sessions ride their topic's card (QA 2026-08-03) — present
-  // in every digest a hearter receives until the session happens.
-  const sessionsA: RawActivity[] = wants("sessions")
-    ? sessions.upcoming.map((s) => ({
-        topicId: s.topicId,
-        timetableId: s.timetableId,
-        activity: { kind: "session" as const, session: s, at: s.updatedAt },
-      }))
-    : [];
-
+  // A topic both ❤️'d and 💙'd would surface a comment once per follow —
+  // the first collector (❤️) wins.
+  const seenFollowedComment = new Set<string>();
   const all = [
-    ...sessionsA,
-    ...commentsA,
-    ...repliesA,
-    ...heartsA,
-    ...hostHeartsA,
-    ...newA,
-    ...assignedA,
+    ...sessionActivities(sessions.upcoming, wantsIn),
+    ...collectedA,
     ...draftsA,
-  ].filter((a) => wantsIn(a.timetableId, KIND_SWITCH[a.activity.kind]));
+  ]
+    .filter((a) =>
+      wantsIn(a.timetableId, a.switch ?? KIND_SWITCH[a.activity.kind]),
+    )
+    .filter((a) => {
+      if (
+        a.activity.kind !== "comment" ||
+        (a.switch !== "commentsHearted" && a.switch !== "commentsHostHearted")
+      ) {
+        return true;
+      }
+      if (seenFollowedComment.has(a.activity.comment.id)) return false;
+      seenFollowedComment.add(a.activity.comment.id);
+      return true;
+    });
   const meta = await resolveTopicMeta(ctx, [
     ...new Set(all.map((a) => a.topicId)),
   ]);

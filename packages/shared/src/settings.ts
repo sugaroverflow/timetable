@@ -17,30 +17,41 @@ export type DigestFrequency = "daily" | "weekly";
 
 /** The digest's activity types, each individually switchable PER FORUM
  * (2026-08-11) — the digest is one email per forum, so each membership
- * carries its own switch set. One entry per thing a digest can carry. */
+ * carries its own switch set. One entry per thing a digest can carry;
+ * list order is the settings card's display order. Round 2 (Ed's pruning
+ * pass, 2026-08-11) added the ❤️/💙-follow kinds: comments and upcoming
+ * sessions on topics the recipient ❤️'d (elector) or 💙'd (host), and
+ * new-topic cards for hosts. */
 export const DIGEST_KINDS = [
   "comments",
+  "commentsHearted",
+  "commentsHostHearted",
   "replies",
   "hearts",
   "hostHearts",
   "sessions",
+  "sessionsHostHearted",
   "availabilityAsks",
   "newTopics",
+  "newTopicsHost",
   "assignments",
   "drafts",
 ] as const;
 export type DigestKind = (typeof DIGEST_KINDS)[number];
 
-/** Per-kind defaults — what an untouched account receives. Everything the
- * digest carried before per-kind switches existed stays on. */
+/** Per-kind defaults — what an untouched account receives. All on. */
 export const DIGEST_KIND_DEFAULTS: Record<DigestKind, boolean> = {
   comments: true,
+  commentsHearted: true,
+  commentsHostHearted: true,
   replies: true,
   hearts: true,
   hostHearts: true,
   sessions: true,
+  sessionsHostHearted: true,
   availabilityAsks: true,
   newTopics: true,
+  newTopicsHost: true,
   assignments: true,
   drafts: true,
 };

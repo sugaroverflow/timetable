@@ -3,7 +3,6 @@
 import { useState } from "react";
 
 import {
-  DIGEST_KIND_DEFAULTS,
   DIGEST_KINDS,
   effectiveDigestSettings,
   isDigestKindEnabled,
@@ -35,42 +34,24 @@ const WEEKDAYS = [
   "Saturday",
 ];
 
-/** Per-kind switch labels (2026-08-11). The "(host)"/"(elector)" and
- * "(on/off by default)" suffixes are scaffolding while the option set is
- * being pruned — remove once the final set is configured. */
+/** Per-kind switch labels (round 2, 2026-08-11). The "(host)"/"(elector)"
+ * tags — which role a kind can ever fire for; untagged kinds apply to
+ * anyone — are scaffolding to be removed once the set is settled. */
 const KIND_LABELS: Record<DigestKind, string> = {
-  comments: "Comments on your topics",
+  comments: "Comments on your topics (host)",
+  commentsHearted: "Comments on topics you ❤️'d (elector)",
+  commentsHostHearted: "Comments on topics you 💙'd (host)",
   replies: "Replies to your comments",
-  hearts: "❤️s on your topics",
-  hostHearts: "💙s from fellow hosts on your topics",
-  sessions: "Upcoming sessions for topics you ❤️'d",
-  availabilityAsks: "“Can you make it?” availability asks",
-  newTopics: "Newly published topics",
-  assignments: "Topics assigned to you",
-  drafts: "Reminders about your unpublished drafts",
+  hearts: "❤️s on your topics (host)",
+  hostHearts: "💙s from fellow hosts on your topics (host)",
+  sessions: "Upcoming sessions for topics you ❤️'d (elector)",
+  sessionsHostHearted: "Upcoming sessions for topics you 💙'd (host)",
+  availabilityAsks: "“Can you make it?” availability asks (elector)",
+  newTopics: "Newly published topics (elector)",
+  newTopicsHost: "Newly published topics (host)",
+  assignments: "Topics assigned to you (host)",
+  drafts: "Reminders about your unpublished drafts (host)",
 };
-
-/** Which role a kind can ever fire for: topic-owner kinds are host-only;
- * ❤️-driven and new-topic kinds are elector-only; replies (absent here)
- * apply to anyone who comments. */
-const KIND_ROLES: Partial<Record<DigestKind, "host" | "elector">> = {
-  comments: "host",
-  hearts: "host",
-  hostHearts: "host",
-  assignments: "host",
-  drafts: "host",
-  sessions: "elector",
-  availabilityAsks: "elector",
-  newTopics: "elector",
-};
-
-function kindLabel(kind: DigestKind): string {
-  const role = KIND_ROLES[kind] ? ` (${KIND_ROLES[kind]})` : "";
-  const suffix = DIGEST_KIND_DEFAULTS[kind]
-    ? " (on by default)"
-    : " (off by default)";
-  return KIND_LABELS[kind] + role + suffix;
-}
 
 type Cadence = "never" | "daily" | "weekly";
 
@@ -177,7 +158,7 @@ export function DigestSettingsForm({
               key={kind}
               checked={kinds[kind]}
               onChange={(next) => setKinds({ ...kinds, [kind]: next })}
-              label={kindLabel(kind)}
+              label={KIND_LABELS[kind]}
             />
           ))}
         </div>
