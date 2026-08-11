@@ -23,10 +23,11 @@ export type DigestFrequency = "daily" | "weekly";
  * releases, and new members — and REMOVED assignments and
  * your-topic-scheduled from the switchable set: an admin scheduling or
  * assigning something for you is an admin override you always hear
- * about. */
+ * about. `comments` covers every thread on your topics, including the
+ * you-and-admin drafting thread (Ed folded the separate drafting switch
+ * back in — it's just a type of comment on your topic). */
 export const DIGEST_KINDS = [
   "comments",
-  "draftingComments",
   "commentsHearted",
   "commentsHostHearted",
   "replies",
@@ -49,7 +50,6 @@ export type DigestKind = (typeof DIGEST_KINDS)[number];
  * hasn't configured its own defaults either. All on. */
 export const DIGEST_KIND_DEFAULTS: Record<DigestKind, boolean> = {
   comments: true,
-  draftingComments: true,
   commentsHearted: true,
   commentsHostHearted: true,
   replies: true,
@@ -73,17 +73,17 @@ export const DIGEST_KIND_DEFAULTS: Record<DigestKind, boolean> = {
  * (one-person-one-gesture: an elector-host's 💙 rolls into their ❤️);
  * newMembers is admin business; replies and mentions reach anyone. The
  * settings card hides inapplicable switches from non-admins and greys
- * them for admins. */
-type DigestKindAudience =
+ * them for admins; restricted switches carry a "([role] only)" tag built
+ * from the forum's own role labels (web side). */
+export type DigestKindAudience =
   | "host"
   | "elector"
   | "hostNonElector"
   | "admin"
   | "all";
 
-const KIND_AUDIENCE: Record<DigestKind, DigestKindAudience> = {
+export const DIGEST_KIND_AUDIENCE: Record<DigestKind, DigestKindAudience> = {
   comments: "host",
-  draftingComments: "host",
   commentsHearted: "elector",
   commentsHostHearted: "hostNonElector",
   replies: "all",
@@ -105,33 +105,13 @@ export function digestKindApplies(kind: DigestKind, roles: string[]): boolean {
   const host = roles.includes("host") || roles.includes("admin");
   const elector = roles.includes("elector");
   const admin = roles.includes("admin") || roles.includes("owner");
-  const audience = KIND_AUDIENCE[kind];
+  const audience = DIGEST_KIND_AUDIENCE[kind];
   if (audience === "host") return host;
   if (audience === "elector") return elector;
   if (audience === "hostNonElector") return host && !elector;
   if (audience === "admin") return admin;
   return true;
 }
-
-/** The "([role] only)" scaffold admins see beside restricted switches —
- * temporary until the option set is final. */
-export const DIGEST_KIND_ROLE_TAGS: Partial<Record<DigestKind, string>> = {
-  comments: "host only",
-  draftingComments: "host only",
-  commentsHearted: "elector only",
-  commentsHostHearted: "non-elector host only",
-  hearts: "host only",
-  hostHearts: "host only",
-  sessions: "elector only",
-  sessionsHostHearted: "non-elector host only",
-  availabilityAsks: "elector only",
-  newTopics: "elector only",
-  newTopicsHost: "non-elector host only",
-  pendingReview: "admin only",
-  slotReleases: "host only",
-  drafts: "host only",
-  newMembers: "admin only",
-};
 
 export type NotificationSettings = {
   /** Master switch (2026-07-29): off means no digest at all. */

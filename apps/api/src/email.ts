@@ -881,10 +881,10 @@ function sampleActivities(
         "2026-07-30T08:10:00Z",
       ),
     },
-    // --- You-and-admin comments on your topics under review ---
+    // --- The you-and-admin drafting thread rides the comments switch ---
     {
       meta: mine,
-      kind: "draftingComments",
+      kind: "comments",
       activity: sComment(
         "admin_only",
         sC(
@@ -898,7 +898,7 @@ function sampleActivities(
     },
     {
       meta: mine,
-      kind: "draftingComments",
+      kind: "comments",
       activity: sComment(
         "admin_only",
         sC(

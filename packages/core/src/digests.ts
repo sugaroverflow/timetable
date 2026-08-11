@@ -711,12 +711,10 @@ async function commentActivities(
   return fresh.map((r) => ({
     topicId: r.topicId,
     timetableId: timetableByTopic.get(r.topicId) ?? "",
-    // Round 2: the you-and-admin drafting thread (review conversation) is
-    // its own switch; the public and {host}-only threads stay `comments`.
-    switch:
-      r.visibility === "admin_only"
-        ? ("draftingComments" as const)
-        : ("comments" as const),
+    // Every thread on your topics — public, {host}-only, and the
+    // you-and-admin drafting thread — rides the one `comments` switch
+    // (Ed folded the separate drafting switch back in, 2026-08-11).
+    switch: "comments" as const,
     activity: {
       kind: "comment" as const,
       visibility: r.visibility,
@@ -1049,7 +1047,7 @@ async function followedCommentActivities(
 
 /** Comments that @mention the recipient (round 2) — anywhere they were
  * mentioned, excluding what other kinds already carry: their own topics
- * (comments/draftingComments) and replies to them (replies). Mention rows
+ * (comments) and replies to them (replies). Mention rows
  * are only written for users allowed to see the thread, so no extra
  * visibility filtering is needed. The Notifications page shows mentions,
  * so its watermark covers them. */
@@ -1448,7 +1446,7 @@ async function collectActivities(
     ctx.forumIds.some((id) => wantsIn(id, kind));
   const none: RawActivity[] = [];
   const collected = await Promise.all([
-    wants("comments") || wants("draftingComments")
+    wants("comments")
       ? commentActivities(ctx, since, myTopicIds, timetableByTopic)
       : none,
     wants("commentsHearted")

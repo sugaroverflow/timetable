@@ -70,3 +70,20 @@ membership switch → forum default → global all-on default.
   only)" for every viewer (Ed — "the {Host} and {Admins}" read as the
   whole faculty); the admin composer hint still names the owner so nobody
   assumes the thread is admin-private.
+
+## Round 3 (same day) — QA on the switch cards
+
+- **draftingComments folded back into comments** (Ed: "it's just a type
+  of 'Comments on your topics'"): the kind is gone from DIGEST_KINDS;
+  admin_only comment rows now ride the `comments` switch. Stored
+  membership/forum JSON with the old key parses fine (unknown kinds are
+  ignored on read, dropped on next save). 16 switches remain.
+- **Role tags for every viewer, in the forum's own labels**: Ed previewed
+  a host who is also an elector and couldn't tell why elector switches
+  ("Can you make it?" asks) appeared — the "([role] only)" scaffold now
+  shows for members too, and all role words (tags plus "fellow hosts"
+  labels) go through the forum's roleLabels ("Fellowship Candidate
+  only", "💙s from fellow Faculty…"). DIGEST_KIND_ROLE_TAGS left shared
+  (hardcoded strings) for an exported DIGEST_KIND_AUDIENCE; the web's
+  `taggedKindLabel(kind, roleLabels)` builds display labels for both the
+  Notifications card and the Forum Settings defaults card.

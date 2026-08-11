@@ -187,6 +187,7 @@ function DigestCard({ slug, data }: { slug: string; data: Data }) {
       )}
       forumDefaults={settings.digestKindDefaults ?? {}}
       roles={data.timetable?.viewerRoles ?? []}
+      roleLabels={settings.roleLabels}
     />
   );
 }
