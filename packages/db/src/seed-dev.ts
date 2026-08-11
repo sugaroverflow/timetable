@@ -1571,7 +1571,9 @@ function deriveTerms(
   return runs.map((run) => {
     const start = new Date(`${run[0]}T00:00:00.000Z`);
     const month = start.getUTCMonth();
-    const season = month >= 8 ? "Autumn" : month <= 2 ? "Spring" : "Summer";
+    // House naming (2026-08-11): late-Sep–early-Dec is the WINTER term,
+    // mid-Jan–early-Apr the Spring term.
+    const season = month >= 8 ? "Winter" : month <= 3 ? "Spring" : "Summer";
     const base = `${season} term ${start.getUTCFullYear()}`;
     const n = (seen.get(base) ?? 0) + 1;
     seen.set(base, n);
@@ -1613,8 +1615,14 @@ function buildCalendarSeedSettings(
       cell.locations.push(slot.location);
     }
     cells.set(slotCellKey(slot), cell);
-    if (slot.location) locations.add(slot.location);
     dates.push(slot.date);
+  }
+  // Preset locations come from EVERY slot, off-grid included (2026-08-11):
+  // the Hall only ever appears as one-off releases (off-grid, so the weekly
+  // pattern never learns it) but must still be offered in the location
+  // checkboxes when admins release dates.
+  for (const slot of slots) {
+    if (slot.location) locations.add(slot.location);
   }
   dates.sort();
   return {

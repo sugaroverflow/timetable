@@ -1,23 +1,31 @@
 #!/usr/bin/env node
 /**
  * Re-runnable generator that writes a multi-year calendar history into the
- * Timeslots section of dev-sample-data.md. Deterministic: same input file +
- * SEED constant → byte-identical output.
+ * Timeslots section of dev-sample-data.md. Deterministic for a given run
+ * date: same input file + SEED constant + calendar date → identical output.
  *
- * Layout: ten ~11-week terms spanning roughly two years back to one year
- * ahead, expressed with the fixture's relative dates ("mon-104" = Monday
- * 104 weeks ago) so the whole history stays anchored to the seed run.
- * The hand-authored current-window slots (weeks 0..+3) are preserved above
- * the marker; the generator fills the current term's other weeks (-7..-1,
- * +4..+5) plus the nine surrounding terms.
+ * House schedule (2026-08-11, realistic): two real-dated terms per academic
+ * year — the WINTER term (20 Sep – first Sunday of December) and the SPRING
+ * term (Monday on/after 12 Jan – first Sunday of April) — emitted with
+ * absolute YYYY-MM-DD dates, six terms spanning roughly two years back to
+ * one ahead of the run date. The hand-authored current-window slots (the
+ * relative-dated summer specials) live above the marker and are preserved.
  *
- * Content per term week: the five standard pattern cells, most carrying a
- * session — past terms are mostly booked (confirmed, Luma URLs), future
+ * Times: 19:00–22:00 every evening, plus 16:00–18:00 weekend afternoons.
+ * Rooms: the Classroom is available every day except Wednesday; the Drawing
+ * Room on Tuesdays and Thursdays; the Hall for ONE week per month (the
+ * Mon-start week containing the 15th), every day that week. Hall slots are
+ * emitted Off-grid so the derived weekly pattern never learns the Hall —
+ * hall weeks read as deliberate one-off releases, and open hall slots are
+ * the "when is the hall free?" QA data. A slot's other rooms ride as bare
+ * companion sections (same time window, different location — the seed
+ * merges them onto one timeslot offering the union of locations).
+ *
+ * Content: past terms are mostly booked (confirmed, Luma URLs), future
  * terms mix booked, pencilled (proposed, some with claim comments and
  * frozen 🟢🟡🔴 counts), and open slots. Sprinkled on top: parallel
- * bookings (a second session in the same time window, different room —
- * the bookings model merges them onto one timeslot), office-hours
- * sessions, and off-grid Saturday/evening proposals.
+ * bookings in the Drawing Room or Hall, office-hours sessions, and rare
+ * off-grid park afternoons.
  *
  * Electors grace/oscar/yuki/ben never appear in generated availability —
  * their standing patterns must stay the only source of their states.
@@ -99,41 +107,61 @@ for (const block of src.split(/^### Topic:\s*/m).slice(1)) {
     topics.push({ label, title, host });
 }
 
-// --- schedule shape ---------------------------------------------------------
-/** The five weekly pattern cells (must match the hand-authored slots — the
- * seed derives the forum's pattern grid from ALL grid slots). */
-const CELLS = [
-  { day: "mon", start: "10:00", end: "12:00", location: "Classroom" },
-  { day: "tue", start: "14:00", end: "16:00", location: "Hall" },
-  { day: "wed", start: "10:00", end: "11:30", location: "Lounge" },
-  { day: "thu", start: "16:00", end: "18:00", location: "Classroom" },
-  { day: "fri", start: "13:00", end: "15:00", location: "Terrace" },
-];
-const LOCATIONS = [
-  "Classroom",
-  "Hall",
-  "Lounge",
-  "Terrace",
-  "Seminar Room",
-  "Library",
-  "Auditorium",
-];
+// --- calendar arithmetic (all UTC) ------------------------------------------
+const DAY_MS = 24 * 60 * 60 * 1000;
+const TODAY = new Date(
+  Date.UTC(
+    new Date().getUTCFullYear(),
+    new Date().getUTCMonth(),
+    new Date().getUTCDate(),
+  ),
+);
 
-/** Term windows in week offsets from the current week (inclusive). Weeks
- * 0..+3 of the current term are hand-authored above the marker. Inter-term
- * gaps are ≥24 days so the seed's term derivation splits them. */
+const ymd = (d) => d.toISOString().slice(0, 10);
+const addDays = (d, n) => new Date(d.getTime() + n * DAY_MS);
+/** The Monday starting d's week. */
+const monday = (d) => addDays(d, -((d.getUTCDay() + 6) % 7));
+
+/** First given weekday (0=Sun..6) on/after a date. */
+function nextWeekday(d, weekday) {
+  return addDays(d, (weekday - d.getUTCDay() + 7) % 7);
+}
+
+/** Winter term: 20 Sep – first Sunday of December. */
+function winterTerm(year) {
+  return {
+    tag: `w${String(year).slice(2)}`,
+    start: new Date(Date.UTC(year, 8, 20)),
+    end: nextWeekday(new Date(Date.UTC(year, 11, 1)), 0),
+  };
+}
+/** Spring term: Monday on/after 12 Jan – first Sunday of April. */
+function springTerm(year) {
+  return {
+    tag: `s${String(year).slice(2)}`,
+    start: nextWeekday(new Date(Date.UTC(year, 0, 12)), 1),
+    end: nextWeekday(new Date(Date.UTC(year, 3, 1)), 0),
+  };
+}
+
+const Y = TODAY.getUTCFullYear();
 const TERMS = [
-  { from: -110, to: -100 },
-  { from: -96, to: -86 },
-  { from: -82, to: -72 },
-  { from: -58, to: -48 },
-  { from: -44, to: -34 },
-  { from: -30, to: -20 },
-  { from: -7, to: 5, skip: [0, 1, 2, 3] },
-  { from: 9, to: 19 },
-  { from: 23, to: 33 },
-  { from: 37, to: 47 },
-];
+  winterTerm(Y - 2),
+  springTerm(Y - 1),
+  winterTerm(Y - 1),
+  springTerm(Y),
+  winterTerm(Y),
+  springTerm(Y + 1),
+].sort((a, b) => a.start - b.start);
+
+/** Hall week: the Mon-start week containing the 15th of some month. */
+function isHallWeek(d) {
+  const mon = monday(d);
+  for (let i = 0; i < 7; i++) {
+    if (addDays(mon, i).getUTCDate() === 15) return true;
+  }
+  return false;
+}
 
 // --- text pools -------------------------------------------------------------
 const CLAIM_TEXTS = [
@@ -169,8 +197,13 @@ const OFFICE_HOURS = [
 ];
 const OFF_GRID_TEXTS = [
   "Off-piste proposal — this one wants a different kind of space.",
-  "Proposing an extra slot outside the usual grid; daytimes are full.",
-  "Evening experiment: same format, different energy. Who's in?",
+  "Proposing an extra afternoon outside the usual grid.",
+  "Weekend experiment: same format, different energy. Who's in?",
+];
+const HALL_RELEASE_TEXTS = [
+  "Hall week — the big room is open every day this week. Claim away.",
+  "The Hall is released for this week; first topics to claim it get it.",
+  "Hall available all week — good for anything expecting a crowd.",
 ];
 
 // --- topic cycling ----------------------------------------------------------
@@ -192,14 +225,6 @@ function nextTopic(usedThisTerm) {
 // --- emission ---------------------------------------------------------------
 const out = [];
 const counts = { slots: 0, confirmed: 0, proposed: 0, empty: 0 };
-
-function dateToken(day, week) {
-  return `${day}${week < 0 ? "-" : "+"}${Math.abs(week)}`;
-}
-
-function labelFor(week, day, suffix = "") {
-  return `slot-g${week < 0 ? "m" : "p"}${Math.abs(week)}-${day}${suffix}`;
-}
 
 function emitAvailability(lines) {
   const n = randInt(3, 6);
@@ -264,9 +289,10 @@ function sessionFieldLines({ topic, officeHours, status }, offGrid) {
   return lines;
 }
 
-function discussionFor({ topic, officeHours, status }, offGrid, isPast) {
+function discussionFor({ topic, officeHours, status }, kind, isPast) {
   if (officeHours) return [{ author: officeHours, text: pick(OFFICE_HOURS) }];
-  if (offGrid) return [{ author: topic.host, text: pick(OFF_GRID_TEXTS) }];
+  if (kind === "park")
+    return [{ author: topic.host, text: pick(OFF_GRID_TEXTS) }];
   return sessionDiscussion({ isPast, status, topic });
 }
 
@@ -274,11 +300,11 @@ function discussionFor({ topic, officeHours, status }, offGrid, isPast) {
  * Emit one slot block. session: null (open slot) or
  * {topic} / {officeHours: hostLabel}, plus status.
  */
-function emitSlot({ label, day, week, cell, location, session, offGrid }) {
-  const isPast = week < 0;
+function emitSlot({ label, date, cell, location, session, offGrid, kind }) {
+  const isPast = date < TODAY;
   const lines = [
     `### Slot: ${label}`,
-    `Date: ${dateToken(day, week)}`,
+    `Date: ${ymd(date)}`,
     `Start: ${cell.start}`,
     `End: ${cell.end}`,
     `Location: ${location}`,
@@ -286,7 +312,9 @@ function emitSlot({ label, day, week, cell, location, session, offGrid }) {
   counts.slots++;
 
   if (!session) {
-    lines.push("Topics:", "");
+    lines.push("Topics:");
+    if (offGrid) lines.push("Off-grid: yes");
+    lines.push("");
     counts.empty++;
     out.push(...lines);
     return;
@@ -294,107 +322,180 @@ function emitSlot({ label, day, week, cell, location, session, offGrid }) {
 
   lines.push(...sessionFieldLines(session, offGrid), "");
   if (!isPast && rand() < 0.4) emitAvailability(lines);
-  const entries = discussionFor(session, offGrid, isPast);
+  const entries = discussionFor(session, kind, isPast);
   if (entries.length > 0) emitDiscussion(lines, entries);
 
   out.push(...lines);
 }
 
-/** Decide what a base grid slot holds. Past terms are mostly booked; future
+/** Decide what a base slot holds. Past terms are mostly booked; future
  * terms mix booked, pencilled, and open slots. */
 function rollSession(isPast, usedThisTerm) {
   const roll = rand();
   if (isPast) {
-    if (roll < 0.72)
+    if (roll < 0.6)
       return { topic: nextTopic(usedThisTerm), status: "confirmed" };
-    if (roll < 0.82)
+    if (roll < 0.7)
       return { topic: nextTopic(usedThisTerm), status: "proposed" };
     return null;
   }
-  if (roll < 0.33)
+  if (roll < 0.25)
     return { topic: nextTopic(usedThisTerm), status: "confirmed" };
-  if (roll < 0.7) return { topic: nextTopic(usedThisTerm), status: "proposed" };
+  if (roll < 0.55)
+    return { topic: nextTopic(usedThisTerm), status: "proposed" };
   return null;
 }
 
-function otherLocation(taken) {
-  return pick(LOCATIONS.filter((l) => l !== taken));
-}
+const EVENING = { start: "19:00", end: "22:00" };
+const AFTERNOON = { start: "16:00", end: "18:00" };
 
-function emitBaseCells(week, usedThisTerm) {
-  const isPast = week < 0;
-  const sessionsThisWeek = [];
-  for (const cell of CELLS) {
-    let session = rollSession(isPast, usedThisTerm);
-    // ~6% of sessions are office hours (a host, no topic) instead.
-    if (session && rand() < 0.06) {
-      session = { officeHours: pick(hosts), status: session.status };
-    }
-    const location =
-      rand() < 0.3 ? otherLocation(cell.location) : cell.location;
-    emitSlot({
-      label: labelFor(week, cell.day),
-      day: cell.day,
-      week,
-      cell,
-      location,
-      session,
-      offGrid: false,
-    });
-    if (session) sessionsThisWeek.push({ cell, location });
+/** The Classroom, or the Hall on hall-week Wednesdays — Hall slots are
+ * Off-grid so the Hall never shapes the weekly pattern. */
+function emitPrimary(ctx, cell, aft) {
+  let session = rollSession(ctx.isPast, ctx.usedThisTerm);
+  if (session && rand() < 0.06) {
+    session = { officeHours: pick(hosts), status: session.status };
   }
-  return sessionsThisWeek;
+  emitSlot({
+    label: `slot-g${ctx.tag}-${ctx.mmdd}${aft}`,
+    date: ctx.date,
+    cell,
+    location: ctx.classroom ? "Classroom" : "Hall",
+    session,
+    offGrid: !ctx.classroom,
+  });
 }
 
-/** A second session in the same time window, different room. */
-function emitParallelBooking(week, usedThisTerm, sessionsThisWeek) {
-  const { cell, location } = pick(sessionsThisWeek);
+/** Drawing Room companion (Tue/Thu evenings): part of the weekly grid;
+ * sometimes a parallel booking, else an open second room. */
+function emitDrawingRoom(ctx, cell) {
+  const book = rand() < (ctx.isPast ? 0.3 : 0.18);
   emitSlot({
-    label: labelFor(week, cell.day, "-b"),
-    day: cell.day,
-    week,
+    label: `slot-g${ctx.tag}-${ctx.mmdd}-dr`,
+    date: ctx.date,
     cell,
-    location: otherLocation(location),
-    session: {
-      topic: nextTopic(usedThisTerm),
-      status: week < 0 || rand() < 0.5 ? "confirmed" : "proposed",
-    },
+    location: "Drawing Room",
+    session: book
+      ? {
+          topic: nextTopic(ctx.usedThisTerm),
+          status: ctx.isPast || rand() < 0.5 ? "confirmed" : "proposed",
+        }
+      : null,
     offGrid: false,
   });
 }
 
-/** An off-grid proposal: Saturday park slot or a weekday evening. */
-function emitOffGrid(week, usedThisTerm) {
-  const evening = rand() < 0.5;
+/** One admin "hall week" note per future hall week, on its first open
+ * evening slot. */
+function emitHallRelease(ctx, cell, label) {
+  counts.slots++;
+  counts.empty++;
+  out.push(
+    `### Slot: ${label}`,
+    `Date: ${ymd(ctx.date)}`,
+    `Start: ${cell.start}`,
+    `End: ${cell.end}`,
+    `Location: Hall`,
+    "Topics:",
+    "Off-grid: yes",
+    "",
+    "Discussion:",
+    `- Author: admin-edwin`,
+    `  Text: ${pick(HALL_RELEASE_TEXTS)}`,
+    "",
+  );
+}
+
+/** Hall companion during hall weeks: mostly OPEN — free hall dates are the
+ * point — with the odd booked event; always Off-grid. */
+function emitHallCompanion(ctx, cell, aft) {
+  const book = rand() < (ctx.isPast ? 0.25 : 0.08);
+  const session = book
+    ? {
+        topic: nextTopic(ctx.usedThisTerm),
+        status: ctx.isPast ? "confirmed" : "proposed",
+      }
+    : null;
+  const label = `slot-g${ctx.tag}-${ctx.mmdd}${aft}-hall`;
+  const announce =
+    !session && !ctx.announced.done && cell === EVENING && !ctx.isPast;
+  if (announce) {
+    ctx.announced.done = true;
+    emitHallRelease(ctx, cell, label);
+    return;
+  }
   emitSlot({
-    label: labelFor(week, evening ? "wed" : "sat", "-og"),
-    day: evening ? "wed" : "sat",
-    week,
-    cell: evening
-      ? { start: "18:30", end: "20:00" }
-      : { start: "15:00", end: "17:00" },
-    location: evening ? "Lounge" : "The Park",
-    session: {
-      topic: nextTopic(usedThisTerm),
-      status: week < 0 ? "confirmed" : "proposed",
-    },
+    label,
+    date: ctx.date,
+    cell,
+    location: "Hall",
+    session,
     offGrid: true,
   });
 }
 
-function emitWeek(week, usedThisTerm) {
-  const sessionsThisWeek = emitBaseCells(week, usedThisTerm);
-  if (sessionsThisWeek.length > 0 && rand() < 0.15) {
-    emitParallelBooking(week, usedThisTerm, sessionsThisWeek);
+/** Rare off-grid park afternoon (Saturdays, its own 15:00 window so it
+ * can never collide with a grid (time, location) pair on reseed). */
+function emitParkExtra(ctx) {
+  emitSlot({
+    label: `slot-g${ctx.tag}-${ctx.mmdd}-og`,
+    date: ctx.date,
+    cell: { start: "15:00", end: "17:00" },
+    location: "The Park",
+    session: {
+      topic: nextTopic(ctx.usedThisTerm),
+      status: ctx.isPast ? "confirmed" : "proposed",
+    },
+    offGrid: true,
+    kind: "park",
+  });
+}
+
+/** All rooms of one time window: primary + companions. */
+function emitCell(ctx, cell) {
+  const aft = cell === AFTERNOON ? "-aft" : "";
+  emitPrimary(ctx, cell, aft);
+  if (ctx.drawingRoom && cell === EVENING) emitDrawingRoom(ctx, cell);
+  if (ctx.hall && ctx.classroom) emitHallCompanion(ctx, cell, aft);
+}
+
+/** One day of a term: primary slot per cell + room companions. */
+function emitDay(term, date, usedThisTerm, announced) {
+  const weekday = date.getUTCDay();
+  const hall = isHallWeek(date);
+  const classroom = weekday !== 3;
+  if (!classroom && !hall) return; // Wednesday outside hall weeks: no rooms.
+
+  const ctx = {
+    tag: term.tag,
+    date,
+    mmdd: ymd(date).slice(5).replace("-", ""),
+    isPast: date < TODAY,
+    classroom,
+    hall,
+    drawingRoom: weekday === 2 || weekday === 4,
+    usedThisTerm,
+    announced,
+  };
+  const weekend = weekday === 0 || weekday === 6;
+  for (const cell of weekend ? [AFTERNOON, EVENING] : [EVENING]) {
+    emitCell(ctx, cell);
   }
-  if (rand() < 0.06) emitOffGrid(week, usedThisTerm);
+
+  if (weekday === 6 && rand() < 0.04) emitParkExtra(ctx);
 }
 
 for (const term of TERMS) {
   const usedThisTerm = new Set();
-  for (let week = term.from; week <= term.to; week++) {
-    if (term.skip?.includes(week)) continue;
-    emitWeek(week, usedThisTerm);
+  let weekKey = "";
+  let announced = { done: true };
+  for (let d = term.start; d <= term.end; d = addDays(d, 1)) {
+    const mon = ymd(monday(d));
+    if (mon !== weekKey) {
+      weekKey = mon;
+      announced = { done: false };
+    }
+    emitDay(term, d, usedThisTerm, announced);
   }
 }
 
@@ -409,5 +510,6 @@ const next = `${base}\n\n${MARKER}\n\n${out.join("\n").trimEnd()}\n${tail}`;
 writeFileSync(FIXTURE, next);
 console.log(
   `Wrote ${counts.slots} generated slots (${counts.confirmed} confirmed, ` +
-    `${counts.proposed} proposed, ${counts.empty} open) across ${TERMS.length} terms`,
+    `${counts.proposed} proposed, ${counts.empty} open) across ${TERMS.length} terms: ` +
+    TERMS.map((t) => `${t.tag} ${ymd(t.start)}..${ymd(t.end)}`).join(", "),
 );
