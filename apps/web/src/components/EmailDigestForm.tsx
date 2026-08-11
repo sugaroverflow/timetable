@@ -11,11 +11,11 @@ import {
   type DigestKinds,
 } from "@timetable/shared";
 
-import { adminKindLabel } from "@/components/DigestSettingsForm";
+import { taggedKindLabel } from "@/components/DigestSettingsForm";
 import { Switch } from "@/components/Switch";
 import { useToast } from "@/components/Toast";
 import { clientApi } from "@/lib/clientApi";
-import type { DigestSettings } from "@/lib/timetableSettings";
+import type { DigestSettings, RoleLabels } from "@/lib/timetableSettings";
 import { useGqlAction } from "@/lib/useGqlAction";
 
 const MUTATION = `mutation DigestDefaults($s: String!, $e: Boolean, $k: String!) {
@@ -35,10 +35,13 @@ export function EmailDigestForm({
   slug,
   digestDefaults,
   digestKindDefaults,
+  roleLabels,
 }: {
   slug: string;
   digestDefaults?: DigestSettings;
   digestKindDefaults?: DigestKinds;
+  /** The forum's custom role labels — role words in switch labels/tags. */
+  roleLabels?: RoleLabels;
 }) {
   const { run, busy } = useGqlAction();
   const { toast, toastError } = useToast();
@@ -118,7 +121,7 @@ export function EmailDigestForm({
               key={kind}
               checked={kinds[kind]}
               onChange={(next) => setKinds({ ...kinds, [kind]: next })}
-              label={adminKindLabel(kind)}
+              label={taggedKindLabel(kind, roleLabels)}
             />
           ))}
         </div>

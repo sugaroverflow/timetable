@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import {
-  DIGEST_KIND_ROLE_TAGS,
+  DIGEST_KIND_AUDIENCE,
   DIGEST_KINDS,
   digestKindApplies,
   effectiveDigestSettings,
@@ -14,7 +14,12 @@ import {
 } from "@timetable/shared";
 
 import { Switch } from "@/components/Switch";
-import type { DigestSettings } from "@/lib/timetableSettings";
+import {
+  pluralLabel,
+  roleLabel,
+  type DigestSettings,
+  type RoleLabels,
+} from "@/lib/timetableSettings";
 import { useGqlAction } from "@/lib/useGqlAction";
 
 // Fully per-forum (2026-08-11): on/off, cadence, and the kind switches
@@ -37,33 +42,48 @@ const WEEKDAYS = [
   "Saturday",
 ];
 
-/** Per-kind switch labels (round 2, 2026-08-11). Role-restricted kinds
- * are hidden from members who can't use them; admins see everything with
- * the "([role] only)" scaffold instead, inapplicable ones greyed out. */
-export const KIND_LABELS: Record<DigestKind, string> = {
-  comments: "Comments on your topics",
-  draftingComments: "You-and-admin comments on your topics under review",
-  commentsHearted: "Comments on topics you ❤️'d",
-  commentsHostHearted: "Comments on topics you 💙'd",
-  replies: "Replies to your comments",
-  mentions: "Comments that @mention you",
-  hearts: "❤️s on your topics",
-  hostHearts: "💙s from fellow hosts on your topics",
-  sessions: "Upcoming sessions for topics you ❤️'d",
-  sessionsHostHearted: "Upcoming sessions for topics you 💙'd",
-  availabilityAsks: "“Can you make it?” availability asks",
-  newTopics: "Newly published topics",
-  newTopicsHost: "Newly published topics by fellow hosts",
-  pendingReview: "New topics ready to review",
-  slotReleases: "New dates released on the calendar",
-  drafts: "Reminders about your unpublished drafts",
-  newMembers: "New members joining",
+/** Per-kind switch labels (round 2, 2026-08-11). Each takes the forum's
+ * plural host label so role words follow the forum's own naming. */
+const KIND_LABELS: Record<DigestKind, (hosts: string) => string> = {
+  comments: () => "Comments on your topics",
+  commentsHearted: () => "Comments on topics you ❤️'d",
+  commentsHostHearted: () => "Comments on topics you 💙'd",
+  replies: () => "Replies to your comments",
+  mentions: () => "Comments that @mention you",
+  hearts: () => "❤️s on your topics",
+  hostHearts: (hosts) => `💙s from fellow ${hosts} on your topics`,
+  sessions: () => "Upcoming sessions for topics you ❤️'d",
+  sessionsHostHearted: () => "Upcoming sessions for topics you 💙'd",
+  availabilityAsks: () => "“Can you make it?” availability asks",
+  newTopics: () => "Newly published topics",
+  newTopicsHost: (hosts) => `Newly published topics by fellow ${hosts}`,
+  pendingReview: () => "New topics ready to review",
+  slotReleases: () => "New dates released on the calendar",
+  drafts: () => "Reminders about your unpublished drafts",
+  newMembers: () => "New members joining",
 };
 
-/** The admin view's label: the base plus the "([role] only)" scaffold. */
-export function adminKindLabel(kind: DigestKind): string {
-  const tag = DIGEST_KIND_ROLE_TAGS[kind];
-  return tag ? `${KIND_LABELS[kind]} (${tag})` : KIND_LABELS[kind];
+/** The "(… only)" audience scaffold beside a restricted switch, in the
+ * forum's own role labels; null for universal kinds. Shown to EVERY
+ * viewer (Ed, 2026-08-11) — for a dual-role member it answers "why do I
+ * see this switch?". Temporary until the option set is final. */
+function audienceTag(kind: DigestKind, labels?: RoleLabels): string | null {
+  const audience = DIGEST_KIND_AUDIENCE[kind];
+  if (audience === "all") return null;
+  if (audience === "hostNonElector") {
+    const host = roleLabel(labels, "host");
+    const elector = roleLabel(labels, "elector");
+    return `${host} without the ${elector} role`;
+  }
+  return `${roleLabel(labels, audience)} only`;
+}
+
+/** A switch's display label: the forum-labelled base plus the audience
+ * scaffold. Shared with the Forum Settings defaults card. */
+export function taggedKindLabel(kind: DigestKind, labels?: RoleLabels): string {
+  const base = KIND_LABELS[kind](pluralLabel(roleLabel(labels, "host")));
+  const tag = audienceTag(kind, labels);
+  return tag ? `${base} (${tag})` : base;
 }
 
 type Cadence = "never" | "daily" | "weekly";
@@ -74,6 +94,7 @@ export function DigestSettingsForm({
   currentForum,
   forumDefaults,
   roles,
+  roleLabels,
 }: {
   slug: string;
   /** The user's stored global settings — the fallback layer. */
@@ -84,6 +105,8 @@ export function DigestSettingsForm({
   forumDefaults: DigestKinds;
   /** The viewer's roles in THIS forum — drives switch visibility. */
   roles: string[];
+  /** The forum's custom role labels — role words in switch labels/tags. */
+  roleLabels?: RoleLabels;
 }) {
   const { run, busy } = useGqlAction();
   const admin = roles.includes("admin") || roles.includes("owner");
@@ -192,7 +215,7 @@ export function DigestSettingsForm({
                 <Switch
                   checked={kinds[kind]}
                   onChange={(next) => setKinds({ ...kinds, [kind]: next })}
-                  label={admin ? adminKindLabel(kind) : KIND_LABELS[kind]}
+                  label={taggedKindLabel(kind, roleLabels)}
                   disabled={!applies}
                 />
               </span>

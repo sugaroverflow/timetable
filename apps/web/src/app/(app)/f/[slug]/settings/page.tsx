@@ -108,6 +108,7 @@ export default async function SettingsPage({
               slug={slug}
               digestDefaults={settings.digestDefaults}
               digestKindDefaults={settings.digestKindDefaults}
+              roleLabels={settings.roleLabels}
             />
           </div>
         </CollapsibleSection>
