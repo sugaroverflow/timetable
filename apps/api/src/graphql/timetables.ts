@@ -35,6 +35,7 @@ import {
   parseThemeJson,
   readTimetable,
 } from "./guards";
+import { parseDigestKinds } from "./members";
 import { TimetableType, type GqlTimetable } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -314,6 +315,9 @@ builder.mutationFields((t) => ({
       /** Digests are all-or-nothing (2026-07-29): the default for new
        * members is just on or off. */
       digestEnabled: t.arg.boolean({ required: false }),
+      /** Forum-level per-kind digest defaults (2026-08-11) as a JSON
+       * {kind: boolean} object — replaces the stored set. */
+      digestKindDefaultsJson: t.arg.string({ required: false }),
       /** Calendar feature settings (calendar v2) — JSON, validated
        * server-side, shallow-merged over the stored calendar group. */
       calendarJson: t.arg.string({ required: false }),
@@ -394,6 +398,12 @@ builder.mutationFields((t) => ({
           ...(current.digestDefaults ?? {}),
           digestEnabled: args.digestEnabled,
         };
+      }
+
+      if (args.digestKindDefaultsJson != null) {
+        const kinds = parseDigestKinds(args.digestKindDefaultsJson);
+        if (!kinds) badRequest("Invalid digest kind defaults");
+        patch.digestKindDefaults = kinds;
       }
 
       if (args.calendarJson != null) {

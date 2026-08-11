@@ -17,32 +17,120 @@ export type DigestFrequency = "daily" | "weekly";
 
 /** The digest's activity types, each individually switchable PER FORUM
  * (2026-08-11) — the digest is one email per forum, so each membership
- * carries its own switch set. One entry per thing a digest can carry. */
+ * carries its own switch set. One entry per thing a digest can carry;
+ * list order is the settings card's display order. Round 2 (Ed's pruning
+ * pass) added the ❤️/💙-follow kinds, host new-topics, @mentions, slot
+ * releases, and new members — and REMOVED assignments and
+ * your-topic-scheduled from the switchable set: an admin scheduling or
+ * assigning something for you is an admin override you always hear
+ * about. */
 export const DIGEST_KINDS = [
   "comments",
+  "draftingComments",
+  "commentsHearted",
+  "commentsHostHearted",
   "replies",
+  "mentions",
   "hearts",
   "hostHearts",
   "sessions",
+  "sessionsHostHearted",
   "availabilityAsks",
   "newTopics",
-  "assignments",
+  "newTopicsHost",
+  "pendingReview",
+  "slotReleases",
   "drafts",
+  "newMembers",
 ] as const;
 export type DigestKind = (typeof DIGEST_KINDS)[number];
 
-/** Per-kind defaults — what an untouched account receives. Everything the
- * digest carried before per-kind switches existed stays on. */
+/** Per-kind defaults — what an untouched account receives when the forum
+ * hasn't configured its own defaults either. All on. */
 export const DIGEST_KIND_DEFAULTS: Record<DigestKind, boolean> = {
   comments: true,
+  draftingComments: true,
+  commentsHearted: true,
+  commentsHostHearted: true,
   replies: true,
+  mentions: true,
   hearts: true,
   hostHearts: true,
   sessions: true,
+  sessionsHostHearted: true,
   availabilityAsks: true,
   newTopics: true,
-  assignments: true,
+  newTopicsHost: true,
+  pendingReview: true,
+  slotReleases: true,
   drafts: true,
+  newMembers: true,
+};
+
+/** Which members a kind can ever fire for (2026-08-11): topic-owner and
+ * calendar-claiming kinds are host business; ❤️-driven kinds are elector
+ * business; the 💙 variants exist for hosts WITHOUT the elector role
+ * (one-person-one-gesture: an elector-host's 💙 rolls into their ❤️);
+ * newMembers is admin business; replies and mentions reach anyone. The
+ * settings card hides inapplicable switches from non-admins and greys
+ * them for admins. */
+type DigestKindAudience =
+  | "host"
+  | "elector"
+  | "hostNonElector"
+  | "admin"
+  | "all";
+
+const KIND_AUDIENCE: Record<DigestKind, DigestKindAudience> = {
+  comments: "host",
+  draftingComments: "host",
+  commentsHearted: "elector",
+  commentsHostHearted: "hostNonElector",
+  replies: "all",
+  mentions: "all",
+  hearts: "host",
+  hostHearts: "host",
+  sessions: "elector",
+  sessionsHostHearted: "hostNonElector",
+  availabilityAsks: "elector",
+  newTopics: "elector",
+  newTopicsHost: "hostNonElector",
+  pendingReview: "admin",
+  slotReleases: "host",
+  drafts: "host",
+  newMembers: "admin",
+};
+
+export function digestKindApplies(kind: DigestKind, roles: string[]): boolean {
+  const host = roles.includes("host") || roles.includes("admin");
+  const elector = roles.includes("elector");
+  const admin = roles.includes("admin") || roles.includes("owner");
+  const audience = KIND_AUDIENCE[kind];
+  if (audience === "host") return host;
+  if (audience === "elector") return elector;
+  if (audience === "hostNonElector") return host && !elector;
+  if (audience === "admin") return admin;
+  return true;
+}
+
+/** The "([role] only)" scaffold admins see beside restricted switches —
+ * temporary until the option set is final. */
+export const DIGEST_KIND_ROLE_TAGS: Partial<Record<DigestKind, string>> = {
+  comments: "host only",
+  draftingComments: "host only",
+  commentsHearted: "elector only",
+  commentsHostHearted: "non-elector host only",
+  hearts: "host only",
+  hostHearts: "host only",
+  sessions: "elector only",
+  sessionsHostHearted: "non-elector host only",
+  availabilityAsks: "elector only",
+  newTopics: "elector only",
+  newTopicsHost: "non-elector host only",
+  pendingReview: "admin only",
+  slotReleases: "host only",
+  drafts: "host only",
+  newMembers: "admin only",
 };
 
 export type NotificationSettings = {
@@ -68,13 +156,16 @@ export type NotificationSettings = {
 /** A membership's per-forum digest switch set ({} = all defaults). */
 export type DigestKinds = Partial<Record<DigestKind, boolean>>;
 
-/** Whether one activity kind belongs in a forum's digest for this member —
- * `kinds` is the membership's switch set; absent keys keep the default. */
+/** Whether one activity kind belongs in a forum's digest for this member:
+ * the membership's own switch, else the FORUM's configured defaults
+ * (2026-08-11 — admins set them in Forum Settings), else the global
+ * all-on defaults. */
 export function isDigestKindEnabled(
   kinds: DigestKinds | null | undefined,
   kind: DigestKind,
+  forumDefaults?: DigestKinds | null,
 ): boolean {
-  return kinds?.[kind] ?? DIGEST_KIND_DEFAULTS[kind];
+  return kinds?.[kind] ?? forumDefaults?.[kind] ?? DIGEST_KIND_DEFAULTS[kind];
 }
 
 /** A membership's digest preferences (2026-08-11): the digest is one email
@@ -287,6 +378,10 @@ export type TimetableSettings = {
   iconEmoji?: string | null;
   /** Digest settings seeded onto new members who haven't customized theirs. */
   digestDefaults?: NotificationSettings;
+  /** Forum-level per-kind digest defaults (2026-08-11), configured in
+   * Forum Settings — the layer between a member's own switches and the
+   * global all-on defaults (see isDigestKindEnabled). */
+  digestKindDefaults?: DigestKinds;
   /** Calendar feature (off unless enabled). */
   calendar?: CalendarSettings;
   /** Topic-lifecycle policy. */

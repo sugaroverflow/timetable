@@ -173,9 +173,11 @@ function NotificationCard({
 
 /** The digest card — fully per-forum (2026-08-11): on/off, cadence, and
  * the kind switches are this forum's; the user's stored globals are the
- * display fallback for untouched memberships. */
+ * display fallback for untouched memberships. Roles drive which switches
+ * show (round 2); the forum's configured defaults fill untouched ones. */
 function DigestCard({ slug, data }: { slug: string; data: Data }) {
   if (!data.me) return null;
+  const settings = parseTimetableSettings(data.timetable?.settings);
   return (
     <DigestSettingsForm
       slug={slug}
@@ -183,6 +185,8 @@ function DigestCard({ slug, data }: { slug: string; data: Data }) {
       currentForum={parseMembershipDigestSettings(
         data.timetable?.viewerDigestSettings,
       )}
+      forumDefaults={settings.digestKindDefaults ?? {}}
+      roles={data.timetable?.viewerRoles ?? []}
     />
   );
 }

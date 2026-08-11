@@ -21,8 +21,8 @@ describe("renderDigest (v3, topic cards)", () => {
   it("subjects and brands as '{Forum} Topics Digest'", () => {
     const { subject, html } = renderDigest(SAMPLE);
     expect(subject).toMatch(/^Sparkle Bureaucracy Topics Digest — /);
-    expect(subject).toContain("comments on your topics");
-    expect(subject).toContain("1 new topic");
+    expect(subject).toContain("10 comments");
+    expect(subject).toContain("2 new topics");
     expect(html).toContain(">Sparkle Bureaucracy Topics</td>");
     expect(html).toContain("#1f7a4d");
     expect(html).not.toContain("Hi Ada");
@@ -176,8 +176,8 @@ describe("renderDigest calendar content (calendar v2)", () => {
 
   it("counts fresh sessions into the subject", () => {
     const { subject } = renderDigest(SAMPLE);
-    expect(subject).toContain("1 session confirmed");
-    expect(subject).toContain("1 session wants your availability");
+    expect(subject).toContain("3 sessions confirmed");
+    expect(subject).toContain("2 sessions want your availability");
   });
 
   it("links URL-less sessions to the forum calendar", () => {
@@ -201,6 +201,8 @@ describe("renderDigest calendar content (calendar v2)", () => {
         },
       ],
       availabilityAsks: [],
+      newSlots: [],
+      newMembers: [],
     });
     expect(isForumDigestEmpty(staleSession(false))).toBe(true);
     expect(isForumDigestEmpty(staleSession(true))).toBe(false);

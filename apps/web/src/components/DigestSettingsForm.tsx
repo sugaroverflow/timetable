@@ -3,11 +3,13 @@
 import { useState } from "react";
 
 import {
-  DIGEST_KIND_DEFAULTS,
+  DIGEST_KIND_ROLE_TAGS,
   DIGEST_KINDS,
+  digestKindApplies,
   effectiveDigestSettings,
   isDigestKindEnabled,
   type DigestKind,
+  type DigestKinds,
   type MembershipDigestSettings,
 } from "@timetable/shared";
 
@@ -35,41 +37,33 @@ const WEEKDAYS = [
   "Saturday",
 ];
 
-/** Per-kind switch labels (2026-08-11). The "(host)"/"(elector)" and
- * "(on/off by default)" suffixes are scaffolding while the option set is
- * being pruned — remove once the final set is configured. */
-const KIND_LABELS: Record<DigestKind, string> = {
+/** Per-kind switch labels (round 2, 2026-08-11). Role-restricted kinds
+ * are hidden from members who can't use them; admins see everything with
+ * the "([role] only)" scaffold instead, inapplicable ones greyed out. */
+export const KIND_LABELS: Record<DigestKind, string> = {
   comments: "Comments on your topics",
+  draftingComments: "You-and-admin comments on your topics under review",
+  commentsHearted: "Comments on topics you ❤️'d",
+  commentsHostHearted: "Comments on topics you 💙'd",
   replies: "Replies to your comments",
+  mentions: "Comments that @mention you",
   hearts: "❤️s on your topics",
   hostHearts: "💙s from fellow hosts on your topics",
   sessions: "Upcoming sessions for topics you ❤️'d",
+  sessionsHostHearted: "Upcoming sessions for topics you 💙'd",
   availabilityAsks: "“Can you make it?” availability asks",
   newTopics: "Newly published topics",
-  assignments: "Topics assigned to you",
+  newTopicsHost: "Newly published topics by fellow hosts",
+  pendingReview: "New topics ready to review",
+  slotReleases: "New dates released on the calendar",
   drafts: "Reminders about your unpublished drafts",
+  newMembers: "New members joining",
 };
 
-/** Which role a kind can ever fire for: topic-owner kinds are host-only;
- * ❤️-driven and new-topic kinds are elector-only; replies (absent here)
- * apply to anyone who comments. */
-const KIND_ROLES: Partial<Record<DigestKind, "host" | "elector">> = {
-  comments: "host",
-  hearts: "host",
-  hostHearts: "host",
-  assignments: "host",
-  drafts: "host",
-  sessions: "elector",
-  availabilityAsks: "elector",
-  newTopics: "elector",
-};
-
-function kindLabel(kind: DigestKind): string {
-  const role = KIND_ROLES[kind] ? ` (${KIND_ROLES[kind]})` : "";
-  const suffix = DIGEST_KIND_DEFAULTS[kind]
-    ? " (on by default)"
-    : " (off by default)";
-  return KIND_LABELS[kind] + role + suffix;
+/** The admin view's label: the base plus the "([role] only)" scaffold. */
+export function adminKindLabel(kind: DigestKind): string {
+  const tag = DIGEST_KIND_ROLE_TAGS[kind];
+  return tag ? `${KIND_LABELS[kind]} (${tag})` : KIND_LABELS[kind];
 }
 
 type Cadence = "never" | "daily" | "weekly";
@@ -78,14 +72,26 @@ export function DigestSettingsForm({
   slug,
   current,
   currentForum,
+  forumDefaults,
+  roles,
 }: {
   slug: string;
   /** The user's stored global settings — the fallback layer. */
   current: DigestSettings;
   /** This forum's stored membership settings. */
   currentForum: MembershipDigestSettings;
+  /** The forum's configured per-kind defaults (Forum Settings). */
+  forumDefaults: DigestKinds;
+  /** The viewer's roles in THIS forum — drives switch visibility. */
+  roles: string[];
 }) {
   const { run, busy } = useGqlAction();
+  const admin = roles.includes("admin") || roles.includes("owner");
+  // Admins see every switch (greyed when inapplicable — useful to know
+  // what the other roles have); members see only what can fire for them.
+  const visibleKinds = admin
+    ? [...DIGEST_KINDS]
+    : DIGEST_KINDS.filter((kind) => digestKindApplies(kind, roles));
   const effective = effectiveDigestSettings(currentForum, current);
   // "Never" folds the enabled flag into the same dropdown as the cadence
   // (2026-07-30) — one control instead of a checkbox + frequency select.
@@ -98,7 +104,7 @@ export function DigestSettingsForm({
       Object.fromEntries(
         DIGEST_KINDS.map((kind) => [
           kind,
-          isDigestKindEnabled(effective.kinds, kind),
+          isDigestKindEnabled(effective.kinds, kind, forumDefaults),
         ]),
       ) as Record<DigestKind, boolean>,
   );
@@ -108,6 +114,13 @@ export function DigestSettingsForm({
     e.preventDefault();
     setSaved(false);
     const enabled = cadence !== "never";
+    // Only the switches the viewer can actually use are saved — greyed
+    // (admin-view) and hidden ones keep falling through to the defaults.
+    const usable = Object.fromEntries(
+      visibleKinds
+        .filter((kind) => digestKindApplies(kind, roles))
+        .map((kind) => [kind, kinds[kind]]),
+    );
     void run(
       MUTATION,
       // Leave the stored frequency untouched when Never is picked (the
@@ -117,7 +130,7 @@ export function DigestSettingsForm({
         e: enabled,
         f: enabled ? cadence : undefined,
         w: weekday,
-        k: JSON.stringify(kinds),
+        k: JSON.stringify(usable),
       },
       {
         success: "Digest settings saved",
@@ -172,14 +185,19 @@ export function DigestSettingsForm({
       {cadence !== "never" ? (
         <div className="stack" style={{ gap: 8, marginBottom: 12 }}>
           <strong style={{ fontSize: 13 }}>What to include</strong>
-          {DIGEST_KINDS.map((kind) => (
-            <Switch
-              key={kind}
-              checked={kinds[kind]}
-              onChange={(next) => setKinds({ ...kinds, [kind]: next })}
-              label={kindLabel(kind)}
-            />
-          ))}
+          {visibleKinds.map((kind) => {
+            const applies = digestKindApplies(kind, roles);
+            return (
+              <span key={kind} style={applies ? undefined : { opacity: 0.45 }}>
+                <Switch
+                  checked={kinds[kind]}
+                  onChange={(next) => setKinds({ ...kinds, [kind]: next })}
+                  label={admin ? adminKindLabel(kind) : KIND_LABELS[kind]}
+                  disabled={!applies}
+                />
+              </span>
+            );
+          })}
         </div>
       ) : null}
       <button className="btn btn-primary" type="submit" disabled={busy}>

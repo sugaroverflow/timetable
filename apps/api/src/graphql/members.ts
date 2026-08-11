@@ -229,7 +229,7 @@ function validDigestWeekday(
 /** Per-forum digest switches (2026-08-11): a JSON {kind: boolean} object.
  * The parsed object REPLACES the stored set (the form always sends every
  * switch); unknown kinds are dropped, malformed JSON yields undefined. */
-function parseDigestKinds(
+export function parseDigestKinds(
   raw: string | null | undefined,
 ): DigestKinds | undefined {
   if (!raw) return undefined;
