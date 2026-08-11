@@ -10,6 +10,8 @@ import {
   sql,
 } from "drizzle-orm";
 
+import { planSlotCreation } from "@timetable/shared";
+
 import {
   availability,
   availabilityPatterns,
@@ -45,59 +47,66 @@ export type SlotInput = {
   endsAt: Date;
   /** Pattern-cell provenance "{weekday}-{HH:MM}" for generated slots. */
   cellKey?: string | null;
+  /** Locations offered at this time (slot locations, 2026-08-11). */
+  locations?: string[];
+};
+
+export type CreateSlotsResult = {
+  created: Timeslot[];
+  /** Existing same-time slots that gained locations (aggregation). */
+  augmented: number;
 };
 
 /** Admin bulk-create (single slots and pattern × terms generation both land
- * here), idempotently: an exact duplicate — same start/end — is skipped,
- * and a cell-generated slot is ALSO skipped when its pattern cell already
- * has a slot within 24h. Exact match alone wasn't enough (QA 2026-08-05 —
- * duplicate slots on dev): generation runs on the admin's browser clock,
- * so the same cell×date yields DIFFERENT UTC instants from different
- * clock contexts (the UTC-clocked seed vs a London browser, either side
- * of a DST switch), and "regeneration" doubled the grid. Same-cell slots
- * are ≥7 days apart by construction (the cell pins the weekday), so the
- * 24h window can't collide with legitimate neighbours. */
+ * here), idempotently. Slots are unique per time window, so an input whose
+ * window already has a slot AGGREGATES — its locations union into that slot
+ * — and an exact (time, location) duplicate is a no-op. A cell-generated
+ * input also matches its pattern cell's slot within 24h (QA 2026-08-05 —
+ * generation runs on the admin's browser clock, so the same cell×date
+ * yields DIFFERENT UTC instants from different clock contexts, and
+ * "regeneration" doubled the grid; same-cell slots are ≥7 days apart by
+ * construction, so the window can't collide with legitimate neighbours).
+ * The matching lives in @timetable/shared's planSlotCreation. */
 export async function createSlots(
   timetableId: string,
   inputs: SlotInput[],
-): Promise<Timeslot[]> {
-  if (inputs.length === 0) return [];
+): Promise<CreateSlotsResult> {
+  if (inputs.length === 0) return { created: [], augmented: 0 };
   const existing = await listSlots(timetableId, { includePast: true });
-  const seen = new Set(
-    existing.map((s) => `${s.startsAt.getTime()}|${s.endsAt.getTime()}`),
-  );
-  const cellStarts = new Map<string, number[]>();
-  for (const s of existing) {
-    if (!s.cellKey) continue;
-    const list = cellStarts.get(s.cellKey) ?? [];
-    list.push(s.startsAt.getTime());
-    cellStarts.set(s.cellKey, list);
+  const plan = planSlotCreation(existing, inputs);
+
+  const byId = new Map(existing.map((s) => [s.id, s]));
+  for (const { slotId, add } of plan.locationAdds) {
+    const slot = byId.get(slotId);
+    if (!slot) continue;
+    await db
+      .update(timeslots)
+      .set({ locations: [...slot.locations, ...add], updatedAt: new Date() })
+      .where(eq(timeslots.id, slotId));
   }
-  const DAY_MS = 24 * 60 * 60 * 1000;
-  const fresh = inputs.filter((s) => {
-    const key = `${s.startsAt.getTime()}|${s.endsAt.getTime()}`;
-    if (seen.has(key)) return false;
-    if (!s.cellKey) return true;
-    const starts = cellStarts.get(s.cellKey);
-    return !starts?.some((t) => Math.abs(t - s.startsAt.getTime()) < DAY_MS);
-  });
-  if (fresh.length === 0) return [];
-  return db
-    .insert(timeslots)
-    .values(
-      fresh.map((s) => ({
-        timetableId,
-        startsAt: s.startsAt,
-        endsAt: s.endsAt,
-        cellKey: s.cellKey ?? null,
-      })),
-    )
-    .returning();
+
+  const created =
+    plan.toInsert.length === 0
+      ? []
+      : await db
+          .insert(timeslots)
+          .values(
+            plan.toInsert.map((s) => ({
+              timetableId,
+              startsAt: s.startsAt,
+              endsAt: s.endsAt,
+              cellKey: s.cellKey,
+              locations: s.locations,
+            })),
+          )
+          .returning();
+  return { created, augmented: plan.locationAdds.length };
 }
 
 /** A host's off-piste proposal: a session at a time the grid doesn't
  * offer. Reuses the timeslot if one already exists at that exact window
- * (slots are unique per time now); the session is born `proposed`. */
+ * (slots are unique per time now) — unioning the proposed location into
+ * its offered set; the session is born `proposed`. */
 export async function proposeSlot(
   timetableId: string,
   createdById: string,
@@ -119,6 +128,14 @@ export async function proposeSlot(
     )
     .limit(1);
   let slot = existing ?? null;
+  if (slot && input.location && !slot.locations.includes(input.location)) {
+    const locations = [...slot.locations, input.location];
+    await db
+      .update(timeslots)
+      .set({ locations, updatedAt: new Date() })
+      .where(eq(timeslots.id, slot.id));
+    slot = { ...slot, locations };
+  }
   if (!slot) {
     const [created] = await db
       .insert(timeslots)
@@ -127,6 +144,7 @@ export async function proposeSlot(
         startsAt: input.startsAt,
         endsAt: input.endsAt,
         createdById,
+        locations: input.location ? [input.location] : [],
       })
       .returning();
     slot = created ?? null;
@@ -143,13 +161,14 @@ export async function proposeSlot(
 
 export async function updateSlot(
   slotId: string,
-  patch: { startsAt?: Date; endsAt?: Date },
+  patch: { startsAt?: Date; endsAt?: Date; locations?: string[] },
 ): Promise<Timeslot | null> {
   const [updated] = await db
     .update(timeslots)
     .set({
       ...(patch.startsAt ? { startsAt: patch.startsAt } : {}),
       ...(patch.endsAt ? { endsAt: patch.endsAt } : {}),
+      ...(patch.locations ? { locations: patch.locations } : {}),
       updatedAt: new Date(),
     })
     .where(eq(timeslots.id, slotId))
@@ -302,6 +321,7 @@ export async function getSlotsForIcs(timetableId: string): Promise<IcsSlot[]> {
       slotId: timeslots.id,
       startsAt: timeslots.startsAt,
       endsAt: timeslots.endsAt,
+      slotLocations: timeslots.locations,
       sessionId: slotSessions.id,
       location: slotSessions.location,
       status: slotSessions.status,
@@ -340,7 +360,8 @@ export async function getSlotsForIcs(timetableId: string): Promise<IcsSlot[]> {
           id: r.slotId,
           startsAt: r.startsAt,
           endsAt: r.endsAt,
-          location: "",
+          // An open slot's ICS location: where it's on offer.
+          location: r.slotLocations.join(", "),
           status: "empty" as const,
           url: "",
           topicTitle: null,
@@ -693,6 +714,8 @@ export type CalendarSlot = {
   endsAt: Date;
   cellKey: string | null;
   createdById: string | null;
+  /** Locations offered at this time (empty on legacy/location-free slots). */
+  locations: string[];
   /** The slot's bookings, location-sorted; empty for an open slot. */
   sessions: CalendarSession[];
   viewerState: AvailabilityState | null;
@@ -976,6 +999,7 @@ function toCalendarSlot(
     endsAt: slot.endsAt,
     cellKey: slot.cellKey,
     createdById: slot.createdById,
+    locations: slot.locations,
     sessions: (related.sessionsBySlot.get(slot.id) ?? []).map((s) =>
       toCalendarSession(s, related),
     ),

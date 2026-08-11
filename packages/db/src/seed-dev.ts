@@ -1595,17 +1595,24 @@ function buildCalendarSeedSettings(
   if (gridSlots.length === 0) return { enabled: true };
   const cells = new Map<
     string,
-    { weekday: number; start: string; end: string }
+    { weekday: number; start: string; end: string; locations: string[] }
   >();
   const locations = new Set<string>();
   const dates: string[] = [];
   for (const slot of gridSlots) {
     const weekday = new Date(`${slot.date}T00:00:00.000Z`).getUTCDay();
-    cells.set(slotCellKey(slot), {
+    const cell = cells.get(slotCellKey(slot)) ?? {
       weekday,
       start: slot.startTime,
       end: slot.endTime,
-    });
+      locations: [],
+    };
+    // A cell offers every location its fixture slots use (slot locations,
+    // 2026-08-11).
+    if (slot.location && !cell.locations.includes(slot.location)) {
+      cell.locations.push(slot.location);
+    }
+    cells.set(slotCellKey(slot), cell);
     if (slot.location) locations.add(slot.location);
     dates.push(slot.date);
   }
@@ -1717,6 +1724,9 @@ function buildSlotRows(
   // become separate bookings, and availability/discussion merge onto it.
   const slotIdByTime = new Map<string, string>();
   const timeslotRows: NewTimeslot[] = [];
+  // A canonical slot offers every location its fixture slots use (slot
+  // locations, 2026-08-11) — assigned onto the rows after the loop.
+  const slotLocations = new Map<string, string[]>();
   const slotSessionRows: NewSlotSession[] = [];
   const availabilityRows: NewAvailability[] = [];
   const seenAvailability = new Set<string>();
@@ -1770,6 +1780,11 @@ function buildSlotRows(
     const endsAt = new Date(`${slot.date}T${slot.endTime}:00.000Z`);
     const { topicId, sessionHostId } = subjectFor(slot);
     const slotId = canonicalSlotId(slot, startsAt, endsAt, sessionHostId);
+    if (slot.location) {
+      const locs = slotLocations.get(slotId) ?? [];
+      if (!locs.includes(slot.location)) locs.push(slot.location);
+      slotLocations.set(slotId, locs);
+    }
 
     if (topicId || sessionHostId) {
       slotSessionRows.push({
@@ -1790,6 +1805,10 @@ function buildSlotRows(
     slotCommentRows.push(
       ...slot.discussion.map((d, i) => toSlotCommentRow(slot, slotId, d, i)),
     );
+  }
+
+  for (const row of timeslotRows) {
+    row.locations = slotLocations.get(row.id!) ?? [];
   }
 
   return {

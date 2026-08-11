@@ -90,6 +90,7 @@ export const calendarSettingsSchema = z
             weekday: z.number().int().min(0).max(6),
             start: z.string().regex(HHMM),
             end: z.string().regex(HHMM),
+            locations: z.array(z.string().max(80)).max(50).optional(),
           })
           .refine((c) => c.end > c.start, "end must be after start"),
       )

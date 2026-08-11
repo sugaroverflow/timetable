@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Settings, X } from "lucide-react";
+import { Plus, Settings, X } from "lucide-react";
 
 import {
   patternCellKey,
@@ -18,7 +18,10 @@ const SAVE_AND_NOOP = `mutation($s: String!, $cal: String!) {
 }`;
 const SAVE_AND_GENERATE = `mutation($s: String!, $cal: String!, $slots: String!) {
   updateForumSettings(idOrSlug: $s, calendarJson: $cal) { id }
-  createTimeslots(idOrSlug: $s, slotsJson: $slots)
+  createTimeslots(idOrSlug: $s, slotsJson: $slots) { created augmented }
+}`;
+const CREATE_SLOTS = `mutation($s: String!, $slots: String!) {
+  createTimeslots(idOrSlug: $s, slotsJson: $slots) { created augmented }
 }`;
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -26,7 +29,8 @@ const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const PICKER_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
 function cellLabel(cell: CalendarPatternCell): string {
-  return `${WEEKDAYS[cell.weekday]} ${cell.start}–${cell.end}`;
+  const where = cell.locations?.length ? ` · ${cell.locations.join(", ")}` : "";
+  return `${WEEKDAYS[cell.weekday]} ${cell.start}–${cell.end}${where}`;
 }
 
 /** Local YYYY-MM-DD for a Date (generation runs on the admin's clock). */
@@ -35,14 +39,22 @@ function ymd(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+type SlotJson = {
+  startsAt: string;
+  endsAt: string;
+  cellKey?: string;
+  locations: string[];
+};
+
 /** Pattern × terms → concrete slots, computed in the ADMIN'S browser
  * timezone (slots are stored UTC; there is no forum-timezone setting yet).
- * Each generated slot carries its cellKey so elector patterns can infer. */
+ * Each generated slot carries its cellKey so elector patterns can infer,
+ * and its cell's locations (slot locations, 2026-08-11). */
 function computeSlots(
   cells: CalendarPatternCell[],
   terms: CalendarTerm[],
-): { startsAt: string; endsAt: string; cellKey: string }[] {
-  const slots: { startsAt: string; endsAt: string; cellKey: string }[] = [];
+): SlotJson[] {
+  const slots: SlotJson[] = [];
   for (const term of terms) {
     const end = new Date(`${term.end}T00:00:00`);
     for (
@@ -57,6 +69,7 @@ function computeSlots(
           startsAt: new Date(`${date}T${cell.start}:00`).toISOString(),
           endsAt: new Date(`${date}T${cell.end}:00`).toISOString(),
           cellKey: patternCellKey(cell),
+          locations: cell.locations ?? [],
         });
       }
     }
@@ -64,14 +77,82 @@ function computeSlots(
   return slots;
 }
 
+/** "N slots created, M gained locations" (aggregation) — shared by the
+ * generate and one-off toasts. */
+function createdMessage(
+  data: unknown,
+  prefix: string,
+  nothing: string,
+): string {
+  const result = (
+    data as { createTimeslots?: { created: number; augmented: number } }
+  ).createTimeslots;
+  const created = result?.created ?? 0;
+  const augmented = result?.augmented ?? 0;
+  const parts = [
+    created > 0 ? `${created} slot${created === 1 ? "" : "s"} created` : null,
+    augmented > 0
+      ? `${augmented} slot${augmented === 1 ? "" : "s"} gained locations`
+      : null,
+  ].filter(Boolean);
+  return parts.length > 0 ? `${prefix} — ${parts.join(", ")}` : nothing;
+}
+
+/** Location checkboxes (slot locations, 2026-08-11): every slot needs at
+ * least one when the forum has locations configured. */
+function LocationPicker({
+  locations,
+  selected,
+  onChange,
+}: {
+  locations: string[];
+  selected: Set<string>;
+  onChange: (next: Set<string>) => void;
+}) {
+  if (locations.length === 0) return null;
+  return (
+    <>
+      {locations.map((loc) => (
+        <label
+          key={loc}
+          className="row"
+          style={{ gap: 3, fontSize: 12, cursor: "pointer" }}
+        >
+          <input
+            type="checkbox"
+            checked={selected.has(loc)}
+            onChange={(e) => {
+              const next = new Set(selected);
+              if (e.target.checked) next.add(loc);
+              else next.delete(loc);
+              onChange(next);
+            }}
+          />
+          {loc}
+        </label>
+      ))}
+    </>
+  );
+}
+
+/** Selected locations in the forum's configured order. */
+function pickedLocations(all: string[], selected: Set<string>): string[] {
+  return all.filter((l) => selected.has(l));
+}
+
 function AddCellForm({
+  locations,
   onAdd,
 }: {
+  /** The forum's configured locations; adding a cell requires ≥1 picked. */
+  locations: string[];
   onAdd: (cells: CalendarPatternCell[]) => void;
 }) {
   const [days, setDays] = useState<Set<number>>(new Set());
   const [start, setStart] = useState("19:00");
   const [end, setEnd] = useState("21:00");
+  const [where, setWhere] = useState<Set<string>>(new Set());
+  const needsLocation = locations.length > 0 && where.size === 0;
 
   return (
     <div className="row wrap" style={{ gap: 6, alignItems: "center" }}>
@@ -109,19 +190,30 @@ function AddCellForm({
         onChange={(e) => setEnd(e.target.value)}
         style={{ width: "auto" }}
       />
+      <LocationPicker
+        locations={locations}
+        selected={where}
+        onChange={setWhere}
+      />
       <button
         type="button"
         className="btn"
-        disabled={days.size === 0 || !start || !end || end <= start}
+        disabled={
+          days.size === 0 || !start || !end || end <= start || needsLocation
+        }
         onClick={() => {
           onAdd(
             PICKER_ORDER.filter((wd) => days.has(wd)).map((weekday) => ({
               weekday,
               start,
               end,
+              ...(locations.length > 0
+                ? { locations: pickedLocations(locations, where) }
+                : {}),
             })),
           );
           setDays(new Set());
+          setWhere(new Set());
         }}
       >
         Add times
@@ -176,11 +268,117 @@ function AddTermForm({ onAdd }: { onAdd: (term: CalendarTerm) => void }) {
   );
 }
 
+/** Release one-off dates outside the weekly pattern — e.g. the hall's rare
+ * openings. Aggregation makes this safe: a date that already has a slot
+ * gains the location instead of duplicating the slot. */
+function AddOneOffForm({
+  slug,
+  locations,
+}: {
+  slug: string;
+  locations: string[];
+}) {
+  const { run, busy } = useGqlAction();
+  const [date, setDate] = useState("");
+  const [start, setStart] = useState("19:00");
+  const [end, setEnd] = useState("21:00");
+  const [where, setWhere] = useState<Set<string>>(new Set());
+  const needsLocation = locations.length > 0 && where.size === 0;
+
+  return (
+    <div className="row wrap" style={{ gap: 6, alignItems: "center" }}>
+      <input
+        type="date"
+        aria-label="Date"
+        value={date}
+        onChange={(e) => setDate(e.target.value)}
+        style={{ width: "auto" }}
+      />
+      <input
+        type="time"
+        aria-label="Start time"
+        value={start}
+        onChange={(e) => setStart(e.target.value)}
+        style={{ width: "auto" }}
+      />
+      <span className="faint">–</span>
+      <input
+        type="time"
+        aria-label="End time"
+        value={end}
+        onChange={(e) => setEnd(e.target.value)}
+        style={{ width: "auto" }}
+      />
+      <LocationPicker
+        locations={locations}
+        selected={where}
+        onChange={setWhere}
+      />
+      <button
+        type="button"
+        className="btn"
+        disabled={
+          busy || !date || !start || !end || end <= start || needsLocation
+        }
+        onClick={() => {
+          const slot: SlotJson = {
+            startsAt: new Date(`${date}T${start}:00`).toISOString(),
+            endsAt: new Date(`${date}T${end}:00`).toISOString(),
+            locations: pickedLocations(locations, where),
+          };
+          void run(
+            CREATE_SLOTS,
+            { s: slug, slots: JSON.stringify([slot]) },
+            {
+              success: (data) =>
+                createdMessage(data, "Saved", "That slot already exists"),
+              errorFallback: "Could not add the slot",
+              onSuccess: () => {
+                setDate("");
+                setWhere(new Set());
+              },
+            },
+          );
+        }}
+      >
+        <Plus size={16} aria-hidden /> Add slot
+      </button>
+    </div>
+  );
+}
+
+/** Merge freshly added cells into the pattern: a cell whose weekday+time
+ * already exists unions its locations into that cell (aggregation, matching
+ * slot behaviour) instead of duplicating it. */
+function mergeCells(
+  cells: CalendarPatternCell[],
+  added: CalendarPatternCell[],
+): CalendarPatternCell[] {
+  const merged = [...cells];
+  for (const cell of added) {
+    const key = patternCellKey(cell);
+    const i = merged.findIndex((c) => patternCellKey(c) === key);
+    if (i === -1) {
+      merged.push(cell);
+      continue;
+    }
+    const known = merged[i]!;
+    const locations = [
+      ...(known.locations ?? []),
+      ...(cell.locations ?? []).filter(
+        (l) => !(known.locations ?? []).includes(l),
+      ),
+    ];
+    merged[i] = { ...known, ...(locations.length > 0 ? { locations } : {}) };
+  }
+  return merged;
+}
+
 /**
  * Admin setup card (calendar v2): the schedule as pattern × terms, with a
  * consequence-preview sentence before anything is saved. Generation is
- * idempotent — identical existing slots are skipped server-side — so
- * re-generating after adding a term or cell is safe.
+ * idempotent — existing slots are skipped or gain locations server-side —
+ * so re-generating after adding a term, cell, or location is safe.
  */
 export function CalendarSetup({
   slug,
@@ -197,6 +395,7 @@ export function CalendarSetup({
     current.patternCells ?? [],
   );
   const [terms, setTerms] = useState<CalendarTerm[]>(current.terms ?? []);
+  const locations = current.locations ?? [];
 
   const slots = computeSlots(cells, terms);
   const cellSummary = cells.map(cellLabel).join(", ");
@@ -215,13 +414,12 @@ export function CalendarSetup({
       SAVE_AND_GENERATE,
       { s: slug, cal, slots: JSON.stringify(slots) },
       {
-        success: (data) => {
-          const created = (data as { createTimeslots?: number })
-            .createTimeslots;
-          return created === 0
-            ? "Pattern saved — all slots already exist"
-            : `Pattern saved — ${created} slot${created === 1 ? "" : "s"} created`;
-        },
+        success: (data) =>
+          createdMessage(
+            data,
+            "Pattern saved",
+            "Pattern saved — all slots already exist",
+          ),
         errorFallback: "Could not save",
       },
     );
@@ -250,7 +448,9 @@ export function CalendarSetup({
           Set up the schedule
         </h3>
         <div className="stack" style={{ gap: 6 }}>
-          <strong style={{ fontSize: 13 }}>When can sessions happen?</strong>
+          <strong style={{ fontSize: 13 }}>
+            When{locations.length > 0 ? " and where" : ""} can sessions happen?
+          </strong>
           <div className="row wrap" style={{ gap: 6 }}>
             {cells.map((cell) => (
               <button
@@ -265,13 +465,8 @@ export function CalendarSetup({
             ))}
           </div>
           <AddCellForm
-            onAdd={(added) => {
-              const known = new Set(cells.map(patternCellKey));
-              setCells([
-                ...cells,
-                ...added.filter((c) => !known.has(patternCellKey(c))),
-              ]);
-            }}
+            locations={locations}
+            onAdd={(added) => setCells(mergeCells(cells, added))}
           />
         </div>
 
@@ -299,7 +494,9 @@ export function CalendarSetup({
             <>
               ➜ This creates <strong>{slots.length} slots</strong>. Electors
               will be asked about: {cellSummary}. Slots that already exist are
-              left alone.
+              left alone
+              {locations.length > 0 ? " (new locations are added to them)" : ""}
+              .
             </>
           ) : (
             <>Add at least one time and one date range to generate slots.</>
@@ -322,6 +519,16 @@ export function CalendarSetup({
           >
             Close
           </button>
+        </div>
+
+        <div className="stack" style={{ gap: 6 }}>
+          <strong style={{ fontSize: 13 }}>One-off dates</strong>
+          <p className="faint" style={{ margin: 0, fontSize: 12 }}>
+            Release extra dates outside the weekly pattern — e.g. when a rarer
+            location becomes available. A date the calendar already has simply
+            gains the location.
+          </p>
+          <AddOneOffForm slug={slug} locations={locations} />
         </div>
       </div>
     </div>

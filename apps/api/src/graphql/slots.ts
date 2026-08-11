@@ -114,9 +114,25 @@ function parsePatternCells(raw: string): PatternCells {
 type SlotInputJson = {
   startsAt?: unknown;
   endsAt?: unknown;
-  location?: unknown;
+  locations?: unknown;
   cellKey?: unknown;
 };
+
+/** A slot's offered locations: trimmed, deduped, capped in count and size. */
+function parseSlotLocations(raw: unknown, label: string): string[] {
+  if (raw == null) return [];
+  if (!Array.isArray(raw)) badRequest(`${label}: locations must be an array`);
+  const locations = [
+    ...new Set(
+      raw.map((l) => (typeof l === "string" ? l.trim() : "")).filter(Boolean),
+    ),
+  ];
+  if (locations.length > 50) badRequest(`${label}: too many locations`);
+  if (locations.some((l) => l.length > 80)) {
+    badRequest(`${label}: location name too long`);
+  }
+  return locations;
+}
 
 /** Validate the admin bulk-create payload (pattern × terms generation and
  * single hand-added slots both arrive here as JSON). */
@@ -146,7 +162,7 @@ function parseSlotInputs(raw: string): SlotInput[] {
     return {
       startsAt,
       endsAt,
-      location: typeof item.location === "string" ? item.location : "",
+      locations: parseSlotLocations(item.locations, `Slot ${i}`),
       cellKey,
     };
   });
@@ -277,6 +293,8 @@ const TimeslotType = builder.objectRef<GqlSlot>("Timeslot").implement({
     startsAt: t.string({ resolve: (s) => s.startsAt.toISOString() }),
     endsAt: t.string({ resolve: (s) => s.endsAt.toISOString() }),
     cellKey: t.exposeString("cellKey", { nullable: true }),
+    /** Locations offered at this time (empty on legacy/location-free slots). */
+    locations: t.exposeStringList("locations"),
     commentCount: t.exposeInt("commentCount"),
     viewerState: t.exposeString("viewerState", { nullable: true }),
     /** The slot's bookings, location-sorted; empty for an open slot. */
@@ -404,11 +422,23 @@ builder.queryFields((t) => ({
 // Slot grid mutations (admin) + host off-piste proposals
 // ---------------------------------------------------------------------------
 
+const CreateSlotsResultType = builder
+  .objectRef<{ created: number; augmented: number }>("CreateSlotsResult")
+  .implement({
+    fields: (t) => ({
+      created: t.exposeInt("created"),
+      /** Existing same-time slots that gained locations (aggregation). */
+      augmented: t.exposeInt("augmented"),
+    }),
+  });
+
 builder.mutationFields((t) => ({
   /** Admin: bulk-create slots (pattern × terms generation, or one slot).
-   * Exact duplicates are skipped, so regeneration is idempotent. */
+   * Slots aggregate per time window — a same-time input adds its locations
+   * to the existing slot, and exact (time, location) duplicates are
+   * skipped — so regeneration is idempotent. */
   createTimeslots: t.field({
-    type: "Int",
+    type: CreateSlotsResultType,
     args: {
       idOrSlug: t.arg.string({ required: true }),
       slotsJson: t.arg.string({ required: true }),
@@ -421,16 +451,27 @@ builder.mutationFields((t) => ({
       requireCalendarEnabled(readable.timetable.settings);
       if (!canManageCalendar(viewer)) forbidden("Admins only");
       const inputs = parseSlotInputs(args.slotsJson);
-      const created = await createSlots(readable.timetable.id, inputs);
-      if (created.length > 0) {
+      const { created, augmented } = await createSlots(
+        readable.timetable.id,
+        inputs,
+      );
+      if (created.length > 0 || augmented > 0) {
+        const parts = [
+          created.length > 0
+            ? `${created.length} slot${created.length === 1 ? "" : "s"} generated`
+            : null,
+          augmented > 0
+            ? `${augmented} slot${augmented === 1 ? "" : "s"} gained locations`
+            : null,
+        ].filter(Boolean);
         await logActivity({
           timetableId: readable.timetable.id,
           actorId: ctx.user?.id ?? null,
           action: "calendar.schedule",
-          note: `${created.length} slot${created.length === 1 ? "" : "s"} generated`,
+          note: parts.join(", "),
         });
       }
-      return created.length;
+      return { created: created.length, augmented };
     },
   }),
 
@@ -468,10 +509,19 @@ builder.mutationFields((t) => ({
         "",
       );
       const { startsAt, endsAt } = parseSlotWindow(args.startsAt, args.endsAt);
+      const location = (args.location ?? "").trim();
+      // Forums with configured locations require one on every new slot
+      // (slot locations, 2026-08-11); location-free forums stay as-is.
+      if (
+        (readable.timetable.settings.calendar?.locations?.length ?? 0) > 0 &&
+        !location
+      ) {
+        badRequest("Pick a location for this session");
+      }
       const { slot } = await proposeSlot(readable.timetable.id, user.id, {
         startsAt,
         endsAt,
-        location: (args.location ?? "").trim(),
+        location,
         topicId: subject.topicId,
         sessionHostId: subject.sessionHostId!,
       });
@@ -490,13 +540,15 @@ builder.mutationFields((t) => ({
     },
   }),
 
-  /** Admin: update a timeslot's time window. */
+  /** Admin: update a timeslot's time window and/or offered locations. */
   updateTimeslot: t.field({
     type: "Boolean",
     args: {
       slotId: t.arg.string({ required: true }),
       startsAt: t.arg.string({ required: false }),
       endsAt: t.arg.string({ required: false }),
+      /** JSON array of offered locations; at least one when provided. */
+      locationsJson: t.arg.string({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
       await requireUser(ctx);
@@ -506,9 +558,21 @@ builder.mutationFields((t) => ({
       );
       requireCalendarEnabled(timetable.settings);
       if (!canManageCalendar(viewer)) forbidden("Admins only");
+      let locations: string[] | undefined;
+      if (args.locationsJson != null) {
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(args.locationsJson);
+        } catch {
+          badRequest("Invalid locations JSON");
+        }
+        locations = parseSlotLocations(parsed, "Slot");
+        if (locations.length === 0) badRequest("Pick at least one location");
+      }
       await updateSlot(slot.id, {
         startsAt: args.startsAt ? new Date(args.startsAt) : undefined,
         endsAt: args.endsAt ? new Date(args.endsAt) : undefined,
+        locations,
       });
       return true;
     },
@@ -729,6 +793,14 @@ builder.mutationFields((t) => ({
         parseCustomTitle(args.title),
       );
       const location = (args.location ?? "").trim();
+      // Slots with offered locations (2026-08-11): the booking must pick
+      // one of them — the location IS the contended resource.
+      if (slot.locations.length > 0) {
+        if (!location) badRequest("Pick a location for this session");
+        if (!slot.locations.includes(location)) {
+          badRequest(`This slot is not offered at "${location}"`);
+        }
+      }
       if (await slotLocationTaken(slot.id, location)) {
         badRequest(
           location

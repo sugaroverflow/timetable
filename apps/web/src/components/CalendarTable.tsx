@@ -211,7 +211,11 @@ function SlotDetail({
         officeHoursLabel={officeHoursLabel}
       />
       {perms.canAdmin ? (
-        <AdminSlotControls slot={slot} label={adminLabel} />
+        <AdminSlotControls
+          slot={slot}
+          locations={locations}
+          label={adminLabel}
+        />
       ) : null}
     </div>
   );
@@ -247,6 +251,13 @@ function RowLine({
         <strong>{formatDate(slot.startsAt)}</strong> {formatTime(slot.startsAt)}{" "}
         – {formatTime(slot.endsAt)}
       </span>
+      {/* Where this time is offered (slot locations, 2026-08-11); each
+          booking's own location rides on its session line below. */}
+      {slot.locations.map((l) => (
+        <span key={l} className="cal-where">
+          {l}
+        </span>
+      ))}
       <span className="cal-row-right">
         {canExpand && slot.commentCount > 0 ? (
           <span
