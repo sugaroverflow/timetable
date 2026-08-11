@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { ImageUploadField } from "@/components/ImageUploadField";
+import type { DigestKinds } from "@timetable/shared";
+
 import {
   BRAND_FONTS,
   DEFAULT_THEME_DARK,
@@ -64,6 +66,8 @@ export type SettingsValues = {
   iconDarkUrl?: string | null;
   iconEmoji?: string | null;
   digestDefaults?: DigestSettings;
+  /** Forum-level per-kind digest defaults (2026-08-11). */
+  digestKindDefaults?: DigestKinds;
 };
 
 type ThemeState = {

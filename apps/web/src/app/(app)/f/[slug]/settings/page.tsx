@@ -107,6 +107,7 @@ export default async function SettingsPage({
             <EmailDigestForm
               slug={slug}
               digestDefaults={settings.digestDefaults}
+              digestKindDefaults={settings.digestKindDefaults}
             />
           </div>
         </CollapsibleSection>

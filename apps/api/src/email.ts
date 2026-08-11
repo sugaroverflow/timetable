@@ -3,6 +3,7 @@ import type {
   DigestComment,
   DigestPerson,
   DigestSessionLine,
+  DigestSlotRelease,
   DigestTopicCard,
   ForumDigest,
 } from "@timetable/core";
@@ -299,16 +300,17 @@ function renderHostHearts(hearters: DigestPerson[]): string {
 }
 
 const STATUS_PILLS: Record<
-  "new" | "assignment" | "draft",
+  "new" | "pending" | "assignment" | "draft",
   [string, string, string]
 > = {
   // [label, background, text]
   new: ["New", "#e8f6ec", "#207a32"],
+  pending: ["Ready to review", "#fdf1e3", "#b25e09"],
   assignment: ["Assigned to you", "#eaeefe", "#2f54eb"],
   draft: ["Unpublished draft", "#eef0f5", "#7d8694"],
 };
 
-function statusPill(kind: "new" | "assignment" | "draft"): string {
+function statusPill(kind: "new" | "pending" | "assignment" | "draft"): string {
   const [label, bg, fg] = STATUS_PILLS[kind];
   return `<span style="display:inline-block;background:${bg};color:${fg};font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;margin-left:6px;white-space:nowrap;vertical-align:middle;">${label}</span>`;
 }
@@ -412,8 +414,14 @@ function renderCard(
   const statuses = card.activities.filter(
     (
       a,
-    ): a is Extract<DigestActivity, { kind: "new" | "assignment" | "draft" }> =>
-      a.kind === "new" || a.kind === "assignment" || a.kind === "draft",
+    ): a is Extract<
+      DigestActivity,
+      { kind: "new" | "pending" | "assignment" | "draft" }
+    > =>
+      a.kind === "new" ||
+      a.kind === "pending" ||
+      a.kind === "assignment" ||
+      a.kind === "draft",
   );
   const discussion = card.activities.filter(
     (a): a is Discussion => a.kind === "comment" || a.kind === "reply",
@@ -540,6 +548,7 @@ function digestSummary(digest: ForumDigest): string {
     heart: 0,
     hostHeart: 0,
     new: 0,
+    pending: 0,
     assignment: 0,
   };
   let confirmedNew = 0;
@@ -555,11 +564,12 @@ function digestSummary(digest: ForumDigest): string {
   const bits: string[] = [];
   const n = (count: number, one: string, many: string) =>
     count > 0 && bits.push(`${count} ${count === 1 ? one : many}`);
-  n(counts.comment, "comment on your topics", "comments on your topics");
+  n(counts.comment, "comment", "comments");
   n(counts.reply, "reply", "replies");
   n(counts.heart, "topic with new ❤️", "topics with new ❤️");
   n(counts.hostHeart, "topic with new 💙", "topics with new 💙");
   n(counts.new, "new topic", "new topics");
+  n(counts.pending, "topic to review", "topics to review");
   n(counts.assignment, "topic assigned to you", "topics assigned to you");
   n(confirmedNew, "session confirmed", "sessions confirmed");
   const asksNew = digest.availabilityAsks.filter((s) => s.isNew).length;
@@ -568,7 +578,62 @@ function digestSummary(digest: ForumDigest): string {
     "session wants your availability",
     "sessions want your availability",
   );
+  n(digest.newSlots.length, "new date released", "new dates released");
+  n(digest.newMembers.length, "new member", "new members");
   return bits.join(", ");
+}
+
+/** "New dates released" (round 2): slots created since the window that
+ * hosts can claim — when/where lines linking to the calendar. */
+function renderNewSlotsCard(
+  slots: DigestSlotRelease[],
+  forumSlug: string,
+  accent: string,
+): string {
+  if (slots.length === 0) return "";
+  const lines = slots
+    .map((s) => {
+      const where =
+        s.locations.length > 0 ? ` · ${esc(s.locations.join(", "))}` : "";
+      return (
+        `<div style="margin:6px 0;">` +
+        `<a href="${esc(`${linkBase}/f/${forumSlug}/calendar`)}" style="color:${accent};font-weight:600;text-decoration:none;">${esc(
+          sessionWhen({
+            startsAt: s.startsAt,
+            endsAt: s.endsAt,
+          } as DigestSessionLine),
+        )}</a>` +
+        `<span class="em-muted" style="color:${E.muted};font-size:13px;">${where}</span>` +
+        `</div>`
+      );
+    })
+    .join("");
+  return (
+    `<div class="em-card" style="background:${E.card};border:1px solid ${E.line};border-radius:12px;padding:16px 18px;margin:0 0 12px;">` +
+    `<div style="font-size:17px;font-weight:700;line-height:1.3;">New dates released</div>` +
+    `<div class="em-muted" style="color:${E.muted};font-size:13px;margin-top:2px;">Fresh slots on the calendar — claim one for your topic.</div>` +
+    `<div style="margin-top:8px;">${lines}</div></div>`
+  );
+}
+
+/** "New members" (round 2, admins): first sign-ins since the window. */
+function renderNewMembersCard(
+  members: DigestPerson[],
+  forumSlug: string,
+  accent: string,
+): string {
+  if (members.length === 0) return "";
+  const lines = members
+    .map(
+      (m) =>
+        `<div style="margin:3px 0;">${personLink(forumSlug, m, accent)} signed in for the first time</div>`,
+    )
+    .join("");
+  return (
+    `<div class="em-card" style="background:${E.card};border:1px solid ${E.line};border-radius:12px;padding:16px 18px;margin:0 0 12px;">` +
+    `<div style="font-size:17px;font-weight:700;line-height:1.3;">New members</div>` +
+    `<div style="margin-top:8px;">${lines}</div></div>`
+  );
 }
 
 /** Digest v3 (2026-07-30): per-forum, forum-branded — one card per topic,
@@ -591,6 +656,8 @@ export function renderDigest(digest: ForumDigest): {
       digest.forumSlug,
       accent,
     ),
+    renderNewSlotsCard(digest.newSlots, digest.forumSlug, accent),
+    renderNewMembersCard(digest.newMembers, digest.forumSlug, accent),
     ...digest.topics.map((card) =>
       renderCard(
         card,
@@ -906,6 +973,15 @@ export function sampleDigest(args: {
         isNew: true,
       },
     ],
+    newSlots: [
+      {
+        startsAt: sAt("2026-08-14T19:00:00Z"),
+        endsAt: sAt("2026-08-14T22:00:00Z"),
+        locations: ["Hall"],
+        timetableId: args.forumId,
+      },
+    ],
+    newMembers: [sWho("Priya Narayan", "sample-priya")],
   };
 }
 

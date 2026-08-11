@@ -3,31 +3,42 @@
 import { Send } from "lucide-react";
 import { useState } from "react";
 
-import { isDigestEnabled } from "@timetable/shared";
+import {
+  DIGEST_KINDS,
+  isDigestEnabled,
+  isDigestKindEnabled,
+  type DigestKind,
+  type DigestKinds,
+} from "@timetable/shared";
 
+import { adminKindLabel } from "@/components/DigestSettingsForm";
 import { Switch } from "@/components/Switch";
 import { useToast } from "@/components/Toast";
 import { clientApi } from "@/lib/clientApi";
 import type { DigestSettings } from "@/lib/timetableSettings";
 import { useGqlAction } from "@/lib/useGqlAction";
 
-const MUTATION = `mutation DigestDefaults($s: String!, $e: Boolean) {
+const MUTATION = `mutation DigestDefaults($s: String!, $e: Boolean, $k: String!) {
   updateTimetableSettings: updateForumSettings(
     idOrSlug: $s
     digestEnabled: $e
+    digestKindDefaultsJson: $k
   ) { id }
 }`;
 
-/** Forum Settings "Email Digest" card (2026-07-29): the per-forum digest
- * default (on/off — digests always include everything) plus a send-test
- * button that emails the admin the real template filled with example
- * notifications. */
+/** Forum Settings "Email Digest" card: the per-forum digest default
+ * (on/off) plus — round 2, 2026-08-11 — the per-kind DEFAULTS members
+ * start from (each member can override on their Notifications page), and
+ * a send-test button that emails the admin the real template filled with
+ * example notifications. */
 export function EmailDigestForm({
   slug,
   digestDefaults,
+  digestKindDefaults,
 }: {
   slug: string;
   digestDefaults?: DigestSettings;
+  digestKindDefaults?: DigestKinds;
 }) {
   const { run, busy } = useGqlAction();
   const { toast, toastError } = useToast();
@@ -38,6 +49,15 @@ export function EmailDigestForm({
       ? isDigestEnabled(digestDefaults)
       : true,
   );
+  const [kinds, setKinds] = useState<Record<DigestKind, boolean>>(
+    () =>
+      Object.fromEntries(
+        DIGEST_KINDS.map((kind) => [
+          kind,
+          isDigestKindEnabled(null, kind, digestKindDefaults),
+        ]),
+      ) as Record<DigestKind, boolean>,
+  );
   const [saved, setSaved] = useState(false);
   const [sendingTest, setSendingTest] = useState(false);
 
@@ -46,7 +66,7 @@ export function EmailDigestForm({
     setSaved(false);
     void run(
       MUTATION,
-      { s: slug, e: enabled },
+      { s: slug, e: enabled, k: JSON.stringify(kinds) },
       {
         success: "Digest defaults saved",
         errorFallback: "Could not save digest defaults",
@@ -88,6 +108,21 @@ export function EmailDigestForm({
         onChange={setEnabled}
         label="Send digests to new members"
       />
+      {enabled ? (
+        <div className="stack" style={{ gap: 8 }}>
+          <strong style={{ fontSize: 13 }}>
+            Default contents (members can change their own)
+          </strong>
+          {DIGEST_KINDS.map((kind) => (
+            <Switch
+              key={kind}
+              checked={kinds[kind]}
+              onChange={(next) => setKinds({ ...kinds, [kind]: next })}
+              label={adminKindLabel(kind)}
+            />
+          ))}
+        </div>
+      ) : null}
       <div className="row wrap">
         <button className="btn btn-primary" type="submit" disabled={busy}>
           {busy ? "Saving…" : saved ? "Saved" : "Save"}

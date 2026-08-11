@@ -1,4 +1,5 @@
-import { and, eq, gt, inArray, isNull, ne, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNull, ne, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 
 import {
   effectiveDigestSettings,
@@ -6,16 +7,19 @@ import {
   isDigestKindEnabled,
   isHostCommentsEnabled,
   type DigestKind,
+  type DigestKinds,
   type EffectiveDigestSettings,
 } from "@timetable/shared";
 
 import type { NotificationSettings, TimetableSettings } from "@timetable/db";
 import {
   activityEvents,
+  commentMentions,
   comments,
   db,
   hearts,
   hostHearts,
+  timeslots,
   timetableMemberships,
   timetables,
   topics,
@@ -88,8 +92,12 @@ export type DigestActivity =
    * happens; only `session.isNew` (confirmed since the last digest) can
    * make an otherwise-quiet digest send. */
   | { kind: "session"; session: DigestSessionLine; at: Date }
-  /** A topic newly published in a forum where the recipient is an elector. */
+  /** A topic newly published in a forum where the recipient is an elector
+   * or (round 2) a host. */
   | { kind: "new"; at: Date }
+  /** A topic submitted for review, awaiting the recipient (an admin) —
+   * round 2. */
+  | { kind: "pending"; at: Date }
   /** A topic an admin (re)assigned to the recipient. */
   | { kind: "assignment"; at: Date }
   /** The recipient's own still-unpublished draft — a standing reminder. */
@@ -137,6 +145,20 @@ export type ForumDigest = {
    * recipient ❤️'d — the moment they're motivated to upgrade a 🟡.
    * (Confirmed sessions ride their topic's card instead — QA 2026-08-03.) */
   availabilityAsks: DigestSessionLine[];
+  /** New dates released (round 2, host switch): timeslots created since
+   * the window — e.g. a hall week — for hosts hunting for a slot. */
+  newSlots: DigestSlotRelease[];
+  /** Members who signed in for the first time since the window (round 2,
+   * admin switch). */
+  newMembers: DigestPerson[];
+};
+
+/** One released timeslot in the "New dates" section. */
+export type DigestSlotRelease = {
+  startsAt: Date;
+  endsAt: Date;
+  locations: string[];
+  timetableId: string;
 };
 
 function topicPath(
@@ -217,8 +239,10 @@ type DigestContext = {
   seenNotificationsAt: Map<string, Date | null>;
   electorTimetableIds: string[];
   /** Forums where the recipient holds the host role (round 2: host
-   * variants of the new-topic and follow kinds). */
+   * variants of the new-topic and follow kinds, slot releases). */
   hostTimetableIds: string[];
+  /** Forums where the recipient is an admin (round 2: new members). */
+  adminTimetableIds: string[];
   /** Forums with the calendar feature switched on (calendar v2). */
   calendarTimetableIds: string[];
   /** Forums with the host-only thread on — the only ones whose 💙s may
@@ -227,6 +251,9 @@ type DigestContext = {
   /** Per-forum effective digest settings (2026-08-11): on/off, cadence,
    * kinds — membership values over the user's stored globals. */
   effectiveByForum: Map<string, EffectiveDigestSettings>;
+  /** The forum's configured per-kind defaults (Forum Settings) — the
+   * layer between a member's switches and the global all-on defaults. */
+  kindDefaultsByForum: Map<string, DigestKinds>;
   /** Per-forum digest window start (2026-08-11): the membership's own
    * lastDigestAt, then the user's legacy watermark, then the cadence
    * lookback. Collectors prefilter on the earliest and cut per forum. */
@@ -339,7 +366,10 @@ async function loadDigestContext(
       .filter((m) => m.roles.includes("elector"))
       .map((m) => m.timetableId),
     hostTimetableIds: memberships
-      .filter((m) => m.roles.includes("host"))
+      .filter((m) => m.roles.includes("host") || m.roles.includes("admin"))
+      .map((m) => m.timetableId),
+    adminTimetableIds: memberships
+      .filter((m) => m.roles.includes("admin") || m.roles.includes("owner"))
       .map((m) => m.timetableId),
     calendarTimetableIds: memberships
       .filter((m) =>
@@ -353,6 +383,12 @@ async function loadDigestContext(
       .map((m) => m.timetableId),
     effectiveByForum: new Map(
       memberships.map((m) => [m.timetableId, m.effective]),
+    ),
+    kindDefaultsByForum: new Map(
+      memberships.map((m) => [
+        m.timetableId,
+        (m.settings as TimetableSettings | null)?.digestKindDefaults ?? {},
+      ]),
     ),
     sinceByForum,
     minSince: new Date(
@@ -376,21 +412,28 @@ type QualifiedSessionLine = DigestSessionLine & {
   viaHostHeart: boolean;
 };
 
-/** Upcoming confirmed sessions ("Coming up") and proposed sessions ("Can
- * you make it?"), scoped to topics the recipient follows — ❤️ (QA
- * 2026-08-03) or 💙 (round 2, confirmed sessions only; asks are an
- * availability question, which is elector business) — across the
- * recipient's calendar-enabled forums. `isNew` = session changed since
- * the forum's window start; only fresh sessions can trigger an email by
+/** Upcoming confirmed sessions ("Coming up"), proposed sessions ("Can
+ * you make it?"), and — round 2, NOT switchable — sessions on the
+ * recipient's OWN topics: an admin scheduling your topic is an admin
+ * override you always hear about. Follow scopes: ❤️ (QA 2026-08-03) or
+ * 💙 (round 2, confirmed sessions only; asks are an availability
+ * question, which is elector business), across the recipient's
+ * calendar-enabled forums. `isNew` = session changed since the forum's
+ * window start; only fresh sessions can trigger an email by
  * themselves. */
 async function loadSessionSections(
   ctx: DigestContext,
   now: Date,
+  myTopicIds: Set<string>,
 ): Promise<{
   upcoming: QualifiedSessionLine[];
   asks: DigestSessionLine[];
+  /** Proposed AND confirmed sessions on the recipient's own topics. */
+  own: DigestSessionLine[];
 }> {
-  if (ctx.calendarTimetableIds.length === 0) return { upcoming: [], asks: [] };
+  if (ctx.calendarTimetableIds.length === 0) {
+    return { upcoming: [], asks: [], own: [] };
+  }
   const horizon = {
     from: now,
     to: new Date(now.getTime() + SESSION_HORIZON_DAYS * 24 * 60 * 60 * 1000),
@@ -401,7 +444,7 @@ async function loadSessionSections(
   ]);
 
   const allTopicIds = [...confirmed, ...proposed].map((s) => s.topicId);
-  if (allTopicIds.length === 0) return { upcoming: [], asks: [] };
+  if (allTopicIds.length === 0) return { upcoming: [], asks: [], own: [] };
   const [heartRows, hostHeartRows] = await Promise.all([
     db
       .select({ topicId: hearts.topicId })
@@ -433,7 +476,9 @@ async function loadSessionSections(
     upcoming: confirmed
       .filter(
         (s) =>
-          heartedTopicIds.has(s.topicId) || hostHeartedTopicIds.has(s.topicId),
+          !myTopicIds.has(s.topicId) &&
+          (heartedTopicIds.has(s.topicId) ||
+            hostHeartedTopicIds.has(s.topicId)),
       )
       .map((s) => ({
         ...heartedLine(s),
@@ -441,7 +486,12 @@ async function loadSessionSections(
         viaHostHeart: hostHeartedTopicIds.has(s.topicId),
       })),
     asks: proposed
-      .filter((s) => heartedTopicIds.has(s.topicId))
+      .filter(
+        (s) => !myTopicIds.has(s.topicId) && heartedTopicIds.has(s.topicId),
+      )
+      .map(heartedLine),
+    own: [...confirmed, ...proposed]
+      .filter((s) => myTopicIds.has(s.topicId))
       .map(heartedLine),
   };
 }
@@ -659,6 +709,12 @@ async function commentActivities(
   return fresh.map((r) => ({
     topicId: r.topicId,
     timetableId: timetableByTopic.get(r.topicId) ?? "",
+    // Round 2: the you-and-admin drafting thread (review conversation) is
+    // its own switch; the public and {host}-only threads stay `comments`.
+    switch:
+      r.visibility === "admin_only"
+        ? ("draftingComments" as const)
+        : ("comments" as const),
     activity: {
       kind: "comment" as const,
       visibility: r.visibility,
@@ -989,6 +1045,246 @@ async function followedCommentActivities(
   }));
 }
 
+/** Comments that @mention the recipient (round 2) — anywhere they were
+ * mentioned, excluding what other kinds already carry: their own topics
+ * (comments/draftingComments) and replies to them (replies). Mention rows
+ * are only written for users allowed to see the thread, so no extra
+ * visibility filtering is needed. The Notifications page shows mentions,
+ * so its watermark covers them. */
+async function mentionActivities(
+  ctx: DigestContext,
+  since: Date,
+): Promise<RawActivity[]> {
+  const parents = alias(comments, "mention_parents");
+  const rows = await db
+    .select({
+      id: comments.id,
+      parentId: comments.parentId,
+      topicId: comments.topicId,
+      timetableId: topics.timetableId,
+      topicHostId: topics.hostId,
+      parentAuthorId: parents.authorId,
+      authorId: comments.authorId,
+      visibility: comments.visibility,
+      by: timetableMemberships.name,
+      body: comments.body,
+      createdAt: comments.createdAt,
+    })
+    .from(commentMentions)
+    .innerJoin(comments, eq(comments.id, commentMentions.commentId))
+    .innerJoin(topics, eq(topics.id, comments.topicId))
+    .leftJoin(parents, eq(parents.id, comments.parentId))
+    .leftJoin(
+      timetableMemberships,
+      and(
+        eq(timetableMemberships.userId, comments.authorId),
+        eq(timetableMemberships.timetableId, topics.timetableId),
+      ),
+    )
+    .where(
+      and(
+        eq(commentMentions.userId, ctx.recipient.id),
+        inArray(topics.timetableId, ctx.forumIds),
+        gt(comments.createdAt, since),
+        ne(comments.authorId, ctx.recipient.id),
+        isNull(comments.hiddenAt),
+        isNull(comments.deletedAt),
+      ),
+    );
+
+  const fresh = rows.filter(
+    (r) =>
+      // Own-topic comments and replies-to-you are already their own kinds.
+      r.topicHostId !== ctx.recipient.id &&
+      r.parentAuthorId !== ctx.recipient.id &&
+      r.createdAt >
+        afterSeen(
+          sinceFor(ctx, r.timetableId),
+          ctx.seenNotificationsAt.get(r.timetableId),
+        ),
+  );
+  const chains = await loadAncestorChains(fresh);
+  return fresh.map((r) => ({
+    topicId: r.topicId,
+    timetableId: r.timetableId,
+    switch: "mentions" as const,
+    activity: {
+      kind: "comment" as const,
+      visibility: r.visibility,
+      comment: {
+        id: r.id,
+        parentId: r.parentId,
+        author: { name: r.by, userId: r.authorId, image: null },
+        body: r.body,
+      },
+      ancestors: chains.get(r.id) ?? [],
+      at: r.createdAt,
+    },
+  }));
+}
+
+/** Topics submitted for review since the window (round 2, admin switch):
+ * "a new topic is ready to review". Sourced from the topic.submit
+ * activity event, kept only while the topic is still awaiting review,
+ * never the admin's own. */
+async function pendingReviewActivities(
+  ctx: DigestContext,
+): Promise<RawActivity[]> {
+  const eligible = ctx.adminTimetableIds.filter((id) =>
+    isDigestKindEnabled(
+      ctx.effectiveByForum.get(id)?.kinds,
+      "pendingReview",
+      ctx.kindDefaultsByForum.get(id),
+    ),
+  );
+  if (eligible.length === 0) return [];
+  const rows = await db
+    .select({
+      payload: activityEvents.payload,
+      timetableId: activityEvents.timetableId,
+      createdAt: activityEvents.createdAt,
+    })
+    .from(activityEvents)
+    .where(
+      and(
+        eq(activityEvents.action, "topic.submit"),
+        inArray(activityEvents.timetableId, eligible),
+        gt(activityEvents.createdAt, ctx.minSince),
+        ne(activityEvents.actorId, ctx.recipient.id),
+      ),
+    );
+  const submitted = rows
+    .map((r) => ({
+      topicId: (r.payload as { topicId?: string } | null)?.topicId,
+      timetableId: r.timetableId,
+      createdAt: r.createdAt,
+    }))
+    .filter(
+      (r): r is { topicId: string; timetableId: string; createdAt: Date } =>
+        Boolean(r.topicId) && r.createdAt > sinceFor(ctx, r.timetableId),
+    );
+  if (submitted.length === 0) return [];
+  // Only topics STILL awaiting review — a submit that was already
+  // published or sent back isn't work anymore.
+  const stillPending = await db
+    .select({ id: topics.id })
+    .from(topics)
+    .where(
+      and(
+        inArray(
+          topics.id,
+          submitted.map((r) => r.topicId),
+        ),
+        eq(topics.status, "submitted"),
+      ),
+    );
+  const pendingIds = new Set(stillPending.map((t) => t.id));
+  const latestByTopic = new Map<string, (typeof submitted)[number]>();
+  for (const r of submitted) {
+    if (!pendingIds.has(r.topicId)) continue;
+    const known = latestByTopic.get(r.topicId);
+    if (!known || r.createdAt > known.createdAt) {
+      latestByTopic.set(r.topicId, r);
+    }
+  }
+  return [...latestByTopic.values()].map((r) => ({
+    topicId: r.topicId,
+    timetableId: r.timetableId,
+    switch: "pendingReview" as const,
+    activity: { kind: "pending" as const, at: r.createdAt },
+  }));
+}
+
+/** Timeslots released since the window (round 2, host switch) — new
+ * dates hosts can claim, e.g. a hall week. Future slots only. */
+async function loadSlotReleases(
+  ctx: DigestContext,
+  now: Date,
+): Promise<DigestSlotRelease[]> {
+  const eligible = ctx.hostTimetableIds.filter(
+    (id) =>
+      ctx.calendarTimetableIds.includes(id) &&
+      isDigestKindEnabled(
+        ctx.effectiveByForum.get(id)?.kinds,
+        "slotReleases",
+        ctx.kindDefaultsByForum.get(id),
+      ),
+  );
+  if (eligible.length === 0) return [];
+  const rows = await db
+    .select({
+      startsAt: timeslots.startsAt,
+      endsAt: timeslots.endsAt,
+      locations: timeslots.locations,
+      timetableId: timeslots.timetableId,
+      createdAt: timeslots.createdAt,
+    })
+    .from(timeslots)
+    .where(
+      and(
+        inArray(timeslots.timetableId, eligible),
+        gt(timeslots.createdAt, ctx.minSince),
+        gt(timeslots.startsAt, now),
+      ),
+    )
+    .orderBy(asc(timeslots.startsAt));
+  return rows
+    .filter((r) => r.createdAt > sinceFor(ctx, r.timetableId))
+    .map((r) => ({
+      startsAt: r.startsAt,
+      endsAt: r.endsAt,
+      locations: r.locations,
+      timetableId: r.timetableId,
+    }));
+}
+
+/** Members who signed in for the first time since the window (round 2,
+ * admin switch), named via their membership profile. */
+async function loadNewMembers(
+  ctx: DigestContext,
+): Promise<(DigestPerson & { timetableId: string })[]> {
+  const eligible = ctx.adminTimetableIds.filter((id) =>
+    isDigestKindEnabled(
+      ctx.effectiveByForum.get(id)?.kinds,
+      "newMembers",
+      ctx.kindDefaultsByForum.get(id),
+    ),
+  );
+  if (eligible.length === 0) return [];
+  const rows = await db
+    .select({
+      userId: activityEvents.actorId,
+      timetableId: activityEvents.timetableId,
+      createdAt: activityEvents.createdAt,
+      name: timetableMemberships.name,
+    })
+    .from(activityEvents)
+    .leftJoin(
+      timetableMemberships,
+      and(
+        eq(timetableMemberships.userId, activityEvents.actorId),
+        eq(timetableMemberships.timetableId, activityEvents.timetableId),
+      ),
+    )
+    .where(
+      and(
+        eq(activityEvents.action, "member.first_login"),
+        inArray(activityEvents.timetableId, eligible),
+        gt(activityEvents.createdAt, ctx.minSince),
+        ne(activityEvents.actorId, ctx.recipient.id),
+      ),
+    )
+    .orderBy(asc(activityEvents.createdAt));
+  return rows
+    .filter((r) => r.userId && r.createdAt > sinceFor(ctx, r.timetableId))
+    .map((r) => ({
+      userId: r.userId,
+      name: r.name,
+      image: null,
+      timetableId: r.timetableId,
+    }));
+}
+
 /** Topics newly published in forums where the recipient is an elector
  * (their queue-review work) or — round 2 — a host (faculty awareness of
  * colleagues' topics), still unseen and never their own. Each row rides
@@ -1039,15 +1335,16 @@ async function newTopicActivities(
   // post-filter then re-checks the same switch (a no-op by construction).
   const passingSwitch = (timetableId: string): DigestKind | null => {
     const kinds = ctx.effectiveByForum.get(timetableId)?.kinds;
+    const defaults = ctx.kindDefaultsByForum.get(timetableId);
     if (
       electorSet.has(timetableId) &&
-      isDigestKindEnabled(kinds, "newTopics")
+      isDigestKindEnabled(kinds, "newTopics", defaults)
     ) {
       return "newTopics";
     }
     if (
       hostSet.has(timetableId) &&
-      isDigestKindEnabled(kinds, "newTopicsHost")
+      isDigestKindEnabled(kinds, "newTopicsHost", defaults)
     ) {
       return "newTopicsHost";
     }
@@ -1110,14 +1407,18 @@ async function assignmentActivities(
 }
 
 /** Which per-forum switch governs each activity kind. */
-const KIND_SWITCH: Record<DigestActivity["kind"], DigestKind> = {
+/** The fallback switch per activity kind for activities without an
+ * explicit `switch` tag. PARTIAL (round 2): sessions and assignments are
+ * absent — an untagged session (your own topic scheduled) or an
+ * assignment is an admin override that always sends; collectors tag
+ * everything else that needs a specific switch. */
+const KIND_SWITCH: Partial<Record<DigestActivity["kind"], DigestKind>> = {
   comment: "comments",
   reply: "replies",
   heart: "hearts",
   hostHeart: "hostHearts",
-  session: "sessions",
   new: "newTopics",
-  assignment: "assignments",
+  pending: "pendingReview",
   draft: "drafts",
 };
 
@@ -1130,6 +1431,7 @@ const CARD_TIER: Record<DigestActivity["kind"], number> = {
   heart: 0,
   hostHeart: 0,
   assignment: 1,
+  pending: 1,
   new: 2,
   draft: 3,
 };
@@ -1140,8 +1442,9 @@ const ACTIVITY_RANK: Record<DigestActivity["kind"], number> = {
   heart: 3,
   hostHeart: 4,
   assignment: 5,
-  new: 6,
-  draft: 7,
+  pending: 6,
+  new: 7,
+  draft: 8,
 };
 
 function cardTier(card: DigestTopicCard): number {
@@ -1172,7 +1475,7 @@ async function collectActivities(
     ctx.forumIds.some((id) => wantsIn(id, kind));
   const none: RawActivity[] = [];
   const collected = await Promise.all([
-    wants("comments")
+    wants("comments") || wants("draftingComments")
       ? commentActivities(ctx, since, myTopicIds, timetableByTopic)
       : none,
     wants("commentsHearted")
@@ -1182,6 +1485,7 @@ async function collectActivities(
       ? followedCommentActivities(ctx, since, "hostHeart")
       : none,
     wants("replies") ? replyActivities(ctx, since) : none,
+    wants("mentions") ? mentionActivities(ctx, since) : none,
     wants("hearts")
       ? heartActivities(ctx, since, myTopicIds, timetableByTopic)
       : none,
@@ -1191,7 +1495,9 @@ async function collectActivities(
     wants("newTopics") || wants("newTopicsHost")
       ? newTopicActivities(ctx, since)
       : none,
-    wants("assignments") ? assignmentActivities(ctx, since) : none,
+    pendingReviewActivities(ctx),
+    // Assignments are an admin override — never switchable, always sent.
+    assignmentActivities(ctx, since),
   ]);
   return collected.flat();
 }
@@ -1243,10 +1549,13 @@ export async function computeUserForumDigests(
   // collected if some forum wants it, and each activity then filters
   // against its own forum's switches — absent keys keep the defaults.
   const wantsIn: WantsIn = (forumId, kind) =>
-    isDigestKindEnabled(ctx.effectiveByForum.get(forumId)?.kinds, kind);
+    isDigestKindEnabled(
+      ctx.effectiveByForum.get(forumId)?.kinds,
+      kind,
+      ctx.kindDefaultsByForum.get(forumId),
+    );
   const wants = (kind: DigestKind) =>
     ctx.forumIds.some((id) => wantsIn(id, kind));
-  const sessions = await loadSessionSections(ctx, now);
 
   const myTopics = await db
     .select({
@@ -1259,13 +1568,20 @@ export async function computeUserForumDigests(
   const myTopicIds = myTopics.map((t) => t.id);
   const timetableByTopic = new Map(myTopics.map((t) => [t.id, t.timetableId]));
 
-  const collectedA = await collectActivities(
-    ctx,
-    since,
-    wantsIn,
-    myTopicIds,
-    timetableByTopic,
-  );
+  const [sessions, collectedA, newSlots, newMembers] = await Promise.all([
+    loadSessionSections(ctx, now, new Set(myTopicIds)),
+    collectActivities(ctx, since, wantsIn, myTopicIds, timetableByTopic),
+    loadSlotReleases(ctx, now),
+    loadNewMembers(ctx),
+  ]);
+
+  // Sessions on the recipient's OWN topics: an admin override — no
+  // switch, always in (the missing `switch` tag passes the post-filter).
+  const ownSessionsA: RawActivity[] = sessions.own.map((s) => ({
+    topicId: s.topicId,
+    timetableId: s.timetableId,
+    activity: { kind: "session" as const, session: s, at: s.updatedAt },
+  }));
 
   const draftsA: RawActivity[] = wants("drafts")
     ? myTopics
@@ -1277,21 +1593,29 @@ export async function computeUserForumDigests(
         }))
     : [];
 
-  // A topic both ❤️'d and 💙'd would surface a comment once per follow —
-  // the first collector (❤️) wins.
+  // A comment can qualify through several kinds at once (❤️ + 💙 follow,
+  // or an @mention on a followed topic) — the first collector wins.
+  const FOLLOW_SWITCHES: (DigestKind | undefined)[] = [
+    "commentsHearted",
+    "commentsHostHearted",
+    "mentions",
+  ];
   const seenFollowedComment = new Set<string>();
   const all = [
+    ...ownSessionsA,
     ...sessionActivities(sessions.upcoming, wantsIn),
     ...collectedA,
     ...draftsA,
   ]
-    .filter((a) =>
-      wantsIn(a.timetableId, a.switch ?? KIND_SWITCH[a.activity.kind]),
-    )
+    .filter((a) => {
+      // No governing switch (own-topic sessions, assignments): always in.
+      const sw = a.switch ?? KIND_SWITCH[a.activity.kind];
+      return !sw || wantsIn(a.timetableId, sw);
+    })
     .filter((a) => {
       if (
         a.activity.kind !== "comment" ||
-        (a.switch !== "commentsHearted" && a.switch !== "commentsHostHearted")
+        !FOLLOW_SWITCHES.includes(a.switch)
       ) {
         return true;
       }
@@ -1322,6 +1646,10 @@ export async function computeUserForumDigests(
       availabilityAsks: wantsIn(forumId, "availabilityAsks")
         ? sessions.asks.filter((s) => s.timetableId === forumId)
         : [],
+      newSlots: newSlots.filter((s) => s.timetableId === forumId),
+      newMembers: newMembers
+        .filter((m) => m.timetableId === forumId)
+        .map(({ timetableId: _t, ...person }) => person),
     };
   });
 
@@ -1378,11 +1706,17 @@ function activityIsNews(a: DigestActivity): boolean {
   return true;
 }
 
-/** Empty = nothing that counts as news. */
+/** Empty = nothing that counts as news. Slot releases and new members are
+ * since-window events, so their presence is inherently news. */
 export function isForumDigestEmpty(digest: ForumDigest): boolean {
   const topicNews = digest.topics.some((card) =>
     card.activities.some(activityIsNews),
   );
   const askNews = digest.availabilityAsks.some((s) => s.isNew);
-  return !topicNews && !askNews;
+  return (
+    !topicNews &&
+    !askNews &&
+    digest.newSlots.length === 0 &&
+    digest.newMembers.length === 0
+  );
 }

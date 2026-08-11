@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   DIGEST_KIND_DEFAULTS,
   DIGEST_KINDS,
+  digestKindApplies,
   effectiveDigestSettings,
   isDigestEnabled,
   isDigestKindEnabled,
@@ -53,6 +54,44 @@ describe("isDigestKindEnabled", () => {
     expect(isDigestKindEnabled({ hearts: false }, "replies")).toBe(
       DIGEST_KIND_DEFAULTS.replies,
     );
+  });
+});
+
+describe("digestKindApplies", () => {
+  it("routes host/elector/admin kinds to their roles", () => {
+    expect(digestKindApplies("comments", ["host"])).toBe(true);
+    expect(digestKindApplies("comments", ["elector"])).toBe(false);
+    expect(digestKindApplies("sessions", ["elector"])).toBe(true);
+    expect(digestKindApplies("sessions", ["host"])).toBe(false);
+    expect(digestKindApplies("newMembers", ["admin"])).toBe(true);
+    expect(digestKindApplies("newMembers", ["host", "elector"])).toBe(false);
+    expect(digestKindApplies("replies", ["elector"])).toBe(true);
+    expect(digestKindApplies("mentions", [])).toBe(true);
+  });
+
+  it("rolls 💙 kinds into ❤️ for elector-hosts (one-person-one-gesture)", () => {
+    expect(digestKindApplies("commentsHostHearted", ["host"])).toBe(true);
+    expect(digestKindApplies("commentsHostHearted", ["host", "elector"])).toBe(
+      false,
+    );
+    expect(digestKindApplies("commentsHearted", ["host", "elector"])).toBe(
+      true,
+    );
+  });
+
+  it("counts admins as hosts for host kinds", () => {
+    expect(digestKindApplies("slotReleases", ["admin"])).toBe(true);
+    expect(digestKindApplies("pendingReview", ["admin"])).toBe(true);
+  });
+});
+
+describe("isDigestKindEnabled layering", () => {
+  it("member switch beats forum default beats global default", () => {
+    expect(isDigestKindEnabled({}, "hearts", { hearts: false })).toBe(false);
+    expect(
+      isDigestKindEnabled({ hearts: true }, "hearts", { hearts: false }),
+    ).toBe(true);
+    expect(isDigestKindEnabled({}, "hearts", {})).toBe(true);
   });
 });
 
