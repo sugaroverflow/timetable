@@ -95,9 +95,11 @@ export type DigestActivity =
   /** A topic newly published in a forum where the recipient is an elector
    * or (round 2) a host. */
   | { kind: "new"; at: Date }
-  /** A topic submitted for review, awaiting the recipient (an admin) —
-   * round 2. */
-  | { kind: "pending"; at: Date }
+  /** A topic awaiting review by the recipient (an admin) — round 2. The
+   * WHOLE review queue rides every digest (a standing to-do, like draft
+   * reminders); only `isNew` (submitted/updated since the window) counts
+   * as send-triggering news. */
+  | { kind: "pending"; at: Date; isNew: boolean }
   /** A topic an admin (re)assigned to the recipient. */
   | { kind: "assignment"; at: Date }
   /** The recipient's own still-unpublished draft — a standing reminder. */
@@ -1123,10 +1125,12 @@ async function mentionActivities(
   }));
 }
 
-/** Topics submitted for review since the window (round 2, admin switch):
- * "a new topic is ready to review". Sourced from the topic.submit
- * activity event, kept only while the topic is still awaiting review,
- * never the admin's own. */
+/** The recipient's ENTIRE review queue (round 2, admin switch, Ed:
+ * admins toggle a standing "for review" listing): every topic currently
+ * awaiting review in their admin forums, never their own. `updatedAt`
+ * approximates the submission time (status transitions bump it; a later
+ * edit re-flagging a queued topic as news is a feature) — only
+ * since-window items count as send-triggering news. */
 async function pendingReviewActivities(
   ctx: DigestContext,
 ): Promise<RawActivity[]> {
@@ -1140,58 +1144,27 @@ async function pendingReviewActivities(
   if (eligible.length === 0) return [];
   const rows = await db
     .select({
-      payload: activityEvents.payload,
-      timetableId: activityEvents.timetableId,
-      createdAt: activityEvents.createdAt,
+      id: topics.id,
+      timetableId: topics.timetableId,
+      updatedAt: topics.updatedAt,
     })
-    .from(activityEvents)
-    .where(
-      and(
-        eq(activityEvents.action, "topic.submit"),
-        inArray(activityEvents.timetableId, eligible),
-        gt(activityEvents.createdAt, ctx.minSince),
-        ne(activityEvents.actorId, ctx.recipient.id),
-      ),
-    );
-  const submitted = rows
-    .map((r) => ({
-      topicId: (r.payload as { topicId?: string } | null)?.topicId,
-      timetableId: r.timetableId,
-      createdAt: r.createdAt,
-    }))
-    .filter(
-      (r): r is { topicId: string; timetableId: string; createdAt: Date } =>
-        Boolean(r.topicId) && r.createdAt > sinceFor(ctx, r.timetableId),
-    );
-  if (submitted.length === 0) return [];
-  // Only topics STILL awaiting review — a submit that was already
-  // published or sent back isn't work anymore.
-  const stillPending = await db
-    .select({ id: topics.id })
     .from(topics)
     .where(
       and(
-        inArray(
-          topics.id,
-          submitted.map((r) => r.topicId),
-        ),
+        inArray(topics.timetableId, eligible),
         eq(topics.status, "submitted"),
+        ne(topics.hostId, ctx.recipient.id),
       ),
     );
-  const pendingIds = new Set(stillPending.map((t) => t.id));
-  const latestByTopic = new Map<string, (typeof submitted)[number]>();
-  for (const r of submitted) {
-    if (!pendingIds.has(r.topicId)) continue;
-    const known = latestByTopic.get(r.topicId);
-    if (!known || r.createdAt > known.createdAt) {
-      latestByTopic.set(r.topicId, r);
-    }
-  }
-  return [...latestByTopic.values()].map((r) => ({
-    topicId: r.topicId,
+  return rows.map((r) => ({
+    topicId: r.id,
     timetableId: r.timetableId,
     switch: "pendingReview" as const,
-    activity: { kind: "pending" as const, at: r.createdAt },
+    activity: {
+      kind: "pending" as const,
+      at: r.updatedAt,
+      isNew: r.updatedAt > sinceFor(ctx, r.timetableId),
+    },
   }));
 }
 
@@ -1703,6 +1676,8 @@ function buildCards(
 function activityIsNews(a: DigestActivity): boolean {
   if (a.kind === "draft") return false;
   if (a.kind === "session") return a.session.isNew;
+  // The standing review queue only sends for fresh submissions.
+  if (a.kind === "pending") return a.isNew;
   return true;
 }
 

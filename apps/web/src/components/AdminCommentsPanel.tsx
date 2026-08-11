@@ -17,10 +17,10 @@ function countNested(comments: FeedComment[]): number {
 /** The drafting thread (QA #59 round 3), visible to admins (on Pending
  * Topics) and the topic owner (on My Topics) only — never in the feed.
  * Threaded, with its own composer. Starts expanded when the thread already
- * has comments so feedback is never missed. Copy is viewer-relative (QA
- * 2026-07-29 — "Add a admin note" read strangely to hosts): hosts see
- * "you and {Admins}", admins see the {host} named too so nobody assumes
- * the thread is admin-private. */
+ * has comments so feedback is never missed. Copy says "you and {Admins}
+ * only" for every viewer (Ed, 2026-08-11 — "the {Host} and {Admins}" read
+ * as the whole faculty); admins get the owner named in the hint so nobody
+ * assumes the thread is admin-private (QA 2026-07-29). */
 export function AdminCommentsPanel({
   topicId,
   comments,
@@ -43,9 +43,7 @@ export function AdminCommentsPanel({
   const count = countNested(comments);
   const [expanded, setExpanded] = useState(count > 0);
   const admins = pluralLabel(adminLabel);
-  const audience = canModerate
-    ? `the ${hostLabel} and ${admins} only`
-    : `you and ${admins} only`;
+  const audience = `you and ${admins} only`;
   const composerHint = canModerate
     ? `only the ${hostLabel} and ${admins} can see this`
     : `only you and ${admins} can see this`;

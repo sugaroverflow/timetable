@@ -55,3 +55,18 @@ Saving writes only the switches the member can use.
 the Forum Settings Email digest card, saved via
 `updateForumSettings(digestKindDefaultsJson:)`. Resolution:
 membership switch → forum default → global all-on default.
+
+## Late additions (same day)
+
+- **The review queue is a standing listing**: `pendingReview` now carries
+  EVERY topic currently awaiting review (like draft reminders), not just
+  since-window submissions — only fresh ones count as send-triggering
+  news (`pending.isNew`, from `topics.updatedAt`).
+- **The test digest is a full showcase**: several examples of every kind
+  (tagged per switch), filtered by the forum's configured kind defaults —
+  the "Send test digest" button now previews exactly what a default
+  member's digest carries; admin overrides always included.
+- **Drafting-thread label**: the panel reads "Comments (you and {Admins}
+  only)" for every viewer (Ed — "the {Host} and {Admins}" read as the
+  whole faculty); the admin composer hint still names the owner so nobody
+  assumes the thread is admin-private.

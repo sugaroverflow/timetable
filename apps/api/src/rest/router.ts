@@ -45,6 +45,7 @@ import {
   updateMemberEmailSchema,
   updateMemberRolesSchema,
   type Role,
+  type TimetableSettings,
 } from "@timetable/shared";
 
 import { buildAtomFeed } from "../atom";
@@ -647,6 +648,29 @@ restRouter.post(
   }),
 );
 
+/** The showcase digest for the test send: the real renderer over sample
+ * data, filtered by the forum's configured kind defaults so the admin
+ * previews exactly what a default member's digest carries. */
+function buildTestDigest(
+  user: { email: string; name: string | null },
+  timetable: {
+    id: string;
+    name: string;
+    slug: string;
+    settings: TimetableSettings | null;
+  },
+): ReturnType<typeof sampleDigest> {
+  return sampleDigest({
+    email: user.email,
+    name: user.name,
+    forumId: timetable.id,
+    forumName: timetable.name,
+    forumSlug: timetable.slug,
+    accent: timetable.settings?.theme?.primary ?? null,
+    kindDefaults: timetable.settings?.digestKindDefaults ?? {},
+  });
+}
+
 /**
  * POST /api/forums/:idOrSlug/digest-test
  * Admin-only: emails the requesting admin a digest built from example
@@ -678,16 +702,10 @@ restRouter.post(
     }
     if (!(await enforceActionLimit(res, user.id, "invite"))) return;
 
-    const digest = sampleDigest({
-      email: user.email,
-      name: user.name,
-      forumId: readable.timetable.id,
-      forumName: readable.timetable.name,
-      forumSlug: readable.timetable.slug,
-      accent:
-        (readable.timetable.settings as { theme?: { primary?: string } } | null)
-          ?.theme?.primary ?? null,
-    });
+    const digest = buildTestDigest(
+      { email: user.email, name: user.name },
+      readable.timetable,
+    );
     const { subject, html } = renderDigest(digest);
     // Test digests get the ticket treatment too, so "Send test digest" QAs
     // the one-click sign-in links exactly as recipients receive them.
