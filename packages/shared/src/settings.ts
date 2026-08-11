@@ -15,8 +15,9 @@ export type RoleLabels = {
  * digest defaults seeded onto new members who haven't customized theirs. */
 export type DigestFrequency = "daily" | "weekly";
 
-/** The digest's activity types, each individually switchable per user
- * (2026-08-11). One entry per thing a digest can carry. */
+/** The digest's activity types, each individually switchable PER FORUM
+ * (2026-08-11) — the digest is one email per forum, so each membership
+ * carries its own switch set. One entry per thing a digest can carry. */
 export const DIGEST_KINDS = [
   "comments",
   "replies",
@@ -60,19 +61,20 @@ export type NotificationSettings = {
   digestFrequency?: DigestFrequency;
   /** Weekly only: day to send on, 0 = Sunday … 6 = Saturday (UTC). */
   digestWeekday?: number;
-  /** Per-kind switches (2026-08-11) — absent keys fall back to
-   * DIGEST_KIND_DEFAULTS via `isDigestKindEnabled`. */
-  digestKinds?: Partial<Record<DigestKind, boolean>>;
   /** Sysadmins only: email when any new forum is created. */
   newForumEmails?: boolean;
 };
 
-/** Whether one activity kind belongs in this user's digest. */
+/** A membership's per-forum digest switch set ({} = all defaults). */
+export type DigestKinds = Partial<Record<DigestKind, boolean>>;
+
+/** Whether one activity kind belongs in a forum's digest for this member —
+ * `kinds` is the membership's switch set; absent keys keep the default. */
 export function isDigestKindEnabled(
-  settings: NotificationSettings,
+  kinds: DigestKinds | null | undefined,
   kind: DigestKind,
 ): boolean {
-  return settings.digestKinds?.[kind] ?? DIGEST_KIND_DEFAULTS[kind];
+  return kinds?.[kind] ?? DIGEST_KIND_DEFAULTS[kind];
 }
 
 /** Whether this user (or a forum's defaults) opt into digest emails. An

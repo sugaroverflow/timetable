@@ -1,4 +1,5 @@
 import type {
+  DigestKinds,
   NotificationSettings,
   RoleLabels,
   ThemeSettings,
@@ -30,6 +31,17 @@ export function parseDigestSettings(
   if (!raw) return {};
   try {
     return JSON.parse(raw) as DigestSettings;
+  } catch {
+    return {};
+  }
+}
+
+/** Parse a membership's serialized per-forum digest kind switches
+ * (2026-08-11); {} (all defaults) on missing/bad JSON. */
+export function parseDigestKinds(raw: string | null | undefined): DigestKinds {
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw) as DigestKinds;
   } catch {
     return {};
   }

@@ -11,6 +11,7 @@ import { MarkNotificationsSeen } from "@/components/MarkNotificationsSeen";
 import { PersonChip } from "@/components/PersonChip";
 import { gqlFetch } from "@/lib/graphql";
 import {
+  parseDigestKinds,
   parseDigestSettings,
   parseTimetableSettings,
   roleLabel,
@@ -39,14 +40,18 @@ type Notification = {
 };
 
 type Data = {
-  timetable: { viewerRoles: string[]; settings: string } | null;
+  timetable: {
+    viewerRoles: string[];
+    settings: string;
+    viewerDigestKinds: string;
+  } | null;
   me: { notificationSettings: string } | null;
   notifications: Notification[];
 };
 
 const QUERY = `
   query Notifications($s: String!) {
-    timetable: forum(idOrSlug: $s) { viewerRoles settings }
+    timetable: forum(idOrSlug: $s) { viewerRoles settings viewerDigestKinds }
     me { notificationSettings }
     notifications(idOrSlug: $s) {
       commentId kind authorId authorName authorImage authorRoles body
@@ -166,6 +171,19 @@ function NotificationCard({
   );
 }
 
+/** The digest card: cadence is the user's, the kind switches are this
+ * forum's (per-forum digests, 2026-08-11). */
+function DigestCard({ slug, data }: { slug: string; data: Data }) {
+  if (!data.me) return null;
+  return (
+    <DigestSettingsForm
+      slug={slug}
+      current={parseDigestSettings(data.me.notificationSettings)}
+      currentKinds={parseDigestKinds(data.timetable?.viewerDigestKinds)}
+    />
+  );
+}
+
 /** Notifications pane (QA #59; sectioned 2026-07-29): a "Settings" section
  * holding the email-digest card, then "Notifications" with user and role
  * filters (same controls as the activity log). Opening the page clears the
@@ -217,11 +235,7 @@ export default async function NotificationsPage({
       <h3 className="section-title">Settings</h3>
       {/* Email digest preferences live with the notifications they gate
           (QA 2026-07-28 — moved off the profile page). */}
-      {data.me ? (
-        <DigestSettingsForm
-          current={parseDigestSettings(data.me.notificationSettings)}
-        />
-      ) : null}
+      <DigestCard slug={slug} data={data} />
 
       <h3 className="section-title">Notifications</h3>
       {data.notifications.length > 0 ? (

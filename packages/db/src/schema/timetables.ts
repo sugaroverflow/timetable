@@ -9,7 +9,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-import type { TimetableSettings } from "@timetable/shared";
+import type { DigestKind, TimetableSettings } from "@timetable/shared";
 
 import { users } from "./auth";
 import { inviteStatusEnum, privacyEnum, roleEnum } from "./enums";
@@ -90,6 +90,14 @@ export const timetableMemberships = pgTable(
     // instant come around again; topics published after it are 🆕 and jump
     // the queue. Null = first round (nothing is "new", all seen rows count).
     queueRoundStartedAt: timestamp({ withTimezone: true }),
+    /** Per-forum digest kind switches (2026-08-11): {kind: boolean},
+     * absent kinds fall back to shared DIGEST_KIND_DEFAULTS. Per-FORUM
+     * because the digest is one email per forum; cadence stays on the
+     * user (one send schedule). */
+    digestKinds: jsonb()
+      .$type<Partial<Record<DigestKind, boolean>>>()
+      .notNull()
+      .default({}),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },

@@ -38,23 +38,20 @@ describe("isDigestKindEnabled", () => {
   it("falls back to the per-kind default for absent keys", () => {
     for (const kind of DIGEST_KINDS) {
       expect(isDigestKindEnabled({}, kind)).toBe(DIGEST_KIND_DEFAULTS[kind]);
-      expect(isDigestKindEnabled({ digestKinds: {} }, kind)).toBe(
+      expect(isDigestKindEnabled(null, kind)).toBe(DIGEST_KIND_DEFAULTS[kind]);
+      expect(isDigestKindEnabled(undefined, kind)).toBe(
         DIGEST_KIND_DEFAULTS[kind],
       );
     }
   });
 
   it("follows an explicit per-kind switch", () => {
-    expect(
-      isDigestKindEnabled({ digestKinds: { hearts: false } }, "hearts"),
-    ).toBe(false);
-    expect(
-      isDigestKindEnabled({ digestKinds: { drafts: true } }, "drafts"),
-    ).toBe(true);
+    expect(isDigestKindEnabled({ hearts: false }, "hearts")).toBe(false);
+    expect(isDigestKindEnabled({ drafts: true }, "drafts")).toBe(true);
     // Other kinds keep their defaults around an explicit neighbour.
-    expect(
-      isDigestKindEnabled({ digestKinds: { hearts: false } }, "replies"),
-    ).toBe(DIGEST_KIND_DEFAULTS.replies);
+    expect(isDigestKindEnabled({ hearts: false }, "replies")).toBe(
+      DIGEST_KIND_DEFAULTS.replies,
+    );
   });
 });
 

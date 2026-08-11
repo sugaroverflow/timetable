@@ -1,0 +1,1 @@
+ALTER TABLE "timetable_memberships" ADD COLUMN "digest_kinds" jsonb DEFAULT '{}'::jsonb NOT NULL;

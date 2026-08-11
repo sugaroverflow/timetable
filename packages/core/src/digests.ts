@@ -6,6 +6,7 @@ import {
   isDigestKindEnabled,
   isHostCommentsEnabled,
   type DigestKind,
+  type DigestKinds,
 } from "@timetable/shared";
 
 import type { NotificationSettings, TimetableSettings } from "@timetable/db";
@@ -209,6 +210,8 @@ type DigestContext = {
   /** Forums with the host-only thread on — the only ones whose 💙s may
    * appear in digests (same visibility rule as the thread's 💙 row). */
   hostCommentsTimetableIds: string[];
+  /** Per-forum digest kind switches (2026-08-11), from the membership. */
+  digestKindsByForum: Map<string, DigestKinds>;
 };
 
 /** The later of the digest window start and an in-app seen watermark. */
@@ -244,6 +247,7 @@ async function loadDigestContext(
       inviteSentAt: timetableMemberships.inviteSentAt,
       lastSeenFeedAt: timetableMemberships.lastSeenFeedAt,
       lastSeenNotificationsAt: timetableMemberships.lastSeenNotificationsAt,
+      digestKinds: timetableMemberships.digestKinds,
       name: timetables.name,
       slug: timetables.slug,
       settings: timetables.settings,
@@ -296,6 +300,9 @@ async function loadDigestContext(
         isHostCommentsEnabled((m.settings as TimetableSettings | null) ?? {}),
       )
       .map((m) => m.timetableId),
+    digestKindsByForum: new Map(
+      memberships.map((m) => [m.timetableId, m.digestKinds]),
+    ),
   };
 }
 
@@ -853,6 +860,18 @@ async function assignmentActivities(
     }));
 }
 
+/** Which per-forum switch governs each activity kind. */
+const KIND_SWITCH: Record<DigestActivity["kind"], DigestKind> = {
+  comment: "comments",
+  reply: "replies",
+  heart: "hearts",
+  hostHeart: "hostHearts",
+  session: "sessions",
+  new: "newTopics",
+  assignment: "assignments",
+  draft: "drafts",
+};
+
 /** Ranks — the coarse one groups cards (your content first, drafts last),
  * the fine one orders activities within a single card. */
 const CARD_TIER: Record<DigestActivity["kind"], number> = {
@@ -895,10 +914,13 @@ export async function computeUserForumDigests(
   now: Date = new Date(),
 ): Promise<ForumDigest[]> {
   const ctx = await loadDigestContext(recipient);
-  // Per-kind switches (2026-08-11): a kind the recipient turned off is
-  // never collected — absent keys keep the defaults.
+  // Per-FORUM kind switches (2026-08-11), from the membership: a kind is
+  // only collected if some forum wants it, and each activity then filters
+  // against its own forum's switches — absent keys keep the defaults.
+  const wantsIn = (forumId: string, kind: DigestKind) =>
+    isDigestKindEnabled(ctx.digestKindsByForum.get(forumId), kind);
   const wants = (kind: DigestKind) =>
-    isDigestKindEnabled(recipient.notificationSettings, kind);
+    ctx.forumIds.some((id) => wantsIn(id, kind));
   const sessions = await loadSessionSections(ctx, since, now);
 
   const myTopics = await db
@@ -958,7 +980,7 @@ export async function computeUserForumDigests(
     ...newA,
     ...assignedA,
     ...draftsA,
-  ];
+  ].filter((a) => wantsIn(a.timetableId, KIND_SWITCH[a.activity.kind]));
   const meta = await resolveTopicMeta(ctx, [
     ...new Set(all.map((a) => a.topicId)),
   ]);
@@ -979,7 +1001,7 @@ export async function computeUserForumDigests(
       hostLabel: ctx.hostLabel.get(forumId) ?? "Host",
       adminLabel: ctx.adminLabel.get(forumId) ?? "Admin",
       topics: cards,
-      availabilityAsks: wants("availabilityAsks")
+      availabilityAsks: wantsIn(forumId, "availabilityAsks")
         ? sessions.asks.filter((s) => s.timetableId === forumId)
         : [],
     };

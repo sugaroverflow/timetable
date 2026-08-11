@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 
 import { and, eq } from "drizzle-orm";
 
+import type { DigestKinds } from "@timetable/shared";
+
 import {
   db,
   timetableMemberships,
@@ -110,4 +112,41 @@ export async function updateUserNotificationSettings(
     .where(eq(users.id, userId))
     .returning();
   return user ?? null;
+}
+
+/** The member's per-forum digest kind switches ({} = all defaults). */
+export async function getMembershipDigestKinds(
+  timetableId: string,
+  userId: string,
+): Promise<DigestKinds> {
+  const [membership] = await db
+    .select({ digestKinds: timetableMemberships.digestKinds })
+    .from(timetableMemberships)
+    .where(
+      and(
+        eq(timetableMemberships.timetableId, timetableId),
+        eq(timetableMemberships.userId, userId),
+      ),
+    )
+    .limit(1);
+  return membership?.digestKinds ?? {};
+}
+
+/** Replace the member's per-forum digest kind switches (2026-08-11). */
+export async function updateMembershipDigestKinds(
+  timetableId: string,
+  userId: string,
+  kinds: DigestKinds,
+): Promise<boolean> {
+  const [updated] = await db
+    .update(timetableMemberships)
+    .set({ digestKinds: kinds, updatedAt: new Date() })
+    .where(
+      and(
+        eq(timetableMemberships.timetableId, timetableId),
+        eq(timetableMemberships.userId, userId),
+      ),
+    )
+    .returning({ id: timetableMemberships.id });
+  return Boolean(updated);
 }

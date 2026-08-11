@@ -6,6 +6,7 @@ import {
   listPeople,
   logActivity,
   updateMemberProfile,
+  updateMembershipDigestKinds,
   updateUserNotificationSettings,
   type Person,
 } from "@timetable/core";
@@ -14,7 +15,7 @@ import {
   canModerate,
   canSeePersonProfile,
   DIGEST_KINDS,
-  type DigestKind,
+  type DigestKinds,
   type Privacy,
   type Role as SharedRole,
   type Viewer,
@@ -25,6 +26,7 @@ import { renderMarkdown } from "../markdown";
 import { isSysadmin } from "../auth/sysadmin";
 import { builder } from "./builder";
 import {
+  badRequest,
   forbidden,
   loadTimetableAndViewer,
   notFound,
@@ -225,13 +227,12 @@ function validDigestWeekday(
     ? value
     : undefined;
 }
-/** Per-kind digest switches (2026-08-11): a JSON {kind: boolean} object.
+/** Per-forum digest switches (2026-08-11): a JSON {kind: boolean} object.
  * The parsed object REPLACES the stored set (the form always sends every
- * switch); unknown kinds or malformed JSON are ignored like the other
- * guards. */
+ * switch); unknown kinds are dropped, malformed JSON yields undefined. */
 function parseDigestKinds(
   raw: string | null | undefined,
-): Partial<Record<DigestKind, boolean>> | undefined {
+): DigestKinds | undefined {
   if (!raw) return undefined;
   let parsed: unknown;
   try {
@@ -242,7 +243,7 @@ function parseDigestKinds(
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
     return undefined;
   }
-  const kinds: Partial<Record<DigestKind, boolean>> = {};
+  const kinds: DigestKinds = {};
   for (const kind of DIGEST_KINDS) {
     const value = (parsed as Record<string, unknown>)[kind];
     if (typeof value === "boolean") kinds[kind] = value;
@@ -337,23 +338,18 @@ builder.mutationFields((t) => ({
       digestFrequency: t.arg.string({ required: false }),
       /** Weekly send day, 0 = Sunday … 6 = Saturday (UTC). */
       digestWeekday: t.arg.int({ required: false }),
-      /** Per-kind switches (2026-08-11) as a JSON {kind: boolean} object —
-       * replaces the stored set; unknown kinds are dropped. */
-      digestKindsJson: t.arg.string({ required: false }),
       newForumEmails: t.arg.boolean({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
       const user = await requireUser(ctx);
       const frequency = validDigestFrequency(args.digestFrequency);
       const weekday = validDigestWeekday(args.digestWeekday);
-      const kinds = parseDigestKinds(args.digestKindsJson);
       const updated = await updateUserNotificationSettings(user.id, {
         ...(args.digestEnabled != null
           ? { digestEnabled: args.digestEnabled }
           : {}),
         ...(frequency ? { digestFrequency: frequency } : {}),
         ...(weekday != null ? { digestWeekday: weekday } : {}),
-        ...(kinds ? { digestKinds: kinds } : {}),
         // Harmless for non-sysadmins to set — the sender only ever mails
         // addresses on the SYSADMIN_EMAILS list.
         ...(args.newForumEmails != null
@@ -367,6 +363,27 @@ builder.mutationFields((t) => ({
         name: updated.name,
         image: updated.image,
       };
+    },
+  }),
+
+  /** Update the viewer's PER-FORUM digest kind switches (2026-08-11) —
+   * the digest is one email per forum, so what goes in it is a membership
+   * setting; cadence stays on the user (one send schedule). The JSON
+   * {kind: boolean} object replaces the stored set. */
+  updateMyDigestKinds: t.field({
+    type: "Boolean",
+    args: {
+      idOrSlug: t.arg.string({ required: true }),
+      kindsJson: t.arg.string({ required: true }),
+    },
+    resolve: async (_p, args, ctx) => {
+      const { user, readable } = await loadTimetableAndViewer(
+        ctx,
+        args.idOrSlug,
+      );
+      const kinds = parseDigestKinds(args.kindsJson);
+      if (!kinds) badRequest("Invalid digest kinds JSON");
+      return updateMembershipDigestKinds(readable.timetable.id, user.id, kinds);
     },
   }),
 

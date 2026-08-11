@@ -8,16 +8,20 @@ import {
   isDigestEnabled,
   isDigestKindEnabled,
   type DigestKind,
+  type DigestKinds,
 } from "@timetable/shared";
 
 import { Switch } from "@/components/Switch";
 import type { DigestSettings } from "@/lib/timetableSettings";
 import { useGqlAction } from "@/lib/useGqlAction";
 
-const MUTATION = `mutation($e: Boolean, $f: String, $w: Int, $k: String) {
+// Cadence is per USER (one send schedule); the kind switches are per
+// FORUM (the digest is one email per forum) — both saved in one request.
+const MUTATION = `mutation($s: String!, $e: Boolean, $f: String, $w: Int, $k: String!) {
   updateMyNotificationSettings(
-    digestEnabled: $e, digestFrequency: $f, digestWeekday: $w, digestKindsJson: $k
+    digestEnabled: $e, digestFrequency: $f, digestWeekday: $w
   ) { id }
+  updateMyDigestKinds(idOrSlug: $s, kindsJson: $k)
 }`;
 
 export type { DigestSettings };
@@ -56,7 +60,16 @@ function kindLabel(kind: DigestKind): string {
 
 type Cadence = "never" | "daily" | "weekly";
 
-export function DigestSettingsForm({ current }: { current: DigestSettings }) {
+export function DigestSettingsForm({
+  slug,
+  current,
+  currentKinds,
+}: {
+  slug: string;
+  current: DigestSettings;
+  /** This forum's stored switch set (from the viewer's membership). */
+  currentKinds: DigestKinds;
+}) {
   const { run, busy } = useGqlAction();
   // "Never" folds the enabled flag into the same dropdown as the cadence
   // (2026-07-30) — one control instead of a checkbox + frequency select.
@@ -67,7 +80,10 @@ export function DigestSettingsForm({ current }: { current: DigestSettings }) {
   const [kinds, setKinds] = useState<Record<DigestKind, boolean>>(
     () =>
       Object.fromEntries(
-        DIGEST_KINDS.map((kind) => [kind, isDigestKindEnabled(current, kind)]),
+        DIGEST_KINDS.map((kind) => [
+          kind,
+          isDigestKindEnabled(currentKinds, kind),
+        ]),
       ) as Record<DigestKind, boolean>,
   );
   const [saved, setSaved] = useState(false);
@@ -81,6 +97,7 @@ export function DigestSettingsForm({ current }: { current: DigestSettings }) {
       // Leave the stored frequency untouched when Never is picked (the
       // mutation ignores an absent frequency) so re-enabling remembers it.
       {
+        s: slug,
         e: enabled,
         f: enabled ? cadence : undefined,
         w: weekday,
@@ -101,7 +118,8 @@ export function DigestSettingsForm({ current }: { current: DigestSettings }) {
       </h2>
       <p className="faint" style={{ marginTop: 0, fontSize: "var(--text-xs)" }}>
         One email per forum with what you haven&rsquo;t seen — comments on your
-        topics, replies, and new topics.
+        topics, replies, and new topics. How often applies everywhere; what to
+        include is your choice for this forum.
       </p>
       <div className="row wrap" style={{ marginBottom: 12 }}>
         <div className="field" style={{ marginBottom: 0 }}>
@@ -137,7 +155,9 @@ export function DigestSettingsForm({ current }: { current: DigestSettings }) {
       </div>
       {cadence !== "never" ? (
         <div className="stack" style={{ gap: 8, marginBottom: 12 }}>
-          <strong style={{ fontSize: 13 }}>What to include</strong>
+          <strong style={{ fontSize: 13 }}>
+            What to include from this forum
+          </strong>
           {DIGEST_KINDS.map((kind) => (
             <Switch
               key={kind}
