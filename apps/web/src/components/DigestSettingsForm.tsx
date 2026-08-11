@@ -35,9 +35,9 @@ const WEEKDAYS = [
   "Saturday",
 ];
 
-/** Per-kind switch labels (2026-08-11). The "(on/off by default)" suffixes
- * are scaffolding while the option set is being pruned — remove once the
- * final set is configured. */
+/** Per-kind switch labels (2026-08-11). The "(host)"/"(elector)" and
+ * "(on/off by default)" suffixes are scaffolding while the option set is
+ * being pruned — remove once the final set is configured. */
 const KIND_LABELS: Record<DigestKind, string> = {
   comments: "Comments on your topics",
   replies: "Replies to your comments",
@@ -50,11 +50,26 @@ const KIND_LABELS: Record<DigestKind, string> = {
   drafts: "Reminders about your unpublished drafts",
 };
 
+/** Which role a kind can ever fire for: topic-owner kinds are host-only;
+ * ❤️-driven and new-topic kinds are elector-only; replies (absent here)
+ * apply to anyone who comments. */
+const KIND_ROLES: Partial<Record<DigestKind, "host" | "elector">> = {
+  comments: "host",
+  hearts: "host",
+  hostHearts: "host",
+  assignments: "host",
+  drafts: "host",
+  sessions: "elector",
+  availabilityAsks: "elector",
+  newTopics: "elector",
+};
+
 function kindLabel(kind: DigestKind): string {
+  const role = KIND_ROLES[kind] ? ` (${KIND_ROLES[kind]})` : "";
   const suffix = DIGEST_KIND_DEFAULTS[kind]
     ? " (on by default)"
     : " (off by default)";
-  return KIND_LABELS[kind] + suffix;
+  return KIND_LABELS[kind] + role + suffix;
 }
 
 type Cadence = "never" | "daily" | "weekly";
