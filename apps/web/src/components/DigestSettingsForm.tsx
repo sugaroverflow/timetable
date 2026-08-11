@@ -64,9 +64,9 @@ const KIND_LABELS: Record<DigestKind, (hosts: string) => string> = {
 };
 
 /** The "(… only)" audience scaffold beside a restricted switch, in the
- * forum's own role labels; null for universal kinds. Shown to EVERY
- * viewer (Ed, 2026-08-11) — for a dual-role member it answers "why do I
- * see this switch?". Temporary until the option set is final. */
+ * forum's own role labels; null for universal kinds. ADMIN VIEWS ONLY
+ * (Ed, 2026-08-11 — members don't need the audience config, they just
+ * get switches that apply to them). Temporary until the set is final. */
 function audienceTag(kind: DigestKind, labels?: RoleLabels): string | null {
   const audience = DIGEST_KIND_AUDIENCE[kind];
   if (audience === "all") return null;
@@ -78,11 +78,16 @@ function audienceTag(kind: DigestKind, labels?: RoleLabels): string | null {
   return `${roleLabel(labels, audience)} only`;
 }
 
-/** A switch's display label: the forum-labelled base plus the audience
- * scaffold. Shared with the Forum Settings defaults card. */
+/** A switch's plain display label in the forum's own role words. */
+function kindLabel(kind: DigestKind, labels?: RoleLabels): string {
+  return KIND_LABELS[kind](pluralLabel(roleLabel(labels, "host")));
+}
+
+/** The admin view's label: the forum-labelled base plus the audience
+ * scaffold. Shared with the Forum Settings defaults card (admin-only). */
 export function taggedKindLabel(kind: DigestKind, labels?: RoleLabels): string {
-  const base = KIND_LABELS[kind](pluralLabel(roleLabel(labels, "host")));
   const tag = audienceTag(kind, labels);
+  const base = kindLabel(kind, labels);
   return tag ? `${base} (${tag})` : base;
 }
 
@@ -215,7 +220,11 @@ export function DigestSettingsForm({
                 <Switch
                   checked={kinds[kind]}
                   onChange={(next) => setKinds({ ...kinds, [kind]: next })}
-                  label={taggedKindLabel(kind, roleLabels)}
+                  label={
+                    admin
+                      ? taggedKindLabel(kind, roleLabels)
+                      : kindLabel(kind, roleLabels)
+                  }
                   disabled={!applies}
                 />
               </span>

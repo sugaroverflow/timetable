@@ -78,12 +78,14 @@ membership switch → forum default → global all-on default.
   admin_only comment rows now ride the `comments` switch. Stored
   membership/forum JSON with the old key parses fine (unknown kinds are
   ignored on read, dropped on next save). 16 switches remain.
-- **Role tags for every viewer, in the forum's own labels**: Ed previewed
-  a host who is also an elector and couldn't tell why elector switches
-  ("Can you make it?" asks) appeared — the "([role] only)" scaffold now
-  shows for members too, and all role words (tags plus "fellow hosts"
-  labels) go through the forum's roleLabels ("Fellowship Candidate
-  only", "💙s from fellow Faculty…"). DIGEST_KIND_ROLE_TAGS left shared
+- **Role tags in the forum's own labels**: all role words (the admin
+  "([role] only)" tags plus the "fellow hosts" labels) go through the
+  forum's roleLabels ("Fellowship Candidate only", "💙s from fellow
+  Faculty…"). Briefly shown to every viewer, reverted same day — Ed:
+  members don't need the audience config, they just get switches that
+  apply to them (a host-elector seeing asks is working as designed — the
+  💙 rolls into ❤️ and elector switches follow the elector role).
+  DIGEST_KIND_ROLE_TAGS left shared
   (hardcoded strings) for an exported DIGEST_KIND_AUDIENCE; the web's
   `taggedKindLabel(kind, roleLabels)` builds display labels for both the
   Notifications card and the Forum Settings defaults card.
