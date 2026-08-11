@@ -10038,6 +10038,13 @@ No self-💙s: interest is for colleagues' topics.
      below (one exception) — their standing patterns supply inferred states.
      "Off-grid: yes" slots are host off-piste proposals: no pattern cell.
      "Session host:" with no Topics is an office-hours session.
+     Slot locations (2026-08-11): fixture slots sharing a time window merge
+     into ONE timeslot offering the union of their locations. The two
+     "-hall" companions below are one-off hall releases (Off-grid so the
+     weekly pattern doesn't learn them): thu+2 gets a free Hall beside the
+     confirmed Classroom session, and mon+3 becomes an open two-room slot —
+     together they exercise the Hall location filter and the pencil-in
+     location select.
 
      The hand-authored slots below cover the current window (weeks 0..+3)
      with carefully chosen QA states — edit freely. Below the GENERATED
@@ -10385,6 +10392,17 @@ Discussion:
 - Author: host-hayley
   Text: Confirmed early because two guest speakers are travelling up for it.
 
+### Slot: slot-w2-thu-hall
+Date: thu+2
+Start: 16:00
+End: 18:00
+Location: Hall
+Off-grid: yes
+
+Discussion:
+- Author: admin-edwin
+  Text: The Hall has come free this evening too — released it alongside the Classroom session for anyone who wants the bigger room.
+
 ### Slot: slot-w2-fri
 Date: fri+2
 Start: 13:00
@@ -10398,6 +10416,17 @@ Start: 10:00
 End: 12:00
 Location: Classroom
 Topics:
+
+### Slot: slot-w3-mon-hall
+Date: mon+3
+Start: 10:00
+End: 12:00
+Location: Hall
+Off-grid: yes
+
+Discussion:
+- Author: admin-edwin
+  Text: Rare one — the Hall is free on a Monday morning. First topic to claim it gets it.
 
 ### Slot: slot-w3-tue
 Date: tue+3
