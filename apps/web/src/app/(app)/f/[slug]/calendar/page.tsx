@@ -52,7 +52,7 @@ type Data = {
 };
 
 const SLOT_FIELDS = `
-  id startsAt endsAt cellKey commentCount viewerState
+  id startsAt endsAt cellKey locations commentCount viewerState
   sessions {
     id location status url customTitle
     topic { id title topicSlug hostId hostName }
@@ -90,6 +90,7 @@ function buildIcsUrl(slug: string, token: string | null | undefined): string {
 
 function CalendarToolbar({
   calendar,
+  configuredLocations,
   topics,
   perms,
   hostView,
@@ -99,6 +100,9 @@ function CalendarToolbar({
   electorsLabel,
 }: {
   calendar: CalendarSlot[];
+  /** The forum's configured locations — offered in the filter even before
+   * any slot carries them ("no slots match" = not released yet). */
+  configuredLocations: string[];
   topics: TopicOption[];
   perms: CalendarPerms;
   hostView: boolean;
@@ -108,12 +112,16 @@ function CalendarToolbar({
   electorsLabel: string;
 }) {
   const locations = [
-    ...new Set(
-      calendar
-        .flatMap((s) => s.sessions.map((x) => x.location))
-        .filter(Boolean),
-    ),
-  ].sort();
+    ...new Set([
+      ...configuredLocations,
+      ...calendar.flatMap((s) => [
+        ...s.locations,
+        ...s.sessions.map((x) => x.location),
+      ]),
+    ]),
+  ]
+    .filter(Boolean)
+    .sort();
 
   if (calendar.length === 0) return null;
 
@@ -152,14 +160,19 @@ function selectClaimTopics(
   return admin ? topicFeed : topicFeed.filter((t) => t.hostId === viewerId);
 }
 
-/** Bookings model: a "location" filter shows timeslots with a session
- * booked at that location (open slots have no location of their own). */
+/** Slot locations (2026-08-11): the "location" filter shows timeslots that
+ * OFFER that location — open ones are exactly when it's free. Legacy slots
+ * with no offered set still match through their booked sessions. */
 function filterByLocation(
   slots: CalendarSlot[],
   location: string | undefined,
 ): CalendarSlot[] {
   return location
-    ? slots.filter((s) => s.sessions.some((x) => x.location === location))
+    ? slots.filter(
+        (s) =>
+          s.locations.includes(location) ||
+          s.sessions.some((x) => x.location === location),
+      )
     : slots;
 }
 
@@ -473,6 +486,7 @@ export default async function CalendarPage({
 
       <CalendarToolbar
         calendar={data.calendar}
+        configuredLocations={calendarSettings.locations}
         topics={claimTopics}
         perms={perms}
         hostView={isHost(roles)}

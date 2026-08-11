@@ -232,6 +232,13 @@
       "when": 1786377653394,
       "tag": "0032_deep_lethal_legion",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1786454918315,
+      "tag": "0033_gorgeous_the_fallen",
+      "breakpoints": true
     }
   ]
 }

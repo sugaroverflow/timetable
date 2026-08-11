@@ -29,6 +29,9 @@ export type CalendarSlot = {
   startsAt: string;
   endsAt: string;
   cellKey: string | null;
+  /** Locations offered at this time, chosen at creation (2026-08-11) —
+   * empty only on legacy slots and in forums with no configured locations. */
+  locations: string[];
   sessions: CalendarSession[];
   viewerState: AvailabilityState | null;
   counts: { green: number; yellow: number; red: number };

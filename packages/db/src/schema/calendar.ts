@@ -38,6 +38,11 @@ export const timeslots = pgTable(
      * at generation). Null for hand-created and off-piste slots — those get
      * no pattern inference. */
     cellKey: text(),
+    /** Locations offered at this time, chosen at creation (2026-08-11) —
+     * adding a same-time slot for another location unions into this row
+     * rather than duplicating it. Empty only on legacy rows and in forums
+     * with no configured locations (location-free behaviour). */
+    locations: text().array().notNull().default([]),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },

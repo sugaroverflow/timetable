@@ -23,8 +23,8 @@ const UPDATE_SESSION = `mutation($session: String!, $status: String, $url: Strin
 const CLEAR_SESSION = `mutation($session: String!) {
   clearSlotSession(sessionId: $session)
 }`;
-const UPDATE_SLOT = `mutation($slot: String!, $a: String, $b: String) {
-  updateTimeslot(slotId: $slot, startsAt: $a, endsAt: $b)
+const UPDATE_SLOT = `mutation($slot: String!, $a: String, $b: String, $locs: String) {
+  updateTimeslot(slotId: $slot, startsAt: $a, endsAt: $b, locationsJson: $locs)
 }`;
 const DELETE_SLOT = `mutation($slot: String!) { deleteTimeslot(slotId: $slot) }`;
 
@@ -170,18 +170,26 @@ function PencilInControl({
   officeHoursLabel,
 }: {
   slot: CalendarSlot;
-  /** The forum's configured locations, offered as datalist suggestions. */
+  /** The forum's configured locations — datalist suggestions on legacy
+   * slots with no offered set of their own. */
   locations: string[];
   claimTopics: TopicOption[];
   perms: CalendarPerms;
   officeHoursLabel: string;
 }) {
   const { run, busy } = useGqlAction();
+  // Slot locations (2026-08-11): the booking picks one of the slot's
+  // offered locations — preselected when there's only one.
+  const offered = slot.locations;
+  const booked = new Set(slot.sessions.map((s) => s.location));
   const [choice, setChoice] = useState("");
-  const [location, setLocation] = useState("");
+  const [location, setLocation] = useState(
+    offered.length === 1 ? offered[0]! : "",
+  );
   const [title, setTitle] = useState("");
   const [url, setUrl] = useState("");
   const custom = choice === CUSTOM_CHOICE;
+  const needsLocation = offered.length > 0 && !location;
 
   function pencilVars() {
     return custom
@@ -210,7 +218,22 @@ function PencilInControl({
           <option value={CUSTOM_CHOICE}>Custom event…</option>
         ) : null}
       </select>
-      {choice ? (
+      {choice && offered.length > 0 ? (
+        <select
+          aria-label="Location"
+          value={location}
+          onChange={(e) => setLocation(e.target.value)}
+          style={{ width: "auto" }}
+        >
+          <option value="">Location…</option>
+          {offered.map((l) => (
+            <option key={l} value={l} disabled={booked.has(l)}>
+              {l}
+              {booked.has(l) ? " (taken)" : ""}
+            </option>
+          ))}
+        </select>
+      ) : choice ? (
         <input
           aria-label="Location"
           placeholder="Location"
@@ -243,7 +266,7 @@ function PencilInControl({
       <button
         type="button"
         className="btn"
-        disabled={busy || !choice || (custom && !title.trim())}
+        disabled={busy || !choice || needsLocation || (custom && !title.trim())}
         onClick={() =>
           void run(
             ADD_SESSION,
@@ -253,7 +276,7 @@ function PencilInControl({
               errorFallback: "Could not pencil in",
               onSuccess: () => {
                 setChoice("");
-                setLocation("");
+                setLocation(offered.length === 1 ? offered[0]! : "");
                 setTitle("");
                 setUrl("");
               },
@@ -404,12 +427,15 @@ export function SessionControls({
   );
 }
 
-/** Admin-only slot editing (time window) and deletion. */
+/** Admin-only slot editing (time window, offered locations) and deletion. */
 export function AdminSlotControls({
   slot,
+  locations = [],
   label,
 }: {
   slot: CalendarSlot;
+  /** The forum's configured locations (edit options beside the slot's own). */
+  locations?: string[];
   label: string;
 }) {
   const { run, busy } = useGqlAction();
@@ -421,6 +447,15 @@ export function AdminSlotControls({
   };
   const [start, setStart] = useState(() => toLocal(slot.startsAt));
   const [end, setEnd] = useState(() => toLocal(slot.endsAt));
+  // Configured locations first, then any extras this slot already carries.
+  const options = [
+    ...locations,
+    ...slot.locations.filter((l) => !locations.includes(l)),
+  ];
+  const [where, setWhere] = useState<Set<string>>(
+    () => new Set(slot.locations),
+  );
+  const needsLocation = options.length > 0 && where.size === 0;
 
   return (
     <div className="stack" style={{ gap: 8 }}>
@@ -453,7 +488,7 @@ export function AdminSlotControls({
         </button>
       </div>
       {editing ? (
-        <div className="row wrap" style={{ gap: 8 }}>
+        <div className="row wrap" style={{ gap: 8, alignItems: "center" }}>
           <input
             type="datetime-local"
             aria-label="Start"
@@ -468,10 +503,29 @@ export function AdminSlotControls({
             onChange={(e) => setEnd(e.target.value)}
             style={{ width: "auto" }}
           />
+          {options.map((loc) => (
+            <label
+              key={loc}
+              className="row"
+              style={{ gap: 3, fontSize: 12, cursor: "pointer" }}
+            >
+              <input
+                type="checkbox"
+                checked={where.has(loc)}
+                onChange={(e) => {
+                  const next = new Set(where);
+                  if (e.target.checked) next.add(loc);
+                  else next.delete(loc);
+                  setWhere(next);
+                }}
+              />
+              {loc}
+            </label>
+          ))}
           <button
             type="button"
             className="btn"
-            disabled={busy || !start || !end}
+            disabled={busy || !start || !end || needsLocation}
             onClick={() =>
               void run(
                 UPDATE_SLOT,
@@ -479,6 +533,10 @@ export function AdminSlotControls({
                   slot: slot.id,
                   a: new Date(start).toISOString(),
                   b: new Date(end).toISOString(),
+                  locs:
+                    options.length > 0
+                      ? JSON.stringify(options.filter((l) => where.has(l)))
+                      : null,
                 },
                 {
                   success: "Slot updated",

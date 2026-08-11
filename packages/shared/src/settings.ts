@@ -127,6 +127,10 @@ export type CalendarPatternCell = {
   weekday: number;
   start: string;
   end: string;
+  /** Locations open in this cell (slot locations, 2026-08-11) — generated
+   * slots carry them. Absent on cells from before locations were required,
+   * and in forums with no configured locations. */
+  locations?: string[];
 };
 
 export function patternCellKey(cell: {

@@ -43,10 +43,13 @@ export function ProposeSlotForm({
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [location, setLocation] = useState("");
+  // Slot locations (2026-08-11): forums with configured locations require
+  // one on every new slot — the proposal creates the slot, so it chooses.
+  const needsLocation = locations.length > 0 && !location.trim();
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!start || !end || !choice) return;
+    if (!start || !end || !choice || needsLocation) return;
     void run(
       PROPOSE,
       {
@@ -122,7 +125,9 @@ export function ProposeSlotForm({
           />
           <input
             aria-label="Location"
-            placeholder="Location"
+            placeholder={
+              locations.length > 0 ? "Location (required)" : "Location"
+            }
             list="cal-locations"
             value={location}
             onChange={(e) => setLocation(e.target.value)}
@@ -138,7 +143,7 @@ export function ProposeSlotForm({
           <button
             className="btn btn-primary"
             type="submit"
-            disabled={busy || !start || !end || !choice}
+            disabled={busy || !start || !end || !choice || needsLocation}
           >
             Propose
           </button>

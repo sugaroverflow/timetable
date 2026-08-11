@@ -252,7 +252,9 @@ Main mutations cover:
 - timetable profile and settings, including validated theme JSON
 - feed and notification watermarks (`markFeedSeen`, `markNotificationsSeen`)
 - slot bulk creation (`createTimeslots`, idempotent pattern×terms
-  generation), host off-piste proposals (`proposeSlot`), editing, deletion
+  generation and one-off dates; returns `{created, augmented}` — augmented
+  counts existing slots that gained locations), host off-piste proposals
+  (`proposeSlot`), editing (incl. `locationsJson`), deletion
 - per-slot availability (`setAvailability`) and the weekly template
   (`setMyAvailabilityPattern`); effective state resolves explicit → pattern
   cell (via the slot's `cellKey`) → yellow
@@ -320,7 +322,11 @@ Core tables:
 - `timeslots` (bookings model, 2026-08-06: a pure TIME WINDOW, unique per
   forum+start+end; `created_by_id`, `cell_key` — the pattern-cell
   provenance for inference. Availability and discussion attach here
-  because both are about the time)
+  because both are about the time. `locations` (2026-08-11): the set of
+  locations offered at this time, chosen at creation — same-time creation
+  AGGREGATES locations into the existing slot (`planSlotCreation` in
+  shared), bookings must pick an offered location, and the calendar's
+  location filter matches this set; empty = legacy/location-free forum)
 - `slot_sessions` (bookings, zero-to-many per slot, unique per
   slot+location: `location`, a singular `topic_id` OR `session_host_id`
   (THE ownership column: the topic's host, or the host themselves for
