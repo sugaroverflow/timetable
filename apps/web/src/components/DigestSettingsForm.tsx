@@ -2,14 +2,21 @@
 
 import { useState } from "react";
 
-import { isDigestEnabled } from "@timetable/shared";
+import {
+  DIGEST_KIND_DEFAULTS,
+  DIGEST_KINDS,
+  isDigestEnabled,
+  isDigestKindEnabled,
+  type DigestKind,
+} from "@timetable/shared";
 
+import { Switch } from "@/components/Switch";
 import type { DigestSettings } from "@/lib/timetableSettings";
 import { useGqlAction } from "@/lib/useGqlAction";
 
-const MUTATION = `mutation($e: Boolean, $f: String, $w: Int) {
+const MUTATION = `mutation($e: Boolean, $f: String, $w: Int, $k: String) {
   updateMyNotificationSettings(
-    digestEnabled: $e, digestFrequency: $f, digestWeekday: $w
+    digestEnabled: $e, digestFrequency: $f, digestWeekday: $w, digestKindsJson: $k
   ) { id }
 }`;
 
@@ -25,6 +32,28 @@ const WEEKDAYS = [
   "Saturday",
 ];
 
+/** Per-kind switch labels (2026-08-11). The "(on/off by default)" suffixes
+ * are scaffolding while the option set is being pruned — remove once the
+ * final set is configured. */
+const KIND_LABELS: Record<DigestKind, string> = {
+  comments: "Comments on your topics",
+  replies: "Replies to your comments",
+  hearts: "❤️s on your topics",
+  hostHearts: "💙s from fellow hosts on your topics",
+  sessions: "Upcoming sessions for topics you ❤️'d",
+  availabilityAsks: "“Can you make it?” availability asks",
+  newTopics: "Newly published topics",
+  assignments: "Topics assigned to you",
+  drafts: "Reminders about your unpublished drafts",
+};
+
+function kindLabel(kind: DigestKind): string {
+  const suffix = DIGEST_KIND_DEFAULTS[kind]
+    ? " (on by default)"
+    : " (off by default)";
+  return KIND_LABELS[kind] + suffix;
+}
+
 type Cadence = "never" | "daily" | "weekly";
 
 export function DigestSettingsForm({ current }: { current: DigestSettings }) {
@@ -35,6 +64,12 @@ export function DigestSettingsForm({ current }: { current: DigestSettings }) {
     isDigestEnabled(current) ? (current.digestFrequency ?? "daily") : "never",
   );
   const [weekday, setWeekday] = useState(current.digestWeekday ?? 1);
+  const [kinds, setKinds] = useState<Record<DigestKind, boolean>>(
+    () =>
+      Object.fromEntries(
+        DIGEST_KINDS.map((kind) => [kind, isDigestKindEnabled(current, kind)]),
+      ) as Record<DigestKind, boolean>,
+  );
   const [saved, setSaved] = useState(false);
 
   function submit(e: React.FormEvent) {
@@ -45,7 +80,12 @@ export function DigestSettingsForm({ current }: { current: DigestSettings }) {
       MUTATION,
       // Leave the stored frequency untouched when Never is picked (the
       // mutation ignores an absent frequency) so re-enabling remembers it.
-      { e: enabled, f: enabled ? cadence : undefined, w: weekday },
+      {
+        e: enabled,
+        f: enabled ? cadence : undefined,
+        w: weekday,
+        k: JSON.stringify(kinds),
+      },
       {
         success: "Digest settings saved",
         errorFallback: "Could not save settings",
@@ -95,6 +135,19 @@ export function DigestSettingsForm({ current }: { current: DigestSettings }) {
           </div>
         ) : null}
       </div>
+      {cadence !== "never" ? (
+        <div className="stack" style={{ gap: 8, marginBottom: 12 }}>
+          <strong style={{ fontSize: 13 }}>What to include</strong>
+          {DIGEST_KINDS.map((kind) => (
+            <Switch
+              key={kind}
+              checked={kinds[kind]}
+              onChange={(next) => setKinds({ ...kinds, [kind]: next })}
+              label={kindLabel(kind)}
+            />
+          ))}
+        </div>
+      ) : null}
       <button className="btn btn-primary" type="submit" disabled={busy}>
         {busy ? "Saving…" : saved ? "Saved" : "Save preferences"}
       </button>

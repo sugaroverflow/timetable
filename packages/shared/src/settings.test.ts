@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { isDigestEnabled, isHostCommentsEnabled } from "./settings";
+import {
+  DIGEST_KIND_DEFAULTS,
+  DIGEST_KINDS,
+  isDigestEnabled,
+  isDigestKindEnabled,
+  isHostCommentsEnabled,
+} from "./settings";
 
 describe("isDigestEnabled", () => {
   it("is off for empty settings", () => {
@@ -25,6 +31,30 @@ describe("isDigestEnabled", () => {
     expect(isDigestEnabled({ digestEnabled: false, digestReplies: true })).toBe(
       false,
     );
+  });
+});
+
+describe("isDigestKindEnabled", () => {
+  it("falls back to the per-kind default for absent keys", () => {
+    for (const kind of DIGEST_KINDS) {
+      expect(isDigestKindEnabled({}, kind)).toBe(DIGEST_KIND_DEFAULTS[kind]);
+      expect(isDigestKindEnabled({ digestKinds: {} }, kind)).toBe(
+        DIGEST_KIND_DEFAULTS[kind],
+      );
+    }
+  });
+
+  it("follows an explicit per-kind switch", () => {
+    expect(
+      isDigestKindEnabled({ digestKinds: { hearts: false } }, "hearts"),
+    ).toBe(false);
+    expect(
+      isDigestKindEnabled({ digestKinds: { drafts: true } }, "drafts"),
+    ).toBe(true);
+    // Other kinds keep their defaults around an explicit neighbour.
+    expect(
+      isDigestKindEnabled({ digestKinds: { hearts: false } }, "replies"),
+    ).toBe(DIGEST_KIND_DEFAULTS.replies);
   });
 });
 

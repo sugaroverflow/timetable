@@ -3,7 +3,9 @@ import { and, eq, gt, inArray, isNull, ne, sql } from "drizzle-orm";
 import {
   isCalendarEnabled,
   isDigestEnabled,
+  isDigestKindEnabled,
   isHostCommentsEnabled,
+  type DigestKind,
 } from "@timetable/shared";
 
 import type { NotificationSettings, TimetableSettings } from "@timetable/db";
@@ -893,6 +895,10 @@ export async function computeUserForumDigests(
   now: Date = new Date(),
 ): Promise<ForumDigest[]> {
   const ctx = await loadDigestContext(recipient);
+  // Per-kind switches (2026-08-11): a kind the recipient turned off is
+  // never collected — absent keys keep the defaults.
+  const wants = (kind: DigestKind) =>
+    isDigestKindEnabled(recipient.notificationSettings, kind);
   const sessions = await loadSessionSections(ctx, since, now);
 
   const myTopics = await db
@@ -906,31 +912,42 @@ export async function computeUserForumDigests(
   const myTopicIds = myTopics.map((t) => t.id);
   const timetableByTopic = new Map(myTopics.map((t) => [t.id, t.timetableId]));
 
+  const none: RawActivity[] = [];
   const [commentsA, repliesA, heartsA, hostHeartsA, newA, assignedA] =
     await Promise.all([
-      commentActivities(ctx, since, myTopicIds, timetableByTopic),
-      replyActivities(ctx, since),
-      heartActivities(ctx, since, myTopicIds, timetableByTopic),
-      hostHeartActivities(ctx, since, myTopicIds, timetableByTopic),
-      newTopicActivities(ctx, since),
-      assignmentActivities(ctx, since),
+      wants("comments")
+        ? commentActivities(ctx, since, myTopicIds, timetableByTopic)
+        : none,
+      wants("replies") ? replyActivities(ctx, since) : none,
+      wants("hearts")
+        ? heartActivities(ctx, since, myTopicIds, timetableByTopic)
+        : none,
+      wants("hostHearts")
+        ? hostHeartActivities(ctx, since, myTopicIds, timetableByTopic)
+        : none,
+      wants("newTopics") ? newTopicActivities(ctx, since) : none,
+      wants("assignments") ? assignmentActivities(ctx, since) : none,
     ]);
 
-  const draftsA: RawActivity[] = myTopics
-    .filter((t) => t.status === "unpublished")
-    .map((t) => ({
-      topicId: t.id,
-      timetableId: t.timetableId,
-      activity: { kind: "draft" as const, at: new Date(0) },
-    }));
+  const draftsA: RawActivity[] = wants("drafts")
+    ? myTopics
+        .filter((t) => t.status === "unpublished")
+        .map((t) => ({
+          topicId: t.id,
+          timetableId: t.timetableId,
+          activity: { kind: "draft" as const, at: new Date(0) },
+        }))
+    : [];
 
   // Confirmed sessions ride their topic's card (QA 2026-08-03) — present
   // in every digest a hearter receives until the session happens.
-  const sessionsA: RawActivity[] = sessions.upcoming.map((s) => ({
-    topicId: s.topicId,
-    timetableId: s.timetableId,
-    activity: { kind: "session" as const, session: s, at: s.updatedAt },
-  }));
+  const sessionsA: RawActivity[] = wants("sessions")
+    ? sessions.upcoming.map((s) => ({
+        topicId: s.topicId,
+        timetableId: s.timetableId,
+        activity: { kind: "session" as const, session: s, at: s.updatedAt },
+      }))
+    : [];
 
   const all = [
     ...sessionsA,
@@ -962,7 +979,9 @@ export async function computeUserForumDigests(
       hostLabel: ctx.hostLabel.get(forumId) ?? "Host",
       adminLabel: ctx.adminLabel.get(forumId) ?? "Admin",
       topics: cards,
-      availabilityAsks: sessions.asks.filter((s) => s.timetableId === forumId),
+      availabilityAsks: wants("availabilityAsks")
+        ? sessions.asks.filter((s) => s.timetableId === forumId)
+        : [],
     };
   });
 

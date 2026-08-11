@@ -15,9 +15,37 @@ export type RoleLabels = {
  * digest defaults seeded onto new members who haven't customized theirs. */
 export type DigestFrequency = "daily" | "weekly";
 
+/** The digest's activity types, each individually switchable per user
+ * (2026-08-11). One entry per thing a digest can carry. */
+export const DIGEST_KINDS = [
+  "comments",
+  "replies",
+  "hearts",
+  "hostHearts",
+  "sessions",
+  "availabilityAsks",
+  "newTopics",
+  "assignments",
+  "drafts",
+] as const;
+export type DigestKind = (typeof DIGEST_KINDS)[number];
+
+/** Per-kind defaults — what an untouched account receives. Everything the
+ * digest carried before per-kind switches existed stays on. */
+export const DIGEST_KIND_DEFAULTS: Record<DigestKind, boolean> = {
+  comments: true,
+  replies: true,
+  hearts: true,
+  hostHearts: true,
+  sessions: true,
+  availabilityAsks: true,
+  newTopics: true,
+  assignments: true,
+  drafts: true,
+};
+
 export type NotificationSettings = {
-  /** Master switch (2026-07-29): a digest always includes every section —
-   * there are no per-section choices. */
+  /** Master switch (2026-07-29): off means no digest at all. */
   digestEnabled?: boolean;
   /** @deprecated Pre-2026-07-29 per-section flags, kept only so stored
    * settings still parse. Any of them true reads as enabled — use
@@ -32,9 +60,20 @@ export type NotificationSettings = {
   digestFrequency?: DigestFrequency;
   /** Weekly only: day to send on, 0 = Sunday … 6 = Saturday (UTC). */
   digestWeekday?: number;
+  /** Per-kind switches (2026-08-11) — absent keys fall back to
+   * DIGEST_KIND_DEFAULTS via `isDigestKindEnabled`. */
+  digestKinds?: Partial<Record<DigestKind, boolean>>;
   /** Sysadmins only: email when any new forum is created. */
   newForumEmails?: boolean;
 };
+
+/** Whether one activity kind belongs in this user's digest. */
+export function isDigestKindEnabled(
+  settings: NotificationSettings,
+  kind: DigestKind,
+): boolean {
+  return settings.digestKinds?.[kind] ?? DIGEST_KIND_DEFAULTS[kind];
+}
 
 /** Whether this user (or a forum's defaults) opt into digest emails. An
  * explicit `digestEnabled` wins; otherwise any legacy per-section flag
