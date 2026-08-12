@@ -1413,7 +1413,9 @@ optgroup {
 }
 .replies {
   margin-top: 10px;
-  padding-left: 14px;
+  /* Threads now nest to 8 fetched levels (was 3) — a shallow 6px step
+     (8px with the rule) keeps deep dialogues on-screen on mobile. */
+  padding-left: 6px;
   border-left: 2px solid var(--line);
   display: flex;
   flex-direction: column;

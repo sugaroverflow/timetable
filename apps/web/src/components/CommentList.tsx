@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import type { FeedComment } from "@/lib/feedTypes";
+import { COMMENT_TREE_DEPTH } from "@/lib/gqlFragments";
 import type { RoleLabels } from "@/lib/timetableSettings";
 
 import { Avatar } from "./Avatar";
@@ -101,6 +102,31 @@ function CommentBubble({
   );
 }
 
+/** The comment's author avatar — clicks through to the author's page like
+ * the name (mobile+links pass 2026-08-03); tombstones have no author. */
+function CommentAvatar({
+  comment,
+  slug,
+}: {
+  comment: FeedComment;
+  slug?: string;
+}) {
+  if (slug && !comment.deleted) {
+    return (
+      <PersonChip slug={slug} userId={comment.authorId}>
+        <Avatar name={comment.authorName} image={comment.authorImage} small />
+      </PersonChip>
+    );
+  }
+  return (
+    <Avatar
+      name={comment.deleted ? null : comment.authorName}
+      image={comment.authorImage}
+      small
+    />
+  );
+}
+
 function CommentItem({
   comment,
   canReply,
@@ -108,6 +134,7 @@ function CommentItem({
   viewerId,
   slug,
   roleLabels,
+  depth,
 }: {
   comment: FeedComment;
   canReply: boolean;
@@ -115,6 +142,8 @@ function CommentItem({
   viewerId: string | null;
   slug?: string;
   roleLabels?: RoleLabels;
+  /** 1-based nesting level, counted from the thread roots. */
+  depth: number;
 }) {
   const replies = comment.replies ?? [];
   const searchParams = useSearchParams();
@@ -130,19 +159,7 @@ function CommentItem({
       id={`comment-${comment.id}`}
       className={`comment ${comment.hidden ? "hidden" : ""}`}
     >
-      {/* The avatar clicks through to the author's page, like the name
-          (mobile+links pass 2026-08-03); tombstones have no author. */}
-      {slug && !comment.deleted ? (
-        <PersonChip slug={slug} userId={comment.authorId}>
-          <Avatar name={comment.authorName} image={comment.authorImage} small />
-        </PersonChip>
-      ) : (
-        <Avatar
-          name={comment.deleted ? null : comment.authorName}
-          image={comment.authorImage}
-          small
-        />
-      )}
+      <CommentAvatar comment={comment} slug={slug} />
       <div className="comment-main">
         {comment.deleted ? (
           // Author-deleted tombstone: only present at all because replies
@@ -164,7 +181,10 @@ function CommentItem({
         {comment.deleted ? null : (
           <CommentActions
             commentId={comment.id}
-            canReply={canReply}
+            // reply-depth-guard: queries fetch COMMENT_TREE_DEPTH levels, so
+            // a reply below the deepest one would save but never render —
+            // don't offer it (deep-thread QA, 2026-08-12).
+            canReply={canReply && depth < COMMENT_TREE_DEPTH}
             canModerate={canModerate}
             hidden={comment.hidden}
             isOwn={isOwn}
@@ -183,6 +203,7 @@ function CommentItem({
                   viewerId={viewerId}
                   slug={slug}
                   roleLabels={roleLabels}
+                  depth={depth + 1}
                 />
               ))}
             </div>
@@ -244,6 +265,7 @@ export function CommentList({
           viewerId={viewerId}
           slug={slug}
           roleLabels={roleLabels}
+          depth={1}
         />
       ))}
       {hiddenCount > 0 ? (

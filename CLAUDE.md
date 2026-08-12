@@ -102,6 +102,18 @@ Lint covers everything: `apps/web` has its own Next config; the root
 - Per-timetable permissions: check `packages/shared/src/permissions.ts`
   (`canModerate`, `canManageMembers`, …) — don't test roles ad hoc.
 
+## Part names (glossary)
+
+Stable names for feature pieces, so instructions can reference them precisely.
+
+- **comment-tree-fragment** — `commentTree()` in `apps/web/src/lib/gqlFragments.ts`:
+  generates every thread query's nested reply selection to `COMMENT_TREE_DEPTH`
+  levels. Deeper comments exist server-side but are never fetched.
+- **reply-depth-guard** — in `CommentList.tsx`: withholds the Reply button at
+  the deepest fetched level so nobody can post a reply the page can't show.
+- **reply-indent** — `.replies` in `globals.css`: the per-level thread indent
+  (6px + 2px rule).
+
 ## Gotchas (learned the hard way)
 
 - Postgres `ALTER TYPE … ADD VALUE` can't run inside a transaction — Drizzle
