@@ -29,7 +29,7 @@ export function commentTree(field = "comments"): string {
  * fetches it lazily on first expand (it costs ~4 queries per topic). */
 export const TOPIC_FEED_FIELDS = `
   id timetableId: forumId hostId hostName hostImage hostSlug title slug bodyMd bodyHtml coverImageUrl status
-  heartCount weightedScore viewerHasHearted commentCount
+  heartCount weightedScore viewerHasHearted commentCount viewerCommentsSeenAt
   viewerHasHostHearted hostHearters { userId name image slug }
   publishedAt createdAt
   ${commentTree()}

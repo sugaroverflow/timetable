@@ -150,6 +150,13 @@ const TopicType = builder.objectRef<GqlTopic>("Topic").implement({
     commentCount: t.int({
       resolve: (tp) => (tp.canSeeComments ? tp.commentCount : 0),
     }),
+    /** The viewer's comments-seen watermark for this topic — set on
+     * engagement (teaser expand / permalink view), drives the teaser's
+     * "new" previews. Null = never engaged (or signed out). */
+    viewerCommentsSeenAt: t.string({
+      nullable: true,
+      resolve: (tp) => tp.viewerCommentsSeenAt?.toISOString() ?? null,
+    }),
     publishedAt: t.string({
       nullable: true,
       resolve: (tp) => tp.publishedAt?.toISOString() ?? null,
@@ -560,6 +567,7 @@ builder.queryFields((t) => ({
         viewerHasHearted: false,
         commentCount: 0,
         latestCommentAt: null,
+        viewerCommentsSeenAt: null,
         canSeeHostOnly: hostOnly,
         canModerate: moderate,
         canSeeComments: seeComments,

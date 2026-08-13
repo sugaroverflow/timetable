@@ -145,6 +145,28 @@ export const topicSeen = pgTable(
   ],
 );
 
+/** Per-(user, topic) comments-seen watermark (dialogue-first threading,
+ * 2026-08-13): bumped when the viewer ENGAGES with a topic's discussion —
+ * expands the card's comment teaser or opens the permalink — never by
+ * merely loading a feed page (that blanket signal is the membership's
+ * lastSeenFeedAt). Drives the teaser's "new" comment previews. */
+export const commentSeen = pgTable(
+  "comment_seen",
+  {
+    topicId: uuid()
+      .notNull()
+      .references(() => topics.id, { onDelete: "cascade" }),
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    seenAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("comment_seen_topic_user_uq").on(t.topicId, t.userId),
+    index("comment_seen_user_idx").on(t.userId),
+  ],
+);
+
 export const comments = pgTable(
   "comments",
   {

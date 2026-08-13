@@ -8,6 +8,8 @@ import {
   getTopicById,
   getUserById,
   getViewerRoles,
+  markCommentsSeen,
+  markDigestRead,
   setCommentHidden,
   softDeleteComment,
   updateCommentBody,
@@ -147,6 +149,31 @@ builder.mutationFields((t) => ({
       await assertActionLimit(user.id, "comment");
       const reply = await addReply(parent, user.id, body);
       return commentNode(reply, topic.timetableId);
+    },
+  }),
+
+  /** Bumps the viewer's per-topic comments-seen watermark (dialogue-first
+   * threading, 2026-08-13) — fired on teaser expand and permalink view.
+   * Any viewer who can load the topic may mark it; the write is
+   * self-scoped. */
+  markCommentsSeen: t.boolean({
+    args: { topicId: t.arg.string({ required: true }) },
+    resolve: async (_p, args, ctx) => {
+      const user = await requireUser(ctx);
+      const { topic } = await loadTopicAndViewer(ctx, args.topicId);
+      await markCommentsSeen(user.id, topic.id);
+      return true;
+    },
+  }),
+
+  /** A digest link was clicked (`?dg=` param): that email is read, so
+   * every comment thread it showed becomes seen up to its send time.
+   * Self-scoped — the send row must belong to the viewer. */
+  markDigestRead: t.boolean({
+    args: { sendId: t.arg.string({ required: true }) },
+    resolve: async (_p, args, ctx) => {
+      const user = await requireUser(ctx);
+      return markDigestRead(user.id, args.sendId);
     },
   }),
 

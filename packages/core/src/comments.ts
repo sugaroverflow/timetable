@@ -5,6 +5,7 @@ import { parseMentionHandles } from "@timetable/shared";
 import {
   commentMentions,
   comments,
+  commentSeen,
   db,
   timetableMemberships,
   topics,
@@ -79,6 +80,22 @@ async function logCommentActivity(
       commentId: comment.id,
     },
   });
+}
+
+/** Bump the viewer's comments-seen watermark for one topic (dialogue-first
+ * threading, 2026-08-13). Called on ENGAGEMENT — teaser expand or permalink
+ * view — never on feed scrolling. */
+export async function markCommentsSeen(
+  userId: string,
+  topicId: string,
+): Promise<void> {
+  await db
+    .insert(commentSeen)
+    .values({ topicId, userId })
+    .onConflictDoUpdate({
+      target: [commentSeen.topicId, commentSeen.userId],
+      set: { seenAt: new Date() },
+    });
 }
 
 export async function getCommentById(id: string): Promise<Comment | null> {

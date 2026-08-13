@@ -145,6 +145,27 @@ export const timetableInvites = pgTable(
   ],
 );
 
+/** One row per digest email sent (2026-08-13): every app link in that
+ * email carries `dg=<id>`, so ANY click proves the email was read — the
+ * app then marks the digest's shown comment threads (`commentTopicIds`)
+ * seen up to `sentAt`. Doubles as a send log. */
+export const digestSends = pgTable(
+  "digest_sends",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    timetableId: uuid()
+      .notNull()
+      .references(() => timetables.id, { onDelete: "cascade" }),
+    /** Topics whose card showed comment/reply threads in this email. */
+    commentTopicIds: jsonb().$type<string[]>().notNull().default([]),
+    sentAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("digest_sends_user_idx").on(t.userId)],
+);
+
 export const usersRelations = relations(users, ({ many }) => ({
   memberships: many(timetableMemberships),
   ownedTimetables: many(timetables),

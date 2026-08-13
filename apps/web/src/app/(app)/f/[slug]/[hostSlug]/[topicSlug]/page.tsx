@@ -6,6 +6,7 @@ import { isHostCommentsEnabled, type Role } from "@timetable/shared";
 import { anonGql } from "@/lib/ogCard";
 
 import { AdminCommentsPanel } from "@/components/AdminCommentsPanel";
+import { MarkCommentsSeen } from "@/components/MarkCommentsSeen";
 import { TopicCard } from "@/components/TopicCard";
 import { topicPerms } from "@/lib/feedPage";
 import type { FeedTopic } from "@/lib/feedTypes";
@@ -148,6 +149,7 @@ export default async function TopicPermalinkPage({
     // topic-permalink: here the topic title IS the page title, so it
     // renders at tier 1 (QA 2026-07-28) — see globals.css.
     <div className="stack topic-permalink">
+      {viewerId ? <MarkCommentsSeen topicId={topic.id} /> : null}
       <StatusBar status={topic.status} />
       <TopicCard
         topic={topic}

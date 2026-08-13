@@ -246,6 +246,20 @@
       "when": 1786468552596,
       "tag": "0034_harsh_beyonder",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1786638267589,
+      "tag": "0035_bored_gunslinger",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1786638890052,
+      "tag": "0036_daffy_wind_dancer",
+      "breakpoints": true
     }
   ]
 }

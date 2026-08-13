@@ -67,6 +67,23 @@ const linked = (label: string, path: string | null): string =>
     ? `<a href="${esc(`${linkBase}${path}`)}">${esc(label)}</a>`
     : esc(label);
 
+/** Stamp every app link in a rendered digest with its send row's id
+ * (`dg=<id>`), so ANY click marks that digest read — the comment threads
+ * it showed become seen (2026-08-13). Must run BEFORE
+ * wrapLinksWithSignInTicket so the param rides inside redirect_url. */
+export function stampDigestLinks(html: string, sendId: string): string {
+  return html.replace(/href="([^"]*)"/g, (full, raw: string) => {
+    const url = raw.replace(/&amp;/g, "&");
+    if (url !== linkBase && !url.startsWith(`${linkBase}/`)) return full;
+    const [base, fragment] = url.split("#", 2);
+    const sep = base!.includes("?") ? "&" : "?";
+    const stamped = `${base}${sep}dg=${encodeURIComponent(sendId)}${
+      fragment ? `#${fragment}` : ""
+    }`;
+    return `href="${esc(stamped)}"`;
+  });
+}
+
 /** Rewrite every app link in a rendered email to hop through /sign-in with
  * a single-use Clerk ticket, so ANY link signs the recipient in (issue
  * #230). The ticket is single-use but one per email is enough: the first

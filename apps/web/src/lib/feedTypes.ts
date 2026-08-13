@@ -68,6 +68,9 @@ export type FeedTopic = {
    * thread is off (💙s are then admin-analysis bookmarks). */
   hostHearters: HostHearter[] | null;
   commentCount: number;
+  /** The viewer's per-topic comments-seen watermark (teaser "new"
+   * previews) — null when they never engaged with this discussion. */
+  viewerCommentsSeenAt: string | null;
   publishedAt: string | null;
   contentUpdatedAt: string | null;
   createdAt: string;

@@ -1,7 +1,9 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import Link from "next/link";
+import { Suspense } from "react";
 
 import { AccountMenu } from "@/components/AccountMenu";
+import { DigestReadMarker } from "@/components/DigestReadMarker";
 import { TopbarBrand, type BrandItem } from "@/components/TopbarBrand";
 import { TopbarHamburger } from "@/components/TopbarHamburger";
 import { TopbarHeightSync } from "@/components/TopbarHeightSync";
@@ -38,6 +40,13 @@ export default async function AppLayout({
 
   return (
     <ToastProvider>
+      {/* Digest links land on arbitrary app pages — watch them all for
+          the ?dg= read-marker (Suspense: useSearchParams). */}
+      {userId ? (
+        <Suspense>
+          <DigestReadMarker />
+        </Suspense>
+      ) : null}
       <header className="topbar">
         <TopbarHeightSync />
         <TopbarHamburger />

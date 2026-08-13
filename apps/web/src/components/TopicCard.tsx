@@ -174,17 +174,17 @@ function ActionsSlot({
 }
 
 /** The public discussion (dialogue-first threading, 2026-08-13): the
- * top-composer starts a new strand above the stack; chains render newest
- * first, each ending in its tail composer. Feed and queue cards collapse
- * the whole section behind the comment-teaser; the permalink page keeps
- * it open. */
+ * top-composer starts a new strand and is ALWAYS visible; chains render
+ * newest first, each ending in its tail composer. Feed and queue cards
+ * collapse the tree below the composer behind the comment-teaser (new
+ * top-level previews + a "💬 n comments" pill); the permalink page keeps
+ * everything open. */
 function CommentSection({
   topic,
   perms,
   slug,
   publicComments,
   open,
-  lastSeenAt,
   viewerId,
   roleLabels,
 }: {
@@ -193,34 +193,37 @@ function CommentSection({
   slug: string;
   publicComments: FeedTopic["comments"];
   open: boolean;
-  lastSeenAt: string | null;
   viewerId: string | null;
   roleLabels: RoleLabels;
 }) {
+  if (!perms.canComment && publicComments.length === 0) return null;
   const thread = (
-    <>
+    <CommentList
+      comments={publicComments}
+      canReply={perms.canComment}
+      canModerate={perms.canModerate}
+      viewerId={viewerId}
+      slug={slug}
+      roleLabels={roleLabels}
+    />
+  );
+  return (
+    <div className="comment-section">
       {perms.canComment ? (
         <CommentComposer topicId={topic.id} mentionSlug={slug} />
       ) : null}
-      <CommentList
-        comments={publicComments}
-        canReply={perms.canComment}
-        canModerate={perms.canModerate}
-        viewerId={viewerId}
-        slug={slug}
-        roleLabels={roleLabels}
-      />
-    </>
-  );
-  if (open) return <div className="comment-section">{thread}</div>;
-  return (
-    <CommentTeaser
-      comments={publicComments}
-      lastSeenAt={lastSeenAt}
-      canComment={perms.canComment}
-    >
-      {thread}
-    </CommentTeaser>
+      {open ? (
+        thread
+      ) : (
+        <CommentTeaser
+          topicId={topic.id}
+          comments={publicComments}
+          seenAt={topic.viewerCommentsSeenAt}
+        >
+          {thread}
+        </CommentTeaser>
+      )}
+    </div>
   );
 }
 
@@ -292,7 +295,6 @@ export function TopicCard({
   expandBody = false,
   queueControls = null,
   discussionOpen = false,
-  lastSeenAt = null,
 }: {
   topic: FeedTopic;
   perms: FeedPerms;
@@ -316,8 +318,6 @@ export function TopicCard({
   /** Permalink page: the discussion renders fully open instead of behind
    * the comment-teaser (dialogue-first threading, 2026-08-13). */
   discussionOpen?: boolean;
-  /** The viewer's feed watermark — the teaser's "new" boundary. */
-  lastSeenAt?: string | null;
 }) {
   const publicComments = topic.comments.filter(
     (c) => c.visibility !== "host_only",
@@ -374,7 +374,6 @@ export function TopicCard({
           slug={slug}
           publicComments={publicComments}
           open={discussionOpen}
-          lastSeenAt={lastSeenAt}
           viewerId={viewerId}
           roleLabels={roleLabels}
         />

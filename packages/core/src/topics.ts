@@ -2,6 +2,7 @@ import { and, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 
 import {
   comments,
+  commentSeen,
   db,
   hearts,
   hostHearts,
@@ -421,6 +422,9 @@ export type FeedTopic = {
   viewerHasHearted: boolean;
   commentCount: number;
   latestCommentAt: Date | null;
+  /** The viewer's comments-seen watermark for this topic (teaser "new"
+   * previews) — null when they never engaged with the discussion. */
+  viewerCommentsSeenAt: Date | null;
 };
 
 /** Deterministic per-seed rank for random sort — stable within a seed so
@@ -570,6 +574,27 @@ async function loadCommentStats(
   return commentStats;
 }
 
+/** The viewer's per-topic comments-seen watermarks, batch-loaded for a
+ * feed page. Empty for signed-out viewers. */
+async function loadCommentsSeen(
+  viewerUserId: string | null,
+  topicIds: string[],
+): Promise<Map<string, Date>> {
+  const seen = new Map<string, Date>();
+  if (!viewerUserId || topicIds.length === 0) return seen;
+  const rows = await db
+    .select({ topicId: commentSeen.topicId, seenAt: commentSeen.seenAt })
+    .from(commentSeen)
+    .where(
+      and(
+        eq(commentSeen.userId, viewerUserId),
+        inArray(commentSeen.topicId, topicIds),
+      ),
+    );
+  for (const r of rows) seen.set(r.topicId, r.seenAt);
+  return seen;
+}
+
 function toFeedTopic(
   row: {
     topic: Topic;
@@ -581,6 +606,7 @@ function toFeedTopic(
     heartsByTopic: Map<string, string[]>;
     heartCounts: Map<string, number>;
     commentStats: Map<string, CommentStat>;
+    commentsSeen: Map<string, Date>;
     viewerUserId: string | null;
   },
 ): FeedTopic {
@@ -613,6 +639,7 @@ function toFeedTopic(
       : false,
     commentCount: ctx.commentStats.get(topic.id)?.count ?? 0,
     latestCommentAt: ctx.commentStats.get(topic.id)?.latestCommentAt ?? null,
+    viewerCommentsSeenAt: ctx.commentsSeen.get(topic.id) ?? null,
   };
 }
 
@@ -667,13 +694,18 @@ export async function buildFeed(
   const heartsByTopic = groupHeartsByTopic(heartRows);
 
   const rows = await loadDisplayedTopicRows(timetableId, opts);
-  const commentStats = await loadCommentStats(rows.map((r) => r.topic.id));
+  const topicIds = rows.map((r) => r.topic.id);
+  const [commentStats, commentsSeen] = await Promise.all([
+    loadCommentStats(topicIds),
+    loadCommentsSeen(viewerUserId, topicIds),
+  ]);
 
   const feed = rows.map((row) =>
     toFeedTopic(row, {
       heartsByTopic,
       heartCounts,
       commentStats,
+      commentsSeen,
       viewerUserId,
     }),
   );
