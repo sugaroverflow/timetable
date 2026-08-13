@@ -185,7 +185,6 @@ function CommentSection({
   slug,
   publicComments,
   open,
-  lastSeenAt,
   viewerId,
   roleLabels,
 }: {
@@ -194,7 +193,6 @@ function CommentSection({
   slug: string;
   publicComments: FeedTopic["comments"];
   open: boolean;
-  lastSeenAt: string | null;
   viewerId: string | null;
   roleLabels: RoleLabels;
 }) {
@@ -217,7 +215,11 @@ function CommentSection({
       {open ? (
         thread
       ) : (
-        <CommentTeaser comments={publicComments} lastSeenAt={lastSeenAt}>
+        <CommentTeaser
+          topicId={topic.id}
+          comments={publicComments}
+          seenAt={topic.viewerCommentsSeenAt}
+        >
           {thread}
         </CommentTeaser>
       )}
@@ -293,7 +295,6 @@ export function TopicCard({
   expandBody = false,
   queueControls = null,
   discussionOpen = false,
-  lastSeenAt = null,
 }: {
   topic: FeedTopic;
   perms: FeedPerms;
@@ -317,8 +318,6 @@ export function TopicCard({
   /** Permalink page: the discussion renders fully open instead of behind
    * the comment-teaser (dialogue-first threading, 2026-08-13). */
   discussionOpen?: boolean;
-  /** The viewer's feed watermark — the teaser's "new" boundary. */
-  lastSeenAt?: string | null;
 }) {
   const publicComments = topic.comments.filter(
     (c) => c.visibility !== "host_only",
@@ -375,7 +374,6 @@ export function TopicCard({
           slug={slug}
           publicComments={publicComments}
           open={discussionOpen}
-          lastSeenAt={lastSeenAt}
           viewerId={viewerId}
           roleLabels={roleLabels}
         />

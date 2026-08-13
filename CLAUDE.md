@@ -120,8 +120,12 @@ Stable names for feature pieces, so instructions can reference them precisely.
   becomes a child of the chain's parent comment, Slack-style), so chains
   never deepen; `?reply=` deep links focus it.
 - **comment-teaser** — `CommentTeaser.tsx`: feed/queue cards' collapsed
-  discussion (latest comment + "x new comments"), unfolds inline; the
-  permalink page passes `discussionOpen` and skips it.
+  discussion under the always-visible composer — previews new top-level
+  comments (vs the per-topic `comment_seen` watermark, padded to the three
+  latest) + a "💬 n comments" pill that reveals the tree; the permalink
+  page passes `discussionOpen` and skips it. "Seen" = engagement only
+  (teaser expand / permalink visit via `markCommentsSeen`), never feed
+  scrolling.
 - **chain-reply digests** — `loadChainScope` in `packages/core/src/digests.ts`:
   the `replies` digest kind covers new comments in chains the recipient is
   part of, batched per chain by the email's thread merge.

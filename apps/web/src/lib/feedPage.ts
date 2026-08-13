@@ -131,7 +131,6 @@ export function topicCardProps(page: FeedPage, topic: FeedTopic) {
     viewerHeartCount: page.viewerHeartCount,
     hosts: page.hosts,
     hostCommentsEnabled: isHostCommentsEnabled(page.settings),
-    lastSeenAt: page.lastSeenAt,
   };
 }
 

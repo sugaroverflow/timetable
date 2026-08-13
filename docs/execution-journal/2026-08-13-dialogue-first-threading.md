@@ -36,6 +36,19 @@ deliberate gesture.
   into one notification for free. Followed-comments and mentions exclude
   the chain scope so nothing lands twice.
 
+## Round 3 (same day): engagement-based comments-seen
+
+Ed rejected the feed-wide watermark for teaser newness ("one feed visit
+marks hundreds of topics read?"). New `comment_seen` table (migration
+0035, per-(user, topic) `seenAt`, mirrors `topic_seen`): bumped ONLY on
+engagement — teaser expand (incl. ?reply auto-open) or permalink visit
+(`MarkCommentsSeen`) — never by loading a feed page. `markCommentsSeen`
+mutation (self-scoped, any viewer who can load the topic);
+`Topic.viewerCommentsSeenAt` rides the feed via a batch loader in
+`buildFeed`. Teaser previews every new-since-engagement top-level comment,
+padded to at least the three latest. Scroll-into-view tracking (Ed:
+"ideal but can live without it") deliberately skipped.
+
 ## Notes
 
 - CommentActions lost its `?reply=` deep-link auto-open (tails own it now).
