@@ -174,10 +174,11 @@ function ActionsSlot({
 }
 
 /** The public discussion (dialogue-first threading, 2026-08-13): the
- * top-composer starts a new strand above the stack; chains render newest
- * first, each ending in its tail composer. Feed and queue cards collapse
- * the whole section behind the comment-teaser; the permalink page keeps
- * it open. */
+ * top-composer starts a new strand and is ALWAYS visible; chains render
+ * newest first, each ending in its tail composer. Feed and queue cards
+ * collapse the tree below the composer behind the comment-teaser (new
+ * top-level previews + a "💬 n comments" pill); the permalink page keeps
+ * everything open. */
 function CommentSection({
   topic,
   perms,
@@ -197,30 +198,30 @@ function CommentSection({
   viewerId: string | null;
   roleLabels: RoleLabels;
 }) {
+  if (!perms.canComment && publicComments.length === 0) return null;
   const thread = (
-    <>
+    <CommentList
+      comments={publicComments}
+      canReply={perms.canComment}
+      canModerate={perms.canModerate}
+      viewerId={viewerId}
+      slug={slug}
+      roleLabels={roleLabels}
+    />
+  );
+  return (
+    <div className="comment-section">
       {perms.canComment ? (
         <CommentComposer topicId={topic.id} mentionSlug={slug} />
       ) : null}
-      <CommentList
-        comments={publicComments}
-        canReply={perms.canComment}
-        canModerate={perms.canModerate}
-        viewerId={viewerId}
-        slug={slug}
-        roleLabels={roleLabels}
-      />
-    </>
-  );
-  if (open) return <div className="comment-section">{thread}</div>;
-  return (
-    <CommentTeaser
-      comments={publicComments}
-      lastSeenAt={lastSeenAt}
-      canComment={perms.canComment}
-    >
-      {thread}
-    </CommentTeaser>
+      {open ? (
+        thread
+      ) : (
+        <CommentTeaser comments={publicComments} lastSeenAt={lastSeenAt}>
+          {thread}
+        </CommentTeaser>
+      )}
+    </div>
   );
 }
 

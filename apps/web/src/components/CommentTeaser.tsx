@@ -1,7 +1,5 @@
 "use client";
 
-import { Collapsible } from "@base-ui/react/collapsible";
-import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 
@@ -9,16 +7,6 @@ import type { FeedComment } from "@/lib/feedTypes";
 
 function countNested(comments: FeedComment[]): number {
   return comments.reduce((sum, c) => sum + 1 + countNested(c.replies ?? []), 0);
-}
-
-function countNew(comments: FeedComment[], seen: number): number {
-  return comments.reduce(
-    (sum, c) =>
-      sum +
-      (Date.parse(c.createdAt) > seen ? 1 : 0) +
-      countNew(c.replies ?? [], seen),
-    0,
-  );
 }
 
 /** True when the deep-linked comment lives in this tree — the teaser
@@ -34,42 +22,47 @@ function snippet(body: string, max = 90): string {
   return text.length > max ? `${text.slice(0, max)}…` : text;
 }
 
-/** The toggle's count text: new-since-last-visit when there is anything
- * new, total otherwise, an invitation when the thread is empty. */
-function teaserLabel(total: number, fresh: number): string {
-  if (total === 0) return "Add a comment…";
-  if (fresh > 0) return `${fresh} new ${fresh === 1 ? "comment" : "comments"}`;
-  return `${total} ${total === 1 ? "comment" : "comments"}`;
-}
-
-/** The collapsed state's latest-comment line. */
-function TeaserSnippet({ latest }: { latest: FeedComment | null }) {
-  if (!latest || latest.deleted) return null;
+/** One new top-level comment's preview line: "name: comment (x replies)".
+ * Clicking it opens the tree, like the pill. */
+function TeaserLine({
+  comment,
+  onOpen,
+}: {
+  comment: FeedComment;
+  onOpen(): void;
+}) {
+  const replyCount = countNested(comment.replies ?? []);
   return (
-    <div className="teaser-snippet faint">
-      <strong>{latest.authorName ?? "Someone"}</strong>: {snippet(latest.body)}
-    </div>
+    <button type="button" className="teaser-snippet" onClick={onOpen}>
+      <strong>{comment.authorName ?? "Someone"}</strong>:{" "}
+      {snippet(comment.body)}
+      {replyCount > 0 ? (
+        <span className="faint">
+          {" "}
+          ({replyCount} {replyCount === 1 ? "reply" : "replies"})
+        </span>
+      ) : null}
+    </button>
   );
 }
 
 /**
- * The comment-teaser (dialogue-first threading, 2026-08-13): feed cards
- * collapse their discussion to the latest top-level comment plus a
- * new-comment count; clicking unfolds the full thread + composers in
- * place. The permalink page skips this and renders everything open.
- * Children are the server-rendered composer + CommentList.
+ * The comment-teaser (dialogue-first threading, round 2 2026-08-13): feed
+ * and queue cards keep the top-composer always visible (the parent renders
+ * it above); below it the teaser shows one preview line per NEW top-level
+ * comment (vs the viewer's feed watermark) and a "💬 n comments" pill.
+ * Clicking either reveals the whole tree in place — one-way; the pill and
+ * previews disappear. The permalink page skips the teaser entirely.
  */
 export function CommentTeaser({
   comments,
   lastSeenAt,
-  canComment,
   children,
 }: {
   comments: FeedComment[];
   /** The viewer's feed watermark — "new" means newer than this. */
   lastSeenAt: string | null;
-  /** Shows an "Add a comment…" invitation when the thread is empty. */
-  canComment: boolean;
+  /** The full server-rendered CommentList. */
   children: React.ReactNode;
 }) {
   const searchParams = useSearchParams();
@@ -77,31 +70,27 @@ export function CommentTeaser({
     treeContains(comments, searchParams.get("reply")),
   );
   const total = countNested(comments);
-  if (total === 0 && !canComment) return null;
+  if (total === 0) return null;
+  if (open) return <>{children}</>;
 
-  const fresh = lastSeenAt ? countNew(comments, Date.parse(lastSeenAt)) : 0;
+  const seen = lastSeenAt ? Date.parse(lastSeenAt) : null;
+  const freshRoots =
+    seen == null
+      ? []
+      : comments.filter((c) => !c.deleted && Date.parse(c.createdAt) > seen);
 
   return (
-    <Collapsible.Root
-      className="comments-fold"
-      open={open}
-      onOpenChange={setOpen}
-    >
-      <Collapsible.Trigger className="comments-fold-toggle">
-        {open ? (
-          <ChevronDown size={14} aria-hidden />
-        ) : (
-          <ChevronRight size={14} aria-hidden />
-        )}{" "}
-        💬{" "}
-        <span className={fresh > 0 ? "teaser-count-new" : ""}>
-          {teaserLabel(total, fresh)}
-        </span>
-      </Collapsible.Trigger>
-      {!open ? <TeaserSnippet latest={comments[0] ?? null} /> : null}
-      <Collapsible.Panel>
-        {open ? <div className="thread-stack">{children}</div> : null}
-      </Collapsible.Panel>
-    </Collapsible.Root>
+    <div className="comment-teaser">
+      {freshRoots.map((c) => (
+        <TeaserLine key={c.id} comment={c} onOpen={() => setOpen(true)} />
+      ))}
+      <button
+        type="button"
+        className="teaser-toggle"
+        onClick={() => setOpen(true)}
+      >
+        💬 {total} {total === 1 ? "comment" : "comments"}
+      </button>
+    </div>
   );
 }
