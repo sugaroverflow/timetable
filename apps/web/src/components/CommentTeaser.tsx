@@ -74,14 +74,19 @@ export function CommentTeaser({
   if (open) return <>{children}</>;
 
   const seen = lastSeenAt ? Date.parse(lastSeenAt) : null;
-  const freshRoots =
+  const roots = comments.filter((c) => !c.deleted);
+  const freshCount =
     seen == null
-      ? []
-      : comments.filter((c) => !c.deleted && Date.parse(c.createdAt) > seen);
+      ? 0
+      : roots.filter((c) => Date.parse(c.createdAt) > seen).length;
+  // Every new top-level comment previews, padded to at least the three
+  // latest (roots arrive newest-first, so new roots are the prefix and
+  // padding is just a wider slice).
+  const preview = roots.slice(0, Math.max(freshCount, 3));
 
   return (
     <div className="comment-teaser">
-      {freshRoots.map((c) => (
+      {preview.map((c) => (
         <TeaserLine key={c.id} comment={c} onOpen={() => setOpen(true)} />
       ))}
       <button
