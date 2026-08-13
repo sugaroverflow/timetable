@@ -181,62 +181,27 @@ function calendarNavVisible(
   return isAdmin(roles) || hasSlots;
 }
 
-function NotificationsNavLink({
-  base,
-  unread,
+/** A nav link with a count badge — hidden at zero, clamped at 999+.
+ * `quiet` = the grey variant (the Topic Queue for non-electors: they
+ * don't get in trouble for not doing the reading; red means the reading
+ * is your vote). */
+function BadgeNavLink({
+  href,
+  label,
+  count,
+  quiet = false,
 }: {
-  base: string;
-  unread: number;
+  href: string;
+  label: string;
+  count: number;
+  quiet?: boolean;
 }) {
   return (
-    <NavLink href={`${base}/notifications`}>
-      Notifications
-      {unread > 0 ? (
-        <span className="nav-badge">{unread > 999 ? "999+" : unread}</span>
-      ) : null}
-    </NavLink>
-  );
-}
-
-/** Every member (v2 2026-07-29 — hosts asked for the queue too). The
- * badge is the never-seen count (the Analysis "Queue" number), gone at
- * zero; round restarts don't revive it, moving the ❤️-count-from cutoff
- * does. Red for electors (the reading is their vote); grey for everyone
- * else — they don't get in trouble for not doing the reading. */
-function QueueNavLink({
-  base,
-  neverSeen,
-  elector,
-}: {
-  base: string;
-  neverSeen: number;
-  elector: boolean;
-}) {
-  return (
-    <NavLink href={`${base}/queue`}>
-      Topic Queue
-      {neverSeen > 0 ? (
-        <span className={`nav-badge${elector ? "" : " nav-badge-quiet"}`}>
-          {neverSeen > 999 ? "999+" : neverSeen}
-        </span>
-      ) : null}
-    </NavLink>
-  );
-}
-
-function PendingNavLink({
-  base,
-  pendingCount,
-}: {
-  base: string;
-  pendingCount: number;
-}) {
-  return (
-    <NavLink href={`${base}/pending`}>
-      Pending Topics
-      {pendingCount > 0 ? (
-        <span className="nav-badge">
-          {pendingCount > 999 ? "999+" : pendingCount}
+    <NavLink href={href}>
+      {label}
+      {count > 0 ? (
+        <span className={`nav-badge${quiet ? " nav-badge-quiet" : ""}`}>
+          {count > 999 ? "999+" : count}
         </span>
       ) : null}
     </NavLink>
@@ -303,11 +268,15 @@ function SideNav({
       <NavLink href={`${base}/topics`} whenAbsent={["hearted"]}>
         All Topics
       </NavLink>
+      {/* Every member (v2 2026-07-29). The badge is the never-seen count
+          (the Analysis "Queue" number); round restarts don't revive it,
+          moving the ❤️-count-from cutoff does. */}
       {isMember && (
-        <QueueNavLink
-          base={base}
-          neverSeen={queueNeverSeen}
-          elector={elector}
+        <BadgeNavLink
+          href={`${base}/queue`}
+          label="Topic Queue"
+          count={queueNeverSeen}
+          quiet={!elector}
         />
       )}
       {hostOrAdmin && <NavLink href={`${base}/my-topics`}>My Topics</NavLink>}
@@ -319,7 +288,13 @@ function SideNav({
       {/* Calendar v2 (closes #55): the link exists only when the forum has
           switched the feature on. */}
       {calendarOn && <NavLink href={`${base}/calendar`}>Calendar</NavLink>}
-      {isMember && <NotificationsNavLink base={base} unread={unread} />}
+      {isMember && (
+        <BadgeNavLink
+          href={`${base}/notifications`}
+          label="Notifications"
+          count={unread}
+        />
+      )}
       {/* People shows for every viewer who can read the forum — the API
           filters the list to the profiles their access allows (all members
           on public forums; hosts + admins on hosts_only ones). */}
@@ -328,7 +303,13 @@ function SideNav({
           (QA 2026-07-30). */}
       {isAuthed && <NavLink href={`${base}/profile`}>Profile</NavLink>}
       {hostOrAdmin && <NavLink href={`${base}/analysis`}>Analysis</NavLink>}
-      {admin && <PendingNavLink base={base} pendingCount={pendingCount} />}
+      {admin && (
+        <BadgeNavLink
+          href={`${base}/pending`}
+          label="Pending Topics"
+          count={pendingCount}
+        />
+      )}
       {admin && <NavLink href={`${base}/log`}>Activity Log</NavLink>}
       {admin && <NavLink href={`${base}/settings`}>Forum Settings</NavLink>}
       {isMember && <NavLink href={`${base}/api`}>API</NavLink>}

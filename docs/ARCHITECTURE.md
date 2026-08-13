@@ -116,7 +116,8 @@ Codex/agent workflows are separate from the app runtime.
   add-person card plus per-member invite state and a View as → Send invite →
   Edit profile action stack)
 - settings (timetable profile + theme sections, hearts cutoff, invites)
-- user profile (name, avatar, markdown bio, digest preferences)
+- user profile (name, avatar, markdown bio; digest preferences live on
+  each forum's Notifications page)
 - Calendar (feature-flagged per forum via
   `settings.calendar.enabled` — nav link and page exist only when on):
   month-grouped slot rows with a topic lens, per-elector avatar groups
@@ -250,7 +251,9 @@ Main mutations cover:
 - profile and notification settings; admin member-bio editing
   (`updateMemberBio`)
 - timetable profile and settings, including validated theme JSON
-- feed and notification watermarks (`markFeedSeen`, `markNotificationsSeen`)
+- seen watermarks: feed and notifications (`markFeedSeen`,
+  `markNotificationsSeen`), per-topic comments-seen on engagement
+  (`markCommentsSeen`), and digest click-to-read (`markDigestRead`)
 - slot bulk creation (`createTimeslots`, idempotent pattern×terms
   generation and one-off dates; returns `{created, augmented}` — augmented
   counts existing slots that gained locations), host off-piste proposals
@@ -318,6 +321,17 @@ Core tables:
   reconstructed across un-hearts and cutoff resets. Written by both
   toggles, read only by the admin data export)
 - `comments`
+- `comment_mentions` (@mention rows, written only for members allowed to
+  see the thread)
+- `topic_seen` (per-user queue-exposure record: queue Next or hearting;
+  suppresses new-topic digest cards)
+- `comment_seen` (per-user-per-topic comments-seen watermark, 2026-08-13:
+  bumped only on engagement — teaser expand, permalink visit, digest
+  click — drives the teaser's "new" previews and comment digest
+  suppression)
+- `digest_sends` (one row per digest email sent: which topics' cards
+  showed comment threads; every link in that email carries `dg=<id>`, so
+  any click marks the digest read. Doubles as a send log)
 - `activity_events`
 - `timeslots` (bookings model, 2026-08-06: a pure TIME WINDOW, unique per
   forum+start+end; `created_by_id`, `cell_key` — the pattern-cell
@@ -349,10 +363,13 @@ option (`hostComments.enabled`, default on — hides the host-only thread and
 `timetable_memberships.slug` power permalinks (member profiles are
 per-forum); `topics.contentUpdatedAt` tracks content edits
 for "newest" sorting; memberships carry `lastSeenFeedAt` and
-`lastSeenNotificationsAt` watermarks plus `inviteSentAt` (null = added by an
-admin but never invited). A membership with `inviteSentAt` null AND both
-seen-watermarks null is a pre-created account whose owner doesn't know the
-forum exists — the digest builder skips those forums entirely.
+`lastSeenNotificationsAt` watermarks, `inviteSentAt` (null = added by an
+admin but never invited), the per-forum `digestSettings` JSON +
+`lastDigestAt` send watermark (2026-08-11, falling back to the user-level
+equivalents), and `queueRoundStartedAt`. A membership with `inviteSentAt`
+null AND both seen-watermarks null is a pre-created account whose owner
+doesn't know the forum exists — the digest builder skips those forums
+entirely.
 
 The settings JSON shapes (`TimetableSettings`, `ThemeSettings`, role labels,
 notification defaults) live in `packages/shared/src/settings.ts` as the single
@@ -394,8 +411,8 @@ kept (empty) so Next.js serves any future static files from the site root.
   sign-ins, and settings changes; new user actions should keep logging.
 - Weighted feed and dashboard queries may need batching/materialization at
   scale; the 2026-07-22 simplify audit measured on the order of 120 DB queries
-  to render the feed page for an admin (lazy breakdown loading, batched
-  comments, and per-request memoisation are queued fixes).
+  to render the feed page for an admin. Lazy breakdown loading, batched
+  comment trees, and per-request memoisation have all since shipped.
 - Feed sorting (including seeded random) happens in the service layer after
   loading the timetable's published topics; fine at current sizes, revisit for
   very large timetables.

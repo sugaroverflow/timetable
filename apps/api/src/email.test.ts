@@ -1,12 +1,8 @@
 import { isForumDigestEmpty, type ForumDigest } from "@timetable/core";
 import { describe, expect, it } from "vitest";
 
-import {
-  linkBase,
-  renderDigest,
-  sampleDigest,
-  wrapLinksWithSignInTicket,
-} from "./email";
+import { linkBase, renderDigest, wrapLinksWithSignInTicket } from "./email";
+import { sampleDigest } from "./email-sample";
 
 const SAMPLE = sampleDigest({
   email: "admin@example.com",

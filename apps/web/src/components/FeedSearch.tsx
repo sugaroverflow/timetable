@@ -23,7 +23,7 @@ export function FeedSearch({ value }: { value: string }) {
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
       timer.current = null;
-      setParam("q", next.trim(), { resetPage: true, replace: true });
+      setParam("q", next.trim(), { replace: true });
     }, 350);
   }
 

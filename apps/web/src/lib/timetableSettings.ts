@@ -1,9 +1,12 @@
-import type {
-  MembershipDigestSettings,
-  NotificationSettings,
-  RoleLabels,
-  ThemeSettings,
-  TimetableSettings,
+import {
+  BRAND_FONT_KEYS,
+  HEX_COLOUR,
+  THEME_FONT_KEYS,
+  type MembershipDigestSettings,
+  type NotificationSettings,
+  type RoleLabels,
+  type ThemeSettings,
+  type TimetableSettings,
 } from "@timetable/shared";
 
 /** Settings shapes live in @timetable/shared (single source of truth, shared
@@ -102,9 +105,11 @@ export function roleLabel(
 
 /** Curated font pairings (QA #59). Keys are persisted in settings; values
  * feed --serif (headings) and --sans (body). All stacks resolve to fonts the
- * app already loads or system fonts, so switching costs nothing. */
+ * app already loads or system fonts, so switching costs nothing. Typed
+ * against shared THEME_FONT_KEYS so a key added there without a stack here
+ * fails the build instead of falling back at runtime. */
 export const FONT_PAIRINGS: Record<
-  string,
+  (typeof THEME_FONT_KEYS)[number],
   { label: string; serif: string; sans: string }
 > = {
   default: {
@@ -163,8 +168,12 @@ export const FONT_PAIRINGS: Record<
 };
 
 /** Display faces for the forum name in the topbar (2026-07-29) — chosen
- * separately from the reading pairing; keys mirror shared BRAND_FONT_KEYS. */
-export const BRAND_FONTS: Record<string, { label: string; stack: string }> = {
+ * separately from the reading pairing; typed against shared
+ * BRAND_FONT_KEYS so the two lists can't drift. */
+export const BRAND_FONTS: Record<
+  (typeof BRAND_FONT_KEYS)[number],
+  { label: string; stack: string }
+> = {
   default: {
     label: "Poetsen One (default)",
     stack: '"Poetsen One", "Fraunces", Georgia, serif',
@@ -490,7 +499,7 @@ export const PRESET_PALETTES: Record<string, PresetPalette> = {
  * instead of invisible white. Falls back to white when `hex` isn't a clean
  * 6-digit value. */
 function readableInk(hex: string): "#ffffff" | "#1b2330" {
-  if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return "#ffffff";
+  if (!HEX_COLOUR.test(hex)) return "#ffffff";
   const n = parseInt(hex.slice(1), 16);
   const lin = (c: number) => {
     const s = c / 255;
@@ -507,7 +516,7 @@ function readableInk(hex: string): "#ffffff" | "#1b2330" {
  * `hex` is a clean 6-digit value — otherwise return it unchanged so we never
  * emit a broken colour like "var(--x)1a". */
 function withAlpha(hex: string, aa: string): string {
-  return /^#[0-9a-fA-F]{6}$/.test(hex) ? hex + aa : hex;
+  return HEX_COLOUR.test(hex) ? hex + aa : hex;
 }
 
 /** Accents carry into dark mode (with optional dark overrides): primary
@@ -548,12 +557,20 @@ function baseVars(theme: ThemeSettings, dark: boolean): Record<string, string> {
 
 function fontVars(theme: ThemeSettings): Record<string, string> {
   const vars: Record<string, string> = {};
-  const font = theme.font ? FONT_PAIRINGS[theme.font] : undefined;
+  // Stored values are validated against the shared key lists at write
+  // time (guards.ts); the membership checks here narrow the string type.
+  const font =
+    theme.font && theme.font in FONT_PAIRINGS
+      ? FONT_PAIRINGS[theme.font as keyof typeof FONT_PAIRINGS]
+      : undefined;
   if (font) {
     vars["--serif"] = font.serif;
     vars["--sans"] = font.sans;
   }
-  const brand = theme.brandFont ? BRAND_FONTS[theme.brandFont] : undefined;
+  const brand =
+    theme.brandFont && theme.brandFont in BRAND_FONTS
+      ? BRAND_FONTS[theme.brandFont as keyof typeof BRAND_FONTS]
+      : undefined;
   if (brand) vars["--brand-display"] = brand.stack;
   return vars;
 }

@@ -1,6 +1,7 @@
 import {
   isAdmin,
   isElector,
+  isFeedSort,
   isHost,
   isHostCommentsEnabled,
   type Role,
@@ -19,23 +20,13 @@ import {
 
 export const FEED_PAGE_SIZE = 20;
 
-const SORTS = new Set([
-  "raw",
-  "l2",
-  "l1",
-  "devotion",
-  "comments",
-  "created",
-  "recent",
-  "random",
-]);
-
 /** Default feed sort is Random (product feedback round 1). "hearts" is a
- * legacy alias for the L1 weighted score. */
+ * legacy alias for the L1 weighted score, rewritten before the request
+ * leaves the browser; the sort list itself is shared canon (FEED_SORTS). */
 export function normalizeFeedSort(sort: string | undefined): string {
   if (!sort) return "random";
   if (sort === "hearts") return "l1";
-  return SORTS.has(sort) ? sort : "random";
+  return isFeedSort(sort) ? sort : "random";
 }
 
 type Data = {
@@ -173,33 +164,44 @@ export async function fetchQueuePage(
   return { page, queue: data.topicQueue };
 }
 
+/** One feed request's knobs — shared by the server page, the load-more
+ * server action, and InfiniteFeed, so the nine parameters can't be
+ * hole-counted positionally (housekeeping 2026-08-13). */
+export type FeedQuery = {
+  slug: string;
+  sort: string;
+  host?: string;
+  offset?: number;
+  /** Only topics the viewer currently ❤️s. */
+  hearted?: boolean;
+  /** Shuffle seed for sort=random. */
+  seed?: string;
+  /** Only topics this user currently ❤️s (person pages). */
+  heartedBy?: string;
+  /** Only topics the viewer currently 💙s. */
+  hostHearted?: boolean;
+  /** Substring search. */
+  q?: string;
+};
+
 /**
  * One page of the topic feed plus the viewer-dependent bits needed to render
  * TopicCards. Used by the feed page (first page) and the load-more server
  * action (subsequent pages) so both stay in lockstep.
  */
-export async function fetchFeedPage(
-  slug: string,
-  sort: string,
-  host: string,
-  offset: number,
-  hearted = false,
-  seed = "",
-  heartedBy = "",
-  hostHearted = false,
-  q = "",
-): Promise<FeedPage> {
+export async function fetchFeedPage(query: FeedQuery): Promise<FeedPage> {
+  const { slug, sort } = query;
   const data = await gqlFetch<Data>(QUERY, {
     s: slug,
     sort: normalizeFeedSort(sort),
-    seed: seed || null,
-    host: host || null,
-    hearted,
-    hostHearted,
-    heartedBy: heartedBy || null,
-    q: q.trim() || null,
+    seed: query.seed || null,
+    host: query.host || null,
+    hearted: query.hearted ?? false,
+    hostHearted: query.hostHearted ?? false,
+    heartedBy: query.heartedBy || null,
+    q: query.q?.trim() || null,
     limit: FEED_PAGE_SIZE + 1,
-    offset: Math.max(0, offset),
+    offset: Math.max(0, query.offset ?? 0),
   });
   const roles = await displayRolesFromCookies(
     (data.timetable?.viewerRoles ?? []) as Role[],

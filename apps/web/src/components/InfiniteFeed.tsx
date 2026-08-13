@@ -2,16 +2,10 @@
 
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 
+import type { FeedQuery } from "@/lib/feedPage";
+
 type LoadMore = (
-  slug: string,
-  sort: string,
-  host: string,
-  offset: number,
-  hearted?: boolean,
-  seed?: string,
-  heartedBy?: string,
-  hostHearted?: boolean,
-  q?: string,
+  query: FeedQuery,
 ) => Promise<{ cards: React.ReactNode; hasNext: boolean }>;
 
 /** The scroller's tail: retry button on failure, sentinel while more
@@ -55,28 +49,15 @@ function FeedTail({
  * into view. Remount with a key when sort/host change.
  */
 export function InfiniteFeed({
-  slug,
-  sort,
-  host,
-  hearted = false,
-  seed = "",
-  heartedBy = "",
-  hostHearted = false,
-  q = "",
+  query,
   refreshToken = "",
   pageSize,
   initialHasNext,
   loadMore,
   children,
 }: {
-  slug: string;
-  sort: string;
-  host: string;
-  hearted?: boolean;
-  seed?: string;
-  heartedBy?: string;
-  hostHearted?: boolean;
-  q?: string;
+  /** The feed request all appended pages repeat (offset varies per page). */
+  query: Omit<FeedQuery, "offset">;
   /** Server-render marker: pass a fresh value on every server render so
    * appended pages can re-sync after a router.refresh() (see below). */
   refreshToken?: string;
@@ -98,17 +79,7 @@ export function InfiniteFeed({
     loadingRef.current = true;
     setFailed(false);
     try {
-      const res = await loadMore(
-        slug,
-        sort,
-        host,
-        offsetRef.current,
-        hearted,
-        seed,
-        heartedBy,
-        hostHearted,
-        q,
-      );
+      const res = await loadMore({ ...query, offset: offsetRef.current });
       offsetRef.current += pageSize;
       setPages((prev) => [...prev, res.cards]);
       setHasNext(res.hasNext);
@@ -117,18 +88,7 @@ export function InfiniteFeed({
     } finally {
       loadingRef.current = false;
     }
-  }, [
-    loadMore,
-    slug,
-    sort,
-    host,
-    hearted,
-    seed,
-    heartedBy,
-    hostHearted,
-    q,
-    pageSize,
-  ]);
+  }, [loadMore, query, pageSize]);
 
   // After a router.refresh() (an action succeeded → new server render →
   // new refreshToken), the server-rendered first page (children) is fresh
@@ -147,17 +107,7 @@ export function InfiniteFeed({
         const fresh: React.ReactNode[] = [];
         let next = true;
         for (let off = pageSize; off < offsetRef.current; off += pageSize) {
-          const res = await loadMore(
-            slug,
-            sort,
-            host,
-            off,
-            hearted,
-            seed,
-            heartedBy,
-            hostHearted,
-            q,
-          );
+          const res = await loadMore({ ...query, offset: off });
           if (cancelled) return;
           fresh.push(res.cards);
           next = res.hasNext;
@@ -173,19 +123,7 @@ export function InfiniteFeed({
     return () => {
       cancelled = true;
     };
-  }, [
-    refreshToken,
-    loadMore,
-    slug,
-    sort,
-    host,
-    hearted,
-    seed,
-    heartedBy,
-    hostHearted,
-    q,
-    pageSize,
-  ]);
+  }, [refreshToken, loadMore, query, pageSize]);
 
   useEffect(() => {
     const el = sentinelRef.current;

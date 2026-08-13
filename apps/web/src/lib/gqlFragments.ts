@@ -1,7 +1,7 @@
 /** Shared GraphQL selection fragments for the web app's queries. */
 
-export const COMMENT_FIELDS = `
-  id parentId authorId authorName authorImage authorRoles body visibility hidden deleted editedAt createdAt
+const COMMENT_FIELDS = `
+  id authorId authorName authorImage authorRoles body visibility hidden deleted editedAt createdAt
 `;
 
 /** How many comment levels every thread query selects (top level + seven
@@ -22,13 +22,20 @@ export function commentTree(field = "comments"): string {
   return `${field} { ${selection} }`;
 }
 
+/** ManagedTopic selection shared by My Topics and Pending Topics — the
+ * superset (hostName/hostImage render only on the moderation queue's
+ * cards, but sharing one fragment beats two drifting lists). */
+export const MANAGED_TOPIC_FIELDS = `
+  id title slug hostId hostSlug hostName hostImage status bodyMd bodyHtml coverImageUrl updatedAt readyAt
+`;
+
 /** Topic selection shared by the feed (feedPage.ts) and the topic permalink
  * page — everything a TopicCard renders. The feed additionally selects
  * contentUpdatedAt for its "new since last visit" highlights. The per-elector
  * weightedBreakdown is deliberately NOT selected here: BreakdownToggle
  * fetches it lazily on first expand (it costs ~4 queries per topic). */
 export const TOPIC_FEED_FIELDS = `
-  id timetableId: forumId hostId hostName hostImage hostSlug title slug bodyMd bodyHtml coverImageUrl status
+  id hostId hostName hostImage hostSlug title slug bodyMd bodyHtml coverImageUrl status
   heartCount weightedScore viewerHasHearted commentCount viewerCommentsSeenAt
   viewerHasHostHearted hostHearters { userId name image slug }
   publishedAt createdAt

@@ -9,7 +9,6 @@ export function FeedSortControl({ value }: { value: string }) {
 
   function change(next: string) {
     setParam("sort", next, {
-      resetPage: true,
       // Random sort gets a fresh shuffle seed per selection; the seed rides
       // in the URL so infinite-scroll pages stay consistent (QA #59).
       mutate: (params) => {

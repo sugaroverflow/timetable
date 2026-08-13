@@ -22,7 +22,7 @@ export function HostFilter({
     <SelectMinimal
       aria-label="Filter by host"
       value={value}
-      onChange={(e) => setParam(param, e.target.value, { resetPage: true })}
+      onChange={(e) => setParam(param, e.target.value)}
     >
       <option value="">{allLabel}</option>
       {hosts.map((h) => (

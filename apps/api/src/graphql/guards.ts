@@ -15,6 +15,7 @@ import {
   calendarSettingsSchema,
   canManageMembers,
   canModerate,
+  HEX_COLOUR,
   isAdmin,
   isHost,
   THEME_FONT_KEYS,
@@ -162,7 +163,6 @@ export function parseElectorActivityFilter(
 // web's pickers can't drift (they did: this Set used to be hand-kept).
 const THEME_FONTS = new Set<string>(THEME_FONT_KEYS);
 const BRAND_FONTS = new Set<string>(BRAND_FONT_KEYS);
-const HEX_COLOUR = /^#[0-9a-fA-F]{6}$/;
 
 /** A validated #rrggbb hex, or undefined. Shared by the themeJson parser and
  * the legacy themePrimary/themeSecondary args so no unvalidated colour is ever

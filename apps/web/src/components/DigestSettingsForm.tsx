@@ -30,8 +30,6 @@ const MUTATION = `mutation($s: String!, $e: Boolean, $f: String, $w: Int, $k: St
   )
 }`;
 
-export type { DigestSettings };
-
 const WEEKDAYS = [
   "Sunday",
   "Monday",

@@ -12,22 +12,6 @@ import { claimInvitesForUser } from "./invites";
  * core only handles the local rows.
  */
 
-export async function findUserByEmail(
-  email: string,
-): Promise<{ id: string; name: string | null } | null> {
-  const [user] = await db
-    .select({ id: users.id, name: users.name })
-    .from(users)
-    .where(eq(users.email, normalizeEmail(email)))
-    .limit(1);
-  return user ?? null;
-}
-
-/**
- * Insert the local row for a just-created Clerk user (id = Clerk user id).
- * Safe to call when the row already exists (first-request JIT creation may
- * have won a race) — the existing row wins.
- */
 /** Admin email correction (2026-07-29): sync the local mirror after the
  * Clerk-side replacement. Caller enforces the never-signed-in guard. */
 export async function updateUserEmail(
