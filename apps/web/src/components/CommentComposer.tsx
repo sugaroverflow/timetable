@@ -12,6 +12,8 @@ import {
 import { clientGql } from "@/lib/clientGraphql";
 import { useGqlAction } from "@/lib/useGqlAction";
 
+import { useCommentsOpen } from "./CommentsOpenScope";
+
 const MUTATION = `mutation AddComment($id: String!, $body: String!, $visibility: String) {
   addComment(topicId: $id, body: $body, visibility: $visibility) { id }
 }`;
@@ -61,6 +63,9 @@ export function CommentComposer({
   successMessage?: string;
 }) {
   const { run, busy } = useGqlAction();
+  // Posting unfolds the card's comment-teaser so the new comment is
+  // visible in its thread (QA 2026-08-13); no-op without a teaser.
+  const { requestOpen } = useCommentsOpen();
   const [body, setBody] = useState("");
   const mentionsEnabled = visibility === "public" && Boolean(mentionSlug);
   const [candidates, setCandidates] = useState<MentionCandidate[]>([]);
@@ -97,7 +102,10 @@ export function CommentComposer({
       {
         success: copy.success,
         errorFallback: "Could not post comment",
-        onSuccess: () => setBody(""),
+        onSuccess: () => {
+          setBody("");
+          requestOpen();
+        },
       },
     );
   }

@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { Collapsible } from "@base-ui/react/collapsible";
 import { ChevronDown, ChevronRight, Lock } from "lucide-react";
 
+import { countNested } from "@/lib/commentTree";
 import type { FeedComment, HostHearter } from "@/lib/feedTypes";
 import type { RoleLabels } from "@/lib/timetableSettings";
 
@@ -14,10 +15,6 @@ import { CommentList } from "./CommentList";
 import { FocusCommentButton } from "./FocusCommentButton";
 import { HeartButton, HeartCount } from "./HeartButton";
 import { PersonChip } from "./PersonChip";
-
-function countNested(comments: FeedComment[]): number {
-  return comments.reduce((sum, c) => sum + 1 + countNested(c.replies ?? []), 0);
-}
 
 /** The faculty actions row (host hearts, QA 2026-08-04): built from the
  * SAME pieces as the public card-actions row (HeartButton/HeartCount,

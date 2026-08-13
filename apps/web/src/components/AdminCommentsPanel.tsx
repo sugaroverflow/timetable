@@ -4,15 +4,12 @@ import { useState } from "react";
 import { Collapsible } from "@base-ui/react/collapsible";
 import { ChevronDown, ChevronRight, Shield } from "lucide-react";
 
+import { countNested } from "@/lib/commentTree";
 import type { FeedComment } from "@/lib/feedTypes";
 import { pluralLabel, type RoleLabels } from "@/lib/timetableSettings";
 
 import { CommentComposer } from "./CommentComposer";
 import { CommentList } from "./CommentList";
-
-function countNested(comments: FeedComment[]): number {
-  return comments.reduce((sum, c) => sum + 1 + countNested(c.replies ?? []), 0);
-}
 
 /** The drafting thread (QA #59 round 3), visible to admins (on Pending
  * Topics) and the topic owner (on My Topics) only — never in the feed.
