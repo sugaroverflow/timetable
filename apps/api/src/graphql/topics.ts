@@ -45,6 +45,7 @@ import {
   canSeeComments,
   canSeeHostOnly,
   isAdmin,
+  isFeedSort,
   isHostCommentsEnabled,
   ownsTopicAsHost,
   type Privacy,
@@ -374,6 +375,133 @@ async function viewerHostHeartedSet(
   return listViewerHostHeartedTopicIds(userId, topicIds);
 }
 
+/** The four per-viewer visibility flags every Topic payload carries —
+ * derived identically by the feed, permalink, and queue resolvers
+ * (housekeeping 2026-08-13: was four hand-kept copies). */
+type TopicViewFlags = {
+  canSeeHostOnly: boolean;
+  canModerate: boolean;
+  canSeeComments: boolean;
+  hostCommentsEnabled: boolean;
+};
+
+function topicViewFlags(
+  timetable: {
+    privacy: string;
+    settings: Parameters<typeof isHostCommentsEnabled>[0];
+  },
+  viewer: Viewer,
+): TopicViewFlags {
+  return {
+    canSeeHostOnly: canSeeHostOnly(viewer),
+    canModerate: canModerate(viewer),
+    canSeeComments: canSeeComments(timetable.privacy as Privacy, viewer),
+    hostCommentsEnabled: isHostCommentsEnabled(timetable.settings),
+  };
+}
+
+/** Attach the view flags, the viewer's 💙 state, and ONE batched
+ * comment-tree prefetch to a page of feed topics — the Topic.comments
+ * resolver serves the prefetch instead of querying per topic. Shared by
+ * topicFeed and the published permalink. */
+async function decorateFeedTopics(
+  feed: Awaited<ReturnType<typeof buildFeed>>,
+  viewerUserId: string | null,
+  viewer: Viewer,
+  flags: TopicViewFlags,
+) {
+  const topicIds = feed.map((tp) => tp.id);
+  const commentTrees = flags.canSeeComments
+    ? await listCommentTreesForTopics(topicIds, {
+        includeHostOnly: flags.canSeeHostOnly && flags.hostCommentsEnabled,
+        includeHidden: flags.canModerate,
+      })
+    : new Map<string, CommentNode[]>();
+  const viewerHostHearted = await viewerHostHeartedSet(
+    viewerUserId,
+    viewer,
+    topicIds,
+  );
+  return feed.map((tp) => ({
+    ...tp,
+    ...flags,
+    viewerHasHostHearted: viewerHostHearted.has(tp.id),
+    prefetchedComments: commentTrees.get(tp.id) ?? [],
+  }));
+}
+
+/** Map the topicFeed GraphQL args onto buildFeed's options (defaults
+ * applied; unknown sorts fall back to the legacy "hearts" alias). */
+function feedOptionsFromArgs(args: {
+  hostId?: string | null;
+  heartedByMe?: boolean | null;
+  hostHeartedByMe?: boolean | null;
+  heartedBy?: string | null;
+  q?: string | null;
+  sort?: string | null;
+  seed?: string | null;
+  limit?: number | null;
+  offset?: number | null;
+}) {
+  const sort: FeedSort =
+    args.sort && isFeedSort(args.sort) ? args.sort : "hearts";
+  return {
+    hostId: args.hostId ?? undefined,
+    heartedByViewer: Boolean(args.heartedByMe),
+    hostHeartedByViewer: Boolean(args.hostHeartedByMe),
+    heartedBy: args.heartedBy ?? undefined,
+    q: args.q ?? undefined,
+    sort,
+    seed: args.seed ?? undefined,
+    limit: args.limit ?? 50,
+    offset: args.offset ?? undefined,
+  };
+}
+
+/** Zeroed heart/comment fields for the unpublished-permalink shape — one
+ * literal, so a new metric column can't be forgotten in one of the two
+ * Topic constructions. */
+const EMPTY_TOPIC_METRICS = {
+  heartCount: 0,
+  weightedScore: 0,
+  l2Score: 0,
+  devotionScore: 0,
+  viewerHasHearted: false,
+  commentCount: 0,
+  latestCommentAt: null,
+  viewerCommentsSeenAt: null,
+} as const;
+
+/** The unpublished-permalink shape: owner or admin only, zeroed heart
+ * data (nothing is voted on before publication). */
+async function unpublishedPermalinkTopic(
+  topic: NonNullable<Awaited<ReturnType<typeof getTopicBySlug>>>,
+  viewerUserId: string | null,
+  flags: TopicViewFlags,
+) {
+  const isOwner = viewerUserId === topic.hostId;
+  if (!isOwner && !flags.canModerate) return null;
+  const host = await getPerson(topic.timetableId, topic.hostId);
+  return {
+    id: topic.id,
+    timetableId: topic.timetableId,
+    hostId: topic.hostId,
+    hostName: host?.name ?? null,
+    hostImage: host?.image ?? null,
+    hostSlug: host?.slug ?? null,
+    title: topic.title,
+    slug: topic.slug,
+    bodyMd: topic.bodyMd,
+    coverImageUrl: topic.coverImageUrl,
+    status: topic.status,
+    publishedAt: topic.publishedAt,
+    contentUpdatedAt: topic.contentUpdatedAt,
+    createdAt: topic.createdAt,
+    ...EMPTY_TOPIC_METRICS,
+    ...flags,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Queries
 // ---------------------------------------------------------------------------
@@ -394,74 +522,18 @@ builder.queryFields((t) => ({
       limit: t.arg.int({ required: false }),
       offset: t.arg.int({ required: false }),
     },
-    // eslint-disable-next-line complexity -- audit debt (2026-07-22): sort validation + permission flags in one pass; decomposition queued
     resolve: async (_p, args, ctx) => {
       const readable = await readTimetable(ctx, args.idOrSlug);
       if (!readable) return [];
-      const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
-      const hostOnly = canSeeHostOnly(viewer);
-      const moderate = canModerate(viewer);
-      const hostThreadOn = isHostCommentsEnabled(readable.timetable.settings);
-      const seeComments = canSeeComments(
-        readable.timetable.privacy as Privacy,
-        viewer,
-      );
-      const validSorts = new Set<FeedSort>([
-        "hearts",
-        "raw",
-        "l2",
-        "l1",
-        "devotion",
-        "comments",
-        "created",
-        "recent",
-        "random",
-      ]);
-      const sort = (
-        args.sort && validSorts.has(args.sort as FeedSort)
-          ? args.sort
-          : "hearts"
-      ) as FeedSort;
+      const viewerUserId = ctx.user?.id ?? null;
+      const viewer = { userId: viewerUserId, roles: readable.roles };
+      const flags = topicViewFlags(readable.timetable, viewer);
       const feed = await buildFeed(
         readable.timetable.id,
-        ctx.user?.id ?? null,
-        {
-          hostId: args.hostId ?? undefined,
-          heartedByViewer: Boolean(args.heartedByMe),
-          hostHeartedByViewer: Boolean(args.hostHeartedByMe),
-          heartedBy: args.heartedBy ?? undefined,
-          q: args.q ?? undefined,
-          sort,
-          seed: args.seed ?? undefined,
-          limit: args.limit ?? 50,
-          offset: args.offset ?? undefined,
-        },
+        viewerUserId,
+        feedOptionsFromArgs(args),
       );
-      // Batch the page's comment trees into one query instead of one per
-      // topic; the Topic.comments resolver serves them from the prefetch.
-      const commentTrees = seeComments
-        ? await listCommentTreesForTopics(
-            feed.map((tp) => tp.id),
-            {
-              includeHostOnly: hostOnly && hostThreadOn,
-              includeHidden: moderate,
-            },
-          )
-        : new Map<string, CommentNode[]>();
-      const viewerHostHearted = await viewerHostHeartedSet(
-        ctx.user?.id ?? null,
-        viewer,
-        feed.map((tp) => tp.id),
-      );
-      return feed.map((tp) => ({
-        ...tp,
-        canSeeHostOnly: hostOnly,
-        canModerate: moderate,
-        canSeeComments: seeComments,
-        hostCommentsEnabled: hostThreadOn,
-        viewerHasHostHearted: viewerHostHearted.has(tp.id),
-        prefetchedComments: commentTrees.get(tp.id) ?? [],
-      }));
+      return decorateFeedTopics(feed, viewerUserId, viewer, flags);
     },
   }),
 
@@ -503,75 +575,29 @@ builder.queryFields((t) => ({
       idOrSlug: t.arg.string({ required: true }),
       topicSlug: t.arg.string({ required: true }),
     },
-    // eslint-disable-next-line complexity -- audit debt (2026-07-22): the published/unpublished dual path; decomposition queued
     resolve: async (_p, args, ctx) => {
       const readable = await readTimetable(ctx, args.idOrSlug);
       if (!readable) return null;
       const topic = await getTopicBySlug(readable.timetable.id, args.topicSlug);
       if (!topic) return null;
-      const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
-      const hostOnly = canSeeHostOnly(viewer);
-      const moderate = canModerate(viewer);
-      const seeComments = canSeeComments(
-        readable.timetable.privacy as Privacy,
-        viewer,
-      );
+      const viewerUserId = ctx.user?.id ?? null;
+      const viewer = { userId: viewerUserId, roles: readable.roles };
+      const flags = topicViewFlags(readable.timetable, viewer);
 
-      if (topic.status === "published") {
-        const [feedTopic] = await buildFeed(
-          readable.timetable.id,
-          ctx.user?.id ?? null,
-          { topicId: topic.id },
-        );
-        if (!feedTopic) return null;
-        const viewerHostHearted = await viewerHostHeartedSet(
-          ctx.user?.id ?? null,
-          viewer,
-          [topic.id],
-        );
-        return {
-          ...feedTopic,
-          canSeeHostOnly: hostOnly,
-          canModerate: moderate,
-          canSeeComments: seeComments,
-          hostCommentsEnabled: isHostCommentsEnabled(
-            readable.timetable.settings,
-          ),
-          viewerHasHostHearted: viewerHostHearted.has(topic.id),
-        };
+      if (topic.status !== "published") {
+        return unpublishedPermalinkTopic(topic, viewerUserId, flags);
       }
-
-      // Not published: owner or admin only, with empty heart data.
-      const isOwner = ctx.user?.id === topic.hostId;
-      if (!isOwner && !moderate) return null;
-      const host = await getPerson(topic.timetableId, topic.hostId);
-      return {
-        id: topic.id,
-        timetableId: topic.timetableId,
-        hostId: topic.hostId,
-        hostName: host?.name ?? null,
-        hostImage: host?.image ?? null,
-        hostSlug: host?.slug ?? null,
-        title: topic.title,
-        slug: topic.slug,
-        bodyMd: topic.bodyMd,
-        coverImageUrl: topic.coverImageUrl,
-        status: topic.status,
-        publishedAt: topic.publishedAt,
-        contentUpdatedAt: topic.contentUpdatedAt,
-        createdAt: topic.createdAt,
-        heartCount: 0,
-        weightedScore: 0,
-        l2Score: 0,
-        devotionScore: 0,
-        viewerHasHearted: false,
-        commentCount: 0,
-        latestCommentAt: null,
-        viewerCommentsSeenAt: null,
-        canSeeHostOnly: hostOnly,
-        canModerate: moderate,
-        canSeeComments: seeComments,
-      };
+      const [feedTopic] = await buildFeed(readable.timetable.id, viewerUserId, {
+        topicId: topic.id,
+      });
+      if (!feedTopic) return null;
+      const [decorated] = await decorateFeedTopics(
+        [feedTopic],
+        viewerUserId,
+        viewer,
+        flags,
+      );
+      return decorated ?? null;
     },
   }),
 
@@ -895,15 +921,7 @@ builder.queryFields((t) => ({
           );
           current = {
             ...topic,
-            canSeeHostOnly: canSeeHostOnly(viewer),
-            canModerate: canModerate(viewer),
-            canSeeComments: canSeeComments(
-              readable.timetable.privacy as Privacy,
-              viewer,
-            ),
-            hostCommentsEnabled: isHostCommentsEnabled(
-              readable.timetable.settings,
-            ),
+            ...topicViewFlags(readable.timetable, viewer),
             viewerHasHostHearted: viewerHostHearted.has(topic.id),
           };
         }

@@ -151,6 +151,11 @@ Stable names for feature pieces, so instructions can reference them precisely.
   re-applied in an every-commit layout effect, not keyed on props.
 - The API refuses to boot when `SPACES_BUCKET` is set without
   `SPACES_KEY`/`SPACES_SECRET` — keep app specs and workflow env in sync.
+- Modules bundled into Next's `opengraph-image` routes (`lib/ogCard.tsx` and
+  anything it imports) must NOT import `@timetable/*` workspace packages —
+  the OG routes' separate compilation can't resolve them (typecheck passes;
+  the dev server then fails at request time and e2e times out). Keep those
+  modules dependency-free; duplicate small constants locally with a comment.
 - Drizzle raw `sql` templates with Date params (`` sql`${col} >= ${now}` ``)
   bypass the column's Date mapping and THROW at runtime on hosted Postgres
   while passing every local check — always use `gte`/`lte`/`eq` operators

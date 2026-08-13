@@ -7,7 +7,6 @@ type CommentVisibility = "public" | "host_only" | "admin_only";
 
 export type FeedComment = {
   id: string;
-  parentId: string | null;
   authorId: string;
   authorName: string | null;
   authorImage: string | null;
@@ -48,7 +47,6 @@ export type HostHearter = {
 
 export type FeedTopic = {
   id: string;
-  timetableId: string;
   hostId: string;
   hostName: string | null;
   hostImage: string | null;

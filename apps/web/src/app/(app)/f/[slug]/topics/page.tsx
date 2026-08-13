@@ -179,17 +179,15 @@ export default async function FeedPage({
   const seed = seedParam ?? "";
   const q = (qParam ?? "").trim();
 
-  const page = await fetchFeedPage(
+  const page = await fetchFeedPage({
     slug,
     sort,
     host,
-    0,
     hearted,
     seed,
-    "",
     hostHearted,
     q,
-  );
+  });
   const hostLabel = roleLabel(page.settings.roleLabels, "host");
   const adminLabel = roleLabel(page.settings.roleLabels, "admin");
 
@@ -239,13 +237,7 @@ export default async function FeedPage({
         <SearchHighlight q={q}>
           <InfiniteFeed
             key={`${sort}|${host}|${hearted}|${hostHearted}|${seed}|${q}`}
-            slug={slug}
-            sort={sort}
-            host={host}
-            hearted={hearted}
-            hostHearted={hostHearted}
-            q={q}
-            seed={seed}
+            query={{ slug, sort, host, hearted, hostHearted, q, seed }}
             // eslint-disable-next-line react-hooks/purity -- server-only render marker
             refreshToken={Math.random().toString(36).slice(2, 10)}
             pageSize={FEED_PAGE_SIZE}

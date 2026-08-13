@@ -145,13 +145,26 @@ host-activity table.
 
 Topics carry up to three comment threads:
 
-- a **public thread**, threaded and auto-collapsed;
+- the **public thread**;
 - a **host-only thread** with its own composer, labelled with the forum's
   host label — a forum option (default on; sensible to switch off where
   hosts and electors are the same people). Switching it off hides the thread
   and the 💙 attribution row without deleting anything; 💙s keep working as
   private bookmarks only admins see in Analysis, and drop out of digests;
 - the **drafting thread** described above.
+
+Threading is **dialogue-first** (2026-08-13): the composer sits at the top
+of every thread and is always visible; top-level comments sort newest
+first; each top-level comment's replies form a linear chain ending in a
+"Continue this thread…" tail composer, which attaches new messages to the
+chain's first comment so dialogues never deepen. The per-comment Reply
+button appears only on chain messages and forks an indented sub-chain —
+the deliberate, rarer gesture. On feed and queue cards the discussion
+collapses to a **teaser** — previews of top-level comments that are new
+since the viewer last engaged with that discussion (padded to the three
+latest) plus a "💬 n comments" pill; clicking anything (the pill, a
+preview, the 💬 action button) or posting a comment reveals the whole
+tree in place. The topic's own page shows everything open.
 
 Comments support @mentions, which notify the mentioned member. Authors can
 edit and delete their own comments; admins can hide them.
@@ -283,18 +296,28 @@ topics, replies to their comments, @mentions of them, and session changes on
 topics they ❤️'d, each linking through; an unread badge in the sidebar
 clears when the pane is opened.
 
-For email, users can opt into digest sections:
+For email, digests are configured **per forum** on the Notifications page:
+on/off, daily or weekly cadence, and sixteen per-kind switches (comments on
+your topics, threads you're part of, @mentions, ❤️s and 💙s, followed-topic
+comments, sessions, availability asks, new topics as elector or host,
+pending review, slot releases, drafts, new members — each shown only to
+the roles it applies to). Admins set forum-level per-kind defaults that
+apply live wherever a member hasn't set their own switch, plus the on/off
+default seeded onto new members.
 
-- new published topics
-- replies to their comments
-- activity on their hosted topics (including topics reassigned to them)
+What quiets a comment email is **engagement** (2026-08-13): each topic has
+a per-member comments-seen watermark, bumped only by expanding that card's
+teaser, opening the topic's page, or clicking a digest email — never by
+merely loading a feed page. Every link in a digest carries a read marker,
+so one click anywhere marks that email's shown threads seen up to its send
+time (`digest_sends` + `comment_seen`); a sent-but-unopened digest marks
+nothing. The email batches each dialogue chain's new messages into one
+thread block.
 
-Admins can set forum digest defaults, applied to new members who have never
-customized their own preferences. Digests are sent through Resend by a
-scheduled job; a member who was pre-created by an admin but never invited is
-skipped entirely, so nobody hears about a forum before their invite. Invite
-emails go through the same plumbing and are only ever sent when an admin
-explicitly triggers them.
+Digests are sent through Resend by a scheduled job; a member who was
+pre-created by an admin but never invited is skipped entirely, so nobody
+hears about a forum before their invite. Invite emails go through the same
+plumbing and are only ever sent when an admin explicitly triggers them.
 
 Calendar sync is one-way ICS export
 (`GET /api/forums/:idOrSlug/calendar.ics`); private forums require a

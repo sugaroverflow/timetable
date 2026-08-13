@@ -5,7 +5,7 @@ import { ListSortControl } from "@/components/ListSortControl";
 import { ModerationCard } from "@/components/ModerationCard";
 import { ReadyFilter } from "@/components/ReadyFilter";
 import type { ManagedTopic } from "@/lib/feedTypes";
-import { commentTree } from "@/lib/gqlFragments";
+import { commentTree, MANAGED_TOPIC_FIELDS } from "@/lib/gqlFragments";
 import { gqlFetch } from "@/lib/graphql";
 import {
   normalizeManagedSort,
@@ -28,7 +28,7 @@ const QUERY = `
     timetableHosts: forumHosts(idOrSlug: $s) { id name }
     me { id }
     moderationQueue(idOrSlug: $s) {
-      id title slug hostId hostSlug hostName hostImage status bodyMd bodyHtml coverImageUrl updatedAt readyAt
+      ${MANAGED_TOPIC_FIELDS}
       ${commentTree("adminComments")}
     }
   }

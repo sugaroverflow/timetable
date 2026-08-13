@@ -40,15 +40,6 @@ export async function getUserByIcsToken(token: string): Promise<User | null> {
   return user ?? null;
 }
 
-export async function getUserProfile(userId: string): Promise<User | null> {
-  const [user] = await db
-    .select()
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
-  return user ?? null;
-}
-
 /** Update a member's per-forum profile (2026-07: name/photo/bio/slug are
  * forum-scoped; only the account itself — email, auth — stays global).
  * The slug follows renames within this forum only. */

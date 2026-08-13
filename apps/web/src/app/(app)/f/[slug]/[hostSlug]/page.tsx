@@ -83,11 +83,7 @@ function TopicSection({
       ) : (
         <InfiniteFeed
           key={`${host}|${heartedBy}`}
-          slug={page.slug}
-          sort="recent"
-          host={host}
-          heartedBy={heartedBy}
-          seed=""
+          query={{ slug: page.slug, sort: "recent", host, heartedBy }}
           refreshToken={refreshToken}
           pageSize={FEED_PAGE_SIZE}
           initialHasNext={page.hasNext}
@@ -146,10 +142,10 @@ export default async function PersonPage({
   // ballot, so no shuffle seed here.
   const [hostPage, heartedPage] = await Promise.all([
     host
-      ? fetchFeedPage(slug, "recent", person.userId, 0, false)
+      ? fetchFeedPage({ slug, sort: "recent", host: person.userId })
       : Promise.resolve(null),
     elector
-      ? fetchFeedPage(slug, "recent", "", 0, false, "", person.userId)
+      ? fetchFeedPage({ slug, sort: "recent", heartedBy: person.userId })
       : Promise.resolve(null),
   ]);
   const feed = hostPage ?? heartedPage;

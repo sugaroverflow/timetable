@@ -16,6 +16,7 @@ import {
   computeElectorHeartCounts,
   computeElectorWeights,
   topicNormScores,
+  type FeedSort,
 } from "@timetable/shared";
 
 import { logActivity } from "./activity";
@@ -385,17 +386,9 @@ export async function countViewerPublishedHearts(
  * Feed ranking. The four normalisations (raw/l2/l1/devotion) mirror the
  * dashboard "Analysis" switcher; "hearts" is kept as a backward-compatible
  * alias for "l1" (the original weighted score). See {@link topicNormScores}.
+ * The sort list itself is canon in @timetable/shared (FEED_SORTS).
  */
-export type FeedSort =
-  | "hearts"
-  | "raw"
-  | "l2"
-  | "l1"
-  | "devotion"
-  | "comments"
-  | "created"
-  | "recent"
-  | "random";
+export type { FeedSort } from "@timetable/shared";
 
 export type FeedTopic = {
   id: string;

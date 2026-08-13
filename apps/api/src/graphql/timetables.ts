@@ -294,6 +294,143 @@ builder.mutationFields((t) => ({
   }),
 }));
 
+/** updateForumSettings' optional args, shared by the per-concern patch
+ * builders below (housekeeping 2026-08-13 — was one 13-branch resolver). */
+type SettingsArgs = {
+  roleLabelAdmin?: string | null;
+  roleLabelHost?: string | null;
+  roleLabelElector?: string | null;
+  themePrimary?: string | null;
+  themeSecondary?: string | null;
+  themeJson?: string | null;
+  coverImageUrl?: string | null;
+  iconUrl?: string | null;
+  iconDarkUrl?: string | null;
+  iconEmoji?: string | null;
+  digestEnabled?: boolean | null;
+  digestKindDefaultsJson?: string | null;
+  calendarJson?: string | null;
+  hostsPublishDirectly?: boolean | null;
+  hostCommentsEnabled?: boolean | null;
+};
+
+/** Each builder owns one settings concern (mirroring the web form that
+ * sends it) and returns the fields it patches — {} when its args are
+ * absent, so the spreads compose. */
+function roleLabelPatch(
+  args: SettingsArgs,
+  current: TimetableSettings,
+): Partial<TimetableSettings> {
+  if (
+    args.roleLabelAdmin == null &&
+    args.roleLabelHost == null &&
+    args.roleLabelElector == null
+  ) {
+    return {};
+  }
+  return {
+    roleLabels: {
+      ...(current.roleLabels ?? {}),
+      ...(args.roleLabelAdmin != null ? { admin: args.roleLabelAdmin } : {}),
+      ...(args.roleLabelHost != null ? { host: args.roleLabelHost } : {}),
+      ...(args.roleLabelElector != null
+        ? { elector: args.roleLabelElector }
+        : {}),
+    },
+  };
+}
+
+/** Legacy individual theme args merge over the stored theme; a full
+ * themeJson (QA #59) wins over both when sent. Both paths validate
+ * through the same HEX_COLOUR gate so an invalid string can't be
+ * persisted and later injected into the SSR theme <style> tag. */
+function themePatch(
+  args: SettingsArgs,
+  current: TimetableSettings,
+): Partial<TimetableSettings> {
+  const patch: Partial<TimetableSettings> = {};
+  const themePrimary = colour(args.themePrimary);
+  const themeSecondary = colour(args.themeSecondary);
+  if (themePrimary != null || themeSecondary != null) {
+    patch.theme = {
+      ...(current.theme ?? {}),
+      ...(themePrimary != null ? { primary: themePrimary } : {}),
+      ...(themeSecondary != null ? { secondary: themeSecondary } : {}),
+    };
+  }
+  if (args.themeJson != null) {
+    const parsed = parseThemeJson(args.themeJson);
+    if (!parsed) badRequest("Invalid theme");
+    patch.theme = parsed;
+  }
+  return patch;
+}
+
+/** Cover, icons, and the emoji icon (a short sequence, capped to guard
+ * against arbitrary payloads). Empty strings clear. */
+function brandingPatch(args: SettingsArgs): Partial<TimetableSettings> {
+  const patch: Partial<TimetableSettings> = {};
+  if (args.coverImageUrl != null) {
+    patch.coverImageUrl = args.coverImageUrl.trim() || null;
+  }
+  if (args.iconUrl != null) patch.iconUrl = args.iconUrl.trim() || null;
+  if (args.iconDarkUrl != null) {
+    patch.iconDarkUrl = args.iconDarkUrl.trim() || null;
+  }
+  if (args.iconEmoji != null) {
+    patch.iconEmoji = args.iconEmoji.trim().slice(0, 24) || null;
+  }
+  return patch;
+}
+
+/** The forum's digest defaults: the all-or-nothing on/off for new
+ * members (2026-07-29) and the per-kind default set (2026-08-11). */
+function digestPatch(
+  args: SettingsArgs,
+  current: TimetableSettings,
+): Partial<TimetableSettings> {
+  const patch: Partial<TimetableSettings> = {};
+  if (args.digestEnabled != null) {
+    patch.digestDefaults = {
+      ...(current.digestDefaults ?? {}),
+      digestEnabled: args.digestEnabled,
+    };
+  }
+  if (args.digestKindDefaultsJson != null) {
+    const kinds = parseDigestKinds(args.digestKindDefaultsJson);
+    if (!kinds) badRequest("Invalid digest kind defaults");
+    patch.digestKindDefaults = kinds;
+  }
+  return patch;
+}
+
+/** Feature switches: calendar group, hosts-publish-directly, and the
+ * host-only comment thread (host hearts, 2026-08-04). */
+function featurePatch(
+  args: SettingsArgs,
+  current: TimetableSettings,
+): Partial<TimetableSettings> {
+  const patch: Partial<TimetableSettings> = {};
+  if (args.calendarJson != null) {
+    const parsed = parseCalendarJson(args.calendarJson);
+    if (!parsed) badRequest("Invalid calendar settings");
+    patch.calendar = { ...(current.calendar ?? {}), ...parsed };
+  }
+  if (args.hostsPublishDirectly != null) {
+    patch.topics = {
+      ...(current.topics ?? {}),
+      hostsPublishDirectly: args.hostsPublishDirectly,
+    };
+  }
+  if (args.hostCommentsEnabled != null) {
+    patch.hostComments = {
+      ...(current.hostComments ?? {}),
+      enabled: args.hostCommentsEnabled,
+    };
+  }
+  return patch;
+}
+
 builder.mutationFields((t) => ({
   /** Admin: update role labels and theme colors (persisted to settings). */
   updateForumSettings: t.field({
@@ -328,7 +465,6 @@ builder.mutationFields((t) => ({
        * bookmarks (host hearts, 2026-08-04). */
       hostCommentsEnabled: t.arg.boolean({ required: false }),
     },
-    // eslint-disable-next-line complexity, sonarjs/cognitive-complexity -- audit debt (2026-07-22): 13-arg settings-patch assembly; decomposition queued
     resolve: async (_p, args, ctx) => {
       const { user, readable, viewer } = await loadTimetableAndViewer(
         ctx,
@@ -337,94 +473,13 @@ builder.mutationFields((t) => ({
       if (!canEditSettings(viewer)) forbidden("Admins only");
 
       const current = readable.timetable.settings;
-      const patch: Partial<TimetableSettings> = {};
-
-      if (
-        args.roleLabelAdmin != null ||
-        args.roleLabelHost != null ||
-        args.roleLabelElector != null
-      ) {
-        patch.roleLabels = {
-          ...(current.roleLabels ?? {}),
-          ...(args.roleLabelAdmin != null
-            ? { admin: args.roleLabelAdmin }
-            : {}),
-          ...(args.roleLabelHost != null ? { host: args.roleLabelHost } : {}),
-          ...(args.roleLabelElector != null
-            ? { elector: args.roleLabelElector }
-            : {}),
-        };
-      }
-
-      // Legacy individual theme args — validate through the same HEX_COLOUR
-      // gate the themeJson path uses so an invalid string can't be persisted
-      // and later injected into the SSR theme <style> tag. Invalid/absent
-      // values are dropped (mirrors colour() in parseThemeJson).
-      const themePrimary = colour(args.themePrimary);
-      const themeSecondary = colour(args.themeSecondary);
-      if (themePrimary != null || themeSecondary != null) {
-        patch.theme = {
-          ...(current.theme ?? {}),
-          ...(themePrimary != null ? { primary: themePrimary } : {}),
-          ...(themeSecondary != null ? { secondary: themeSecondary } : {}),
-        };
-      }
-
-      if (args.themeJson != null) {
-        const parsed = parseThemeJson(args.themeJson);
-        if (!parsed) badRequest("Invalid theme");
-        patch.theme = parsed;
-      }
-
-      if (args.coverImageUrl != null) {
-        patch.coverImageUrl = args.coverImageUrl.trim() || null;
-      }
-
-      if (args.iconUrl != null) {
-        patch.iconUrl = args.iconUrl.trim() || null;
-      }
-
-      if (args.iconDarkUrl != null) {
-        patch.iconDarkUrl = args.iconDarkUrl.trim() || null;
-      }
-
-      // A short emoji sequence (capped to guard against arbitrary payloads).
-      if (args.iconEmoji != null) {
-        patch.iconEmoji = args.iconEmoji.trim().slice(0, 24) || null;
-      }
-
-      if (args.digestEnabled != null) {
-        patch.digestDefaults = {
-          ...(current.digestDefaults ?? {}),
-          digestEnabled: args.digestEnabled,
-        };
-      }
-
-      if (args.digestKindDefaultsJson != null) {
-        const kinds = parseDigestKinds(args.digestKindDefaultsJson);
-        if (!kinds) badRequest("Invalid digest kind defaults");
-        patch.digestKindDefaults = kinds;
-      }
-
-      if (args.calendarJson != null) {
-        const parsed = parseCalendarJson(args.calendarJson);
-        if (!parsed) badRequest("Invalid calendar settings");
-        patch.calendar = { ...(current.calendar ?? {}), ...parsed };
-      }
-
-      if (args.hostsPublishDirectly != null) {
-        patch.topics = {
-          ...(current.topics ?? {}),
-          hostsPublishDirectly: args.hostsPublishDirectly,
-        };
-      }
-
-      if (args.hostCommentsEnabled != null) {
-        patch.hostComments = {
-          ...(current.hostComments ?? {}),
-          enabled: args.hostCommentsEnabled,
-        };
-      }
+      const patch: Partial<TimetableSettings> = {
+        ...roleLabelPatch(args, current),
+        ...themePatch(args, current),
+        ...brandingPatch(args),
+        ...digestPatch(args, current),
+        ...featurePatch(args, current),
+      };
 
       const updated = await updateTimetableSettings(
         readable.timetable.id,

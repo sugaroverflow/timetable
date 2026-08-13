@@ -60,13 +60,13 @@ import { buildContext, type ApiContext } from "../context";
 import {
   linkBase,
   renderDigest,
-  sampleDigest,
   renderInvite,
   renderNewForum,
   sendEmail,
   stampDigestLinks,
   wrapLinksWithSignInTicket,
 } from "../email";
+import { sampleDigest } from "../email-sample";
 import { env } from "../env";
 import { enforceActionLimit } from "../http/action-limits";
 import {

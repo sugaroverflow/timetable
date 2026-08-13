@@ -5,7 +5,7 @@ import { CreateTopicReveal } from "@/components/CreateTopicReveal";
 import { ListSortControl } from "@/components/ListSortControl";
 import { TopicManager } from "@/components/TopicManager";
 import type { ManagedTopic } from "@/lib/feedTypes";
-import { commentTree } from "@/lib/gqlFragments";
+import { commentTree, MANAGED_TOPIC_FIELDS } from "@/lib/gqlFragments";
 import { gqlFetch } from "@/lib/graphql";
 import {
   MY_TOPICS_SORTS,
@@ -28,7 +28,7 @@ const QUERY = `
     me { id }
     timetableHosts: forumHosts(idOrSlug: $s) { id name }
     hostDashboard(idOrSlug: $s) {
-      id title slug hostId hostSlug status bodyMd bodyHtml coverImageUrl updatedAt readyAt
+      ${MANAGED_TOPIC_FIELDS}
       hostHearters { userId name image slug }
       ${commentTree()}
       ${commentTree("hostOnlyComments")}

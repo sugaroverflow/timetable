@@ -5,6 +5,7 @@ import {
   isCalendarEnabled,
   isDigestKindEnabled,
   isHostCommentsEnabled,
+  topicPath,
   type DigestKind,
   type DigestKinds,
   type EffectiveDigestSettings,
@@ -163,15 +164,6 @@ export type DigestSlotRelease = {
   locations: string[];
   timetableId: string;
 };
-
-function topicPath(
-  timetableSlug: string | null | undefined,
-  hostSlug: string | null | undefined,
-  topicSlug: string | null | undefined,
-): string | null {
-  if (!timetableSlug || !hostSlug || !topicSlug) return null;
-  return `/f/${timetableSlug}/${hostSlug}/${topicSlug}`;
-}
 
 /** Everyone with an email — whether any of their forums' digests are due
  * and enabled is a PER-MEMBERSHIP question (2026-08-11), answered inside
@@ -546,16 +538,18 @@ async function resolveTopicMeta(
     )
     .where(inArray(topics.id, topicIds));
   for (const r of rows) {
+    const forumSlug = ctx.forumSlug.get(r.timetableId);
     meta.set(r.id, {
       timetableId: r.timetableId,
       title: r.title,
       body: r.body,
       author: { name: r.hostName, userId: r.hostId, image: r.hostImage },
-      path: topicPath(
-        ctx.forumSlug.get(r.timetableId),
-        r.hostSlug,
-        r.topicSlug,
-      ),
+      // Shared topicPath (housekeeping 2026-08-13): the hostId fallback
+      // means slug-less hosts no longer silently drop the email link —
+      // the app route accepts ids and canonical-redirects.
+      path: forumSlug
+        ? topicPath(forumSlug, r.hostSlug, r.topicSlug, r.hostId)
+        : null,
     });
   }
   return meta;
@@ -1152,6 +1146,32 @@ async function mentionActivities(
   }));
 }
 
+/** Whether one forum's effective settings want a digest kind — the
+ * membership's switches over the forum's configured defaults over the
+ * global all-on defaults. */
+function forumWantsKind(
+  ctx: DigestContext,
+  forumId: string,
+  kind: DigestKind,
+): boolean {
+  return isDigestKindEnabled(
+    ctx.effectiveByForum.get(forumId)?.kinds,
+    kind,
+    ctx.kindDefaultsByForum.get(forumId),
+  );
+}
+
+/** The subset of `ids` whose effective settings want `kind` — the
+ * role-scoped collectors' opening move (housekeeping 2026-08-13: was the
+ * same three-line filter in three collectors). */
+function eligibleForums(
+  ctx: DigestContext,
+  ids: string[],
+  kind: DigestKind,
+): string[] {
+  return ids.filter((id) => forumWantsKind(ctx, id, kind));
+}
+
 /** The recipient's ENTIRE review queue (round 2, admin switch, Ed:
  * admins toggle a standing "for review" listing): every topic currently
  * awaiting review in their admin forums, never their own. `updatedAt`
@@ -1161,13 +1181,7 @@ async function mentionActivities(
 async function pendingReviewActivities(
   ctx: DigestContext,
 ): Promise<RawActivity[]> {
-  const eligible = ctx.adminTimetableIds.filter((id) =>
-    isDigestKindEnabled(
-      ctx.effectiveByForum.get(id)?.kinds,
-      "pendingReview",
-      ctx.kindDefaultsByForum.get(id),
-    ),
-  );
+  const eligible = eligibleForums(ctx, ctx.adminTimetableIds, "pendingReview");
   if (eligible.length === 0) return [];
   const rows = await db
     .select({
@@ -1201,14 +1215,10 @@ async function loadSlotReleases(
   ctx: DigestContext,
   now: Date,
 ): Promise<DigestSlotRelease[]> {
-  const eligible = ctx.hostTimetableIds.filter(
-    (id) =>
-      ctx.calendarTimetableIds.includes(id) &&
-      isDigestKindEnabled(
-        ctx.effectiveByForum.get(id)?.kinds,
-        "slotReleases",
-        ctx.kindDefaultsByForum.get(id),
-      ),
+  const eligible = eligibleForums(
+    ctx,
+    ctx.hostTimetableIds.filter((id) => ctx.calendarTimetableIds.includes(id)),
+    "slotReleases",
   );
   if (eligible.length === 0) return [];
   const rows = await db
@@ -1243,13 +1253,7 @@ async function loadSlotReleases(
 async function loadNewMembers(
   ctx: DigestContext,
 ): Promise<(DigestPerson & { timetableId: string })[]> {
-  const eligible = ctx.adminTimetableIds.filter((id) =>
-    isDigestKindEnabled(
-      ctx.effectiveByForum.get(id)?.kinds,
-      "newMembers",
-      ctx.kindDefaultsByForum.get(id),
-    ),
-  );
+  const eligible = eligibleForums(ctx, ctx.adminTimetableIds, "newMembers");
   if (eligible.length === 0) return [];
   const rows = await db
     .select({
@@ -1334,17 +1338,15 @@ async function newTopicActivities(
   // so the passing switch resolves here against the forum's settings; the
   // post-filter then re-checks the same switch (a no-op by construction).
   const passingSwitch = (timetableId: string): DigestKind | null => {
-    const kinds = ctx.effectiveByForum.get(timetableId)?.kinds;
-    const defaults = ctx.kindDefaultsByForum.get(timetableId);
     if (
       electorSet.has(timetableId) &&
-      isDigestKindEnabled(kinds, "newTopics", defaults)
+      forumWantsKind(ctx, timetableId, "newTopics")
     ) {
       return "newTopics";
     }
     if (
       hostSet.has(timetableId) &&
-      isDigestKindEnabled(kinds, "newTopicsHost", defaults)
+      forumWantsKind(ctx, timetableId, "newTopicsHost")
     ) {
       return "newTopicsHost";
     }
@@ -1550,11 +1552,7 @@ export async function computeUserForumDigests(
   // collected if some forum wants it, and each activity then filters
   // against its own forum's switches — absent keys keep the defaults.
   const wantsIn: WantsIn = (forumId, kind) =>
-    isDigestKindEnabled(
-      ctx.effectiveByForum.get(forumId)?.kinds,
-      kind,
-      ctx.kindDefaultsByForum.get(forumId),
-    );
+    forumWantsKind(ctx, forumId, kind);
   const wants = (kind: DigestKind) =>
     ctx.forumIds.some((id) => wantsIn(id, kind));
 

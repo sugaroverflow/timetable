@@ -14,17 +14,6 @@ export type Privacy = (typeof PRIVACY_LEVELS)[number];
 export const ASSIGNABLE_ROLES = ["admin", "host", "elector"] as const;
 export type AssignableRole = (typeof ASSIGNABLE_ROLES)[number];
 
-export const DEFAULT_ROLE_LABELS: Record<"admin" | "host" | "elector", string> =
-  {
-    admin: "Admin",
-    host: "Host",
-    elector: "Elector",
-  };
-
-export function hasRole(roles: readonly Role[], role: Role): boolean {
-  return roles.includes(role);
-}
-
 export function isOwner(roles: readonly Role[]): boolean {
   return roles.includes("owner");
 }
