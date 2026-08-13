@@ -1,6 +1,5 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import type { FeedComment } from "@/lib/feedTypes";
@@ -8,32 +7,18 @@ import { COMMENT_TREE_DEPTH } from "@/lib/gqlFragments";
 import type { RoleLabels } from "@/lib/timetableSettings";
 
 import { Avatar } from "./Avatar";
+import { ChainTailComposer } from "./ChainTailComposer";
 import { CommentActions } from "./CommentActions";
 import { CommentBody } from "./CommentBody";
 import { CommentEditForm } from "./CommentEditForm";
 import { PersonChip } from "./PersonChip";
 import { PrimaryRolePill } from "./RolePills";
 
-const VISIBLE_TOP_LEVEL = 3;
-
 /** Restricted-visibility badge next to the author name. */
 const VISIBILITY_PILLS: Record<string, { className: string; label: string }> = {
   host_only: { className: "pill pill-host", label: "hosts" },
   admin_only: { className: "pill pill-admin", label: "admins" },
 };
-
-function countNested(comments: FeedComment[]): number {
-  return comments.reduce((sum, c) => sum + 1 + countNested(c.replies ?? []), 0);
-}
-
-/** True when the deep-linked comment lives in this subtree — collapsed
- * threads auto-expand so ?reply= targets are visible (QA #59 round 3). */
-function subtreeContains(comments: FeedComment[], id: string | null): boolean {
-  if (!id) return false;
-  return comments.some(
-    (c) => c.id === id || subtreeContains(c.replies ?? [], id),
-  );
-}
 
 /** The name row + body for a live (non-deleted) comment; the body swaps
  * for the inline editor while editing (edit-in-place, QA 2026-07-29). */
@@ -127,6 +112,71 @@ function CommentAvatar({
   );
 }
 
+/** A comment's chain: its children as a linear dialogue (oldest first),
+ * ending in the chain-tail-composer. New messages attach to the PARENT
+ * comment (root-attach), so chains don't deepen; the tail only exists
+ * where the reply-depth-guard allows the next message to be fetched. */
+function ChainBlock({
+  comment,
+  replies,
+  canReply,
+  canModerate,
+  viewerId,
+  slug,
+  roleLabels,
+  depth,
+}: {
+  comment: FeedComment;
+  replies: FeedComment[];
+  canReply: boolean;
+  canModerate: boolean;
+  viewerId: string | null;
+  slug?: string;
+  roleLabels?: RoleLabels;
+  depth: number;
+}) {
+  // Chain parents: every top-level comment, and any forked comment whose
+  // sub-chain has started.
+  const showTail =
+    canReply &&
+    (depth === 1 || replies.length > 0) &&
+    depth < COMMENT_TREE_DEPTH;
+  if (replies.length === 0 && !showTail) return null;
+  // ?reply= deep links (digest emails) land on the chain's tail: the chain
+  // parent's own id, plus its childless messages (a message with a
+  // sub-chain is answered by its own tail instead).
+  const tailFocusIds = [
+    comment.id,
+    ...replies.filter((r) => (r.replies ?? []).length === 0).map((r) => r.id),
+  ];
+  return (
+    <div className="replies">
+      {replies.map((r) => (
+        <CommentItem
+          key={r.id}
+          comment={r}
+          canReply={canReply}
+          canModerate={canModerate}
+          viewerId={viewerId}
+          slug={slug}
+          roleLabels={roleLabels}
+          depth={depth + 1}
+        />
+      ))}
+      {showTail ? (
+        <ChainTailComposer parentId={comment.id} focusIds={tailFocusIds} />
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Dialogue-first threading (2026-08-13): a comment's children render as a
+ * linear chain (oldest first) ending in a chain-tail-composer that
+ * continues the dialogue — new messages attach to THIS comment
+ * (root-attach), so chains don't deepen. Reply on a chain message is the
+ * rarer fork gesture, opening a sub-chain beside the main line.
+ */
 function CommentItem({
   comment,
   canReply,
@@ -146,12 +196,7 @@ function CommentItem({
   depth: number;
 }) {
   const replies = comment.replies ?? [];
-  const searchParams = useSearchParams();
-  const [showReplies, setShowReplies] = useState(() =>
-    subtreeContains(replies, searchParams.get("reply")),
-  );
   const [editing, setEditing] = useState(false);
-  const replyCount = countNested(replies);
   const isOwn = viewerId != null && viewerId === comment.authorId;
 
   return (
@@ -181,47 +226,34 @@ function CommentItem({
         {comment.deleted ? null : (
           <CommentActions
             commentId={comment.id}
-            // reply-depth-guard: queries fetch COMMENT_TREE_DEPTH levels, so
-            // a reply below the deepest one would save but never render —
-            // don't offer it (deep-thread QA, 2026-08-12).
-            canReply={canReply && depth < COMMENT_TREE_DEPTH}
+            // Reply = fork a sub-chain off a chain message; top-level
+            // comments continue through their tail composer instead.
+            canReply={canReply && depth >= 2 && depth < COMMENT_TREE_DEPTH}
             canModerate={canModerate}
             hidden={comment.hidden}
             isOwn={isOwn}
             onEdit={() => setEditing(true)}
           />
         )}
-        {replies.length > 0 ? (
-          showReplies ? (
-            <div className="replies">
-              {replies.map((r) => (
-                <CommentItem
-                  key={r.id}
-                  comment={r}
-                  canReply={canReply}
-                  canModerate={canModerate}
-                  viewerId={viewerId}
-                  slug={slug}
-                  roleLabels={roleLabels}
-                  depth={depth + 1}
-                />
-              ))}
-            </div>
-          ) : (
-            <button
-              type="button"
-              className="thread-toggle"
-              onClick={() => setShowReplies(true)}
-            >
-              View {replyCount} {replyCount === 1 ? "reply" : "replies"}
-            </button>
-          )
-        ) : null}
+        <ChainBlock
+          comment={comment}
+          replies={replies}
+          canReply={canReply}
+          canModerate={canModerate}
+          viewerId={viewerId}
+          slug={slug}
+          roleLabels={roleLabels}
+          depth={depth}
+        />
       </div>
     </div>
   );
 }
 
+/** The full thread, always open — newest chain first (the server orders
+ * roots newest-first to match the top-composer above the stack); feed
+ * surfaces collapse the whole section behind CommentTeaser instead of
+ * folding here. */
 export function CommentList({
   comments,
   canReply,
@@ -239,24 +271,11 @@ export function CommentList({
   /** The forum's role labels, for the author role pills. */
   roleLabels?: RoleLabels;
 }) {
-  const searchParams = useSearchParams();
-  const [showAll, setShowAll] = useState(() =>
-    subtreeContains(
-      comments.slice(VISIBLE_TOP_LEVEL),
-      searchParams.get("reply"),
-    ),
-  );
   if (!comments.length) return null;
-
-  const visible =
-    showAll || comments.length <= VISIBLE_TOP_LEVEL + 1
-      ? comments
-      : comments.slice(0, VISIBLE_TOP_LEVEL);
-  const hiddenCount = comments.length - visible.length;
 
   return (
     <div className="comments">
-      {visible.map((c) => (
+      {comments.map((c) => (
         <CommentItem
           key={c.id}
           comment={c}
@@ -268,15 +287,6 @@ export function CommentList({
           depth={1}
         />
       ))}
-      {hiddenCount > 0 ? (
-        <button
-          type="button"
-          className="thread-toggle"
-          onClick={() => setShowAll(true)}
-        >
-          View all {comments.length} comments
-        </button>
-      ) : null}
     </div>
   );
 }

@@ -1,8 +1,7 @@
 "use client";
 
 import { Send } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState } from "react";
 
 import { ComposerRow } from "@/components/ComposerRow";
 import { GrowingTextarea } from "@/components/GrowingTextarea";
@@ -36,20 +35,11 @@ export function CommentActions({
   isOwn?: boolean;
   onEdit?: () => void;
 }) {
+  // ?reply= deep links focus a chain-tail composer (dialogue-first
+  // threading, 2026-08-13) — this composer only opens from its button.
   const { run, busy } = useGqlAction();
-  const searchParams = useSearchParams();
-  // Deep link from the notifications pane (QA #59 round 3): ?reply=<id>
-  // opens and focuses this comment's reply composer.
-  const deepLinked = canReply && searchParams.get("reply") === commentId;
-  const [open, setOpen] = useState(deepLinked);
+  const [open, setOpen] = useState(false);
   const [body, setBody] = useState("");
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    if (!deepLinked) return;
-    textareaRef.current?.focus();
-    textareaRef.current?.scrollIntoView({ block: "center" });
-  }, [deepLinked]);
 
   function reply(e: React.FormEvent) {
     e.preventDefault();
@@ -120,7 +110,6 @@ export function CommentActions({
         <ComposerRow className="inline-form-nested">
           <form onSubmit={reply} className="inline-form">
             <GrowingTextarea
-              ref={textareaRef}
               value={body}
               onChange={(e) => setBody(e.target.value)}
               placeholder="Write a reply…"

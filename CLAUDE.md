@@ -109,10 +109,22 @@ Stable names for feature pieces, so instructions can reference them precisely.
 - **comment-tree-fragment** — `commentTree()` in `apps/web/src/lib/gqlFragments.ts`:
   generates every thread query's nested reply selection to `COMMENT_TREE_DEPTH`
   levels. Deeper comments exist server-side but are never fetched.
-- **reply-depth-guard** — in `CommentList.tsx`: withholds the Reply button at
+- **reply-depth-guard** — in `CommentList.tsx`: withholds reply composers at
   the deepest fetched level so nobody can post a reply the page can't show.
 - **reply-indent** — `.replies` in `globals.css`: the per-level thread indent
   (6px + 2px rule).
+- **top-composer** — the new-strand comment composer at the TOP of each
+  comment stack; top-level comments sort newest-first to match.
+- **chain-tail-composer** — `ChainTailComposer.tsx`: the slim "Continue this
+  thread…" input ending every dialogue chain. Posts root-attach (message
+  becomes a child of the chain's parent comment, Slack-style), so chains
+  never deepen; `?reply=` deep links focus it.
+- **comment-teaser** — `CommentTeaser.tsx`: feed/queue cards' collapsed
+  discussion (latest comment + "x new comments"), unfolds inline; the
+  permalink page passes `discussionOpen` and skips it.
+- **chain-reply digests** — `loadChainScope` in `packages/core/src/digests.ts`:
+  the `replies` digest kind covers new comments in chains the recipient is
+  part of, batched per chain by the email's thread merge.
 
 ## Gotchas (learned the hard way)
 

@@ -9,7 +9,7 @@ import { Avatar } from "./Avatar";
 import { CollapsibleTopicBody } from "./CollapsibleTopicBody";
 import { CommentComposer } from "./CommentComposer";
 import { CommentList } from "./CommentList";
-import { FoldedComments } from "./FoldedComments";
+import { CommentTeaser } from "./CommentTeaser";
 import { HostOnlyPanel } from "./HostOnlyPanel";
 import { HostTopicActions } from "./HostTopicActions";
 import { PersonChip } from "./PersonChip";
@@ -77,7 +77,6 @@ function TopicTail({
   topic,
   perms,
   slug,
-  isOwner,
   viewerId,
   hostLabel,
   adminLabel,
@@ -89,7 +88,6 @@ function TopicTail({
   topic: FeedTopic;
   perms: FeedPerms;
   slug: string;
-  isOwner: boolean;
   viewerId: string | null;
   hostLabel: string;
   adminLabel: string;
@@ -98,6 +96,7 @@ function TopicTail({
   hostComments: FeedTopic["comments"];
   hostCommentsEnabled: boolean;
 }) {
+  const isOwner = viewerId != null && viewerId === topic.hostId;
   const editable = {
     id: topic.id,
     title: topic.title,
@@ -174,14 +173,18 @@ function ActionsSlot({
   );
 }
 
-/** The public thread + composer — folded behind "💬 Comments (n)" in the
- * Topic Queue, open everywhere else. */
+/** The public discussion (dialogue-first threading, 2026-08-13): the
+ * top-composer starts a new strand above the stack; chains render newest
+ * first, each ending in its tail composer. Feed and queue cards collapse
+ * the whole section behind the comment-teaser; the permalink page keeps
+ * it open. */
 function CommentSection({
   topic,
   perms,
   slug,
   publicComments,
-  folded,
+  open,
+  lastSeenAt,
   viewerId,
   roleLabels,
 }: {
@@ -189,12 +192,16 @@ function CommentSection({
   perms: FeedPerms;
   slug: string;
   publicComments: FeedTopic["comments"];
-  folded: boolean;
+  open: boolean;
+  lastSeenAt: string | null;
   viewerId: string | null;
   roleLabels: RoleLabels;
 }) {
   const thread = (
     <>
+      {perms.canComment ? (
+        <CommentComposer topicId={topic.id} mentionSlug={slug} />
+      ) : null}
       <CommentList
         comments={publicComments}
         canReply={perms.canComment}
@@ -203,13 +210,18 @@ function CommentSection({
         slug={slug}
         roleLabels={roleLabels}
       />
-      {perms.canComment ? (
-        <CommentComposer topicId={topic.id} mentionSlug={slug} />
-      ) : null}
     </>
   );
-  if (!folded) return thread;
-  return <FoldedComments count={topic.commentCount}>{thread}</FoldedComments>;
+  if (open) return <div className="comment-section">{thread}</div>;
+  return (
+    <CommentTeaser
+      comments={publicComments}
+      lastSeenAt={lastSeenAt}
+      canComment={perms.canComment}
+    >
+      {thread}
+    </CommentTeaser>
+  );
 }
 
 /** Collapsed by default; the Topic Queue shows the whole body. */
@@ -220,6 +232,46 @@ function TopicBody({ html, expand }: { html: string; expand: boolean }) {
     );
   }
   return <CollapsibleTopicBody html={html} />;
+}
+
+/** The card's content block (head, cover, body) — what TopicEditScope
+ * swaps for the edit form while editing. */
+function TopicContent({
+  topic,
+  slug,
+  hostLabel,
+  isNew,
+  expandBody,
+  permalink,
+}: {
+  topic: FeedTopic;
+  slug: string;
+  hostLabel: string;
+  isNew: boolean;
+  expandBody: boolean;
+  permalink: string | null;
+}) {
+  return (
+    <>
+      <TopicHead
+        topic={topic}
+        slug={slug}
+        hostLabel={hostLabel}
+        isNew={isNew}
+        permalink={permalink}
+      />
+
+      {topic.coverImageUrl ? (
+        <div
+          className="topic-cover"
+          style={{ backgroundImage: `url(${topic.coverImageUrl})` }}
+          aria-label={`${topic.title} cover image`}
+        />
+      ) : null}
+
+      <TopicBody html={topic.bodyHtml} expand={expandBody} />
+    </>
+  );
 }
 
 /* Element order per QA #42: title, author, cover, description,
@@ -239,6 +291,8 @@ export function TopicCard({
   hostCommentsEnabled,
   expandBody = false,
   queueControls = null,
+  discussionOpen = false,
+  lastSeenAt = null,
 }: {
   topic: FeedTopic;
   perms: FeedPerms;
@@ -259,6 +313,11 @@ export function TopicCard({
    * heart/comment row (one call to action per card), with the comments
    * folded below it. */
   queueControls?: React.ReactNode;
+  /** Permalink page: the discussion renders fully open instead of behind
+   * the comment-teaser (dialogue-first threading, 2026-08-13). */
+  discussionOpen?: boolean;
+  /** The viewer's feed watermark — the teaser's "new" boundary. */
+  lastSeenAt?: string | null;
 }) {
   const publicComments = topic.comments.filter(
     (c) => c.visibility !== "host_only",
@@ -266,7 +325,6 @@ export function TopicCard({
   const hostComments = topic.comments.filter(
     (c) => c.visibility === "host_only",
   );
-  const isOwner = viewerId != null && viewerId === topic.hostId;
   const permalink = topicPath(slug, topic.hostSlug, topic.slug, topic.hostId);
   // The card's label props are the forum's resolved role labels — reshape
   // them for the comment threads' author role pills.
@@ -290,25 +348,14 @@ export function TopicCard({
         }}
         slug={slug}
         content={
-          <>
-            <TopicHead
-              topic={topic}
-              slug={slug}
-              hostLabel={hostLabel}
-              isNew={isNew}
-              permalink={permalink}
-            />
-
-            {topic.coverImageUrl ? (
-              <div
-                className="topic-cover"
-                style={{ backgroundImage: `url(${topic.coverImageUrl})` }}
-                aria-label={`${topic.title} cover image`}
-              />
-            ) : null}
-
-            <TopicBody html={topic.bodyHtml} expand={expandBody} />
-          </>
+          <TopicContent
+            topic={topic}
+            slug={slug}
+            hostLabel={hostLabel}
+            isNew={isNew}
+            expandBody={expandBody}
+            permalink={permalink}
+          />
         }
       >
         <ActionsSlot
@@ -326,7 +373,8 @@ export function TopicCard({
           perms={perms}
           slug={slug}
           publicComments={publicComments}
-          folded={queueControls != null}
+          open={discussionOpen}
+          lastSeenAt={lastSeenAt}
           viewerId={viewerId}
           roleLabels={roleLabels}
         />
@@ -335,7 +383,6 @@ export function TopicCard({
           topic={topic}
           perms={perms}
           slug={slug}
-          isOwner={isOwner}
           viewerId={viewerId}
           hostLabel={hostLabel}
           adminLabel={adminLabel}
