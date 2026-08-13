@@ -3,31 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-import { clientGql } from "@/lib/clientGraphql";
+import { countNested, treeContains } from "@/lib/commentTree";
+import { markCommentsSeen } from "@/lib/commentsSeen";
 import type { FeedComment } from "@/lib/feedTypes";
 
 import { useCommentsOpen } from "./CommentsOpenScope";
-
-const MARK_SEEN = `mutation($id: String!){ markCommentsSeen(topicId: $id) }`;
-
-/** Fire-and-forget comments-seen bump — expanding IS the engagement; the
- * previews rendered for this visit are unaffected. */
-function markSeen(topicId: string) {
-  clientGql(MARK_SEEN, { id: topicId }).catch(() => {
-    // Non-fatal: the watermark just stays where it was.
-  });
-}
-
-function countNested(comments: FeedComment[]): number {
-  return comments.reduce((sum, c) => sum + 1 + countNested(c.replies ?? []), 0);
-}
-
-/** True when the deep-linked comment lives in this tree — the teaser
- * auto-opens so ?reply= targets can render and focus their tail. */
-function treeContains(comments: FeedComment[], id: string | null): boolean {
-  if (!id) return false;
-  return comments.some((c) => c.id === id || treeContains(c.replies ?? [], id));
-}
 
 /** One-line plain-text preview of a comment body. */
 function snippet(body: string, max = 90): string {
@@ -98,7 +78,7 @@ export function CommentTeaser({
   useEffect(() => {
     if (!opened || marked.current) return;
     marked.current = true;
-    markSeen(topicId);
+    markCommentsSeen(topicId);
   }, [opened, topicId]);
   const total = countNested(comments);
   if (total === 0) return null;

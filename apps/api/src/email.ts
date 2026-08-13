@@ -67,20 +67,32 @@ const linked = (label: string, path: string | null): string =>
     ? `<a href="${esc(`${linkBase}${path}`)}">${esc(label)}</a>`
     : esc(label);
 
+/** Walk every href in rendered email HTML and offer the app links (those
+ * under linkBase) to `rewrite`; it returns the replacement URL, or null
+ * to leave the link alone. Non-app links are never touched. */
+function rewriteAppLinks(
+  html: string,
+  rewrite: (url: string) => string | null,
+): string {
+  return html.replace(/href="([^"]*)"/g, (full, raw: string) => {
+    const url = raw.replace(/&amp;/g, "&");
+    if (url !== linkBase && !url.startsWith(`${linkBase}/`)) return full;
+    const next = rewrite(url);
+    return next == null ? full : `href="${esc(next)}"`;
+  });
+}
+
 /** Stamp every app link in a rendered digest with its send row's id
  * (`dg=<id>`), so ANY click marks that digest read — the comment threads
  * it showed become seen (2026-08-13). Must run BEFORE
  * wrapLinksWithSignInTicket so the param rides inside redirect_url. */
 export function stampDigestLinks(html: string, sendId: string): string {
-  return html.replace(/href="([^"]*)"/g, (full, raw: string) => {
-    const url = raw.replace(/&amp;/g, "&");
-    if (url !== linkBase && !url.startsWith(`${linkBase}/`)) return full;
+  return rewriteAppLinks(html, (url) => {
     const [base, fragment] = url.split("#", 2);
     const sep = base!.includes("?") ? "&" : "?";
-    const stamped = `${base}${sep}dg=${encodeURIComponent(sendId)}${
+    return `${base}${sep}dg=${encodeURIComponent(sendId)}${
       fragment ? `#${fragment}` : ""
     }`;
-    return `href="${esc(stamped)}"`;
   });
 }
 
@@ -95,15 +107,12 @@ export function wrapLinksWithSignInTicket(
   html: string,
   ticket: string,
 ): string {
-  return html.replace(/href="([^"]*)"/g, (full, raw: string) => {
-    const url = raw.replace(/&amp;/g, "&");
-    if (url !== linkBase && !url.startsWith(`${linkBase}/`)) return full;
+  return rewriteAppLinks(html, (url) => {
     const path = url.slice(linkBase.length) || "/";
-    if (path.startsWith("/sign-in")) return full;
-    const wrapped = `${linkBase}/sign-in?__clerk_ticket=${encodeURIComponent(
+    if (path.startsWith("/sign-in")) return null;
+    return `${linkBase}/sign-in?__clerk_ticket=${encodeURIComponent(
       ticket,
     )}&redirect_url=${encodeURIComponent(path)}`;
-    return `href="${esc(wrapped)}"`;
   });
 }
 

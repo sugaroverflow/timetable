@@ -654,7 +654,7 @@ async function commentActivities(
   since: Date,
   myTopicIds: string[],
   timetableByTopic: Map<string, string>,
-  commentsSeen: Map<string, Date>,
+  scope: CommentScope,
 ): Promise<RawActivity[]> {
   if (myTopicIds.length === 0) return [];
   const rows = await db
@@ -693,7 +693,7 @@ async function commentActivities(
     const timetableId = timetableByTopic.get(r.topicId) ?? "";
     return (
       r.createdAt >
-      afterSeen(sinceFor(ctx, timetableId), commentsSeen.get(r.topicId))
+      afterSeen(sinceFor(ctx, timetableId), scope.seen.get(r.topicId))
     );
   });
   const chains = await loadAncestorChains(
@@ -756,6 +756,21 @@ async function loadChainScope(userId: string): Promise<Set<string>> {
   return scope;
 }
 
+/** The recipient's comment perspective, loaded once per digest run:
+ * `chains` = comment ids heading dialogues they're part of (the replies
+ * kind's inclusion, the followed/mention kinds' exclusion); `seen` =
+ * their per-topic comments-seen watermarks (every comment kind's
+ * suppression signal). */
+type CommentScope = { chains: Set<string>; seen: Map<string, Date> };
+
+async function loadCommentScope(userId: string): Promise<CommentScope> {
+  const [chains, seen] = await Promise.all([
+    loadChainScope(userId),
+    loadCommentSeenMap(userId),
+  ]);
+  return { chains, seen };
+}
+
 /** New comments in chains the recipient is part of — replies to their
  * comments and continuations of dialogues they joined ({@link
  * loadChainScope}). The email batches a chain's messages into one thread
@@ -764,10 +779,9 @@ async function loadChainScope(userId: string): Promise<Set<string>> {
 async function replyActivities(
   ctx: DigestContext,
   since: Date,
-  chainScope: Set<string>,
-  commentsSeen: Map<string, Date>,
+  scope: CommentScope,
 ): Promise<RawActivity[]> {
-  const chainIds = [...chainScope];
+  const chainIds = [...scope.chains];
   if (chainIds.length === 0) return [];
 
   const rows = await db
@@ -806,7 +820,7 @@ async function replyActivities(
   const fresh = rows.filter(
     (r) =>
       r.createdAt >
-      afterSeen(sinceFor(ctx, r.timetableId), commentsSeen.get(r.topicId)),
+      afterSeen(sinceFor(ctx, r.timetableId), scope.seen.get(r.topicId)),
   );
   const chains = await loadAncestorChains(fresh);
 
@@ -967,8 +981,7 @@ async function followedCommentActivities(
   ctx: DigestContext,
   since: Date,
   follow: "heart" | "hostHeart",
-  chainScope: Set<string>,
-  commentsSeen: Map<string, Date>,
+  scope: CommentScope,
 ): Promise<RawActivity[]> {
   const followTable = follow === "heart" ? hearts : hostHearts;
   const followed = await db
@@ -1031,10 +1044,10 @@ async function followedCommentActivities(
       return false;
     }
     // Chains the recipient is in already ride the `replies` kind.
-    if (r.parentId && chainScope.has(r.parentId)) return false;
+    if (r.parentId && scope.chains.has(r.parentId)) return false;
     return (
       r.createdAt >
-      afterSeen(sinceFor(ctx, timetableId), commentsSeen.get(r.topicId))
+      afterSeen(sinceFor(ctx, timetableId), scope.seen.get(r.topicId))
     );
   });
   const chains = await loadAncestorChains(
@@ -1075,8 +1088,7 @@ async function followedCommentActivities(
 async function mentionActivities(
   ctx: DigestContext,
   since: Date,
-  chainScope: Set<string>,
-  commentsSeen: Map<string, Date>,
+  scope: CommentScope,
 ): Promise<RawActivity[]> {
   const rows = await db
     .select({
@@ -1116,9 +1128,9 @@ async function mentionActivities(
     (r) =>
       // Own-topic comments and your chains' messages are their own kinds.
       r.topicHostId !== ctx.recipient.id &&
-      !(r.parentId && chainScope.has(r.parentId)) &&
+      !(r.parentId && scope.chains.has(r.parentId)) &&
       r.createdAt >
-        afterSeen(sinceFor(ctx, r.timetableId), commentsSeen.get(r.topicId)),
+        afterSeen(sinceFor(ctx, r.timetableId), scope.seen.get(r.topicId)),
   );
   const chains = await loadAncestorChains(fresh);
   return fresh.map((r) => ({
@@ -1462,41 +1474,19 @@ async function collectActivities(
   const wants = (kind: DigestKind) =>
     ctx.forumIds.some((id) => wantsIn(id, kind));
   const none: RawActivity[] = [];
-  // Which comments count as "the recipient's chains" — shared by the
-  // replies kind (inclusion) and the followed/mention kinds (exclusion) —
-  // and their per-topic comments-seen watermarks (suppression).
-  const [chainScope, commentsSeen] = await Promise.all([
-    loadChainScope(ctx.recipient.id),
-    loadCommentSeenMap(ctx.recipient.id),
-  ]);
+  const scope = await loadCommentScope(ctx.recipient.id);
   const collected = await Promise.all([
     wants("comments")
-      ? commentActivities(
-          ctx,
-          since,
-          myTopicIds,
-          timetableByTopic,
-          commentsSeen,
-        )
+      ? commentActivities(ctx, since, myTopicIds, timetableByTopic, scope)
       : none,
     wants("commentsHearted")
-      ? followedCommentActivities(ctx, since, "heart", chainScope, commentsSeen)
+      ? followedCommentActivities(ctx, since, "heart", scope)
       : none,
     wants("commentsHostHearted")
-      ? followedCommentActivities(
-          ctx,
-          since,
-          "hostHeart",
-          chainScope,
-          commentsSeen,
-        )
+      ? followedCommentActivities(ctx, since, "hostHeart", scope)
       : none,
-    wants("replies")
-      ? replyActivities(ctx, since, chainScope, commentsSeen)
-      : none,
-    wants("mentions")
-      ? mentionActivities(ctx, since, chainScope, commentsSeen)
-      : none,
+    wants("replies") ? replyActivities(ctx, since, scope) : none,
+    wants("mentions") ? mentionActivities(ctx, since, scope) : none,
     wants("hearts")
       ? heartActivities(ctx, since, myTopicIds, timetableByTopic)
       : none,
