@@ -840,6 +840,7 @@ builder.mutationFields((t) => ({
       const user = await requireUser(ctx);
       const { topic, viewer } = await loadTopicAndViewer(ctx, args.topicId);
       if (!canHeart(viewer)) forbidden("Electors only");
+      await assertActionLimit(user.id, "heart");
       const { hearted } = await toggleHeart(topic.id, user.id);
       return { topicId: topic.id, hearted };
     },
@@ -855,6 +856,7 @@ builder.mutationFields((t) => ({
       const user = await requireUser(ctx);
       const { topic, viewer } = await loadTopicAndViewer(ctx, args.topicId);
       if (!canHostHeart(viewer)) forbidden("Hosts who aren't electors only");
+      await assertActionLimit(user.id, "heart");
       const { hearted } = await toggleHostHeart(topic.id, user.id);
       return { topicId: topic.id, hearted };
     },

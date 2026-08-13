@@ -1,5 +1,11 @@
+import { ApiTokenPanel, type ApiTokenRow } from "@/components/ApiTokenPanel";
 import { ExportDownloadButton } from "@/components/ExportDownloadButton";
 import { env } from "@/env";
+import { gqlFetch } from "@/lib/graphql";
+
+const TOKENS_QUERY = `query {
+  myApiTokens { id name prefix scopes createdAt lastUsedAt expiresAt revokedAt }
+}`;
 
 export default async function ApiPage({
   params,
@@ -7,6 +13,11 @@ export default async function ApiPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  // Signed-out visitors read this page too (public forums) — they get the docs
+  // without the token panel's data.
+  const { myApiTokens } = await gqlFetch<{
+    myApiTokens: ApiTokenRow[] | null;
+  }>(TOKENS_QUERY).catch(() => ({ myApiTokens: null }));
 
   return (
     <div className="stack">
@@ -37,10 +48,40 @@ export default async function ApiPage({
         <p>
           The endpoint is <code>{env.graphqlUrl}</code>. Read queries return the
           same role-filtered data as the app. The schema is discoverable via
-          introspection. Requests authenticate with the signed-in
-          session&rsquo;s bearer token. Forums with public privacy are readable
-          without authentication.
+          introspection. Forums with public privacy are readable without
+          authentication.
         </p>
+        <p>
+          Requests authenticate with a bearer token: either the signed-in
+          session&rsquo;s (what the app itself uses, refreshed every minute) or
+          a personal token from the section below, which is what scripts and
+          other clients want.
+        </p>
+      </section>
+
+      <section className="stack">
+        <h3 className="section-title">Personal tokens</h3>
+        <p>
+          A personal token is a long-lived credential that acts as you. Send it
+          as <code>Authorization: Bearer tpk_…</code> to the GraphQL endpoint.
+          Tokens are <strong>account-wide</strong> — a token carries your roles
+          in every forum you belong to, not just this one.
+        </p>
+        <p>
+          Every token can read whatever you can read. Writing is opt-in per
+          token, and a token can only ever do a subset of what you can do in the
+          app — the same role checks apply. Some things are off limits to every
+          token no matter what you tick, and no matter your role: moderating or
+          publishing topics, forum settings, member management and invites, and
+          creating or revoking tokens. Those need a signed-in session. The REST
+          endpoints (uploads, invites, the export above) do not accept personal
+          tokens at all.
+        </p>
+        {myApiTokens ? (
+          <ApiTokenPanel tokens={myApiTokens} />
+        ) : (
+          <p className="faint">Sign in to create a token.</p>
+        )}
       </section>
 
       <section className="stack">
@@ -57,7 +98,6 @@ export default async function ApiPage({
       <section className="stack">
         <h3 className="section-title">Planned</h3>
         <ul className="list">
-          <li>Personal API tokens (read-only).</li>
           <li>An MCP server.</li>
         </ul>
       </section>

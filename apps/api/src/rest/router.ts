@@ -95,6 +95,10 @@ function h(
   };
 }
 
+/** REST acts as the signed-in session only. Do NOT pass `allowApiToken` here:
+ * personal-token scopes are enforced by a GraphQL plugin that never sees a
+ * REST request, so accepting a token on this surface would hand any token the
+ * whole admin API (invites, roles, uploads, export) unscoped. */
 function contextFromRequest(req: Request) {
   return buildContext({
     authHeader: req.headers.authorization,

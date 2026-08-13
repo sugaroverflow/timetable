@@ -1,11 +1,13 @@
 import { z } from "zod";
 
+import { API_TOKEN_SCOPES } from "./apiTokens";
 import { ASSIGNABLE_ROLES, PRIVACY_LEVELS, ROLES } from "./roles";
 import { CONFIRM_POLICIES } from "./settings";
 
 const roleEnum = z.enum(ROLES);
 const assignableRoleEnum = z.enum(ASSIGNABLE_ROLES);
 const privacyEnum = z.enum(PRIVACY_LEVELS);
+const tokenScopeEnum = z.enum(API_TOKEN_SCOPES);
 
 /**
  * Canonical email form used everywhere emails are stored or compared
@@ -61,6 +63,15 @@ export const updateMemberRolesSchema = z.object({
   roles: z.array(roleEnum),
 });
 export type UpdateMemberRolesInput = z.infer<typeof updateMemberRolesSchema>;
+
+/** Creating a personal API token. An empty `scopes` array is valid and
+ * meaningful — it makes a read-only token. */
+export const createApiTokenSchema = z.object({
+  name: z.string().min(1, "Name is required").max(60),
+  scopes: z.array(tokenScopeEnum).max(API_TOKEN_SCOPES.length),
+  expiresInDays: z.number().int().min(1).max(3650).nullable().optional(),
+});
+export type CreateApiTokenInput = z.infer<typeof createApiTokenSchema>;
 
 export const updateProfileSchema = z.object({
   name: z.string().min(1).max(120).optional(),

@@ -4,8 +4,14 @@ import {
   getViewerRoles,
   type ReadableTimetable,
 } from "@timetable/core";
-import { isAdmin, type Role, type Viewer } from "@timetable/shared";
+import {
+  isAdmin,
+  type Role,
+  type TokenScope,
+  type Viewer,
+} from "@timetable/shared";
 
+import { extractApiToken, getUserFromApiToken } from "./auth/api-token";
 import { getUserFromRequest, type SessionUser } from "./auth/clerk";
 import { isSysadmin } from "./auth/sysadmin";
 import { structuredLogger } from "./http/request-log";
@@ -16,8 +22,18 @@ type Impersonation = {
   timetableId: string;
 };
 
+/** The personal API token the request authenticated with, when it did. Its
+ * presence is what makes the scope check in graphql/token-scopes.ts apply —
+ * session-authenticated requests leave this null and are unaffected. */
+type ApiTokenAuth = {
+  id: string;
+  scopes: TokenScope[];
+};
+
 export type ApiContext = {
   user: SessionUser | null;
+  /** Non-null only on requests authenticated by a personal API token. */
+  apiToken: ApiTokenAuth | null;
   /** Set while an admin previews a timetable as another member (QA #59
    * round 3): `user` is the preview target for reads; every GraphQL
    * mutation is blocked while this is set. */
@@ -75,7 +91,34 @@ export async function buildContext(args: {
   authHeader?: string | null;
   cookieHeader?: string | null;
   viewAsHeader?: string | null;
+  /**
+   * Whether a personal API token may authenticate this request. ONLY the
+   * GraphQL entry point passes true.
+   *
+   * Scope enforcement is a GraphQL plugin (graphql/token-scopes.ts), so it
+   * cannot see REST requests. If REST accepted personal tokens, a token
+   * scoped to nothing but `hearts:write` would arrive at
+   * POST /api/forums/:id/invites, PATCH /api/memberships/:id/roles, and the
+   * rest of the admin surface as a fully authenticated user — the scopes
+   * would be decorative. Defaulting to false keeps that closed by
+   * construction rather than by a guard every new REST route must remember.
+   */
+  allowApiToken?: boolean;
 }): Promise<ApiContext> {
+  const presentedToken = args.allowApiToken
+    ? extractApiToken(args.authHeader)
+    : null;
+  if (presentedToken) {
+    // A personal token acts as its owner, always: no impersonation preview
+    // (x-view-as is ignored) and no cookie fallback.
+    const identity = await getUserFromApiToken(presentedToken);
+    return baseContext({
+      user: identity?.user ?? null,
+      apiToken: identity?.token ?? null,
+      impersonation: null,
+    });
+  }
+
   const actual = await getUserFromRequest(args.authHeader, args.cookieHeader);
 
   let user = actual;
@@ -88,6 +131,18 @@ export async function buildContext(args: {
     }
   }
 
+  return baseContext({ user, apiToken: null, impersonation });
+}
+
+/** The request-scoped viewer/memo machinery, shared by both credential
+ * paths so they can't drift. */
+function baseContext(args: {
+  user: SessionUser | null;
+  apiToken: ApiTokenAuth | null;
+  impersonation: Impersonation | null;
+}): ApiContext {
+  const { user, apiToken, impersonation } = args;
+
   // Caveat: within a single multi-mutation document, a role-changing
   // mutation won't invalidate the memo (acceptable — mutations that change
   // roles don't re-read them today).
@@ -97,6 +152,7 @@ export async function buildContext(args: {
 
   return {
     user,
+    apiToken,
     impersonation,
     async getViewer(timetableId: string): Promise<Viewer> {
       const roles = await getViewerRoles(user?.id ?? null, timetableId);
