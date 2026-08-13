@@ -6,6 +6,8 @@ import { useSearchParams } from "next/navigation";
 import { clientGql } from "@/lib/clientGraphql";
 import type { FeedComment } from "@/lib/feedTypes";
 
+import { useCommentsOpen } from "./CommentsOpenScope";
+
 const MARK_SEEN = `mutation($id: String!){ markCommentsSeen(topicId: $id) }`;
 
 /** Fire-and-forget comments-seen bump — expanding IS the engagement; the
@@ -86,16 +88,21 @@ export function CommentTeaser({
   const [open, setOpen] = useState(() =>
     treeContains(comments, searchParams.get("reply")),
   );
-  // Opening (click or deep link) is the engagement signal — mark once.
+  // The card's 💬 button and top-composer also open the tree
+  // (comments-open-scope, QA 2026-08-13) — derived, not mirrored state.
+  const { requestId } = useCommentsOpen();
+  const opened = open || requestId > 0;
+  // Opening (click, deep link, 💬, or posting) is the engagement signal —
+  // mark once.
   const marked = useRef(false);
   useEffect(() => {
-    if (!open || marked.current) return;
+    if (!opened || marked.current) return;
     marked.current = true;
     markSeen(topicId);
-  }, [open, topicId]);
+  }, [opened, topicId]);
   const total = countNested(comments);
   if (total === 0) return null;
-  if (open) return <>{children}</>;
+  if (opened) return <>{children}</>;
 
   const openTree = () => setOpen(true);
 

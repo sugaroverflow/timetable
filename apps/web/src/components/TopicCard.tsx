@@ -9,6 +9,7 @@ import { Avatar } from "./Avatar";
 import { CollapsibleTopicBody } from "./CollapsibleTopicBody";
 import { CommentComposer } from "./CommentComposer";
 import { CommentList } from "./CommentList";
+import { CommentsOpenScope } from "./CommentsOpenScope";
 import { CommentTeaser } from "./CommentTeaser";
 import { HostOnlyPanel } from "./HostOnlyPanel";
 import { HostTopicActions } from "./HostTopicActions";
@@ -358,25 +359,29 @@ export function TopicCard({
           />
         }
       >
-        <ActionsSlot
-          topic={topic}
-          perms={perms}
-          slug={slug}
-          viewerId={viewerId}
-          viewerHeartCount={viewerHeartCount}
-          electorLabel={electorLabel}
-          queueControls={queueControls}
-        />
+        {/* comments-open-scope: the 💬 button and top-composer unfold the
+            teaser below them (QA 2026-08-13). */}
+        <CommentsOpenScope>
+          <ActionsSlot
+            topic={topic}
+            perms={perms}
+            slug={slug}
+            viewerId={viewerId}
+            viewerHeartCount={viewerHeartCount}
+            electorLabel={electorLabel}
+            queueControls={queueControls}
+          />
 
-        <CommentSection
-          topic={topic}
-          perms={perms}
-          slug={slug}
-          publicComments={publicComments}
-          open={discussionOpen}
-          viewerId={viewerId}
-          roleLabels={roleLabels}
-        />
+          <CommentSection
+            topic={topic}
+            perms={perms}
+            slug={slug}
+            publicComments={publicComments}
+            open={discussionOpen}
+            viewerId={viewerId}
+            roleLabels={roleLabels}
+          />
+        </CommentsOpenScope>
 
         <TopicTail
           topic={topic}
