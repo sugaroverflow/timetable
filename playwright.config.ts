@@ -23,9 +23,19 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "npm run dev --workspace @timetable/web -- --hostname 127.0.0.1",
+    // --port must be threaded through: the workspace's dev script pins
+    // `next dev -p 3000`, so without this PLAYWRIGHT_PORT moved only the
+    // baseURL and the suite waited on a port nothing was ever served on.
+    command: `npm run dev --workspace @timetable/web -- --hostname 127.0.0.1 --port ${port}`,
     url: baseURL,
-    reuseExistingServer: !process.env.CI,
+    // Never reuse. Reuse trusts whatever answers on the port to BE this app,
+    // and a dev machine running any other service on 3000 (a second Next
+    // project, a CRM, anything) silently hijacks the whole suite: Playwright
+    // skips starting the web server and asserts against the stranger's UI,
+    // which fails as unreadable "element not visible" errors far from the
+    // cause. Failing loudly with "port is already used" is the better trade —
+    // set PLAYWRIGHT_PORT to a free port to run alongside whatever holds 3000.
+    reuseExistingServer: false,
     timeout: 120_000,
     env: {
       E2E_TEST_MODE: "1",
