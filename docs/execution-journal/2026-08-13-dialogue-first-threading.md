@@ -49,6 +49,26 @@ mutation (self-scoped, any viewer who can load the topic);
 padded to at least the three latest. Scroll-into-view tracking (Ed:
 "ideal but can live without it") deliberately skipped.
 
+## Round 4 (same day): digests ride comment_seen + click-to-read
+
+- The four comment collectors (comments / replies / followed / mentions)
+  now suppress against the per-topic `comment_seen` watermark instead of
+  the blanket feed/notifications-page watermarks — only engaging with a
+  discussion quiets its emails. `ctx.seenNotificationsAt` deleted;
+  `seenFeedAt` survives for ❤️ cards only.
+- **Click-to-read** (Ed: "if anything in the digest is clicked, that
+  digest can be thought of as read and its contents seen"): new
+  `digest_sends` table (migration 0036 — one row per sent digest email,
+  storing which topics' cards showed comment threads; doubles as a send
+  log). `stampDigestLinks` rides `dg=<send id>` on every app link (before
+  the sign-in-ticket wrap, so it survives inside redirect_url);
+  `DigestReadMarker` in the app layout watches every page for `?dg=`,
+  fires `markDigestRead`, and strips the param. Marking bumps
+  `comment_seen` to the SEND time via `GREATEST` (ISO-string cast, never
+  a raw Date in a sql template — the Drizzle gotcha), so later in-app
+  engagement is never regressed and comments newer than the email stay
+  new. Send-time marking was considered and rejected — sent ≠ read.
+
 ## Notes
 
 - CommentActions lost its `?reply=` deep-link auto-open (tails own it now).

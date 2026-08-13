@@ -15,7 +15,9 @@ import {
   activityEvents,
   commentMentions,
   comments,
+  commentSeen,
   db,
+  digestSends,
   hearts,
   hostHearts,
   timeslots,
@@ -233,11 +235,10 @@ type DigestContext = {
   /** Per-forum role labels (host/admin) for thread headings. */
   hostLabel: Map<string, string>;
   adminLabel: Map<string, string>;
-  /** Per-forum "seen it in the app" watermarks: feed visits cover ambient
-   * ❤️ counts; notifications-page visits cover comments/replies. New topics
-   * use topic_seen rows instead (deliberate queue reviews). */
+  /** Per-forum feed watermark: covers ambient ❤️ counts only. Comments
+   * use per-topic comment_seen watermarks (engagement, 2026-08-13); new
+   * topics use topic_seen rows (deliberate queue reviews). */
   seenFeedAt: Map<string, Date | null>;
-  seenNotificationsAt: Map<string, Date | null>;
   electorTimetableIds: string[];
   /** Forums where the recipient holds the host role (round 2: host
    * variants of the new-topic and follow kinds, slot releases). */
@@ -359,9 +360,6 @@ async function loadDigestContext(
     ),
     seenFeedAt: new Map(
       memberships.map((m) => [m.timetableId, m.lastSeenFeedAt]),
-    ),
-    seenNotificationsAt: new Map(
-      memberships.map((m) => [m.timetableId, m.lastSeenNotificationsAt]),
     ),
     electorTimetableIds: memberships
       .filter((m) => m.roles.includes("elector"))
@@ -656,6 +654,7 @@ async function commentActivities(
   since: Date,
   myTopicIds: string[],
   timetableByTopic: Map<string, string>,
+  commentsSeen: Map<string, Date>,
 ): Promise<RawActivity[]> {
   if (myTopicIds.length === 0) return [];
   const rows = await db
@@ -694,10 +693,7 @@ async function commentActivities(
     const timetableId = timetableByTopic.get(r.topicId) ?? "";
     return (
       r.createdAt >
-      afterSeen(
-        sinceFor(ctx, timetableId),
-        ctx.seenNotificationsAt.get(timetableId),
-      )
+      afterSeen(sinceFor(ctx, timetableId), commentsSeen.get(r.topicId))
     );
   });
   const chains = await loadAncestorChains(
@@ -729,6 +725,19 @@ async function commentActivities(
   }));
 }
 
+/** All the recipient's per-topic comments-seen watermarks (engagement:
+ * teaser expand, permalink visit, digest click — 2026-08-13). The comment
+ * collectors' suppression signal, replacing the blanket feed/notification
+ * page watermarks: only actually engaging with a discussion quiets its
+ * emails. */
+async function loadCommentSeenMap(userId: string): Promise<Map<string, Date>> {
+  const rows = await db
+    .select({ topicId: commentSeen.topicId, seenAt: commentSeen.seenAt })
+    .from(commentSeen)
+    .where(eq(commentSeen.userId, userId));
+  return new Map(rows.map((r) => [r.topicId, r.seenAt]));
+}
+
 /** The comment ids whose NEW children are thread activity for this user
  * (dialogue-first threading, 2026-08-13): their own comments (someone
  * replied to them / continued their chain — chains attach every message
@@ -756,6 +765,7 @@ async function replyActivities(
   ctx: DigestContext,
   since: Date,
   chainScope: Set<string>,
+  commentsSeen: Map<string, Date>,
 ): Promise<RawActivity[]> {
   const chainIds = [...chainScope];
   if (chainIds.length === 0) return [];
@@ -791,15 +801,12 @@ async function replyActivities(
       ),
     );
 
-  // Replies live on the Notifications page — a visit there after the reply
-  // means it was seen in the app; don't email it.
+  // Engaging with the topic's discussion (teaser expand, permalink,
+  // digest click) means the chain was seen in the app; don't email it.
   const fresh = rows.filter(
     (r) =>
       r.createdAt >
-      afterSeen(
-        sinceFor(ctx, r.timetableId),
-        ctx.seenNotificationsAt.get(r.timetableId),
-      ),
+      afterSeen(sinceFor(ctx, r.timetableId), commentsSeen.get(r.topicId)),
   );
   const chains = await loadAncestorChains(fresh);
 
@@ -961,6 +968,7 @@ async function followedCommentActivities(
   since: Date,
   follow: "heart" | "hostHeart",
   chainScope: Set<string>,
+  commentsSeen: Map<string, Date>,
 ): Promise<RawActivity[]> {
   const followTable = follow === "heart" ? hearts : hostHearts;
   const followed = await db
@@ -1026,7 +1034,7 @@ async function followedCommentActivities(
     if (r.parentId && chainScope.has(r.parentId)) return false;
     return (
       r.createdAt >
-      afterSeen(sinceFor(ctx, timetableId), ctx.seenFeedAt.get(timetableId))
+      afterSeen(sinceFor(ctx, timetableId), commentsSeen.get(r.topicId))
     );
   });
   const chains = await loadAncestorChains(
@@ -1068,6 +1076,7 @@ async function mentionActivities(
   ctx: DigestContext,
   since: Date,
   chainScope: Set<string>,
+  commentsSeen: Map<string, Date>,
 ): Promise<RawActivity[]> {
   const rows = await db
     .select({
@@ -1109,10 +1118,7 @@ async function mentionActivities(
       r.topicHostId !== ctx.recipient.id &&
       !(r.parentId && chainScope.has(r.parentId)) &&
       r.createdAt >
-        afterSeen(
-          sinceFor(ctx, r.timetableId),
-          ctx.seenNotificationsAt.get(r.timetableId),
-        ),
+        afterSeen(sinceFor(ctx, r.timetableId), commentsSeen.get(r.topicId)),
   );
   const chains = await loadAncestorChains(fresh);
   return fresh.map((r) => ({
@@ -1457,20 +1463,40 @@ async function collectActivities(
     ctx.forumIds.some((id) => wantsIn(id, kind));
   const none: RawActivity[] = [];
   // Which comments count as "the recipient's chains" — shared by the
-  // replies kind (inclusion) and the followed/mention kinds (exclusion).
-  const chainScope = await loadChainScope(ctx.recipient.id);
+  // replies kind (inclusion) and the followed/mention kinds (exclusion) —
+  // and their per-topic comments-seen watermarks (suppression).
+  const [chainScope, commentsSeen] = await Promise.all([
+    loadChainScope(ctx.recipient.id),
+    loadCommentSeenMap(ctx.recipient.id),
+  ]);
   const collected = await Promise.all([
     wants("comments")
-      ? commentActivities(ctx, since, myTopicIds, timetableByTopic)
+      ? commentActivities(
+          ctx,
+          since,
+          myTopicIds,
+          timetableByTopic,
+          commentsSeen,
+        )
       : none,
     wants("commentsHearted")
-      ? followedCommentActivities(ctx, since, "heart", chainScope)
+      ? followedCommentActivities(ctx, since, "heart", chainScope, commentsSeen)
       : none,
     wants("commentsHostHearted")
-      ? followedCommentActivities(ctx, since, "hostHeart", chainScope)
+      ? followedCommentActivities(
+          ctx,
+          since,
+          "hostHeart",
+          chainScope,
+          commentsSeen,
+        )
       : none,
-    wants("replies") ? replyActivities(ctx, since, chainScope) : none,
-    wants("mentions") ? mentionActivities(ctx, since, chainScope) : none,
+    wants("replies")
+      ? replyActivities(ctx, since, chainScope, commentsSeen)
+      : none,
+    wants("mentions")
+      ? mentionActivities(ctx, since, chainScope, commentsSeen)
+      : none,
     wants("hearts")
       ? heartActivities(ctx, since, myTopicIds, timetableByTopic)
       : none,
@@ -1679,6 +1705,75 @@ function buildCards(
     (a, b) => cardTier(a) - cardTier(b) || cardRecency(b) - cardRecency(a),
   );
   return cards;
+}
+
+/** Topics whose card showed a comment/reply thread in this digest — what
+ * a digest click marks seen. */
+export function digestCommentTopicIds(digest: ForumDigest): string[] {
+  return digest.topics
+    .filter((card) =>
+      card.activities.some((a) => a.kind === "comment" || a.kind === "reply"),
+    )
+    .map((card) => card.topicId);
+}
+
+/** Persist one sent digest email's read-tracking row (2026-08-13); its id
+ * rides every app link in that email as `dg=<id>`. */
+export async function recordDigestSend(
+  digest: ForumDigest,
+  sentAt: Date,
+): Promise<string> {
+  const [row] = await db
+    .insert(digestSends)
+    .values({
+      userId: digest.userId,
+      timetableId: digest.forumId,
+      commentTopicIds: digestCommentTopicIds(digest),
+      sentAt,
+    })
+    .returning({ id: digestSends.id });
+  if (!row) throw new Error("Failed to record digest send");
+  return row.id;
+}
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** A digest link was clicked — that email is read, so every comment
+ * thread it showed is seen up to its send time. GREATEST keeps any later
+ * in-app engagement; comments newer than the send stay "new" (the email
+ * never showed them). */
+export async function markDigestRead(
+  userId: string,
+  sendId: string,
+): Promise<boolean> {
+  if (!UUID_RE.test(sendId)) return false;
+  const [send] = await db
+    .select()
+    .from(digestSends)
+    .where(and(eq(digestSends.id, sendId), eq(digestSends.userId, userId)))
+    .limit(1);
+  if (!send) return false;
+  if (send.commentTopicIds.length === 0) return true;
+  // ISO string + explicit cast, NEVER a raw Date param in a sql template
+  // (the Drizzle date-mapping gotcha — see CLAUDE.md).
+  const sentIso = send.sentAt.toISOString();
+  await db
+    .insert(commentSeen)
+    .values(
+      send.commentTopicIds.map((topicId) => ({
+        topicId,
+        userId,
+        seenAt: send.sentAt,
+      })),
+    )
+    .onConflictDoUpdate({
+      target: [commentSeen.topicId, commentSeen.userId],
+      set: {
+        seenAt: sql`GREATEST(${commentSeen.seenAt}, ${sentIso}::timestamptz)`,
+      },
+    });
+  return true;
 }
 
 /** Whether one activity justifies sending an email. Drafts never do;

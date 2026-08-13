@@ -27,6 +27,7 @@ import {
   listHostTopics,
   markForumDigestsSent,
   markInviteSent,
+  recordDigestSend,
   removeMembership,
   setMemberRoles,
   updateUserEmail,
@@ -63,6 +64,7 @@ import {
   renderInvite,
   renderNewForum,
   sendEmail,
+  stampDigestLinks,
   wrapLinksWithSignInTicket,
 } from "../email";
 import { env } from "../env";
@@ -777,13 +779,19 @@ restRouter.post(
           for (const digest of digests) {
             if (!digest.email) continue;
             const { subject, html } = renderDigest(digest);
+            // Read tracking (2026-08-13): every link carries the send row's
+            // id — one click marks the digest's shown threads seen.
+            const sendId = await recordDigestSend(digest, now);
+            const stamped = stampDigestLinks(html, sendId);
             // One single-use ticket per email; null (Clerk hiccup) degrades
             // to plain links, never blocks the send.
             const ticket = await createSignInTicket(digest.userId);
             await sendEmail({
               to: digest.email,
               subject,
-              html: ticket ? wrapLinksWithSignInTicket(html, ticket) : html,
+              html: ticket
+                ? wrapLinksWithSignInTicket(stamped, ticket)
+                : stamped,
             });
             didSend += 1;
           }

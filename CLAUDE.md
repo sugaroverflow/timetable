@@ -128,7 +128,12 @@ Stable names for feature pieces, so instructions can reference them precisely.
   scrolling.
 - **chain-reply digests** — `loadChainScope` in `packages/core/src/digests.ts`:
   the `replies` digest kind covers new comments in chains the recipient is
-  part of, batched per chain by the email's thread merge.
+  part of, batched per chain by the email's thread merge. All comment kinds
+  suppress against `comment_seen` (engagement), not page watermarks.
+- **digest click-to-read** — `digest_sends` table + `stampDigestLinks`
+  (api `email.ts`) + `DigestReadMarker` (app layout): every digest link
+  carries `dg=<send id>`; one click marks that email's shown comment
+  threads seen up to its send time (`markDigestRead`, GREATEST semantics).
 
 ## Gotchas (learned the hard way)
 
