@@ -68,6 +68,13 @@ export function AdminCommentsPanel({
       <Collapsible.Panel>
         {expanded && (
           <div className="host-thread thread-stack">
+            <CommentComposer
+              topicId={topicId}
+              visibility="admin_only"
+              adminLabel={adminLabel}
+              placeholder={`Add a comment… (${composerHint})`}
+              successMessage="Comment added"
+            />
             <CommentList
               comments={comments}
               canReply={true}
@@ -75,13 +82,6 @@ export function AdminCommentsPanel({
               viewerId={viewerId}
               slug={slug}
               roleLabels={roleLabels}
-            />
-            <CommentComposer
-              topicId={topicId}
-              visibility="admin_only"
-              adminLabel={adminLabel}
-              placeholder={`Add a comment… (${composerHint})`}
-              successMessage="Comment added"
             />
           </div>
         )}

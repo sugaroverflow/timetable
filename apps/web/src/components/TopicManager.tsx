@@ -302,6 +302,9 @@ export function TopicManager({
           </>
         }
       >
+        {topic.status === "published" ? (
+          <CommentComposer topicId={topic.id} mentionSlug={slug} />
+        ) : null}
         {publicComments.length > 0 ? (
           <CommentList
             comments={publicComments}
@@ -311,9 +314,6 @@ export function TopicManager({
             slug={slug}
             roleLabels={roleLabels}
           />
-        ) : null}
-        {topic.status === "published" ? (
-          <CommentComposer topicId={topic.id} mentionSlug={slug} />
         ) : null}
 
         {/* No 💙 toggle on your own topic: read-only row. */}

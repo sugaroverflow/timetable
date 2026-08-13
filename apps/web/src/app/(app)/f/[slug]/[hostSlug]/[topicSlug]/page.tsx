@@ -159,6 +159,7 @@ export default async function TopicPermalinkPage({
         electorLabel={roleLabel(settings.roleLabels, "elector")}
         viewerHeartCount={data.timetable?.viewerHeartedPublishedCount ?? null}
         hosts={data.timetableHosts}
+        discussionOpen
         hostCommentsEnabled={isHostCommentsEnabled(settings)}
       />
       <DraftingThread

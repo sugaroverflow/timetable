@@ -315,6 +315,11 @@ function buildCommentTree(rows: CommentTreeRow[]): CommentNode[] {
     if (parent) parent.replies.push(node);
     else roots.push(node);
   }
+  // Dialogue-first threading (2026-08-13): newest top-level comment first —
+  // the composer sits at the top of the stack, so a fresh comment appears
+  // right where it was typed. Replies keep input (createdAt asc) order:
+  // chains read downward as dialogues.
+  roots.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   return pruneDeleted(roots);
 }
 

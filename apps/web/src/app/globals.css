@@ -813,22 +813,6 @@ textarea {
   text-decoration: underline;
 }
 
-/* "View N replies" / "View all N comments" disclosure */
-.thread-toggle {
-  border: none;
-  background: none;
-  padding: 4px 0;
-  font-size: var(--text-xs);
-  font-weight: var(--fw-semibold);
-  color: var(--muted);
-  cursor: pointer;
-  text-align: left;
-}
-.thread-toggle:hover {
-  color: var(--ink);
-  text-decoration: underline;
-}
-
 .muted {
   color: var(--muted);
 }
@@ -1411,6 +1395,47 @@ optgroup {
   font-size: var(--text-xs);
   padding: 0;
 }
+/* Dialogue-first threading (2026-08-13): the open discussion section
+   (permalink page) — top-composer above the thread. The section carries
+   the divider, so the inner .comments gives its border up. */
+.comment-section {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.comment-section .comments {
+  border-top: 0;
+  padding-top: 0;
+}
+/* Same ❤️-pill air rule as .card-actions + .comments (QA 2026-08-10). */
+.card-actions + .comment-section {
+  margin-top: -13px;
+}
+/* chain-tail-composer: quieter than the section composer — a slimmer box
+   reading as "continue", not "start". */
+.tail-composer textarea {
+  height: 34px;
+  min-height: 34px;
+  font-size: var(--text-sm);
+}
+.tail-composer .btn-send {
+  transform: scale(0.85);
+}
+/* comment-teaser: the collapsed latest-comment line under the toggle. */
+.teaser-snippet {
+  margin: 2px 0 0 20px;
+  font-size: var(--text-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.teaser-count-new {
+  color: var(--primary);
+  font-weight: var(--fw-semibold);
+}
+
 .replies {
   margin-top: 10px;
   /* Threads now nest to 8 fetched levels (was 3) — a shallow 6px step

@@ -162,6 +162,11 @@ export function HostOnlyPanel({
                 }
               />
             ) : null}
+            <CommentComposer
+              topicId={topicId}
+              visibility="host_only"
+              hostLabel={hostLabel}
+            />
             <CommentList
               comments={comments}
               canReply={true}
@@ -169,11 +174,6 @@ export function HostOnlyPanel({
               viewerId={viewerId}
               slug={slug}
               roleLabels={roleLabels}
-            />
-            <CommentComposer
-              topicId={topicId}
-              visibility="host_only"
-              hostLabel={hostLabel}
             />
           </div>
         )}

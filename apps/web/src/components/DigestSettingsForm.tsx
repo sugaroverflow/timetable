@@ -48,7 +48,7 @@ const KIND_LABELS: Record<DigestKind, (hosts: string) => string> = {
   comments: () => "Comments on your topics",
   commentsHearted: () => "Comments on topics you ❤️'d",
   commentsHostHearted: () => "Comments on topics you 💙'd",
-  replies: () => "Replies to your comments",
+  replies: () => "New comments in threads you're part of",
   mentions: () => "Comments that @mention you",
   hearts: () => "❤️s on your topics",
   hostHearts: (hosts) => `💙s from fellow ${hosts} on your topics`,
