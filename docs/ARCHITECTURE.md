@@ -275,13 +275,14 @@ Main mutations cover:
   author edit/delete and admin hide (`updateSlotComment`,
   `deleteSlotComment`, `hideSlotComment`)
 - the session lifecycle (`addSlotSession`: a topic, an office-hours
-  `sessionHostId`, or an admin-only custom `title`, at a `location`;
-  `updateSlotSession` for confirm/URL; `clearSlotSession`), gated by the
-  forum's confirm policy and the never-displace rule per booking
-  (`canTouchSlotSession` against `session_host_id`; custom sessions gate
-  on the admin bit). Several bookings can share a slot — the location is
-  the contended resource. Calendar actions are activity-logged and
-  session events notify the topic's hearters
+  `sessionHostId`, or an admin-only custom `title` — always location-less;
+  `updateSlotSession` for confirm/URL/location — the room is assigned at
+  confirm time, and confirmed sessions are exclusive per (slot, location);
+  `clearSlotSession`), gated by the forum's confirm policy and the
+  never-displace rule per booking (`canTouchSlotSession` against
+  `session_host_id`; custom sessions gate on the admin bit). Any number of
+  pencils can share a slot; only confirmed rooms contend. Calendar actions
+  are activity-logged and session events notify the topic's hearters
 - topic publishing by the owning host when
   `settings.topics.hostsPublishDirectly` is on (same `moderateTopic`
   mutation; admin review becomes post-hoc)
@@ -352,8 +353,10 @@ Core tables:
   legacy/location-free forum)
 - `slot_sessions` (bookings, zero-to-many per slot; pencils are
   location-less time-intents since 2026-08-14 — unique per slot+topic,
-  plus one office-hours pencil per slot+host; `location` is display copy
-  only. A singular `topic_id` OR `session_host_id` (THE ownership column:
+  plus one office-hours pencil per slot+host; `location` is assigned at
+  confirm time, and a partial unique index makes confirmed sessions
+  exclusive per slot+non-empty location. A singular `topic_id` OR
+  `session_host_id` (THE ownership column:
   the topic's host, or the host themselves for topic-less "office hours")
   OR an admin-only `custom_title`; `status` `proposed`/`confirmed` + `url`
   — an empty slot simply has no rows)

@@ -44,7 +44,9 @@ export function ProposeSlotForm({
   const [end, setEnd] = useState("");
   const [location, setLocation] = useState("");
   // Slot locations (2026-08-11): forums with configured locations require
-  // one on every new slot — the proposal creates the slot, so it chooses.
+  // one on every new slot — the proposal creates the slot, so it chooses
+  // what the slot OFFERS. The session itself is pencilled location-less;
+  // the room is decided at confirm time (2026-08-14).
   const needsLocation = locations.length > 0 && !location.trim();
 
   function submit(e: React.FormEvent) {
@@ -92,7 +94,9 @@ export function ProposeSlotForm({
       <form onSubmit={submit} className="stack" style={{ gap: 8 }}>
         <p className="faint" style={{ margin: 0, fontSize: 12 }}>
           Off the usual grid — breakfast, a full day, the park. It appears as a
-          pencilled slot and starts collecting availability right away.
+          pencilled slot and starts collecting availability right away; the
+          location is what the new timeslot offers (the room itself is decided
+          at confirm time).
         </p>
         <div className="row wrap" style={{ gap: 8 }}>
           <select
