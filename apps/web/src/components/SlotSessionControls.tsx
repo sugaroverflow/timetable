@@ -14,11 +14,11 @@ import { groupTopicsByHost } from "@/lib/calendarTypes";
 import { topicPath } from "@/lib/topicPath";
 import { useGqlAction } from "@/lib/useGqlAction";
 
-const ADD_SESSION = `mutation($slot: String!, $loc: String, $topic: String, $sh: String, $title: String, $url: String) {
-  addSlotSession(slotId: $slot, location: $loc, topicId: $topic, sessionHostId: $sh, title: $title, url: $url)
+const ADD_SESSION = `mutation($slot: String!, $topic: String, $sh: String, $title: String, $url: String) {
+  addSlotSession(slotId: $slot, topicId: $topic, sessionHostId: $sh, title: $title, url: $url)
 }`;
-const UPDATE_SESSION = `mutation($session: String!, $status: String, $url: String) {
-  updateSlotSession(sessionId: $session, status: $status, url: $url)
+const UPDATE_SESSION = `mutation($session: String!, $status: String, $url: String, $loc: String) {
+  updateSlotSession(sessionId: $session, status: $status, url: $url, location: $loc)
 }`;
 const CLEAR_SESSION = `mutation($session: String!) {
   clearSlotSession(sessionId: $session)
@@ -159,37 +159,25 @@ export function SessionChoiceOptions({
 const CUSTOM_CHOICE = "custom:";
 
 /** "Pencil in…" — book a session into the slot: a topic, office hours, or
- * (admins) a custom event with its own title and link, at a location the
- * slot doesn't already use. Shown even when the slot has bookings —
- * several sessions can share a time in different locations. */
+ * (admins) a custom event with its own title and link. Pencilling is a
+ * location-less time-intent (2026-08-14) — the room is decided at confirm
+ * time — so any number of subjects can share a slot. */
 function PencilInControl({
   slot,
-  locations,
   claimTopics,
   perms,
   officeHoursLabel,
 }: {
   slot: CalendarSlot;
-  /** The forum's configured locations — datalist suggestions on legacy
-   * slots with no offered set of their own. */
-  locations: string[];
   claimTopics: TopicOption[];
   perms: CalendarPerms;
   officeHoursLabel: string;
 }) {
   const { run, busy } = useGqlAction();
-  // Slot locations (2026-08-11): the booking picks one of the slot's
-  // offered locations — preselected when there's only one.
-  const offered = slot.locations;
-  const booked = new Set(slot.sessions.map((s) => s.location));
   const [choice, setChoice] = useState("");
-  const [location, setLocation] = useState(
-    offered.length === 1 ? offered[0]! : "",
-  );
   const [title, setTitle] = useState("");
   const [url, setUrl] = useState("");
   const custom = choice === CUSTOM_CHOICE;
-  const needsLocation = offered.length > 0 && !location;
 
   function pencilVars() {
     return custom
@@ -218,30 +206,6 @@ function PencilInControl({
           <option value={CUSTOM_CHOICE}>Custom event…</option>
         ) : null}
       </select>
-      {choice && offered.length > 0 ? (
-        <select
-          aria-label="Location"
-          value={location}
-          onChange={(e) => setLocation(e.target.value)}
-          style={{ width: "auto" }}
-        >
-          <option value="">Location…</option>
-          {offered.map((l) => (
-            <option key={l} value={l} disabled={booked.has(l)}>
-              {l}
-              {booked.has(l) ? " (taken)" : ""}
-            </option>
-          ))}
-        </select>
-      ) : choice ? (
-        <input
-          aria-label="Location"
-          placeholder="Location"
-          list="cal-locations"
-          value={location}
-          onChange={(e) => setLocation(e.target.value)}
-        />
-      ) : null}
       {custom ? (
         <>
           <input
@@ -258,25 +222,19 @@ function PencilInControl({
           />
         </>
       ) : null}
-      <datalist id="cal-locations">
-        {locations.map((l) => (
-          <option key={l} value={l} />
-        ))}
-      </datalist>
       <button
         type="button"
         className="btn"
-        disabled={busy || !choice || needsLocation || (custom && !title.trim())}
+        disabled={busy || !choice || (custom && !title.trim())}
         onClick={() =>
           void run(
             ADD_SESSION,
-            { slot: slot.id, loc: location.trim() || null, ...pencilVars() },
+            { slot: slot.id, ...pencilVars() },
             {
               success: "Pencilled in",
               errorFallback: "Could not pencil in",
               onSuccess: () => {
                 setChoice("");
-                setLocation(offered.length === 1 ? offered[0]! : "");
                 setTitle("");
                 setUrl("");
               },
@@ -290,23 +248,131 @@ function PencilInControl({
   );
 }
 
-/** Confirm / URL / clear for one booking. */
+/** The confirm-time room picker: a select over the slot's offered
+ * locations — options another confirmed session already holds are
+ * disabled — or free text with the forum-locations datalist when the slot
+ * offers none. (Forums with no locations at all never render this.) */
+function SessionLocationPicker({
+  offered,
+  taken,
+  locations,
+  datalistId,
+  location,
+  onChange,
+}: {
+  offered: string[];
+  taken: Set<string>;
+  locations: string[];
+  datalistId: string;
+  location: string;
+  onChange: (location: string) => void;
+}) {
+  if (offered.length > 0) {
+    return (
+      <select
+        aria-label="Location"
+        value={location}
+        onChange={(e) => onChange(e.target.value)}
+        style={{ width: "auto" }}
+      >
+        <option value="">Location…</option>
+        {offered.map((l) => (
+          <option key={l} value={l} disabled={taken.has(l)}>
+            {l}
+            {taken.has(l) ? " (taken)" : ""}
+          </option>
+        ))}
+      </select>
+    );
+  }
+  return (
+    <>
+      <input
+        aria-label="Location"
+        placeholder="Location"
+        list={datalistId}
+        value={location}
+        onChange={(e) => onChange(e.target.value)}
+        style={{ width: 160 }}
+      />
+      <datalist id={datalistId}>
+        {locations.map((l) => (
+          <option key={l} value={l} />
+        ))}
+      </datalist>
+    </>
+  );
+}
+
+/** Nothing to save — the inputs match the booking as stored. */
+function sessionUnchanged(
+  session: CalendarSession,
+  url: string,
+  location: string,
+): boolean {
+  return url === session.url && location === session.location;
+}
+
+/** Confirm / URL / location / clear for one booking. The room is decided
+ * at confirm time (2026-08-14): confirming picks a free location (exactly
+ * one free offered option preselects); forums with no locations at all
+ * have no picker. Once confirmed, the location stays editable alongside
+ * the URL under one Save. */
 function ActiveSessionControls({
   session,
+  slot,
+  locations,
   perms,
 }: {
   session: CalendarSession;
+  slot: CalendarSlot;
+  /** The forum's configured locations — free-text suggestions when the
+   * slot has no offered set of its own. */
+  locations: string[];
   perms: CalendarPerms;
 }) {
   const { run, busy } = useGqlAction();
-  const [url, setUrl] = useState(session.url);
   const confirmed = session.status === "confirmed";
+  const offered = slot.locations;
+  // Rooms held by ANOTHER confirmed session in this slot — confirmed
+  // sessions are exclusive per (slot, location).
+  const taken = new Set(
+    slot.sessions
+      .filter((s) => s.status === "confirmed" && s.id !== session.id)
+      .map((s) => s.location)
+      .filter(Boolean),
+  );
+  const free = offered.filter((l) => !taken.has(l));
+  const [url, setUrl] = useState(session.url);
+  const [location, setLocation] = useState(
+    () => session.location || (free.length === 1 ? free[0]! : ""),
+  );
+  const canEdit = perms.canConfirm || confirmed;
+  const showPicker = canEdit && offered.length + locations.length > 0;
+  const needsLocation = offered.length > 0 && !location;
+  const datalistId = `cal-locations-${session.id}`;
+  // null = unchanged when there is no picker to change anything with.
+  const locationVar = showPicker ? location.trim() : null;
+  const confirmNow = () =>
+    void run(
+      UPDATE_SESSION,
+      { session: session.id, status: "confirmed", url, loc: locationVar },
+      { success: "Session confirmed", errorFallback: "Could not confirm" },
+    );
+  const save = () =>
+    void run(
+      UPDATE_SESSION,
+      { session: session.id, url, loc: locationVar },
+      { success: "Saved", errorFallback: "Could not save" },
+    );
+  const unchanged = sessionUnchanged(session, url, location);
 
   return (
     // Full-width row matching the comments composer: the URL input flexes
-    // and {input, Save URL, Clear} span the column (QA 2026-08-10).
+    // and {input, picker, Confirm/Save, Clear} span the column
+    // (QA 2026-08-10).
     <div className="row wrap cal-controls-row" style={{ gap: 8 }}>
-      {perms.canConfirm || confirmed ? (
+      {canEdit ? (
         <input
           aria-label="Event page URL"
           placeholder="Event page URL (optional)"
@@ -314,21 +380,22 @@ function ActiveSessionControls({
           onChange={(e) => setUrl(e.target.value)}
         />
       ) : null}
+      {showPicker ? (
+        <SessionLocationPicker
+          offered={offered}
+          taken={taken}
+          locations={locations}
+          datalistId={datalistId}
+          location={location}
+          onChange={setLocation}
+        />
+      ) : null}
       {!confirmed && perms.canConfirm ? (
         <button
           type="button"
           className="btn btn-primary"
-          disabled={busy}
-          onClick={() =>
-            void run(
-              UPDATE_SESSION,
-              { session: session.id, status: "confirmed", url },
-              {
-                success: "Session confirmed",
-                errorFallback: "Could not confirm",
-              },
-            )
-          }
+          disabled={busy || needsLocation}
+          onClick={confirmNow}
         >
           Confirm
         </button>
@@ -337,16 +404,10 @@ function ActiveSessionControls({
         <button
           type="button"
           className="btn"
-          disabled={busy || url === session.url}
-          onClick={() =>
-            void run(
-              UPDATE_SESSION,
-              { session: session.id, url },
-              { success: "URL saved", errorFallback: "Could not save URL" },
-            )
-          }
+          disabled={busy || unchanged}
+          onClick={save}
         >
-          Save URL
+          Save
         </button>
       ) : null}
       <button
@@ -404,7 +465,6 @@ export function SessionControls({
       {perms.canPropose ? (
         <PencilInControl
           slot={slot}
-          locations={locations}
           claimTopics={claimTopics}
           perms={perms}
           officeHoursLabel={officeHoursLabel}
@@ -420,7 +480,12 @@ export function SessionControls({
               {session.location ? ` · ${session.location}` : ""}
             </span>
           ) : null}
-          <ActiveSessionControls session={session} perms={perms} />
+          <ActiveSessionControls
+            session={session}
+            slot={slot}
+            locations={locations}
+            perms={perms}
+          />
         </div>
       ))}
     </>

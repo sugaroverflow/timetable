@@ -161,9 +161,10 @@ function selectClaimTopics(
   return admin ? topicFeed : topicFeed.filter((t) => t.hostId === viewerId);
 }
 
-/** Slot locations (2026-08-11): the "location" filter shows timeslots that
- * OFFER that location — open ones are exactly when it's free. Legacy slots
- * with no offered set still match through their booked sessions. */
+/** Slot locations (2026-08-11): the "location" filter shows timeslots
+ * offering, or hosting something at, that location. (Since 2026-08-14
+ * sessions only carry a location once the room is assigned at confirm
+ * time, so an open slot here no longer means the room is free.) */
 function filterByLocation(
   slots: CalendarSlot[],
   location: string | undefined,
