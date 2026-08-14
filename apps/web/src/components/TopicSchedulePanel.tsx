@@ -8,8 +8,20 @@ import { clientGql } from "@/lib/clientGraphql";
 import { useGqlAction } from "@/lib/useGqlAction";
 import { useTableSort } from "@/lib/useTableSort";
 
-import { formatDate, formatTime } from "./CalendarTable";
+import { formatTime } from "./CalendarTable";
 import { SortHeader } from "./SortHeader";
+
+/** Unlike the calendar page (which groups rows under month-year headings),
+ * this table mixes terms years apart once sorted by counts — every date
+ * carries its year (QA 2026-08-14: "Mon 28 Jun" was 2027 and read as past). */
+function formatFitDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
 
 const QUERY = `query TopicSchedule($s: String!, $t: String!) {
   topicSlotFit(idOrSlug: $s, topicId: $t) {
@@ -190,7 +202,7 @@ function TopicScheduleBody({
             <tbody>
               {sorted.map((row) => (
                 <tr key={row.slotId} className={row.full ? "faint" : undefined}>
-                  <td>{formatDate(row.startsAt)}</td>
+                  <td>{formatFitDate(row.startsAt)}</td>
                   <td className="mono">
                     {formatTime(row.startsAt)}–{formatTime(row.endsAt)}
                   </td>

@@ -27,7 +27,7 @@ export type CalendarTableRow = { slot: CalendarSlot; past: boolean };
 
 // "Fri 9 Oct" / "14:00" — en-GB pinned for day-before-month and 24h time
 // (QA 2026-08-02; the viewer's own locale gave "Fri, Oct 9 02:00 PM").
-export function formatDate(iso: string): string {
+function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-GB", {
     weekday: "short",
     day: "numeric",
