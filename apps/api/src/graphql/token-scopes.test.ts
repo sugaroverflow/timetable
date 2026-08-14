@@ -4,8 +4,16 @@ import { describe, expect, it } from "vitest";
 import { API_TOKEN_SCOPES, type TokenScope } from "@timetable/shared";
 
 import type { ApiContext } from "../context";
+import { createMemoryRateLimitStore } from "../http/rate-limit";
 
-import { MUTATION_SCOPES, useApiTokenScopes } from "./token-scopes";
+import {
+  createTokenWriteLimiter,
+  MUTATION_SCOPES,
+  TOKEN_WRITE_LIMITS,
+  TOKEN_WRITE_WINDOW_MS,
+  useApiTokenScopes,
+  useApiTokenWriteLimits,
+} from "./token-scopes";
 
 const plugin = useApiTokenScopes();
 
@@ -106,6 +114,23 @@ describe("useApiTokenScopes", () => {
     ).toThrow(/fragments/);
   });
 
+  it("lets a feed:write token clear comment-thread and digest unread state", () => {
+    // Without these two, a feed-triage token can mark the queue seen but its
+    // owner keeps receiving digests for comment threads already read.
+    expect(() =>
+      execute(
+        `mutation {
+           markCommentsSeen(topicId: "t1")
+           markDigestRead(sendId: "d1")
+         }`,
+        token("feed:write"),
+      ),
+    ).not.toThrow();
+    expect(() =>
+      execute(`mutation { markCommentsSeen(topicId: "t1") }`, token()),
+    ).toThrow(/feed:write/);
+  });
+
   it("leaves queries alone — reading needs no scope", () => {
     expect(() =>
       execute(`query { topicFeed(idOrSlug: "f") { id } }`, token()),
@@ -137,6 +162,92 @@ describe("useApiTokenScopes", () => {
   it("maps every scope it references to a published scope", () => {
     for (const scope of Object.values(MUTATION_SCOPES)) {
       expect(API_TOKEN_SCOPES).toContain(scope);
+    }
+  });
+});
+
+describe("useApiTokenWriteLimits", () => {
+  /** A fresh plugin per test — memory store, so budgets can't bleed between
+   * tests. Async because the limiter awaits its store. */
+  function limitedExecute() {
+    const plugin = useApiTokenWriteLimits(
+      createTokenWriteLimiter(
+        createMemoryRateLimitStore(TOKEN_WRITE_WINDOW_MS),
+      ),
+    );
+    return async (
+      document: string,
+      apiToken: ApiContext["apiToken"],
+      operationName?: string,
+    ) => {
+      const onExecute = plugin.onExecute;
+      if (!onExecute) throw new Error("plugin has no onExecute hook");
+      await onExecute({
+        args: {
+          document: parse(document),
+          contextValue: { apiToken } as ApiContext,
+          operationName,
+        },
+      } as unknown as Parameters<NonNullable<typeof onExecute>>[0]);
+    };
+  }
+
+  const CREATE_TOPIC = `mutation { createTopic(idOrSlug: "f", title: "t") { id } }`;
+  const HEART = `mutation { heartTopic(topicId: "t1") { hearted } }`;
+
+  it("stops topic creation at its hourly budget, with the friendly error", async () => {
+    const run = limitedExecute();
+    for (let i = 0; i < TOKEN_WRITE_LIMITS.topics; i++) {
+      await run(CREATE_TOPIC, token("topics:write"));
+    }
+    await expect(run(CREATE_TOPIC, token("topics:write"))).rejects.toThrow(
+      /Rate limit for automated writes reached — try later/,
+    );
+  });
+
+  it("gives ❤️ toggles their own, larger budget", async () => {
+    const run = limitedExecute();
+    for (let i = 0; i < TOKEN_WRITE_LIMITS.hearts; i++) {
+      await run(HEART, token("hearts:write"));
+    }
+    await expect(run(HEART, token("hearts:write"))).rejects.toMatchObject({
+      extensions: expect.objectContaining({ code: "RATE_LIMITED" }),
+    });
+  });
+
+  it("pools every unlisted write into the shared `other` budget", async () => {
+    const run = limitedExecute();
+    for (let i = 0; i < TOKEN_WRITE_LIMITS.other; i++) {
+      await run(
+        `mutation { markFeedSeen(idOrSlug: "f") }`,
+        token("feed:write"),
+      );
+    }
+    // A DIFFERENT mutation is refused: `other` is one pool, not per field.
+    await expect(
+      run(`mutation { queueMarkSeen(idOrSlug: "f") }`, token("feed:write")),
+    ).rejects.toThrow(/automated writes/);
+  });
+
+  it("budgets tokens independently of each other", async () => {
+    const run = limitedExecute();
+    for (let i = 0; i < TOKEN_WRITE_LIMITS.topics; i++) {
+      await run(CREATE_TOPIC, token("topics:write"));
+    }
+    const other: ApiContext["apiToken"] = {
+      id: "token-2",
+      scopes: ["topics:write"],
+    };
+    await expect(run(CREATE_TOPIC, other)).resolves.toBeUndefined();
+  });
+
+  it("never touches session-authenticated requests or queries", async () => {
+    const run = limitedExecute();
+    for (let i = 0; i < TOKEN_WRITE_LIMITS.topics + 5; i++) {
+      await run(CREATE_TOPIC, null);
+    }
+    for (let i = 0; i < 5; i++) {
+      await run(`query { topicFeed(idOrSlug: "f") { id } }`, token());
     }
   });
 });
