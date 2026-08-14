@@ -326,8 +326,16 @@ A second credential, for scripts and external clients that can't hold a
    `buildContext` takes `allowApiToken` and only the Yoga context passes true.
    See the flag's own docs — this is enforced by construction, not convention.
 
-Tokens are account-wide, carry no impersonation (`x-view-as` is ignored), and
-are bucketed for rate limiting by token hash rather than client IP.
+Tokens are account-wide and carry no impersonation (`x-view-as` is ignored).
+Rate limiting is two-layer (2026-08-14 hardening): the pre-auth middleware
+buckets strictly by client IP — bucketing by the presented token would let
+unvalidated `tpk_` strings mint a fresh bucket per request — and a token is
+charged its own request budget only after its hash lookup succeeds
+(`auth/api-token.ts`), plus per-token write budgets — hourly burst and daily
+volume caps per action class (`TOKEN_WRITE_LIMITS` in
+`graphql/token-scopes.ts`). Minting is capped
+(10/hour, 25 active per user) and an omitted expiry defaults to 90 days
+server-side; "never expires" needs an explicit null.
 
 ## Data Model
 
