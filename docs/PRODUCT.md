@@ -153,6 +153,12 @@ Topics carry up to three comment threads:
   private bookmarks only admins see in Analysis, and drop out of digests;
 - the **drafting thread** described above.
 
+When a card has more than one live section for its viewer (threads,
+scheduling), they render as one horizontal **tab strip** (2026-08-14) —
+Comments first and default, count badges on the labels; a card with a
+single live section keeps the plain pre-tabs presentation. The actions
+row's 💬 button always lands on the Comments tab.
+
 Threading is **dialogue-first** (2026-08-13): the composer sits at the top
 of every thread and is always visible; top-level comments sort newest
 first; each top-level comment's replies form a linear chain ending in a
