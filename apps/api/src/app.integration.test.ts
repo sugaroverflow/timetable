@@ -27,15 +27,19 @@ vi.mock("@timetable/core", async (importOriginal) => {
     addSlotComment: vi.fn(),
     addSlotSession: vi.fn(),
     buildCalendar: vi.fn(),
+    buildFeed: vi.fn(),
     slotSubjectTaken: vi.fn(),
     computeSlotCounts: vi.fn(),
+    countTopicSessionSlots: vi.fn(),
     countViewerPublishedHearts: vi.fn(),
     createLocalUser: vi.fn(),
     deleteTopic: vi.fn(),
     getAudienceElectorIds: vi.fn(),
     getCommentById: vi.fn(),
     getSlotById: vi.fn(),
+    listCommentTreesForTopics: vi.fn(),
     listSlotComments: vi.fn(),
+    listTopicSessions: vi.fn(),
     getTopicById: vi.fn(),
     getMembership: vi.fn(),
     getMembershipById: vi.fn(),
@@ -314,11 +318,15 @@ afterEach(() => {
   vi.mocked(core.addSlotComment).mockReset();
   vi.mocked(core.addSlotSession).mockReset();
   vi.mocked(core.buildCalendar).mockReset();
+  vi.mocked(core.buildFeed).mockReset();
   vi.mocked(core.slotSubjectTaken).mockReset();
   vi.mocked(core.computeSlotCounts).mockReset();
+  vi.mocked(core.countTopicSessionSlots).mockReset();
   vi.mocked(core.getAudienceElectorIds).mockReset();
   vi.mocked(core.getSlotById).mockReset();
+  vi.mocked(core.listCommentTreesForTopics).mockReset();
   vi.mocked(core.listSlotComments).mockReset();
+  vi.mocked(core.listTopicSessions).mockReset();
   vi.mocked(core.countViewerPublishedHearts).mockReset();
   vi.mocked(core.createLocalUser).mockReset();
   vi.mocked(core.deleteTopic).mockReset();
@@ -1863,6 +1871,276 @@ describe("createApiApp", () => {
           (await request(baseUrl, topic.id)).data?.topicSlotFit,
         ).toBeNull();
         expect(core.buildCalendar).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("topicSessions (sessions-tab, 2026-08-14)", () => {
+    const QUERY = `query($s: String!, $t: String!){
+      topicSessions(idOrSlug: $s, topicId: $t) {
+        slotId startsAt endsAt status location viewerState
+      }
+    }`;
+
+    const calendarTimetable = () =>
+      timetableFixture({ settings: { calendar: { enabled: true } } });
+
+    function sessionRow(
+      patch: Partial<core.TopicSessionRow> = {},
+    ): core.TopicSessionRow {
+      return {
+        slotId: "33333333-3333-3333-3333-333333333333",
+        startsAt: new Date("2026-09-01T18:00:00.000Z"),
+        endsAt: new Date("2026-09-01T20:00:00.000Z"),
+        status: "proposed",
+        location: "",
+        viewerState: null,
+        ...patch,
+      };
+    }
+
+    async function request(baseUrl: string, topicId: string) {
+      const res = await fetch(`${baseUrl}/graphql`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: QUERY,
+          variables: { s: "public-calendar", t: topicId },
+        }),
+      });
+      return (await res.json()) as {
+        data?: {
+          topicSessions:
+            | {
+                slotId: string;
+                startsAt: string;
+                endsAt: string;
+                status: string;
+                location: string;
+                viewerState: string | null;
+              }[]
+            | null;
+        };
+        errors?: unknown[];
+      };
+    }
+
+    it("maps rows for a member, with their own viewerState", async () => {
+      const topic = topicFixture({ status: "published" });
+      mockSession("elector-1", ["elector"]);
+      vi.mocked(core.getReadableTimetable).mockResolvedValue({
+        timetable: calendarTimetable(),
+        roles: ["elector"],
+      });
+      vi.mocked(core.getTopicById).mockResolvedValue(topic);
+      vi.mocked(core.listTopicSessions).mockResolvedValue([
+        sessionRow({ viewerState: "green" }),
+        sessionRow({
+          slotId: "33333333-3333-3333-3333-333333333334",
+          startsAt: new Date("2026-09-08T18:00:00.000Z"),
+          endsAt: new Date("2026-09-08T20:00:00.000Z"),
+          status: "confirmed",
+          location: "Main hall",
+          viewerState: "yellow",
+        }),
+      ]);
+
+      await withTestServer(async (baseUrl) => {
+        const body = await request(baseUrl, topic.id);
+        expect(body.errors).toBeUndefined();
+        expect(body.data?.topicSessions).toEqual([
+          {
+            slotId: "33333333-3333-3333-3333-333333333333",
+            startsAt: "2026-09-01T18:00:00.000Z",
+            endsAt: "2026-09-01T20:00:00.000Z",
+            status: "proposed",
+            location: "",
+            viewerState: "green",
+          },
+          {
+            slotId: "33333333-3333-3333-3333-333333333334",
+            startsAt: "2026-09-08T18:00:00.000Z",
+            endsAt: "2026-09-08T20:00:00.000Z",
+            status: "confirmed",
+            location: "Main hall",
+            viewerState: "yellow",
+          },
+        ]);
+        expect(core.listTopicSessions).toHaveBeenCalledWith(
+          "11111111-1111-1111-1111-111111111111",
+          topic.id,
+          "elector-1",
+        );
+      });
+    });
+
+    it("serves anonymous viewers of a readable forum, viewerState null", async () => {
+      const topic = topicFixture({ status: "published" });
+      // No mockSession: the beforeEach anonymous context stands.
+      vi.mocked(core.getReadableTimetable).mockResolvedValue({
+        timetable: calendarTimetable(),
+        roles: [],
+      });
+      vi.mocked(core.getTopicById).mockResolvedValue(topic);
+      vi.mocked(core.listTopicSessions).mockResolvedValue([sessionRow()]);
+
+      await withTestServer(async (baseUrl) => {
+        const body = await request(baseUrl, topic.id);
+        expect(body.errors).toBeUndefined();
+        expect(body.data?.topicSessions).toHaveLength(1);
+        expect(body.data?.topicSessions?.[0]?.viewerState).toBeNull();
+        expect(core.listTopicSessions).toHaveBeenCalledWith(
+          "11111111-1111-1111-1111-111111111111",
+          topic.id,
+          null,
+        );
+      });
+    });
+
+    it("returns null for unreadable forum / calendar off / foreign or unpublished topic", async () => {
+      const topic = topicFixture({ status: "published" });
+      mockSession("elector-1", ["elector"]);
+
+      await withTestServer(async (baseUrl) => {
+        // Unreadable forum.
+        vi.mocked(core.getReadableTimetable).mockResolvedValue(null);
+        expect(
+          (await request(baseUrl, topic.id)).data?.topicSessions,
+        ).toBeNull();
+
+        // Calendar disabled.
+        vi.mocked(core.getReadableTimetable).mockResolvedValue({
+          timetable: timetableFixture(),
+          roles: ["elector"],
+        });
+        vi.mocked(core.getTopicById).mockResolvedValue(topic);
+        expect(
+          (await request(baseUrl, topic.id)).data?.topicSessions,
+        ).toBeNull();
+
+        // Foreign topic (another forum's id).
+        vi.mocked(core.getReadableTimetable).mockResolvedValue({
+          timetable: calendarTimetable(),
+          roles: ["elector"],
+        });
+        vi.mocked(core.getTopicById).mockResolvedValue(
+          topicFixture({
+            status: "published",
+            timetableId: "99999999-9999-9999-9999-999999999999",
+          }),
+        );
+        expect(
+          (await request(baseUrl, topic.id)).data?.topicSessions,
+        ).toBeNull();
+
+        // Unpublished topic.
+        vi.mocked(core.getTopicById).mockResolvedValue(
+          topicFixture({ status: "submitted" }),
+        );
+        expect(
+          (await request(baseUrl, topic.id)).data?.topicSessions,
+        ).toBeNull();
+
+        expect(core.listTopicSessions).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("sessionSlotCount (sessions-tab, 2026-08-14)", () => {
+    const QUERY = `query($s: String!){
+      topicFeed(idOrSlug: $s) { id sessionSlotCount }
+    }`;
+
+    const calendarTimetable = () =>
+      timetableFixture({ settings: { calendar: { enabled: true } } });
+
+    function feedTopicFixture(
+      patch: Partial<core.FeedTopic> = {},
+    ): core.FeedTopic {
+      return {
+        id: "22222222-2222-2222-2222-222222222222",
+        timetableId: "11111111-1111-1111-1111-111111111111",
+        hostId: "host-1",
+        hostName: null,
+        hostImage: null,
+        hostSlug: null,
+        title: "A topic",
+        slug: "a-topic",
+        bodyMd: "",
+        coverImageUrl: null,
+        status: "published",
+        publishedAt: new Date("2026-08-01T00:00:00.000Z"),
+        contentUpdatedAt: null,
+        createdAt: new Date("2026-07-01T00:00:00.000Z"),
+        heartCount: 0,
+        weightedScore: 0,
+        l2Score: 0,
+        devotionScore: 0,
+        viewerHasHearted: false,
+        commentCount: 0,
+        latestCommentAt: null,
+        viewerCommentsSeenAt: null,
+        ...patch,
+      };
+    }
+
+    async function request(baseUrl: string) {
+      const res = await fetch(`${baseUrl}/graphql`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: QUERY,
+          variables: { s: "public-calendar" },
+        }),
+      });
+      return (await res.json()) as {
+        data?: { topicFeed: { id: string; sessionSlotCount: number }[] };
+        errors?: unknown[];
+      };
+    }
+
+    it("serves the batched future-session count on feed topics", async () => {
+      const topic = feedTopicFixture();
+      mockSession("elector-1", ["elector"]);
+      vi.mocked(core.getReadableTimetable).mockResolvedValue({
+        timetable: calendarTimetable(),
+        roles: ["elector"],
+      });
+      vi.mocked(core.buildFeed).mockResolvedValue([topic]);
+      vi.mocked(core.listCommentTreesForTopics).mockResolvedValue(new Map());
+      vi.mocked(core.countTopicSessionSlots).mockResolvedValue(
+        new Map([[topic.id, 2]]),
+      );
+
+      await withTestServer(async (baseUrl) => {
+        const body = await request(baseUrl);
+        expect(body.errors).toBeUndefined();
+        expect(body.data?.topicFeed).toEqual([
+          { id: topic.id, sessionSlotCount: 2 },
+        ]);
+        // One batched call per page — the loadCommentStats idiom; the
+        // future-only cut (endsAt >= now, gte) lives in the core query.
+        expect(core.countTopicSessionSlots).toHaveBeenCalledWith([topic.id]);
+      });
+    });
+
+    it("stays 0, skipping the count query, while the calendar is off", async () => {
+      const topic = feedTopicFixture();
+      mockSession("elector-1", ["elector"]);
+      vi.mocked(core.getReadableTimetable).mockResolvedValue({
+        timetable: timetableFixture(),
+        roles: ["elector"],
+      });
+      vi.mocked(core.buildFeed).mockResolvedValue([topic]);
+      vi.mocked(core.listCommentTreesForTopics).mockResolvedValue(new Map());
+
+      await withTestServer(async (baseUrl) => {
+        const body = await request(baseUrl);
+        expect(body.errors).toBeUndefined();
+        expect(body.data?.topicFeed).toEqual([
+          { id: topic.id, sessionSlotCount: 0 },
+        ]);
+        expect(core.countTopicSessionSlots).not.toHaveBeenCalled();
       });
     });
   });
