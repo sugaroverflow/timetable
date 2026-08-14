@@ -108,9 +108,10 @@ Codex/agent workflows are separate from the app runtime.
   userId segment canonically redirects to the member's slug)
 - My Topics (feed-identical cards + manage controls, TipTap editor; admins
   can create a topic on behalf of another host; when the calendar is on,
-  published cards carry the topic-workbench — a lazy per-topic scheduling
-  panel: hearters' availability × future slots as a sortable best-dates
-  table with inline pencil-in, 2026-08-14)
+  published cards carry the topic-workbench — a lazy per-topic
+  mini-calendar: hearters' availability across future slots as washed rows
+  (shared `CalendarRowWash` pieces) with the avatar fold, a
+  Date/Availability sort toggle, and pencil/unpencil per row, 2026-08-14)
 - Pending Topics (the submitted moderation queue — new topics are created
   as `submitted`; there is no draft status)
 - activity timeline (week/day grouping, date range, actor/role/type filters)
@@ -345,13 +346,15 @@ Core tables:
   because both are about the time. `locations` (2026-08-11): the set of
   locations offered at this time, chosen at creation — same-time creation
   AGGREGATES locations into the existing slot (`planSlotCreation` in
-  shared), bookings must pick an offered location, and the calendar's
-  location filter matches this set; empty = legacy/location-free forum)
-- `slot_sessions` (bookings, zero-to-many per slot, unique per
-  slot+location: `location`, a singular `topic_id` OR `session_host_id`
-  (THE ownership column: the topic's host, or the host themselves for
-  topic-less "office hours") OR an admin-only `custom_title`; `status`
-  `proposed`/`confirmed` + `url` — an empty slot simply has no rows)
+  shared), and the calendar's location filter matches this set; empty =
+  legacy/location-free forum)
+- `slot_sessions` (bookings, zero-to-many per slot; pencils are
+  location-less time-intents since 2026-08-14 — unique per slot+topic,
+  plus one office-hours pencil per slot+host; `location` is display copy
+  only. A singular `topic_id` OR `session_host_id` (THE ownership column:
+  the topic's host, or the host themselves for topic-less "office hours")
+  OR an admin-only `custom_title`; `status` `proposed`/`confirmed` + `url`
+  — an empty slot simply has no rows)
 - `availability` (explicit per-slot answers — location-independent)
 - `availability_patterns` (one row per forum+user; jsonb cell → state map)
 - `slot_comments` (+ optional claim: `topic_id` and frozen

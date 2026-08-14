@@ -197,27 +197,40 @@ export async function getSlotSessionById(
 
 /** Whether the slot already has a booking at this location — the
  * pre-flight for addSlotSession's unique (slot, location) constraint. */
-export async function slotLocationTaken(
+/** Is this subject (topic, or office-hours host) already pencilled into
+ * this slot? Pencils are location-less time-intents (2026-08-14) — the
+ * per-subject uniques backstop this pre-flight under concurrency. */
+export async function slotSubjectTaken(
   slotId: string,
-  location: string,
+  subject: { topicId: string | null; sessionHostId: string | null },
 ): Promise<boolean> {
   const [row] = await db
     .select({ id: slotSessions.id })
     .from(slotSessions)
     .where(
-      and(eq(slotSessions.slotId, slotId), eq(slotSessions.location, location)),
+      subject.topicId
+        ? and(
+            eq(slotSessions.slotId, slotId),
+            eq(slotSessions.topicId, subject.topicId),
+          )
+        : and(
+            eq(slotSessions.slotId, slotId),
+            isNull(slotSessions.topicId),
+            eq(slotSessions.sessionHostId, subject.sessionHostId ?? ""),
+          ),
     )
     .limit(1);
   return Boolean(row);
 }
 
 /** Book a session into a slot. Ownership (`sessionHostId`) and the
- * admin-only custom gate are the resolver's job; the unique (slot,
- * location) index backstops concurrent double-booking. */
+ * admin-only custom gate are the resolver's job; the per-subject unique
+ * indexes backstop concurrent double-pencilling. */
 export async function addSlotSession(
   slotId: string,
   session: {
-    location: string;
+    /** Display copy only since 2026-08-14 — never contended. */
+    location?: string;
     topicId: string | null;
     sessionHostId: string | null;
     customTitle?: string;
@@ -230,7 +243,7 @@ export async function addSlotSession(
     .insert(slotSessions)
     .values({
       slotId,
-      location: session.location,
+      location: session.location ?? "",
       topicId: session.topicId,
       sessionHostId: session.sessionHostId,
       customTitle: session.customTitle ?? "",

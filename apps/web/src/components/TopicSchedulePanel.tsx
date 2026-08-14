@@ -6,14 +6,50 @@ import { CalendarDays, ChevronDown, ChevronRight } from "lucide-react";
 
 import { clientGql } from "@/lib/clientGraphql";
 import { useGqlAction } from "@/lib/useGqlAction";
-import { useTableSort } from "@/lib/useTableSort";
 
+import {
+  FoldAvatars,
+  tallyStates,
+  TintLayer,
+  type PerUserAvailability,
+} from "./CalendarRowWash";
 import { formatTime } from "./CalendarTable";
-import { SortHeader } from "./SortHeader";
+
+const QUERY = `query TopicSchedule($s: String!, $t: String!) {
+  topicSlotFit(idOrSlug: $s, topicId: $t) {
+    hearterCount
+    slots {
+      slotId startsAt endsAt sessionId topicStatus
+      counts { green yellow red }
+      perUser { userId name image state }
+    }
+  }
+}`;
+
+const ADD_SESSION = `mutation($slot: String!, $topic: String!) {
+  addSlotSession(slotId: $slot, topicId: $topic)
+}`;
+const CLEAR_SESSION = `mutation($session: String!) {
+  clearSlotSession(sessionId: $session)
+}`;
+
+type FitRow = {
+  slotId: string;
+  startsAt: string;
+  endsAt: string;
+  sessionId: string | null;
+  topicStatus: "proposed" | "confirmed" | null;
+  counts: { green: number; yellow: number; red: number };
+  perUser: PerUserAvailability[];
+};
+
+type TopicSchedule = { hearterCount: number; slots: FitRow[] };
+
+type SortMode = "date" | "availability";
 
 /** Unlike the calendar page (which groups rows under month-year headings),
- * this table mixes terms years apart once sorted by counts — every date
- * carries its year (QA 2026-08-14: "Mon 28 Jun" was 2027 and read as past). */
+ * this list mixes terms years apart once sorted by availability — every
+ * date carries its year (QA 2026-08-14). */
 function formatFitDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-GB", {
     weekday: "short",
@@ -23,56 +59,36 @@ function formatFitDate(iso: string): string {
   });
 }
 
-const QUERY = `query TopicSchedule($s: String!, $t: String!) {
-  topicSlotFit(idOrSlug: $s, topicId: $t) {
-    hearterCount
-    slots {
-      slotId startsAt endsAt locations freeLocations full topicStatus
-      counts { green yellow red }
+/** Availability order (Ed, 2026-08-14): 🟢 dominates 🟡 dominates 🔴 —
+ * and since every hearter is exactly one of the three, (green, yellow)
+ * lexicographic IS the complete ordering; date breaks exact ties. */
+function compareRows(a: FitRow, b: FitRow, mode: SortMode): number {
+  if (mode === "availability") {
+    if (b.counts.green !== a.counts.green)
+      return b.counts.green - a.counts.green;
+    if (b.counts.yellow !== a.counts.yellow) {
+      return b.counts.yellow - a.counts.yellow;
     }
   }
-}`;
-
-const ADD_SESSION = `mutation($slot: String!, $loc: String, $topic: String) {
-  addSlotSession(slotId: $slot, location: $loc, topicId: $topic)
-}`;
-
-type FitRow = {
-  slotId: string;
-  startsAt: string;
-  endsAt: string;
-  locations: string[];
-  freeLocations: string[];
-  full: boolean;
-  topicStatus: "proposed" | "confirmed" | null;
-  counts: { green: number; yellow: number; red: number };
-};
-
-type TopicSchedule = { hearterCount: number; slots: FitRow[] };
-
-type SortKey = "date" | "where" | "green" | "yellow" | "red";
-
-function compareRows(a: FitRow, b: FitRow, key: SortKey) {
-  switch (key) {
-    case "date":
-      return Date.parse(a.startsAt) - Date.parse(b.startsAt);
-    case "where":
-      return a.freeLocations
-        .join(", ")
-        .localeCompare(b.freeLocations.join(", "));
-    case "green":
-      return a.counts.green - b.counts.green;
-    case "yellow":
-      return a.counts.yellow - b.counts.yellow;
-    case "red":
-      return a.counts.red - b.counts.red;
-  }
+  return Date.parse(a.startsAt) - Date.parse(b.startsAt);
 }
 
-/** topic-workbench (2026-08-14, demand-first scheduling): the per-topic
- * scheduling panel on My Topics. Future slots scored by THIS topic's
- * hearters' availability, sortable, with inline pencil-in. Collapsed by
- * default; the body mounts (and fetches) only when opened. */
+/** True when a click landed on an interactive element that owns the event
+ * (the pencil/unpencil buttons) — same guard as the calendar rows. */
+function onInteractive(e: { target: EventTarget | null }): boolean {
+  return Boolean(
+    (e.target as HTMLElement | null)?.closest(
+      "a,button,input,select,textarea,label",
+    ),
+  );
+}
+
+/** topic-workbench v2 (2026-08-14, demand-first scheduling): the per-topic
+ * scheduling panel on My Topics as a mini-calendar — one washed row per
+ * datetime (pencils are location-less time-intents; a pencil is the host
+ * saying "I am available at this time"), expandable to the hearter avatar
+ * fold, with a Date/Availability sort toggle. A dashboard only: no
+ * comments here — discussion happens on the calendar page. */
 export function TopicSchedulePanel({
   slug,
   topicId,
@@ -82,8 +98,8 @@ export function TopicSchedulePanel({
 }: {
   slug: string;
   topicId: string;
-  /** False under confirmPolicy "admins" (hosts can't pencil): the demand
-   * table still shows, the action column hides. */
+  /** False under confirmPolicy "admins" (hosts can't pencil): rows stay
+   * informative, the pencil buttons hide. */
   canPencil: boolean;
   /** The panel self-gates (keeps TopicManager's complexity budget flat):
    * calendar on + published topics only. */
@@ -127,11 +143,7 @@ function TopicScheduleBody({
   const [data, setData] = useState<TopicSchedule | null | undefined>(undefined);
   const [failed, setFailed] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
-  const { sortRows, headerProps } = useTableSort<SortKey, FitRow>({
-    initial: "date",
-    ascendingKeys: ["date", "where"],
-    compare: compareRows,
-  });
+  const [mode, setMode] = useState<SortMode>("date");
 
   useEffect(() => {
     let cancelled = false;
@@ -172,141 +184,157 @@ function TopicScheduleBody({
     );
   }
 
-  const sorted = sortRows(data.slots);
+  const sorted = [...data.slots].sort((a, b) => compareRows(a, b, mode));
 
   return (
     <div className="stack" style={{ gap: 8 }}>
-      <div className="faint" style={{ fontSize: 12 }}>
-        {data.hearterCount === 0
-          ? "No ❤️s yet — the counts below will fill in as people ❤️ this topic."
-          : `Availability of the ${data.hearterCount} ❤️ on this topic across upcoming slots.`}
+      <div
+        className="row wrap"
+        style={{
+          gap: 8,
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <span className="faint" style={{ fontSize: 12 }}>
+          {data.hearterCount === 0
+            ? "No ❤️s yet — the washes fill in as people ❤️ this topic."
+            : `Availability of the ${data.hearterCount} ❤️ on this topic. Pencil in every time you could run it.`}
+        </span>
+        <div className="avseg" role="group" aria-label="Sort slots">
+          {(["date", "availability"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              className={mode === m ? "on" : ""}
+              aria-pressed={mode === m}
+              onClick={() => setMode(m)}
+            >
+              {m === "date" ? "By date" : "By availability"}
+            </button>
+          ))}
+        </div>
       </div>
       {sorted.length === 0 ? (
         <div className="faint" style={{ fontSize: 12 }}>
           No upcoming slots on the calendar.
         </div>
       ) : (
-        <div className="table-wrap">
-          <table className="data-table sortable-table">
-            <thead>
-              <tr>
-                <SortHeader label="Date" {...headerProps("date")} />
-                <th>Time</th>
-                <SortHeader label="Where" {...headerProps("where")} />
-                <SortHeader label="🟢" {...headerProps("green")} />
-                <SortHeader label="🟡" {...headerProps("yellow")} />
-                <SortHeader label="🔴" {...headerProps("red")} />
-                {canPencil ? <th aria-label="Actions" /> : null}
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.map((row) => (
-                <tr key={row.slotId} className={row.full ? "faint" : undefined}>
-                  <td>{formatFitDate(row.startsAt)}</td>
-                  <td className="mono">
-                    {formatTime(row.startsAt)}–{formatTime(row.endsAt)}
-                  </td>
-                  <td>
-                    {row.freeLocations.length > 0
-                      ? row.freeLocations.join(", ")
-                      : row.locations.length > 0
-                        ? row.locations.join(", ")
-                        : "—"}
-                  </td>
-                  <td className="mono">{row.counts.green}</td>
-                  <td className="mono">{row.counts.yellow}</td>
-                  <td className="mono">{row.counts.red}</td>
-                  {canPencil ? (
-                    <td>
-                      {row.topicStatus ? (
-                        row.topicStatus === "confirmed" ? (
-                          <span className="pill pill-host">confirmed</span>
-                        ) : (
-                          <span
-                            className="pill"
-                            title="Pencilled in — under discussion"
-                          >
-                            ✎ pencilled
-                          </span>
-                        )
-                      ) : row.full ? (
-                        "full"
-                      ) : (
-                        <RowPencil
-                          slotId={row.slotId}
-                          topicId={topicId}
-                          freeLocations={row.freeLocations}
-                          onReload={() => setReloadKey((k) => k + 1)}
-                        />
-                      )}
-                    </td>
-                  ) : null}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="cal-list">
+          {sorted.map((row) => (
+            <WorkbenchRow
+              key={row.slotId}
+              row={row}
+              slug={slug}
+              topicId={topicId}
+              canPencil={canPencil}
+              onReload={() => setReloadKey((k) => k + 1)}
+            />
+          ))}
         </div>
       )}
     </div>
   );
 }
 
-/** Inline pencil-in for one slot row: the location is preselected when the
- * slot offers exactly one (or none — location-free forums); a small select
- * appears when there's a real choice. Races on a just-taken location
- * surface as the server's toast, like PencilInControl. */
-function RowPencil({
-  slotId,
+/** One washed datetime row, calendar-style: the tint IS the availability
+ * chart; clicking the row folds open the hearter avatars (the accordion);
+ * the right cluster is the pencil state/action. */
+function WorkbenchRow({
+  row,
+  slug,
   topicId,
-  freeLocations,
+  canPencil,
   onReload,
 }: {
-  slotId: string;
+  row: FitRow;
+  slug: string;
   topicId: string;
-  freeLocations: string[];
+  canPencil: boolean;
   onReload: () => void;
 }) {
+  const [open, setOpen] = useState(false);
   const { run, busy } = useGqlAction();
-  const [location, setLocation] = useState(
-    freeLocations.length === 1 ? freeLocations[0]! : "",
-  );
-  const needsLocation = freeLocations.length > 0 && !location;
 
   return (
-    <span className="row" style={{ gap: 6, alignItems: "center" }}>
-      {freeLocations.length > 1 ? (
-        <select
-          aria-label="Location"
-          value={location}
-          onChange={(e) => setLocation(e.target.value)}
-          style={{ width: "auto" }}
-        >
-          <option value="">Location…</option>
-          {freeLocations.map((l) => (
-            <option key={l} value={l}>
-              {l}
-            </option>
-          ))}
-        </select>
-      ) : null}
-      <button
-        type="button"
-        className="btn"
-        disabled={busy || needsLocation}
-        onClick={() =>
-          void run(
-            ADD_SESSION,
-            { slot: slotId, loc: location.trim() || null, topic: topicId },
-            {
-              success: "Pencilled in",
-              errorFallback: "Could not pencil in",
-              onSuccess: onReload,
-            },
-          )
-        }
-      >
-        Pencil in
-      </button>
-    </span>
+    <div
+      className="cal-row cal-row-expandable"
+      role="button"
+      tabIndex={0}
+      aria-expanded={open}
+      onClick={(e) => {
+        if (!onInteractive(e)) setOpen((o) => !o);
+      }}
+      onKeyDown={(e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        if (e.target !== e.currentTarget) return;
+        e.preventDefault();
+        setOpen((o) => !o);
+      }}
+    >
+      <div className="cal-row-head">
+        <TintLayer
+          counts={row.counts}
+          avatarCounts={open ? tallyStates(row.perUser) : null}
+        />
+        <div className="cal-row-line">
+          <span className="cal-when">
+            <strong>{formatFitDate(row.startsAt)}</strong>{" "}
+            {formatTime(row.startsAt)} – {formatTime(row.endsAt)}
+          </span>
+          <span className="cal-row-right">
+            {row.topicStatus === "confirmed" ? (
+              <span className="pill pill-host">confirmed</span>
+            ) : row.topicStatus === "proposed" ? (
+              <>
+                <span className="pill" title="Pencilled in — under discussion">
+                  ✎ pencilled
+                </span>
+                {canPencil && row.sessionId ? (
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={busy}
+                    onClick={() =>
+                      void run(
+                        CLEAR_SESSION,
+                        { session: row.sessionId },
+                        {
+                          success: "Unpencilled",
+                          errorFallback: "Could not unpencil",
+                          onSuccess: onReload,
+                        },
+                      )
+                    }
+                  >
+                    Unpencil
+                  </button>
+                ) : null}
+              </>
+            ) : canPencil ? (
+              <button
+                type="button"
+                className="btn"
+                disabled={busy}
+                onClick={() =>
+                  void run(
+                    ADD_SESSION,
+                    { slot: row.slotId, topic: topicId },
+                    {
+                      success: "Pencilled in",
+                      errorFallback: "Could not pencil in",
+                      onSuccess: onReload,
+                    },
+                  )
+                }
+              >
+                Pencil in
+              </button>
+            ) : null}
+          </span>
+        </div>
+        {open ? <FoldAvatars perUser={row.perUser} slug={slug} /> : null}
+      </div>
+    </div>
   );
 }

@@ -25,7 +25,9 @@ vi.mock("@timetable/core", async (importOriginal) => {
   return {
     ...actual,
     addSlotComment: vi.fn(),
+    addSlotSession: vi.fn(),
     buildCalendar: vi.fn(),
+    slotSubjectTaken: vi.fn(),
     computeSlotCounts: vi.fn(),
     countViewerPublishedHearts: vi.fn(),
     createLocalUser: vi.fn(),
@@ -310,7 +312,9 @@ afterEach(() => {
   restoreStorageEnv();
   vi.mocked(context.buildContext).mockReset();
   vi.mocked(core.addSlotComment).mockReset();
+  vi.mocked(core.addSlotSession).mockReset();
   vi.mocked(core.buildCalendar).mockReset();
+  vi.mocked(core.slotSubjectTaken).mockReset();
   vi.mocked(core.computeSlotCounts).mockReset();
   vi.mocked(core.getAudienceElectorIds).mockReset();
   vi.mocked(core.getSlotById).mockReset();
@@ -1656,7 +1660,11 @@ describe("createApiApp", () => {
     const QUERY = `query($s: String!, $t: String!){
       topicSlotFit(idOrSlug: $s, topicId: $t) {
         hearterCount
-        slots { slotId freeLocations full topicStatus counts { green } }
+        slots {
+          slotId sessionId topicStatus
+          counts { green }
+          perUser { userId state }
+        }
       }
     }`;
 
@@ -1712,10 +1720,10 @@ describe("createApiApp", () => {
             hearterCount: number;
             slots: {
               slotId: string;
-              freeLocations: string[];
-              full: boolean;
+              sessionId: string | null;
               topicStatus: string | null;
               counts: { green: number };
+              perUser: { userId: string; state: string }[];
             }[];
           } | null;
         };
@@ -1723,7 +1731,7 @@ describe("createApiApp", () => {
       };
     }
 
-    it("maps free locations, fullness, and the topic's own booking", async () => {
+    it("maps the topic's own pencil, counts, and per-hearter states", async () => {
       const topic = topicFixture({ status: "published", hostId: "host-1" });
       mockSession("host-1", ["host"]);
       vi.mocked(core.getReadableTimetable).mockResolvedValue({
@@ -1736,13 +1744,13 @@ describe("createApiApp", () => {
         "elector-2",
       ]);
       vi.mocked(core.buildCalendar).mockResolvedValue([
-        // Two locations, one taken by this very topic.
+        // This topic pencilled, alongside someone else's pencil (pencils
+        // are location-less time-intents — both share the slot).
         calendarSlot({
           id: "aaaaaaaa-0000-0000-0000-000000000001",
-          locations: ["Hall", "Classroom"],
           sessions: [
             session({
-              location: "Hall",
+              id: "55555555-5555-5555-5555-555555555551",
               status: "confirmed",
               topic: {
                 id: topic.id,
@@ -1752,16 +1760,19 @@ describe("createApiApp", () => {
                 hostName: null,
               },
             }),
+            session({ id: "55555555-5555-5555-5555-555555555552" }),
           ],
           counts: { green: 2, yellow: 0, red: 0 },
+          perUser: [
+            { userId: "elector-1", name: null, image: null, state: "green" },
+            { userId: "elector-2", name: null, image: null, state: "green" },
+          ],
         }),
-        // Location-free slot fully taken by someone else's session.
+        // A slot with only someone else's session — no own pencil.
         calendarSlot({
           id: "aaaaaaaa-0000-0000-0000-000000000002",
           sessions: [session()],
         }),
-        // Open location-free slot.
-        calendarSlot({ id: "aaaaaaaa-0000-0000-0000-000000000003" }),
       ]);
 
       await withTestServer(async (baseUrl) => {
@@ -1771,24 +1782,20 @@ describe("createApiApp", () => {
         expect(body.data?.topicSlotFit?.slots).toEqual([
           {
             slotId: "aaaaaaaa-0000-0000-0000-000000000001",
-            freeLocations: ["Classroom"],
-            full: false,
+            sessionId: "55555555-5555-5555-5555-555555555551",
             topicStatus: "confirmed",
             counts: { green: 2 },
+            perUser: [
+              { userId: "elector-1", state: "green" },
+              { userId: "elector-2", state: "green" },
+            ],
           },
           {
             slotId: "aaaaaaaa-0000-0000-0000-000000000002",
-            freeLocations: [],
-            full: true,
+            sessionId: null,
             topicStatus: null,
             counts: { green: 0 },
-          },
-          {
-            slotId: "aaaaaaaa-0000-0000-0000-000000000003",
-            freeLocations: [],
-            full: false,
-            topicStatus: null,
-            counts: { green: 0 },
+            perUser: [],
           },
         ]);
         expect(core.getAudienceElectorIds).toHaveBeenCalledWith(
@@ -1856,6 +1863,72 @@ describe("createApiApp", () => {
           (await request(baseUrl, topic.id)).data?.topicSlotFit,
         ).toBeNull();
         expect(core.buildCalendar).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("addSlotSession (location-less pencils, 2026-08-14)", () => {
+    const PENCIL = `mutation($slot: String!, $topic: String!){
+      addSlotSession(slotId: $slot, topicId: $topic)
+    }`;
+
+    function mockPencilWorld() {
+      const slot = slotFixture();
+      const topic = topicFixture({ status: "published", hostId: "host-1" });
+      vi.mocked(core.getSlotById).mockResolvedValue(slot);
+      vi.mocked(core.getTimetableById).mockResolvedValue(
+        timetableFixture({ settings: { calendar: { enabled: true } } }),
+      );
+      vi.mocked(core.getTopicById).mockResolvedValue(topic);
+      mockSession("host-1", ["host"]);
+      return { slot, topic };
+    }
+
+    async function pencil(baseUrl: string, slotId: string, topicId: string) {
+      const res = await fetch(`${baseUrl}/graphql`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: PENCIL,
+          variables: { slot: slotId, topic: topicId },
+        }),
+      });
+      return (await res.json()) as {
+        data?: { addSlotSession: boolean | null };
+        errors?: unknown[];
+      };
+    }
+
+    it("pencils with no location, even on a slot with configured locations", async () => {
+      const { slot, topic } = mockPencilWorld();
+      vi.mocked(core.getSlotById).mockResolvedValue(
+        slotFixture({ locations: ["Hall", "Classroom"] }),
+      );
+      vi.mocked(core.slotSubjectTaken).mockResolvedValue(false);
+
+      await withTestServer(async (baseUrl) => {
+        const body = await pencil(baseUrl, slot.id, topic.id);
+        expect(body.errors).toBeUndefined();
+        expect(body.data?.addSlotSession).toBe(true);
+        expect(core.addSlotSession).toHaveBeenCalledWith(
+          slot.id,
+          expect.objectContaining({
+            location: "",
+            topicId: topic.id,
+            status: "proposed",
+          }),
+        );
+      });
+    });
+
+    it("refuses a duplicate pencil for the same topic", async () => {
+      const { slot, topic } = mockPencilWorld();
+      vi.mocked(core.slotSubjectTaken).mockResolvedValue(true);
+
+      await withTestServer(async (baseUrl) => {
+        const body = await pencil(baseUrl, slot.id, topic.id);
+        expect(body.errors?.length).toBeGreaterThan(0);
+        expect(core.addSlotSession).not.toHaveBeenCalled();
       });
     });
   });
