@@ -130,12 +130,16 @@ Stable names for feature pieces, so instructions can reference them precisely.
   the `replies` digest kind covers new comments in chains the recipient is
   part of, batched per chain by the email's thread merge. All comment kinds
   suppress against `comment_seen` (engagement), not page watermarks.
-- **topic-card-tabs** — `TopicCardTabs.tsx`: the My Topics card's four
-  sections — public comments / {host}-only / drafting thread / Scheduling —
-  as one horizontal tab strip (Base UI Tabs; inactive panels unmounted so
-  lazy fetches stay lazy). Replaced the stacked collapsibles 2026-08-14;
-  the collapsible `HostOnlyPanel`/`AdminCommentsPanel` wrappers live on at
-  their other call sites (feed card, permalink, moderation).
+- **card-section tabs** — `CardSectionTabs.tsx` (generic strip) +
+  `TopicCardTabs.tsx` (My Topics assembly) + `buildFeedSections` in
+  `TopicCard.tsx` (feed/permalink/queue): a topic card's parallel sections
+  ("activities" — naming TBD with Ed) — public comments / {host}-only /
+  drafting thread / Scheduling — render as one horizontal tab strip when
+  ≥2 are live, and bare (the pre-tabs presentation) when only one is.
+  Inactive panels unmount, so lazy fetches stay lazy; on feed cards the
+  💬 button / top-composer snap the strip back to Comments through
+  CommentsOpenScope. The collapsible `HostOnlyPanel` wrapper is gone
+  (2026-08-14); `AdminCommentsPanel`'s survives on permalink + moderation.
 - **topic-workbench** — `TopicScheduleBody` in `TopicSchedulePanel.tsx`,
   the Scheduling tab of topic-card-tabs (published, calendar on): per-topic
   mini-calendar — the topic's hearters' availability across future slots
