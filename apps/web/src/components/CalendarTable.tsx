@@ -355,7 +355,7 @@ function SlotRow({
 }) {
   const [open, setOpen] = useState(false);
   const [comments, setComments] = useState<SlotComment[] | null>(null);
-  const canExpand = perms.canSeeHostOnly || perms.canAdmin;
+  const canExpand = perms.canDiscuss;
 
   async function loadComments() {
     try {
@@ -429,7 +429,8 @@ function SlotRow({
  * with its meters, hairlines, and week rules): each slot is one rounded
  * block whose background tints ARE the availability chart, rows separated
  * by gaps (bigger between weeks), month headings between groups. The whole
- * row toggles its fold (discussion, avatars, controls) for hosts/admins.
+ * row toggles its fold for any member (discussion for everyone since
+ * 2026-08-14; avatars and controls remain host/admin).
  */
 export function CalendarTable({
   rows,

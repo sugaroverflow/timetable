@@ -38,6 +38,7 @@ import type {
 import {
   calendarConfirmPolicy,
   canConfirmSession,
+  canDiscussSlots,
   canManageCalendar,
   canProposeSession,
   canSeeHostOnly,
@@ -386,14 +387,14 @@ builder.queryFields((t) => ({
     },
   }),
 
-  /** Slot discussion thread (host/admin only; admins also see hidden). */
+  /** Slot discussion thread (any member; admins also see hidden). */
   slotComments: t.field({
     type: [SlotCommentType],
     args: { slotId: t.arg.string({ required: true }) },
     resolve: async (_p, args, ctx) => {
       const { viewer, timetable } = await loadSlotAndViewer(ctx, args.slotId);
       if (!isCalendarEnabled(timetable.settings)) return [];
-      if (!canSeeHostOnly(viewer)) return [];
+      if (!canDiscussSlots(viewer)) return [];
       return listSlotComments(args.slotId, {
         includeHidden: canManageCalendar(viewer),
       });
@@ -975,9 +976,9 @@ builder.mutationFields((t) => ({
     },
   }),
 
-  /** Host/admin: post to a slot discussion — optionally as a session claim
-   * carrying a topic and the availability snapshot the server computes for
-   * that topic's hearters at this moment. */
+  /** Any member: post to a slot discussion. Hosts/admins may optionally post
+   * a session claim carrying a topic and the availability snapshot the server
+   * computes for that topic's hearters at this moment. */
   addSlotComment: t.field({
     type: SlotCommentType,
     args: {
@@ -992,7 +993,10 @@ builder.mutationFields((t) => ({
         args.slotId,
       );
       requireCalendarEnabled(timetable.settings);
-      if (!canSeeHostOnly(viewer)) forbidden("Hosts/admins only");
+      if (!canDiscussSlots(viewer)) forbidden("Members only");
+      if (args.topicId && !canSeeHostOnly(viewer)) {
+        forbidden("Attaching a topic snapshot is host/admin-only");
+      }
       const body = args.body.trim();
       if (!body) throw new GraphQLError("Comment cannot be empty");
       await assertActionLimit(user.id, "comment");

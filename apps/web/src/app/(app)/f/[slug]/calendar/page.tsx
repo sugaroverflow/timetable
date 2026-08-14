@@ -4,6 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import {
   calendarConfirmPolicy,
   canConfirmSession,
+  canDiscussSlots,
   canProposeSession,
   isAdmin,
   isCalendarEnabled,
@@ -213,6 +214,7 @@ function buildPerms(
     canSetAvailability: isElector(roles),
     canSeeHostOnly: isHost(roles) || admin,
     canAdmin: admin,
+    canDiscuss: canDiscussSlots(viewer),
     canPropose: canProposeSession(viewer, policy),
     canConfirm: canConfirmSession(viewer, policy),
     viewerId,

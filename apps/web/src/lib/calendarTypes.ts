@@ -73,6 +73,8 @@ export type CalendarPerms = {
   canSetAvailability: boolean;
   canSeeHostOnly: boolean;
   canAdmin: boolean;
+  /** Read/post in per-slot discussion threads — any member (2026-08-14). */
+  canDiscuss: boolean;
   /** Pencil a session / propose an off-piste slot (policy-dependent). */
   canPropose: boolean;
   /** Confirm a session (policy-dependent). */

@@ -5,6 +5,7 @@ import {
   calendarConfirmPolicy,
   canComment,
   canConfirmSession,
+  canDiscussSlots,
   canEditSettings,
   canEditTopic,
   canHeart,
@@ -86,6 +87,22 @@ describe("canUseQueue", () => {
     expect(canUseQueue({ userId: "u", roles: ["admin"] })).toBe(true);
     expect(canUseQueue(SIGNED_IN_GUEST)).toBe(false);
     expect(canUseQueue(ANONYMOUS)).toBe(false);
+  });
+});
+
+describe("canDiscussSlots (open slot threads, 2026-08-14)", () => {
+  it("every member role may read and post in slot threads", () => {
+    expect(canDiscussSlots({ userId: "u", roles: ["elector"] })).toBe(true);
+    expect(canDiscussSlots({ userId: "u", roles: ["host"] })).toBe(true);
+    expect(canDiscussSlots({ userId: "u", roles: ["admin"] })).toBe(true);
+  });
+
+  it("guests, anonymous, and sysadmin oversight may not", () => {
+    expect(canDiscussSlots(SIGNED_IN_GUEST)).toBe(false);
+    expect(canDiscussSlots(ANONYMOUS)).toBe(false);
+    expect(canDiscussSlots({ userId: "op", roles: [], sysadmin: true })).toBe(
+      false,
+    );
   });
 });
 
