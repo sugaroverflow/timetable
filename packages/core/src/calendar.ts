@@ -7,6 +7,7 @@ import {
   isNotNull,
   isNull,
   lte,
+  ne,
   sql,
 } from "drizzle-orm";
 
@@ -106,7 +107,8 @@ export async function createSlots(
 /** A host's off-piste proposal: a session at a time the grid doesn't
  * offer. Reuses the timeslot if one already exists at that exact window
  * (slots are unique per time now) — unioning the proposed location into
- * its offered set; the session is born `proposed`. */
+ * its OFFERED set (`input.location` is the slot's, not the session's);
+ * the session is born `proposed` and location-less. */
 export async function proposeSlot(
   timetableId: string,
   createdById: string,
@@ -151,7 +153,6 @@ export async function proposeSlot(
   }
   if (!slot) throw new Error("Failed to propose slot");
   const session = await addSlotSession(slot.id, {
-    location: input.location,
     topicId: input.topicId,
     sessionHostId: input.sessionHostId,
     createdById,
@@ -181,7 +182,8 @@ export async function deleteSlot(slotId: string): Promise<void> {
 }
 
 // --------------------------------------------------------------------------
-// Bookings (slot sessions): several per slot, unique per (slot, location)
+// Bookings (slot sessions): several per slot, one pencil per subject;
+// confirmed sessions are exclusive per (slot, location)
 // --------------------------------------------------------------------------
 
 export async function getSlotSessionById(
@@ -195,8 +197,6 @@ export async function getSlotSessionById(
   return session ?? null;
 }
 
-/** Whether the slot already has a booking at this location — the
- * pre-flight for addSlotSession's unique (slot, location) constraint. */
 /** Is this subject (topic, or office-hours host) already pencilled into
  * this slot? Pencils are location-less time-intents (2026-08-14) — the
  * per-subject uniques backstop this pre-flight under concurrency. */
@@ -223,14 +223,14 @@ export async function slotSubjectTaken(
   return Boolean(row);
 }
 
-/** Book a session into a slot. Ownership (`sessionHostId`) and the
- * admin-only custom gate are the resolver's job; the per-subject unique
- * indexes backstop concurrent double-pencilling. */
+/** Book a session into a slot — always location-less: a pencil is a pure
+ * time-intent, and the room is decided at confirm time (2026-08-14, via
+ * updateSlotSessionRow). Ownership (`sessionHostId`) and the admin-only
+ * custom gate are the resolver's job; the per-subject unique indexes
+ * backstop concurrent double-pencilling. */
 export async function addSlotSession(
   slotId: string,
   session: {
-    /** Display copy only since 2026-08-14 — never contended. */
-    location?: string;
     topicId: string | null;
     sessionHostId: string | null;
     customTitle?: string;
@@ -243,7 +243,7 @@ export async function addSlotSession(
     .insert(slotSessions)
     .values({
       slotId,
-      location: session.location ?? "",
+      location: "",
       topicId: session.topicId,
       sessionHostId: session.sessionHostId,
       customTitle: session.customTitle ?? "",
@@ -256,16 +256,43 @@ export async function addSlotSession(
   return created;
 }
 
-/** Confirm / URL edits on an existing booking. */
+/** Is this slot+location already held by another CONFIRMED session? The
+ * pre-flight for confirm-time location assignment (2026-08-14): confirmed
+ * sessions are exclusive per (slot, location); the partial unique index
+ * `slot_sessions_slot_confirmed_location_uq` backstops races. */
+export async function confirmedLocationTaken(
+  slotId: string,
+  location: string,
+  excludeSessionId?: string,
+): Promise<boolean> {
+  if (!location) return false;
+  const [row] = await db
+    .select({ id: slotSessions.id })
+    .from(slotSessions)
+    .where(
+      and(
+        eq(slotSessions.slotId, slotId),
+        eq(slotSessions.location, location),
+        eq(slotSessions.status, "confirmed"),
+        excludeSessionId ? ne(slotSessions.id, excludeSessionId) : undefined,
+      ),
+    )
+    .limit(1);
+  return Boolean(row);
+}
+
+/** Confirm / URL / location edits on an existing booking — the location
+ * arrives here at confirm time ("" clears it). */
 export async function updateSlotSessionRow(
   sessionId: string,
-  patch: { status?: SlotStatus; url?: string },
+  patch: { status?: SlotStatus; url?: string; location?: string },
 ): Promise<SlotSession | null> {
   const [updated] = await db
     .update(slotSessions)
     .set({
       ...(patch.status ? { status: patch.status } : {}),
       ...(patch.url !== undefined ? { url: patch.url } : {}),
+      ...(patch.location !== undefined ? { location: patch.location } : {}),
       updatedAt: new Date(),
     })
     .where(eq(slotSessions.id, sessionId))

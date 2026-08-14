@@ -5,6 +5,7 @@ import {
   addSlotSession,
   buildCalendar,
   computeSlotCounts,
+  confirmedLocationTaken,
   createSlots,
   deleteSlot,
   deleteSlotComment,
@@ -197,6 +198,26 @@ function parseSessionUrl(raw: string | null | undefined): string {
     badRequest("Session URL must be http(s)");
   }
   return trimmed;
+}
+
+/** A confirm-time location — trimmed, capped like slot locations. */
+function parseSessionLocation(raw: string): string {
+  const trimmed = raw.trim();
+  if (trimmed.length > 80) badRequest("Location name too long");
+  return trimmed;
+}
+
+/** Did this write trip `slot_sessions_slot_confirmed_location_uq`? The
+ * pre-flight can race a concurrent confirm; the partial unique index is
+ * the backstop, mapped to the same friendly error. */
+function isConfirmedLocationConflict(err: unknown): boolean {
+  for (let e = err; e instanceof Error; e = e.cause as Error) {
+    const code = (e as { code?: unknown }).code;
+    if (code === "23505" && e.message.includes("slot_confirmed_location")) {
+      return true;
+    }
+  }
+  return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -589,6 +610,8 @@ builder.mutationFields((t) => ({
       idOrSlug: t.arg.string({ required: true }),
       startsAt: t.arg.string({ required: true }),
       endsAt: t.arg.string({ required: true }),
+      /** Offered at the new slot (slot-level; the session stays
+       * location-less — the room is decided at confirm time). */
       location: t.arg.string({ required: false }),
       topicId: t.arg.string({ required: false }),
       /** Office hours: the host the session is for (topicId omitted). */
@@ -614,8 +637,9 @@ builder.mutationFields((t) => ({
         "",
       );
       const { startsAt, endsAt } = parseSlotWindow(args.startsAt, args.endsAt);
-      // Location optional since 2026-08-14 (pencils are location-less
-      // time-intents) — kept as display copy when given.
+      // The location is the SLOT's — it joins the new timeslot's offered
+      // set — while the session itself is born location-less (the room is
+      // decided at confirm time, 2026-08-14).
       const location = (args.location ?? "").trim();
       const { slot } = await proposeSlot(readable.timetable.id, user.id, {
         startsAt,
@@ -838,6 +862,44 @@ function assertStatusGate(
   }
 }
 
+/** updateSlotSession's write path: parse the url/location args
+ * (null=unchanged, ""=clear), guard the confirm-time location rule — a
+ * confirmed session's non-empty location must not be held by another
+ * confirmed session in the slot — and persist. Returns the session's
+ * effective location (for the activity log). */
+async function persistSessionUpdate(
+  session: { id: string; location: string },
+  slot: { id: string },
+  status: SlotStatus,
+  args: { url: string | null | undefined; location: string | null | undefined },
+): Promise<string> {
+  const location =
+    args.location == null ? undefined : parseSessionLocation(args.location);
+  const nextLocation = location ?? session.location;
+  if (
+    status === "confirmed" &&
+    nextLocation &&
+    (await confirmedLocationTaken(slot.id, nextLocation, session.id))
+  ) {
+    badRequest("That location is already confirmed for this time");
+  }
+  try {
+    await updateSlotSessionRow(session.id, {
+      status,
+      url: args.url === undefined ? undefined : parseSessionUrl(args.url),
+      location,
+    });
+  } catch (err) {
+    // The pre-flight can race a concurrent confirm; the partial unique
+    // index backstops it — same friendly error.
+    if (isConfirmedLocationConflict(err)) {
+      badRequest("That location is already confirmed for this time");
+    }
+    throw err;
+  }
+  return nextLocation;
+}
+
 /** Validated start/end for a hand-proposed slot. */
 function parseSlotWindow(
   startsAtRaw: string,
@@ -856,17 +918,16 @@ function parseSlotWindow(
 
 builder.mutationFields((t) => ({
   /** Book a session into a slot — a topic, (QA 2026-08-03) office hours
-   * for `sessionHostId`, or an admin's custom `title` — at a location.
-   * Pencils are location-less time-intents (2026-08-14): any number of
-   * subjects can share a slot — a pencil is the host saying "I am
-   * available at this time" — and the only exclusivity is one pencil per
-   * subject per slot. `location` is optional display copy. Who may do
+   * for `sessionHostId`, or an admin's custom `title`. Pencils are
+   * location-less time-intents (2026-08-14): any number of subjects can
+   * share a slot — a pencil is the host saying "I am available at this
+   * time" — and the only exclusivity is one pencil per subject per slot;
+   * the room is decided at confirm time (updateSlotSession). Who may do
    * what depends on the forum's confirm policy. */
   addSlotSession: t.field({
     type: "Boolean",
     args: {
       slotId: t.arg.string({ required: true }),
-      location: t.arg.string({ required: false }),
       topicId: t.arg.string({ required: false }),
       /** Office hours: the host the session is for (topicId omitted). */
       sessionHostId: t.arg.string({ required: false }),
@@ -893,7 +954,6 @@ builder.mutationFields((t) => ({
         args.sessionHostId,
         parseCustomTitle(args.title),
       );
-      const location = (args.location ?? "").trim();
       if (
         (subject.topicId || subject.sessionHostId) &&
         (await slotSubjectTaken(slot.id, subject))
@@ -901,7 +961,6 @@ builder.mutationFields((t) => ({
         badRequest("Already pencilled in at this time");
       }
       await addSlotSession(slot.id, {
-        location,
         topicId: subject.topicId,
         sessionHostId: subject.sessionHostId,
         customTitle: subject.customTitle,
@@ -916,7 +975,6 @@ builder.mutationFields((t) => ({
         payload: {
           slotId: slot.id,
           startsAt: slot.startsAt.toISOString(),
-          ...(location ? { location } : {}),
           ...subject.payloadExtra,
         },
         ...(subject.note ? { note: subject.note } : {}),
@@ -925,14 +983,20 @@ builder.mutationFields((t) => ({
     },
   }),
 
-  /** Confirm a booking / edit its URL. Owner or admin only; custom
-   * sessions are admin-only. */
+  /** Confirm a booking / edit its URL or location. Owner or admin only;
+   * custom sessions are admin-only. The room is decided here (2026-08-14):
+   * `location` follows the null=unchanged / ""=clear convention, and a
+   * confirmed session's non-empty location must be free — confirmed
+   * sessions are exclusive per (slot, location). The location itself is
+   * never required server-side (location-free forums confirm without
+   * one); the UI enforces the pick when the slot offers locations. */
   updateSlotSession: t.field({
     type: "Boolean",
     args: {
       sessionId: t.arg.string({ required: true }),
       status: t.arg.string({ required: false }),
       url: t.arg.string({ required: false }),
+      location: t.arg.string({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
       const user = await requireUser(ctx);
@@ -942,9 +1006,9 @@ builder.mutationFields((t) => ({
       const status = parseSessionStatus(args.status ?? session.status);
       assertStatusGate(viewer, policy, status);
 
-      await updateSlotSessionRow(session.id, {
-        status,
-        url: args.url === undefined ? undefined : parseSessionUrl(args.url),
+      const nextLocation = await persistSessionUpdate(session, slot, status, {
+        url: args.url,
+        location: args.location,
       });
       // Re-confirming (e.g. a URL edit) still logs slot.confirm — the log
       // is a feed, and the fresh URL is the news.
@@ -955,7 +1019,7 @@ builder.mutationFields((t) => ({
         payload: {
           slotId: slot.id,
           startsAt: slot.startsAt.toISOString(),
-          ...(session.location ? { location: session.location } : {}),
+          ...(nextLocation ? { location: nextLocation } : {}),
           ...(topic
             ? { topicId: topic.id, title: topic.title }
             : session.customTitle

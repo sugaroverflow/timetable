@@ -1,4 +1,4 @@
-import { isNull, relations } from "drizzle-orm";
+import { isNull, relations, sql } from "drizzle-orm";
 import {
   index,
   integer,
@@ -63,8 +63,10 @@ export const timeslots = pgTable(
  * (2026-08-14, demand-first): any number of subjects can pencil the same
  * time — a pencil is the host saying "I am available at this time" — so
  * the only uniqueness is one pencil per topic (and one office-hours pencil
- * per host) per slot. `location` remains as display copy on existing rows
- * and for the future confirm-time assignment; it no longer contends. */
+ * per host) per slot. The room is decided at CONFIRM time (2026-08-14,
+ * same day): a confirmed session acquires a `location`, and confirmed
+ * sessions are exclusive per (slot, location) — location-free forums keep
+ * working, their confirms simply have no location. */
 export const slotSessions = pgTable(
   "slot_sessions",
   {
@@ -101,6 +103,12 @@ export const slotSessions = pgTable(
     uniqueIndex("slot_sessions_slot_oh_host_uq")
       .on(t.slotId, t.sessionHostId)
       .where(isNull(t.topicId)),
+    // Confirm-time locations (2026-08-14): two confirmed sessions cannot
+    // share a room at the same time. Pencils (proposed) and location-less
+    // confirms stay unconstrained.
+    uniqueIndex("slot_sessions_slot_confirmed_location_uq")
+      .on(t.slotId, t.location)
+      .where(sql`${t.status} = 'confirmed' and ${t.location} <> ''`),
     index("slot_sessions_slot_idx").on(t.slotId),
   ],
 );

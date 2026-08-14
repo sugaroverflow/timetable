@@ -126,5 +126,7 @@ npm run format:check && npm run test && npm run test:e2e
 
 plus `npm run db:migrate` when schema or migrations change. Tests are Vitest
 (`packages/shared`, `apps/api`, `apps/web`) and one Playwright smoke suite
-(`tests/e2e/`); known coverage gaps are listed in
+(`tests/e2e/`); the e2e suite always starts its own web server on port 3100
+(override with `PLAYWRIGHT_PORT`), so it runs alongside a dev stack holding
+:3000. Known coverage gaps are listed in
 [docs/PRODUCT.md](docs/PRODUCT.md#testing-gaps).

@@ -6,6 +6,7 @@ import type { IcsSlot, ReadableTimetable } from "@timetable/core";
 import * as core from "@timetable/core";
 import type {
   SlotComment,
+  SlotSession,
   Timeslot,
   Timetable,
   TimetableMembership,
@@ -31,9 +32,13 @@ vi.mock("@timetable/core", async (importOriginal) => {
     addSlotComment: vi.fn(),
     addSlotSession: vi.fn(),
     buildCalendar: vi.fn(),
+    confirmedLocationTaken: vi.fn(),
     slotSubjectTaken: vi.fn(),
     computeSlotCounts: vi.fn(),
     countActiveApiTokens: vi.fn(),
+    getSlotSessionById: vi.fn(),
+    proposeSlot: vi.fn(),
+    updateSlotSessionRow: vi.fn(),
     countViewerPublishedHearts: vi.fn(),
     createApiToken: vi.fn(),
     createLocalUser: vi.fn(),
@@ -263,6 +268,23 @@ function slotFixture(patch: Partial<Timeslot> = {}): Timeslot {
   };
 }
 
+function slotSessionFixture(patch: Partial<SlotSession> = {}): SlotSession {
+  return {
+    id: "55555555-5555-5555-5555-555555555555",
+    slotId: "33333333-3333-3333-3333-333333333333",
+    location: "",
+    topicId: "22222222-2222-2222-2222-222222222222",
+    sessionHostId: "host-1",
+    customTitle: "",
+    status: "proposed",
+    url: "",
+    createdById: "host-1",
+    createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    ...patch,
+  };
+}
+
 function slotCommentRowFixture(patch: Partial<SlotComment> = {}): SlotComment {
   return {
     id: "44444444-4444-4444-4444-444444444444",
@@ -346,8 +368,12 @@ afterEach(() => {
   vi.mocked(core.addSlotComment).mockReset();
   vi.mocked(core.addSlotSession).mockReset();
   vi.mocked(core.buildCalendar).mockReset();
+  vi.mocked(core.confirmedLocationTaken).mockReset();
   vi.mocked(core.slotSubjectTaken).mockReset();
   vi.mocked(core.computeSlotCounts).mockReset();
+  vi.mocked(core.getSlotSessionById).mockReset();
+  vi.mocked(core.proposeSlot).mockReset();
+  vi.mocked(core.updateSlotSessionRow).mockReset();
   vi.mocked(core.getAudienceElectorIds).mockReset();
   vi.mocked(core.getSlotById).mockReset();
   vi.mocked(core.listSlotComments).mockReset();
@@ -1948,11 +1974,15 @@ describe("createApiApp", () => {
         expect(core.addSlotSession).toHaveBeenCalledWith(
           slot.id,
           expect.objectContaining({
-            location: "",
             topicId: topic.id,
             status: "proposed",
           }),
         );
+        // The room is decided at confirm time — the pencil carries no
+        // location at all (core inserts "").
+        expect(
+          vi.mocked(core.addSlotSession).mock.calls[0]![1],
+        ).not.toHaveProperty("location");
       });
     });
 
@@ -1964,6 +1994,162 @@ describe("createApiApp", () => {
         const body = await pencil(baseUrl, slot.id, topic.id);
         expect(body.errors?.length).toBeGreaterThan(0);
         expect(core.addSlotSession).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("updateSlotSession (confirm-time locations, 2026-08-14)", () => {
+    const UPDATE = `mutation($session: String!, $status: String, $loc: String){
+      updateSlotSession(sessionId: $session, status: $status, location: $loc)
+    }`;
+
+    function mockConfirmWorld(sessionPatch: Partial<SlotSession> = {}) {
+      const session = slotSessionFixture(sessionPatch);
+      const slot = slotFixture({ locations: ["Hall", "Classroom"] });
+      const topic = topicFixture({ status: "published", hostId: "host-1" });
+      vi.mocked(core.getSlotSessionById).mockResolvedValue(session);
+      vi.mocked(core.getSlotById).mockResolvedValue(slot);
+      vi.mocked(core.getTimetableById).mockResolvedValue(
+        timetableFixture({ settings: { calendar: { enabled: true } } }),
+      );
+      vi.mocked(core.getTopicById).mockResolvedValue(topic);
+      mockSession("admin-1", ["admin"]);
+      return { session, slot, topic };
+    }
+
+    async function update(
+      baseUrl: string,
+      vars: { session: string; status?: string; loc?: string },
+    ) {
+      const res = await fetch(`${baseUrl}/graphql`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: UPDATE, variables: vars }),
+      });
+      return (await res.json()) as {
+        data?: { updateSlotSession: boolean | null };
+        errors?: { message: string }[];
+      };
+    }
+
+    it("confirms with a free location", async () => {
+      const { session, slot } = mockConfirmWorld();
+      vi.mocked(core.confirmedLocationTaken).mockResolvedValue(false);
+      vi.mocked(core.updateSlotSessionRow).mockResolvedValue(
+        slotSessionFixture({ status: "confirmed", location: "Hall" }),
+      );
+
+      await withTestServer(async (baseUrl) => {
+        const body = await update(baseUrl, {
+          session: session.id,
+          status: "confirmed",
+          loc: "Hall",
+        });
+        expect(body.errors).toBeUndefined();
+        expect(body.data?.updateSlotSession).toBe(true);
+        expect(core.confirmedLocationTaken).toHaveBeenCalledWith(
+          slot.id,
+          "Hall",
+          session.id,
+        );
+        expect(core.updateSlotSessionRow).toHaveBeenCalledWith(session.id, {
+          status: "confirmed",
+          url: undefined,
+          location: "Hall",
+        });
+      });
+    });
+
+    it("refuses to confirm into a location another confirmed session holds", async () => {
+      const { session } = mockConfirmWorld();
+      vi.mocked(core.confirmedLocationTaken).mockResolvedValue(true);
+
+      await withTestServer(async (baseUrl) => {
+        const body = await update(baseUrl, {
+          session: session.id,
+          status: "confirmed",
+          loc: "Hall",
+        });
+        expect(body.errors?.[0]?.message).toBe(
+          "That location is already confirmed for this time",
+        );
+        expect(core.updateSlotSessionRow).not.toHaveBeenCalled();
+      });
+    });
+
+    it("refuses to move a confirmed session to a taken location", async () => {
+      // No status arg: the session is already confirmed, only the room moves.
+      const { session } = mockConfirmWorld({
+        status: "confirmed",
+        location: "Hall",
+      });
+      vi.mocked(core.confirmedLocationTaken).mockResolvedValue(true);
+
+      await withTestServer(async (baseUrl) => {
+        const body = await update(baseUrl, {
+          session: session.id,
+          loc: "Classroom",
+        });
+        expect(body.errors?.[0]?.message).toBe(
+          "That location is already confirmed for this time",
+        );
+        expect(core.updateSlotSessionRow).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("proposeSlot (slot-level location, 2026-08-14)", () => {
+    it("passes the location to the slot's offered set; the session is born location-less", async () => {
+      // The location arg feeds the SLOT (its offered set); the session is
+      // location-less by construction — core's addSlotSession no longer
+      // accepts a location at all.
+      const topic = topicFixture({ status: "published", hostId: "host-1" });
+      mockSession("host-1", ["host"]);
+      vi.mocked(core.getReadableTimetable).mockResolvedValue({
+        timetable: timetableFixture({
+          settings: { calendar: { enabled: true } },
+        }),
+        roles: ["host"],
+      });
+      vi.mocked(core.getTopicById).mockResolvedValue(topic);
+      vi.mocked(core.proposeSlot).mockResolvedValue({
+        slot: slotFixture({ locations: ["Hall"] }),
+        session: slotSessionFixture(),
+      });
+
+      await withTestServer(async (baseUrl) => {
+        const res = await fetch(`${baseUrl}/graphql`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            query: `mutation($s: String!, $a: String!, $b: String!, $loc: String, $t: String){
+              proposeSlot(idOrSlug: $s, startsAt: $a, endsAt: $b, location: $loc, topicId: $t) { id }
+            }`,
+            variables: {
+              s: "public-calendar",
+              a: "2026-09-01T18:00:00.000Z",
+              b: "2026-09-01T20:00:00.000Z",
+              loc: "Hall",
+              t: topic.id,
+            },
+          }),
+        });
+        const body = (await res.json()) as {
+          data?: { proposeSlot: { id: string } | null };
+          errors?: unknown[];
+        };
+        expect(body.errors).toBeUndefined();
+        expect(core.proposeSlot).toHaveBeenCalledWith(
+          "11111111-1111-1111-1111-111111111111",
+          "host-1",
+          {
+            startsAt: new Date("2026-09-01T18:00:00.000Z"),
+            endsAt: new Date("2026-09-01T20:00:00.000Z"),
+            location: "Hall",
+            topicId: topic.id,
+            sessionHostId: "host-1",
+          },
+        );
       });
     });
   });
