@@ -180,9 +180,12 @@ pointing at the real event page once one exists.
 **Demand-first scheduling (2026-08-14).** A ❤️ already implies "I'd attend a
 session" (deliberately unstated in UI copy — it was the original
 implication), so hosts schedule from demand rather than supply: each
-published card on My Topics carries a **topic-workbench** panel — a
-per-topic mini-calendar of upcoming slots as washed rows (the calendar's
-row-wash look), each expandable to the hearters' avatar fold, with a
+My Topics card carries **topic-card-tabs** — public comments /
+{host}-only / drafting thread / **Scheduling** as one horizontal tab
+strip — and the Scheduling tab is the **topic-workbench**: a per-topic
+mini-calendar of upcoming slots as washed rows (the calendar's row-wash
+look, month headings and week gaps in the by-date view, past slots never
+shown), each expandable to the hearters' avatar fold, with a
 Date / Availability sort toggle (availability order: 🟢 dominates 🟡) and
 a pencil / unpencil control per row. It is a dashboard only — no
 discussion there; the conversation about when/where/who happens on the

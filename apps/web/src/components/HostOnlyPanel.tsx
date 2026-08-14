@@ -93,6 +93,67 @@ function HostHeartsActionsRow({
   );
 }
 
+/** The host-only thread's body — 💙 actions row (when hearters are
+ * provided), composer, thread. Shared by the collapsible panel below and
+ * the My Topics card tabs (topic-card-tabs, 2026-08-14). */
+export function HostOnlyThreadBody({
+  topicId,
+  comments,
+  canModerate,
+  viewerId = null,
+  slug,
+  hostLabel = "Host",
+  roleLabels,
+  hostHearters = null,
+  canHostHeart = false,
+  viewerHasHostHearted = false,
+}: {
+  topicId: string;
+  comments: FeedComment[];
+  canModerate: boolean;
+  viewerId?: string | null;
+  slug?: string;
+  hostLabel?: string;
+  roleLabels?: RoleLabels;
+  hostHearters?: HostHearter[] | null;
+  canHostHeart?: boolean;
+  viewerHasHostHearted?: boolean;
+}) {
+  const count = countNested(comments);
+  const threadRef = useRef<HTMLDivElement>(null);
+  return (
+    <div className="host-thread thread-stack" ref={threadRef}>
+      {hostHearters ? (
+        <HostHeartsActionsRow
+          topicId={topicId}
+          hearters={hostHearters}
+          canHostHeart={canHostHeart}
+          viewerHasHostHearted={viewerHasHostHearted}
+          commentCount={count}
+          slug={slug}
+          hostLabel={hostLabel}
+          onFocusComposer={() =>
+            threadRef.current?.querySelector("textarea")?.focus()
+          }
+        />
+      ) : null}
+      <CommentComposer
+        topicId={topicId}
+        visibility="host_only"
+        hostLabel={hostLabel}
+      />
+      <CommentList
+        comments={comments}
+        canReply={true}
+        canModerate={canModerate}
+        viewerId={viewerId}
+        slug={slug}
+        roleLabels={roleLabels}
+      />
+    </div>
+  );
+}
+
 /** Collapsible host-only comment thread with its own composer — separate
  * from the vote-breakdown panel (QA #42). Rendered only for hosts/admins. */
 export function HostOnlyPanel({
@@ -121,7 +182,6 @@ export function HostOnlyPanel({
 }) {
   const [expanded, setExpanded] = useState(false);
   const count = countNested(comments);
-  const threadRef = useRef<HTMLDivElement>(null);
 
   return (
     <Collapsible.Root
@@ -144,35 +204,18 @@ export function HostOnlyPanel({
       </Collapsible.Trigger>
       <Collapsible.Panel>
         {expanded && (
-          <div className="host-thread thread-stack" ref={threadRef}>
-            {hostHearters ? (
-              <HostHeartsActionsRow
-                topicId={topicId}
-                hearters={hostHearters}
-                canHostHeart={canHostHeart}
-                viewerHasHostHearted={viewerHasHostHearted}
-                commentCount={count}
-                slug={slug}
-                hostLabel={hostLabel}
-                onFocusComposer={() =>
-                  threadRef.current?.querySelector("textarea")?.focus()
-                }
-              />
-            ) : null}
-            <CommentComposer
-              topicId={topicId}
-              visibility="host_only"
-              hostLabel={hostLabel}
-            />
-            <CommentList
-              comments={comments}
-              canReply={true}
-              canModerate={canModerate}
-              viewerId={viewerId}
-              slug={slug}
-              roleLabels={roleLabels}
-            />
-          </div>
+          <HostOnlyThreadBody
+            topicId={topicId}
+            comments={comments}
+            canModerate={canModerate}
+            viewerId={viewerId}
+            slug={slug}
+            hostLabel={hostLabel}
+            roleLabels={roleLabels}
+            hostHearters={hostHearters}
+            canHostHeart={canHostHeart}
+            viewerHasHostHearted={viewerHasHostHearted}
+          />
         )}
       </Collapsible.Panel>
     </Collapsible.Root>

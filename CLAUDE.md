@@ -130,16 +130,25 @@ Stable names for feature pieces, so instructions can reference them precisely.
   the `replies` digest kind covers new comments in chains the recipient is
   part of, batched per chain by the email's thread merge. All comment kinds
   suppress against `comment_seen` (engagement), not page watermarks.
-- **topic-workbench** — `TopicSchedulePanel.tsx` on My Topics cards
-  (published, calendar on): per-topic mini-calendar — the topic's hearters'
-  availability across future slots (`topicSlotFit` query, lazy on expand)
-  as washed rows (shared `CalendarRowWash.tsx`) with the avatar fold, a
-  Date/Availability sort toggle (🟢 dominates 🟡), and pencil/unpencil per
-  row. No discussion here — that's the calendar page. Part of demand-first
-  scheduling (2026-08-14): ❤️ implies "I'd attend" (never stated in UI
-  copy), and a **pencil is a location-less time-intent** — the host saying
-  "I am available at this time"; unique per slot+topic, locations never
-  contend (migration 0037).
+- **topic-card-tabs** — `TopicCardTabs.tsx`: the My Topics card's four
+  sections — public comments / {host}-only / drafting thread / Scheduling —
+  as one horizontal tab strip (Base UI Tabs; inactive panels unmounted so
+  lazy fetches stay lazy). Replaced the stacked collapsibles 2026-08-14;
+  the collapsible `HostOnlyPanel`/`AdminCommentsPanel` wrappers live on at
+  their other call sites (feed card, permalink, moderation).
+- **topic-workbench** — `TopicScheduleBody` in `TopicSchedulePanel.tsx`,
+  the Scheduling tab of topic-card-tabs (published, calendar on): per-topic
+  mini-calendar — the topic's hearters' availability across future slots
+  (`topicSlotFit` query, lazy on tab open) as washed rows (shared
+  `CalendarRowWash.tsx`) with the avatar fold, a Date/Availability sort
+  toggle (🟢 dominates 🟡), and pencil/unpencil per row. By date the rows
+  group under month headings with week gaps (calendar idiom; past slots
+  excluded server-side); by availability the list is flat and ranked, with
+  years on every date. No discussion here — that's the calendar page.
+  Part of demand-first scheduling (2026-08-14): ❤️ implies "I'd attend"
+  (never stated in UI copy), and a **pencil is a location-less
+  time-intent** — the host saying "I am available at this time"; unique
+  per slot+topic, locations never contend (migration 0037).
 - **digest click-to-read** — `digest_sends` table + `stampDigestLinks`
   (api `email.ts`) + `DigestReadMarker` (app layout): every digest link
   carries `dg=<send id>`; one click marks that email's shown comment
