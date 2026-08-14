@@ -122,6 +122,9 @@ export function rateLimit(opts: {
 
   return async (req, res, next) => {
     const now = Date.now();
+    // Always the client IP — never anything the client can vary at will
+    // (an Authorization header, say): a self-chosen key would let a caller
+    // mint a fresh bucket per request and sail past the limit.
     const client = req.ip || req.socket.remoteAddress || "unknown";
     const key = `${opts.keyPrefix ?? "api"}:${client}`;
 

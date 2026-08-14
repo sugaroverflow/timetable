@@ -12,7 +12,11 @@ import type {
   TimetableMembership,
   Topic,
 } from "@timetable/db";
-import type { Role } from "@timetable/shared";
+import {
+  API_TOKEN_SCOPES,
+  type Role,
+  type TokenScope,
+} from "@timetable/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createApiApp } from "./app";
@@ -31,10 +35,12 @@ vi.mock("@timetable/core", async (importOriginal) => {
     confirmedLocationTaken: vi.fn(),
     slotSubjectTaken: vi.fn(),
     computeSlotCounts: vi.fn(),
+    countActiveApiTokens: vi.fn(),
     getSlotSessionById: vi.fn(),
     proposeSlot: vi.fn(),
     updateSlotSessionRow: vi.fn(),
     countViewerPublishedHearts: vi.fn(),
+    createApiToken: vi.fn(),
     createLocalUser: vi.fn(),
     deleteTopic: vi.fn(),
     getAudienceElectorIds: vi.fn(),
@@ -59,6 +65,7 @@ vi.mock("@timetable/core", async (importOriginal) => {
     setMemberRoles: vi.fn(),
     setTopicReady: vi.fn(),
     softDeleteComment: vi.fn(),
+    toggleHeart: vi.fn(),
     toggleHostHeart: vi.fn(),
     updateCommentBody: vi.fn(),
     updateUserEmail: vi.fn(),
@@ -86,8 +93,21 @@ vi.mock("./email", async (importOriginal) => {
   };
 });
 
+/** The real buildContext, for the tests that must exercise its own auth
+ * decisions rather than a stand-in (see "REST refuses personal tokens").
+ * Captured from the mock factory's importOriginal rather than a top-level
+ * vi.importActual: that would instantiate a SECOND copy of the module graph,
+ * and Yoga would stop recognising GraphQLErrors thrown by the other copy's
+ * `graphql` — masking every resolver error as "Unexpected error." */
+const real = vi.hoisted(() => ({
+  buildContext: undefined as
+    | undefined
+    | typeof import("./context").buildContext,
+}));
+
 vi.mock("./context", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./context")>();
+  real.buildContext = actual.buildContext;
   return {
     ...actual,
     buildContext: vi.fn(),
@@ -109,7 +129,11 @@ const originalStorageEnv = Object.fromEntries(
   storageEnvKeys.map((key) => [key, process.env[key]]),
 ) as Record<(typeof storageEnvKeys)[number], string | undefined>;
 
-function testContext(userId: string | null, roles: Role[] = []): ApiContext {
+function testContext(
+  userId: string | null,
+  roles: Role[] = [],
+  apiToken: ApiContext["apiToken"] = null,
+): ApiContext {
   return {
     user: userId
       ? {
@@ -119,6 +143,7 @@ function testContext(userId: string | null, roles: Role[] = []): ApiContext {
           image: null,
         }
       : null,
+    apiToken,
     impersonation: null,
     getViewer: vi.fn(async () => ({ userId, roles })),
   };
@@ -126,6 +151,13 @@ function testContext(userId: string | null, roles: Role[] = []): ApiContext {
 
 function mockSession(userId: string, roles: Role[]) {
   vi.mocked(context.buildContext).mockResolvedValue(testContext(userId, roles));
+}
+
+/** A request authenticated by a personal API token holding `scopes`. */
+function mockTokenAuth(userId: string, roles: Role[], scopes: TokenScope[]) {
+  vi.mocked(context.buildContext).mockResolvedValue(
+    testContext(userId, roles, { id: "token-1", scopes }),
+  );
 }
 
 function restoreCronSecret() {
@@ -362,9 +394,12 @@ afterEach(() => {
   vi.mocked(core.listHostTopics).mockReset();
   vi.mocked(core.markInviteSent).mockReset();
   vi.mocked(core.getCommentById).mockReset();
+  vi.mocked(core.countActiveApiTokens).mockReset();
+  vi.mocked(core.createApiToken).mockReset();
   vi.mocked(core.setMemberRoles).mockReset();
   vi.mocked(core.setTopicReady).mockReset();
   vi.mocked(core.softDeleteComment).mockReset();
+  vi.mocked(core.toggleHeart).mockReset();
   vi.mocked(core.toggleHostHeart).mockReset();
   vi.mocked(core.updateCommentBody).mockReset();
   vi.mocked(core.updateUserEmail).mockReset();
@@ -2222,6 +2257,258 @@ describe("createApiApp", () => {
       };
       expect(deleted.data.deleteComment).toBe(true);
       expect(core.softDeleteComment).toHaveBeenCalledWith("comment-1");
+    });
+  });
+
+  describe("personal API tokens", () => {
+    const HEART = `mutation { heartTopic(topicId: "22222222-2222-2222-2222-222222222222") { hearted } }`;
+
+    async function post(baseUrl: string, query: string) {
+      const res = await fetch(`${baseUrl}/graphql`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer tpk_integration-test-secret",
+        },
+        body: JSON.stringify({ query }),
+      });
+      return (await res.json()) as {
+        data: Record<string, unknown> | null;
+        errors?: { message: string }[];
+      };
+    }
+
+    function publishedTopic() {
+      const topic = topicFixture({ status: "published" });
+      vi.mocked(core.getTopicById).mockResolvedValue(topic);
+      vi.mocked(core.getTimetableById).mockResolvedValue(timetableFixture());
+      return topic;
+    }
+
+    it("lets a token with hearts:write ❤️ a topic", async () => {
+      const topic = publishedTopic();
+      mockTokenAuth("elector-1", ["elector"], ["hearts:write"]);
+      vi.mocked(core.toggleHeart).mockResolvedValue({ hearted: true });
+
+      await withTestServer(async (baseUrl) => {
+        const body = await post(baseUrl, HEART);
+
+        expect(body.errors).toBeUndefined();
+        expect(core.toggleHeart).toHaveBeenCalledWith(topic.id, "elector-1");
+      });
+    });
+
+    it("refuses the same ❤️ when the token lacks the scope", async () => {
+      publishedTopic();
+      mockTokenAuth("elector-1", ["elector"], ["comments:write"]);
+
+      await withTestServer(async (baseUrl) => {
+        const body = await post(baseUrl, HEART);
+
+        expect(body.errors?.[0]?.message).toMatch(/hearts:write/);
+        expect(core.toggleHeart).not.toHaveBeenCalled();
+      });
+    });
+
+    it("refuses moderation to an admin's token holding every scope", async () => {
+      publishedTopic();
+      mockTokenAuth("admin-1", ["admin"], [...API_TOKEN_SCOPES]);
+
+      await withTestServer(async (baseUrl) => {
+        const body = await post(
+          baseUrl,
+          `mutation { moderateTopic(topicId: "22222222-2222-2222-2222-222222222222", action: "publish") { id } }`,
+        );
+
+        expect(body.errors?.[0]?.message).toMatch(/Not allowed/);
+      });
+    });
+
+    it("refuses token administration, so a token can't mint another", async () => {
+      mockTokenAuth("member-1", ["elector"], [...API_TOKEN_SCOPES]);
+
+      await withTestServer(async (baseUrl) => {
+        const body = await post(
+          baseUrl,
+          `mutation { createApiToken(name: "second", scopes: []) { secret } }`,
+        );
+
+        expect(body.errors?.[0]?.message).toMatch(/Not allowed/);
+      });
+    });
+
+    it("leaves reads open to a token with no write scopes at all", async () => {
+      const timetable = timetableFixture();
+      mockTokenAuth("member-1", ["elector"], []);
+      vi.mocked(core.getReadableTimetable).mockResolvedValue({
+        timetable,
+        roles: ["elector"],
+      });
+
+      await withTestServer(async (baseUrl) => {
+        const body = await post(
+          baseUrl,
+          `query { forum(idOrSlug: "${timetable.slug}") { id } }`,
+        );
+
+        expect(body.errors).toBeUndefined();
+        expect(body.data?.forum).toMatchObject({ id: timetable.id });
+      });
+    });
+
+    /** Session-authenticated token minting: the cap and the expiry default
+     * (hardening pass adopting #273). */
+    describe("minting", () => {
+      const NEW_TOKEN = {
+        id: "token-new",
+        userId: "",
+        name: "fresh",
+        prefix: "abcdefgh",
+        scopes: [],
+        lastUsedAt: null,
+        expiresAt: null,
+        revokedAt: null,
+        createdAt: new Date("2026-08-14T00:00:00.000Z"),
+      };
+
+      async function mint(baseUrl: string, args = "") {
+        const res = await fetch(`${baseUrl}/graphql`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            query: `mutation { createApiToken(name: "fresh", scopes: []${args}) { secret } }`,
+          }),
+        });
+        return (await res.json()) as {
+          data: Record<string, unknown> | null;
+          errors?: { message: string }[];
+        };
+      }
+
+      it("defaults an omitted expiry to 90 days, server-side", async () => {
+        mockSession("minter-default", ["elector"]);
+        vi.mocked(core.countActiveApiTokens).mockResolvedValue(0);
+        vi.mocked(core.createApiToken).mockResolvedValue({
+          secret: "tpk_fresh-secret",
+          token: NEW_TOKEN,
+        });
+
+        await withTestServer(async (baseUrl) => {
+          const before = Date.now();
+          const body = await mint(baseUrl);
+          expect(body.errors).toBeUndefined();
+
+          const input = vi.mocked(core.createApiToken).mock.calls[0]?.[1];
+          const expiresAt = input?.expiresAt;
+          expect(expiresAt).toBeInstanceOf(Date);
+          const ninetyDays = 90 * 86_400_000;
+          expect((expiresAt as Date).getTime() - before).toBeGreaterThan(
+            ninetyDays - 60_000,
+          );
+          expect((expiresAt as Date).getTime() - before).toBeLessThan(
+            ninetyDays + 60_000,
+          );
+        });
+      });
+
+      it("still mints a never-expiring token on an EXPLICIT null", async () => {
+        mockSession("minter-never", ["elector"]);
+        vi.mocked(core.countActiveApiTokens).mockResolvedValue(0);
+        vi.mocked(core.createApiToken).mockResolvedValue({
+          secret: "tpk_fresh-secret",
+          token: NEW_TOKEN,
+        });
+
+        await withTestServer(async (baseUrl) => {
+          const body = await mint(baseUrl, ", expiresInDays: null");
+          expect(body.errors).toBeUndefined();
+          expect(
+            vi.mocked(core.createApiToken).mock.calls[0]?.[1],
+          ).toMatchObject({ expiresAt: null });
+        });
+      });
+
+      it("refuses a 26th active token, and never mints it", async () => {
+        mockSession("minter-capped", ["elector"]);
+        vi.mocked(core.countActiveApiTokens).mockResolvedValue(25);
+
+        await withTestServer(async (baseUrl) => {
+          const body = await mint(baseUrl);
+          expect(body.errors?.[0]?.message).toMatch(/25 active tokens/);
+          expect(core.createApiToken).not.toHaveBeenCalled();
+        });
+      });
+
+      it("rate-limits minting to 10 an hour per user", async () => {
+        mockSession("minter-hasty", ["elector"]);
+        vi.mocked(core.countActiveApiTokens).mockResolvedValue(0);
+        vi.mocked(core.createApiToken).mockResolvedValue({
+          secret: "tpk_fresh-secret",
+          token: NEW_TOKEN,
+        });
+
+        await withTestServer(async (baseUrl) => {
+          for (let i = 0; i < 10; i++) {
+            const body = await mint(baseUrl);
+            expect(body.errors).toBeUndefined();
+          }
+          const blocked = await mint(baseUrl);
+          expect(blocked.errors?.[0]?.message).toMatch(
+            /creating API tokens too quickly/,
+          );
+          expect(core.createApiToken).toHaveBeenCalledTimes(10);
+        });
+      });
+    });
+
+    /**
+     * The REST surface must never accept a personal token: scope enforcement is
+     * a GraphQL plugin that can't see REST requests, so a token scoped to
+     * nothing but hearts:write would otherwise reach invites, role edits, and
+     * uploads as a fully authenticated user. These two run the REAL
+     * buildContext — mocking it would test nothing.
+     */
+    describe("REST refuses personal tokens", () => {
+      const routes = [
+        {
+          name: "invites",
+          url: (baseUrl: string) => `${baseUrl}/api/forums/timetable-1/invites`,
+          method: "POST",
+          body: { emails: ["someone@example.com"], roles: ["elector"] },
+        },
+        {
+          name: "member role edits",
+          url: (baseUrl: string) =>
+            `${baseUrl}/api/memberships/membership-1/roles`,
+          method: "PATCH",
+          body: { roles: ["admin"] },
+        },
+      ];
+
+      for (const route of routes) {
+        it(`rejects a personal token on ${route.name}`, async () => {
+          if (!real.buildContext) throw new Error("real buildContext missing");
+          vi.mocked(context.buildContext).mockImplementation(real.buildContext);
+
+          await withTestServer(async (baseUrl) => {
+            const res = await fetch(route.url(baseUrl), {
+              method: route.method,
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: "Bearer tpk_integration-test-secret",
+              },
+              body: JSON.stringify(route.body),
+            });
+
+            expect(res.status).toBe(401);
+            await expect(res.json()).resolves.toEqual({
+              error: "Not authenticated",
+            });
+            expect(core.inviteEmails).not.toHaveBeenCalled();
+            expect(core.setMemberRoles).not.toHaveBeenCalled();
+          });
+        });
+      }
     });
   });
 });

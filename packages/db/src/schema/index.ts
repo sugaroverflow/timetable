@@ -5,7 +5,7 @@ export * from "./topics";
 export * from "./calendar";
 export * from "./rate-limits";
 
-import { users } from "./auth";
+import { apiTokens, users } from "./auth";
 import { apiRateLimitBuckets } from "./rate-limits";
 import {
   availability,
@@ -24,6 +24,9 @@ import { activityEvents, comments, hearts, hostHearts, topics } from "./topics";
 /** Convenience: inferred row types for the whole schema. */
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+
+export type ApiToken = typeof apiTokens.$inferSelect;
+export type NewApiToken = typeof apiTokens.$inferInsert;
 
 export type Timetable = typeof timetables.$inferSelect;
 export type NewTimetable = typeof timetables.$inferInsert;

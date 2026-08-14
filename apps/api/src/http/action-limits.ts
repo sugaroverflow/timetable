@@ -19,8 +19,15 @@ import {
 export const ACTION_LIMITS = {
   /** Topic comments, replies, and slot comments. */
   comment: { windowMs: 60_000, max: 12 },
+  /** ❤️ toggles, on topics and as a host. Well above what a human clicking
+   * through a review queue reaches; binding on a script that would otherwise
+   * churn hearts (and their weighted-score recomputation) in a loop. */
+  heart: { windowMs: 60_000, max: 60 },
   /** Topic creation. */
   topic: { windowMs: 60 * 60_000, max: 30 },
+  /** Personal API token creation. Ten fresh credentials an hour is plenty
+   * for humans rotating tokens; a mint loop is what this stops. */
+  tokenMint: { windowMs: 60 * 60_000, max: 10 },
   /** Invite emails, counted per recipient (bulk paste of a cohort is fine). */
   invite: { windowMs: 60 * 60_000, max: 100 },
 } as const;
@@ -29,7 +36,9 @@ export type LimitedAction = keyof typeof ACTION_LIMITS;
 
 const BLOCKED_MESSAGES: Record<LimitedAction, string> = {
   comment: "You're commenting too quickly",
+  heart: "You're ❤️-ing too quickly",
   topic: "You're creating topics too quickly",
+  tokenMint: "You're creating API tokens too quickly",
   invite: "Too many invites sent recently",
 };
 

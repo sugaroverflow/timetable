@@ -169,6 +169,7 @@ and the topic status in one place, and `topicCardProps` assembles the shared
 - REST under `/api`
 - health check at `/health`
 - Clerk token verification
+- personal API token verification (GraphQL only) and per-token mutation scopes
 - local user upsert on first API request
 - digest rendering/sending
 - ICS generation
@@ -308,6 +309,34 @@ data in PostgreSQL.
 There are no Auth.js tables and no Clerk webhook is required for normal
 operation. A future `user.deleted` webhook could be added if hard deletion of
 local rows is required.
+
+### Personal API tokens (2026-08-13)
+
+A second credential, for scripts and external clients that can't hold a
+60-second Clerk session token. `buildContext` resolves either one:
+
+1. A `Bearer tpk_…` value is looked up by its SHA-256 in `api_token` (only the
+   hash is stored) and resolves to its owner plus the token's scopes; anything
+   else goes to the Clerk path above.
+2. `apps/api/src/graphql/token-scopes.ts` gates mutations by those scopes in one
+   `onExecute` plugin, **default-deny**: a mutation it doesn't map is
+   unreachable by any token, which is what keeps moderation, forum settings,
+   member management, and token administration session-only regardless of the
+   owner's roles. The resolvers' own role checks still run on top.
+3. Scope enforcement is GraphQL-only, so **REST must not accept these tokens**:
+   `buildContext` takes `allowApiToken` and only the Yoga context passes true.
+   See the flag's own docs — this is enforced by construction, not convention.
+
+Tokens are account-wide and carry no impersonation (`x-view-as` is ignored).
+Rate limiting is two-layer (2026-08-14 hardening): the pre-auth middleware
+buckets strictly by client IP — bucketing by the presented token would let
+unvalidated `tpk_` strings mint a fresh bucket per request — and a token is
+charged its own request budget only after its hash lookup succeeds
+(`auth/api-token.ts`), plus per-token write budgets — hourly burst and daily
+volume caps per action class (`TOKEN_WRITE_LIMITS` in
+`graphql/token-scopes.ts`). Minting is capped
+(10/hour, 25 active per user) and an omitted expiry defaults to 90 days
+server-side; "never expires" needs an explicit null.
 
 ## Data Model
 

@@ -9,6 +9,10 @@ import { buildContext, type ApiContext } from "./context";
 import { env } from "./env";
 import { useOperationLimits } from "./graphql/depth-limit";
 import { schema } from "./graphql/schema";
+import {
+  useApiTokenScopes,
+  useApiTokenWriteLimits,
+} from "./graphql/token-scopes";
 import { createDatabaseRateLimitStore, rateLimit } from "./http/rate-limit";
 import { requestLog, structuredLogger } from "./http/request-log";
 import { restRouter } from "./rest/router";
@@ -32,6 +36,12 @@ export function createApiApp() {
     windowMs: env.rateLimitWindowMs,
     max: env.rateLimitMax,
     keyPrefix: env.rateLimitKeyPrefix,
+    // Buckets by client IP for EVERY request, personal-token traffic
+    // included. Bucketing by the presented token here would run before any
+    // validation, so a different random `tpk_` string per request would mint
+    // a fresh bucket each time (and, on the database backend, INSERT a row
+    // per fake token). The per-token budget is charged after the token
+    // authenticates instead — see auth/api-token.ts.
     store:
       env.rateLimitBackend === "database"
         ? createDatabaseRateLimitStore({
@@ -53,6 +63,13 @@ export function createApiApp() {
         maxDepth: env.graphqlMaxDepth,
         maxCost: env.graphqlMaxCost,
       }),
+      // Personal API tokens reach only the mutations their scopes name;
+      // anything unmapped is denied outright (graphql/token-scopes.ts).
+      useApiTokenScopes(),
+      // …and the writes they do reach are budgeted per token
+      // (TOKEN_WRITE_LIMITS in the same file). Session traffic is exempt —
+      // it keeps the per-user ACTION_LIMITS.
+      useApiTokenWriteLimits(),
       // While an admin previews the timetable as another member, the
       // preview is strictly read-only (QA #59 round 3): acting as someone
       // else would corrupt attribution.
@@ -73,6 +90,10 @@ export function createApiApp() {
         authHeader: request.headers.get("authorization"),
         cookieHeader: request.headers.get("cookie"),
         viewAsHeader: request.headers.get("x-view-as"),
+        // GraphQL is the ONLY surface personal API tokens can authenticate
+        // on — scope enforcement lives in a plugin here and can't police
+        // REST. See buildContext's allowApiToken docs.
+        allowApiToken: true,
       }),
   });
 
