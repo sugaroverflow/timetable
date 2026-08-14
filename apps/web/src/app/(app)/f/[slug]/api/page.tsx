@@ -1,3 +1,5 @@
+import { auth } from "@clerk/nextjs/server";
+
 import { ApiTokenPanel, type ApiTokenRow } from "@/components/ApiTokenPanel";
 import { ExportDownloadButton } from "@/components/ExportDownloadButton";
 import { env } from "@/env";
@@ -13,11 +15,14 @@ export default async function ApiPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  // Signed-out visitors read this page too (public forums) — they get the docs
-  // without the token panel's data.
-  const { myApiTokens } = await gqlFetch<{
-    myApiTokens: ApiTokenRow[] | null;
-  }>(TOKENS_QUERY).catch(() => ({ myApiTokens: null }));
+  // Signed-out visitors read this page too (public forums) — they get the
+  // docs without the token panel's data. Don't fire the query for them
+  // (myApiTokens would only refuse), and don't swallow real errors for
+  // signed-in members into a bogus "sign in" prompt.
+  const { userId } = await auth();
+  const myApiTokens = userId
+    ? (await gqlFetch<{ myApiTokens: ApiTokenRow[] }>(TOKENS_QUERY)).myApiTokens
+    : null;
 
   return (
     <div className="stack">
