@@ -17,6 +17,7 @@ import {
   getTopicById,
   getViewerRoles,
   listSlotComments,
+  listTopicSessions,
   logActivity,
   proposeSlot,
   setAvailability,
@@ -30,6 +31,7 @@ import {
   type CalendarSlot,
   type PatternCells,
   type SlotInput,
+  type TopicSessionRow,
 } from "@timetable/core";
 import type {
   AvailabilityState,
@@ -427,6 +429,26 @@ const TopicScheduleType = builder
     }),
   });
 
+/** One future slot on a topic card's sessions tab (2026-08-14): public
+ * session facts plus the viewer's OWN availability. Group counts/perUser
+ * are deliberately never exposed here — whether electors may see group
+ * availability is a deferred privacy question. */
+const TopicSessionType = builder
+  .objectRef<TopicSessionRow>("TopicSession")
+  .implement({
+    fields: (t) => ({
+      slotId: t.exposeID("slotId"),
+      startsAt: t.string({ resolve: (s) => s.startsAt.toISOString() }),
+      endsAt: t.string({ resolve: (s) => s.endsAt.toISOString() }),
+      /** proposed (pencilled) | confirmed. */
+      status: t.exposeString("status"),
+      /** Display copy — empty on location-less pencils. */
+      location: t.exposeString("location"),
+      /** The viewer's own 🟢🟡🔴 answer; null when signed out. */
+      viewerState: t.exposeString("viewerState", { nullable: true }),
+    }),
+  });
+
 // ---------------------------------------------------------------------------
 // Queries
 // ---------------------------------------------------------------------------
@@ -523,6 +545,34 @@ builder.queryFields((t) => ({
           };
         }),
       };
+    },
+  }),
+
+  /** The sessions tab (2026-08-14): every future slot where this topic is
+   * pencilled or confirmed — for ANY viewer who can see the card (sessions
+   * are public on the calendar page); anonymous viewers of a readable
+   * forum DO get rows, with viewerState null. Null when gated
+   * (topicWeightedBreakdown precedent): unreadable forum / calendar off /
+   * foreign or unpublished topic. */
+  topicSessions: t.field({
+    type: [TopicSessionType],
+    nullable: true,
+    args: {
+      idOrSlug: t.arg.string({ required: true }),
+      topicId: t.arg.string({ required: true }),
+    },
+    resolve: async (_p, args, ctx) => {
+      const readable = await readTimetable(ctx, args.idOrSlug);
+      if (!readable) return null;
+      if (!isCalendarEnabled(readable.timetable.settings)) return null;
+      const topic = await getTopicById(args.topicId);
+      if (!topic || topic.timetableId !== readable.timetable.id) return null;
+      if (topic.status !== "published") return null;
+      return listTopicSessions(
+        readable.timetable.id,
+        topic.id,
+        ctx.user?.id ?? null,
+      );
     },
   }),
 

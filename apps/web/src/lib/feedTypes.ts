@@ -66,6 +66,9 @@ export type FeedTopic = {
    * thread is off (💙s are then admin-analysis bookmarks). */
   hostHearters: HostHearter[] | null;
   commentCount: number;
+  /** Future slots where this topic is pencilled/confirmed — gates the
+   * card's sessions tab (0 while the forum's calendar is off). */
+  sessionSlotCount: number;
   /** The viewer's per-topic comments-seen watermark (teaser "new"
    * previews) — null when they never engaged with this discussion. */
   viewerCommentsSeenAt: string | null;

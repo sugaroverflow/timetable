@@ -232,6 +232,8 @@ Main queries include:
 - `calendar` (audience lens + `includePast`; per-elector rows host/admin-only)
 - `slotComments`
 - `topicSlotFit` (topic-workbench: one topic's hearters vs future slots)
+- `topicSessions` (sessions tab: a topic's future sessions + the viewer's
+  OWN availability only; any viewer of a readable forum, anonymous included)
 - `myAvailabilityPattern`
 - `dashboard`
 - `myIcsToken`
