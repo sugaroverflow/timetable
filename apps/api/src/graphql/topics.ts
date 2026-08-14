@@ -3,6 +3,7 @@ import { GraphQLError } from "graphql";
 import {
   buildFeed,
   type FeedSort,
+  countTopicSessionSlots,
   createTopic,
   deleteTopic,
   getPerson,
@@ -45,6 +46,7 @@ import {
   canSeeComments,
   canSeeHostOnly,
   isAdmin,
+  isCalendarEnabled,
   isFeedSort,
   isHostCommentsEnabled,
   ownsTopicAsHost,
@@ -83,6 +85,10 @@ type GqlTopic = FeedTopic & {
    * (topicFeed); single-topic paths leave it unset and the field resolver
    * falls back to a per-topic query. */
   prefetchedComments?: CommentNode[];
+  /** Future slots where this topic is pencilled/confirmed (sessions tab,
+   * 2026-08-14) — batch-attached like viewerHasHostHearted; unset (feeds
+   * that never attach it, calendar off) serves as 0. */
+  sessionSlotCount?: number;
 };
 
 /** ManagedTopic rows with the three comment threads optionally prefetched
@@ -151,6 +157,9 @@ const TopicType = builder.objectRef<GqlTopic>("Topic").implement({
     commentCount: t.int({
       resolve: (tp) => (tp.canSeeComments ? tp.commentCount : 0),
     }),
+    /** Count of this topic's sessions on future slots — gates the card's
+     * sessions tab without fetching rows. 0 while the calendar is off. */
+    sessionSlotCount: t.int({ resolve: (tp) => tp.sessionSlotCount ?? 0 }),
     /** The viewer's comments-seen watermark for this topic — set on
      * engagement (teaser expand / permalink view), drives the teaser's
      * "new" previews. Null = never engaged (or signed out). */
@@ -383,6 +392,8 @@ type TopicViewFlags = {
   canModerate: boolean;
   canSeeComments: boolean;
   hostCommentsEnabled: boolean;
+  /** Skips the sessions-tab count query while the calendar is off. */
+  calendarEnabled: boolean;
 };
 
 function topicViewFlags(
@@ -397,6 +408,7 @@ function topicViewFlags(
     canModerate: canModerate(viewer),
     canSeeComments: canSeeComments(timetable.privacy as Privacy, viewer),
     hostCommentsEnabled: isHostCommentsEnabled(timetable.settings),
+    calendarEnabled: isCalendarEnabled(timetable.settings),
   };
 }
 
@@ -422,11 +434,15 @@ async function decorateFeedTopics(
     viewer,
     topicIds,
   );
+  const sessionSlotCounts = flags.calendarEnabled
+    ? await countTopicSessionSlots(topicIds)
+    : new Map<string, number>();
   return feed.map((tp) => ({
     ...tp,
     ...flags,
     viewerHasHostHearted: viewerHostHearted.has(tp.id),
     prefetchedComments: commentTrees.get(tp.id) ?? [],
+    sessionSlotCount: sessionSlotCounts.get(tp.id) ?? 0,
   }));
 }
 
@@ -916,15 +932,20 @@ builder.queryFields((t) => ({
           topicId: state.currentTopicId,
         });
         if (topic) {
+          const flags = topicViewFlags(readable.timetable, viewer);
           const viewerHostHearted = await viewerHostHeartedSet(
             ctx.user.id,
             viewer,
             [topic.id],
           );
+          const sessionSlotCounts = flags.calendarEnabled
+            ? await countTopicSessionSlots([topic.id])
+            : new Map<string, number>();
           current = {
             ...topic,
-            ...topicViewFlags(readable.timetable, viewer),
+            ...flags,
             viewerHasHostHearted: viewerHostHearted.has(topic.id),
+            sessionSlotCount: sessionSlotCounts.get(topic.id) ?? 0,
           };
         }
       }

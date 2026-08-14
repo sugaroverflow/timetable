@@ -157,6 +157,18 @@ Stable names for feature pieces, so instructions can reference them precisely.
   per slot+topic, locations never contend (migration 0037); the room is
   assigned at confirm time (confirms are exclusive per slot+location,
   migration 0038).
+- **sessions-tab** — `SessionsTabBody.tsx`, the Sessions tab of
+  topic-tabs on feed/permalink/queue cards ONLY (My Topics keeps the
+  host's Scheduling tab instead): every future slot where the topic is
+  pencilled/confirmed, lazily fetched on tab open (`topicSessions` query;
+  the `sessionSlotCount` scalar on feed topics gates the tab without
+  fetching rows), each row a date/time + SessionLine-style status pill
+  and — electors only — the inline 🟢🟡🔴 toggle, which IS the elector's
+  existing per-slot calendar write (`AvailabilityControl` /
+  `setAvailability`, re-homed). Visible to anyone who can see the card,
+  anonymous included (viewerState null). NO group washes/counts/avatars
+  by design — electors seeing group availability is a deferred privacy
+  question; never leak counts or perUser here.
 - **digest click-to-read** — `digest_sends` table + `stampDigestLinks`
   (api `email.ts`) + `DigestReadMarker` (app layout): every digest link
   carries `dg=<send id>`; one click marks that email's shown comment

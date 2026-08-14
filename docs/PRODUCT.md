@@ -198,6 +198,17 @@ discussion there; the conversation about when/where/who happens on the
 calendar page. The calendar page stays the shared schedule view; nothing
 moved off it yet (the trim is a later, deliberate step).
 
+**The sessions tab (2026-08-14)** is the elector side of the same
+inversion: feed, permalink, and queue topic cards grow a "Sessions" tab
+(topic-tabs) whenever the topic is pencilled or confirmed on future
+slots, so anyone weighing a ❤️ sees when it might run — each row is the
+date/time, a ✎ pencilled / confirmed pill (plus the location once
+confirmed), and, for electors, their own inline 🟢🟡🔴 toggle: the same
+per-slot availability answer as the calendar page, written from the card.
+The list is visible to everyone who can see the card (sessions are public
+on the calendar page), but shows no group availability — whether electors
+should see the group's washes is a deliberately open privacy question.
+
 **Schedule = pattern × terms.** Admins define weekly time cells ("Tue and
 Thu 19:00–21:00") and named date ranges ("Michaelmas, 29 Sep–12 Dec"); slots
 are generated from the cross product (idempotently — regeneration skips

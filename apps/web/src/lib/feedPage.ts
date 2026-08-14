@@ -90,6 +90,10 @@ export function topicPerms(
     canComment: roles.length > 0 && published,
     canHostOnly: isHost(roles) || isAdmin(roles),
     canModerate: isAdmin(roles),
+    // The sessions tab's inline 🟢🟡🔴 toggle — the elector's existing
+    // per-slot calendar write, re-homed (sessions tab, 2026-08-14). Same
+    // gate as the calendar page's own toggle.
+    canSetAvailability: isElector(roles),
   };
 }
 

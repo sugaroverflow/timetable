@@ -38,6 +38,7 @@ export const TOPIC_FEED_FIELDS = `
   id hostId hostName hostImage hostSlug title slug bodyMd bodyHtml coverImageUrl status
   heartCount weightedScore viewerHasHearted commentCount viewerCommentsSeenAt
   viewerHasHostHearted hostHearters { userId name image slug }
+  sessionSlotCount
   publishedAt createdAt
   ${commentTree()}
 `;

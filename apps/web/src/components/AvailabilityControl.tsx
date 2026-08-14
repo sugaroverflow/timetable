@@ -24,11 +24,16 @@ export function AvailabilityControl({
   slotId,
   state,
   compact = false,
+  onSet,
 }: {
   slotId: string;
   state: string | null;
   /** Emoji-only segments for table cells (calendar table, QA 2026-07-31). */
   compact?: boolean;
+  /** Runs after a successful save. Hosts whose `state` prop comes from
+   * client-fetched data (the sessions tab) patch it here — the calendar
+   * page's server-rendered rows rely on the router refresh instead. */
+  onSet?: (state: string) => void;
 }) {
   const { run, busy } = useGqlAction();
 
@@ -36,7 +41,10 @@ export function AvailabilityControl({
     void run(
       MUTATION,
       { id: slotId, state: value },
-      { errorFallback: "Could not set availability" },
+      {
+        errorFallback: "Could not set availability",
+        onSuccess: () => onSet?.(value),
+      },
     );
   }
 

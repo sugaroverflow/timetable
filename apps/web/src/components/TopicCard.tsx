@@ -17,6 +17,7 @@ import { CommentTeaser } from "./CommentTeaser";
 import { HostOnlyThreadBody } from "./HostOnlyPanel";
 import { HostTopicActions } from "./HostTopicActions";
 import { PersonChip } from "./PersonChip";
+import { SessionsTabBody } from "./SessionsTabBody";
 import { TopicActionsRow } from "./TopicActionsRow";
 import { TopicEditScope } from "./TopicEditScope";
 
@@ -27,6 +28,9 @@ export type FeedPerms = {
   canComment: boolean;
   canHostOnly: boolean;
   canModerate: boolean;
+  /** Electors only: the sessions tab's inline 🟢🟡🔴 toggle — their
+   * existing per-slot calendar write, re-homed (2026-08-14). */
+  canSetAvailability: boolean;
 };
 
 function TopicHead({
@@ -285,6 +289,24 @@ function buildFeedSections({
           hostHearters={topic.hostHearters}
           canHostHeart={perms.canHostHeart}
           viewerHasHostHearted={topic.viewerHasHostHearted}
+        />
+      ),
+    });
+  }
+  // sessions-tab (2026-08-14): where this topic is pencilled/confirmed on
+  // future slots — for every viewer of the card (sessions are public on
+  // the calendar page); the inline availability toggle is elector-only.
+  if (topic.sessionSlotCount > 0) {
+    sections.push({
+      value: "schedule",
+      icon: "schedule",
+      text: "Sessions",
+      badge: `(${topic.sessionSlotCount})`,
+      pane: (
+        <SessionsTabBody
+          slug={slug}
+          topicId={topic.id}
+          canSetAvailability={perms.canSetAvailability}
         />
       ),
     });
