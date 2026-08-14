@@ -1,5 +1,5 @@
 import { parse } from "graphql";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { API_TOKEN_SCOPES, type TokenScope } from "@timetable/shared";
 
@@ -10,7 +10,7 @@ import {
   createTokenWriteLimiter,
   MUTATION_SCOPES,
   TOKEN_WRITE_LIMITS,
-  TOKEN_WRITE_WINDOW_MS,
+  TOKEN_WRITE_WINDOWS,
   useApiTokenScopes,
   useApiTokenWriteLimits,
 } from "./token-scopes";
@@ -167,13 +167,18 @@ describe("useApiTokenScopes", () => {
 });
 
 describe("useApiTokenWriteLimits", () => {
-  /** A fresh plugin per test — memory store, so budgets can't bleed between
-   * tests. Async because the limiter awaits its store. */
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** A fresh plugin per test — memory stores, so budgets can't bleed between
+   * tests. Async because the limiter awaits its stores. */
   function limitedExecute() {
     const plugin = useApiTokenWriteLimits(
-      createTokenWriteLimiter(
-        createMemoryRateLimitStore(TOKEN_WRITE_WINDOW_MS),
-      ),
+      createTokenWriteLimiter({
+        hourly: createMemoryRateLimitStore(TOKEN_WRITE_WINDOWS.hourly),
+        daily: createMemoryRateLimitStore(TOKEN_WRITE_WINDOWS.daily),
+      }),
     );
     return async (
       document: string,
@@ -194,10 +199,11 @@ describe("useApiTokenWriteLimits", () => {
 
   const CREATE_TOPIC = `mutation { createTopic(idOrSlug: "f", title: "t") { id } }`;
   const HEART = `mutation { heartTopic(topicId: "t1") { hearted } }`;
+  const HOUR = 60 * 60_000;
 
-  it("stops topic creation at its hourly budget, with the friendly error", async () => {
+  it("stops topic creation at its hourly burst budget, with the friendly error", async () => {
     const run = limitedExecute();
-    for (let i = 0; i < TOKEN_WRITE_LIMITS.topics; i++) {
+    for (let i = 0; i < TOKEN_WRITE_LIMITS.topics.hourly; i++) {
       await run(CREATE_TOPIC, token("topics:write"));
     }
     await expect(run(CREATE_TOPIC, token("topics:write"))).rejects.toThrow(
@@ -205,9 +211,31 @@ describe("useApiTokenWriteLimits", () => {
     );
   });
 
+  it("still stops at the daily cap when bursts stay under the hourly limit", async () => {
+    vi.useFakeTimers();
+    const run = limitedExecute();
+    const { hourly, daily } = TOKEN_WRITE_LIMITS.topics;
+
+    // Spread the daily cap across enough hours that no hour ever exceeds
+    // the burst limit — the daily window is what must refuse the next one.
+    let spent = 0;
+    while (spent < daily) {
+      const batch = Math.min(hourly, daily - spent);
+      for (let i = 0; i < batch; i++) {
+        await run(CREATE_TOPIC, token("topics:write"));
+      }
+      spent += batch;
+      vi.advanceTimersByTime(HOUR + 1);
+    }
+
+    await expect(run(CREATE_TOPIC, token("topics:write"))).rejects.toThrow(
+      /automated writes/,
+    );
+  });
+
   it("gives ❤️ toggles their own, larger budget", async () => {
     const run = limitedExecute();
-    for (let i = 0; i < TOKEN_WRITE_LIMITS.hearts; i++) {
+    for (let i = 0; i < TOKEN_WRITE_LIMITS.hearts.hourly; i++) {
       await run(HEART, token("hearts:write"));
     }
     await expect(run(HEART, token("hearts:write"))).rejects.toMatchObject({
@@ -217,7 +245,7 @@ describe("useApiTokenWriteLimits", () => {
 
   it("pools every unlisted write into the shared `other` budget", async () => {
     const run = limitedExecute();
-    for (let i = 0; i < TOKEN_WRITE_LIMITS.other; i++) {
+    for (let i = 0; i < TOKEN_WRITE_LIMITS.other.hourly; i++) {
       await run(
         `mutation { markFeedSeen(idOrSlug: "f") }`,
         token("feed:write"),
@@ -231,7 +259,7 @@ describe("useApiTokenWriteLimits", () => {
 
   it("budgets tokens independently of each other", async () => {
     const run = limitedExecute();
-    for (let i = 0; i < TOKEN_WRITE_LIMITS.topics; i++) {
+    for (let i = 0; i < TOKEN_WRITE_LIMITS.topics.hourly; i++) {
       await run(CREATE_TOPIC, token("topics:write"));
     }
     const other: ApiContext["apiToken"] = {
@@ -243,7 +271,7 @@ describe("useApiTokenWriteLimits", () => {
 
   it("never touches session-authenticated requests or queries", async () => {
     const run = limitedExecute();
-    for (let i = 0; i < TOKEN_WRITE_LIMITS.topics + 5; i++) {
+    for (let i = 0; i < TOKEN_WRITE_LIMITS.topics.hourly + 5; i++) {
       await run(CREATE_TOPIC, null);
     }
     for (let i = 0; i < 5; i++) {

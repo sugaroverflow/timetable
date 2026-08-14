@@ -82,24 +82,32 @@ function forbidScope(field: string, scope: TokenScope | undefined): never {
 }
 
 /**
- * Hourly write budgets for token-authenticated requests, per token
- * (2026-08-14, the hardening pass adopting #273). Session traffic never
- * touches these — signed-in humans keep the per-user ACTION_LIMITS in
- * http/action-limits.ts, which token requests are ALSO subject to (those are
- * keyed by the owning user). Tune here.
+ * Write budgets for token-authenticated requests, per token (2026-08-14,
+ * the hardening pass adopting #273). Two windows per action class: `hourly`
+ * is burst control, `daily` is volume control — real organic volume is far
+ * below either (a host writes ~30 topics a YEAR), so a token that saturates
+ * a day's cap is automation misbehaving, not a member working fast. Session
+ * traffic never touches these — signed-in humans keep the per-user
+ * ACTION_LIMITS in http/action-limits.ts, which token requests are ALSO
+ * subject to (those are keyed by the owning user). Tune here.
  */
-export const TOKEN_WRITE_WINDOW_MS = 60 * 60_000;
+export const TOKEN_WRITE_WINDOWS = {
+  hourly: 60 * 60_000,
+  daily: 24 * 60 * 60_000,
+} as const;
+
+export type TokenWriteWindow = keyof typeof TOKEN_WRITE_WINDOWS;
 
 export const TOKEN_WRITE_LIMITS = {
   /** createTopic. */
-  topics: 10,
+  topics: { hourly: 10, daily: 20 },
   /** New comments: addComment, addSlotComment. */
-  comments: 20,
+  comments: { hourly: 20, daily: 60 },
   /** ❤️ toggles: heartTopic, hostHeartTopic. Deliberately far tighter than
    * the per-user 60/minute heart action limit — for tokens only. */
-  hearts: 60,
+  hearts: { hourly: 60, daily: 100 },
   /** Every other mapped write mutation, sharing one bucket. */
-  other: 60,
+  other: { hourly: 60, daily: 200 },
 } as const;
 
 export type TokenWriteBucket = keyof typeof TOKEN_WRITE_LIMITS;
@@ -123,25 +131,51 @@ export type TokenWriteLimiter = {
 };
 
 export function createTokenWriteLimiter(
-  injectedStore?: RateLimitStore,
+  injectedStores?: Partial<Record<TokenWriteWindow, RateLimitStore>>,
 ): TokenWriteLimiter {
-  let store = injectedStore;
+  // One store per window; every bucket in a window shares it.
+  const stores: Partial<Record<TokenWriteWindow, RateLimitStore>> = {
+    ...injectedStores,
+  };
+
+  function storeFor(window: TokenWriteWindow): RateLimitStore {
+    return (stores[window] ??=
+      env.rateLimitBackend === "database"
+        ? createDatabaseRateLimitStore({
+            windowMs: TOKEN_WRITE_WINDOWS[window],
+            cleanupIntervalMs: env.rateLimitCleanupIntervalMs,
+          })
+        : createMemoryRateLimitStore(TOKEN_WRITE_WINDOWS[window]));
+  }
+
   return {
     async check(tokenId, bucket) {
-      // One store: every bucket shares TOKEN_WRITE_WINDOW_MS.
-      store ??=
-        env.rateLimitBackend === "database"
-          ? createDatabaseRateLimitStore({
-              windowMs: TOKEN_WRITE_WINDOW_MS,
-              cleanupIntervalMs: env.rateLimitCleanupIntervalMs,
-            })
-          : createMemoryRateLimitStore(TOKEN_WRITE_WINDOW_MS);
-      const now = Date.now();
-      const hit = await store.hit(
-        `${env.rateLimitKeyPrefix}:token-write:${bucket}:${tokenId}`,
-        now,
-      );
-      return rateLimitDecision(hit, TOKEN_WRITE_LIMITS[bucket], now);
+      // Both windows are always charged, so a burst-blocked request still
+      // counts toward the day — no free retries against the daily cap.
+      let allowed = true;
+      let retryAfterSeconds = 0;
+      for (const window of Object.keys(
+        TOKEN_WRITE_WINDOWS,
+      ) as TokenWriteWindow[]) {
+        const now = Date.now();
+        const hit = await storeFor(window).hit(
+          `${env.rateLimitKeyPrefix}:token-write:${window}:${bucket}:${tokenId}`,
+          now,
+        );
+        const decision = rateLimitDecision(
+          hit,
+          TOKEN_WRITE_LIMITS[bucket][window],
+          now,
+        );
+        if (!decision.allowed) {
+          allowed = false;
+          retryAfterSeconds = Math.max(
+            retryAfterSeconds,
+            decision.retryAfterSeconds,
+          );
+        }
+      }
+      return { allowed, retryAfterSeconds };
     },
   };
 }
