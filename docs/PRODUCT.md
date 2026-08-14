@@ -43,7 +43,7 @@ Roles are scoped to forum membership:
 | Owner | Everything an admin can do, plus protected ownership of the forum |
 | Admin | Moderate topics, create topics for any host and reassign them, see every host's submitted topics, hide comments, manage members and their bios from the People page, edit settings and theme, set the ❤️ cutoff, set up the calendar schedule and pencil/confirm sessions, view Analysis |
 | Host | Propose and submit topics, edit their own topics, see weighted-❤️ breakdowns, use the host-only thread, 💙 colleagues' topics (host-non-electors only), join slot discussions, pencil in / propose / confirm sessions per the forum's calendar policy, view Analysis |
-| Elector | Read published topics, ❤️ and comment on them, collect "My hearted topics", share availability (weekly pattern + per-slot answers) |
+| Elector | Read published topics, ❤️ and comment on them, collect "My hearted topics", share availability (weekly pattern + per-slot answers), join slot discussions |
 
 Each forum can rename its roles (e.g. Admin → Dean, Host → Faculty, Elector →
 Fellowship Candidate); the custom labels are used throughout the UI. Every
@@ -209,16 +209,19 @@ one rounded block whose background carries the availability chart — three
 low-alpha 🟢🟡🔴 tints whose widths are the group's proportions
 (host/admin-only), with the date, time, location, and session line riding
 on top and gaps (bigger between weeks) instead of rules. Clicking a row
-folds it open: elector avatars aligned under their wash segment, then the
-slot discussion and session controls. The calendar wears two hats —
-upcoming events and scheduling workbench — so a slot-state filter (All
-slots / Sessions / Open slots) gives each its own view. The topic lens
-re-scopes every row's tints to the electors who ❤️'d that topic; group
-availability is hidden from electors, who see only their own toggle.
-Slot discussions ("host chat") support claim comments that attach the active
+folds it open for any member: the slot discussion, plus (host/admin) elector
+avatars aligned under their wash segment and the session controls. The
+calendar wears two hats — upcoming events and scheduling workbench — so a
+slot-state filter (All slots / Sessions / Open slots) gives each its own
+view. The topic lens re-scopes every row's tints to the electors who ❤️'d
+that topic; group availability is hidden from electors, who see only their
+own toggle.
+Slot discussions are open to every member (2026-08-14) — what actually
+happens in a slot is discussed with admins, hosts, and electors together.
+Hosts/admins may additionally post claim comments that attach the active
 lens topic plus a frozen server-computed availability snapshot ("I'd like
-this slot for Yoga · 4🟢 8🟡 2🔴"); slot comments have the standard author
-edit/delete and admin hide/unhide controls.
+this slot for Yoga · 4🟢 8🟡 2🔴") — everyone can read them; slot comments
+have the standard author edit/delete and admin hide/unhide controls.
 
 Past slots are archived out of the default view ("Show past" reveals them);
 until slots exist the whole page and nav link hide from non-admins.

@@ -123,7 +123,9 @@ Codex/agent workflows are separate from the app runtime.
   month-grouped slot rows with a topic lens, per-elector avatar groups
   (host/admin), elector weekly-pattern grid, admin pattern×terms setup with
   client-side slot generation, host off-piste proposals, session
-  pencil/confirm controls, claim comments with frozen availability snapshots
+  pencil/confirm controls, per-slot discussion threads open to every member
+  (2026-08-14; claim comments with frozen availability snapshots stay a
+  host/admin gesture, but everyone reads them)
 - Analysis page (`/f/[slug]/analysis`): topics analysis table with ❤️ and 💬
   normalisations, per-table host filters, elector activity table with
   per-row topic folds, admin-only host activity table

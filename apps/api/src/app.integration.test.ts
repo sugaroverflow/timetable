@@ -4,7 +4,13 @@ import type { Server } from "node:http";
 
 import type { IcsSlot, ReadableTimetable } from "@timetable/core";
 import * as core from "@timetable/core";
-import type { Timetable, TimetableMembership, Topic } from "@timetable/db";
+import type {
+  SlotComment,
+  Timeslot,
+  Timetable,
+  TimetableMembership,
+  Topic,
+} from "@timetable/db";
 import type { Role } from "@timetable/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -18,10 +24,15 @@ vi.mock("@timetable/core", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@timetable/core")>();
   return {
     ...actual,
+    addSlotComment: vi.fn(),
+    computeSlotCounts: vi.fn(),
     countViewerPublishedHearts: vi.fn(),
     createLocalUser: vi.fn(),
     deleteTopic: vi.fn(),
+    getAudienceElectorIds: vi.fn(),
     getCommentById: vi.fn(),
+    getSlotById: vi.fn(),
+    listSlotComments: vi.fn(),
     getTopicById: vi.fn(),
     getMembership: vi.fn(),
     getMembershipById: vi.fn(),
@@ -202,6 +213,57 @@ function topicFixture(patch: Partial<Topic> = {}): Topic {
   };
 }
 
+function slotFixture(patch: Partial<Timeslot> = {}): Timeslot {
+  return {
+    id: "33333333-3333-3333-3333-333333333333",
+    timetableId: "11111111-1111-1111-1111-111111111111",
+    startsAt: new Date("2026-09-01T18:00:00.000Z"),
+    endsAt: new Date("2026-09-01T20:00:00.000Z"),
+    createdById: null,
+    cellKey: null,
+    locations: [],
+    createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    ...patch,
+  };
+}
+
+function slotCommentRowFixture(patch: Partial<SlotComment> = {}): SlotComment {
+  return {
+    id: "44444444-4444-4444-4444-444444444444",
+    slotId: "33333333-3333-3333-3333-333333333333",
+    authorId: "elector-1",
+    body: "See you there",
+    topicId: null,
+    greenCount: null,
+    yellowCount: null,
+    redCount: null,
+    editedAt: null,
+    hiddenAt: null,
+    hiddenByUserId: null,
+    createdAt: new Date("2026-01-02T00:00:00.000Z"),
+    ...patch,
+  };
+}
+
+function slotCommentViewFixture(patch: Record<string, unknown> = {}) {
+  return {
+    id: "44444444-4444-4444-4444-444444444444",
+    authorId: "elector-1",
+    authorName: "Elector One",
+    authorImage: null,
+    authorRoles: ["elector"],
+    body: "See you there",
+    topicId: null,
+    topicTitle: null,
+    counts: null,
+    editedAt: null,
+    hidden: false,
+    createdAt: new Date("2026-01-02T00:00:00.000Z"),
+    ...patch,
+  };
+}
+
 async function startTestServer(): Promise<{ baseUrl: string; server: Server }> {
   const server = createServer(createApiApp());
 
@@ -246,6 +308,11 @@ afterEach(() => {
   restoreCronSecret();
   restoreStorageEnv();
   vi.mocked(context.buildContext).mockReset();
+  vi.mocked(core.addSlotComment).mockReset();
+  vi.mocked(core.computeSlotCounts).mockReset();
+  vi.mocked(core.getAudienceElectorIds).mockReset();
+  vi.mocked(core.getSlotById).mockReset();
+  vi.mocked(core.listSlotComments).mockReset();
   vi.mocked(core.countViewerPublishedHearts).mockReset();
   vi.mocked(core.createLocalUser).mockReset();
   vi.mocked(core.deleteTopic).mockReset();
@@ -1420,6 +1487,165 @@ describe("createApiApp", () => {
         const body = await requestHostHeart(baseUrl, topic.id);
         expect(body.errors?.length).toBeGreaterThan(0);
         expect(core.toggleHostHeart).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("slot discussion (open to every member, 2026-08-14)", () => {
+    const calendarTimetable = () =>
+      timetableFixture({ settings: { calendar: { enabled: true } } });
+    const COMMENTS_QUERY = `query($id: String!){ slotComments(slotId: $id) { id body } }`;
+    const ADD_COMMENT = `mutation($id: String!, $body: String!, $topic: String){
+      addSlotComment(slotId: $id, body: $body, topicId: $topic) { id body topicId }
+    }`;
+
+    function mockSlotWorld() {
+      const slot = slotFixture();
+      vi.mocked(core.getSlotById).mockResolvedValue(slot);
+      vi.mocked(core.getTimetableById).mockResolvedValue(calendarTimetable());
+      return slot;
+    }
+
+    async function gql(baseUrl: string, query: string, variables: unknown) {
+      const res = await fetch(`${baseUrl}/graphql`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, variables }),
+      });
+      return (await res.json()) as {
+        data?: Record<string, unknown> | null;
+        errors?: { message: string }[];
+      };
+    }
+
+    it("lets an elector read the thread", async () => {
+      const slot = mockSlotWorld();
+      mockSession("elector-1", ["elector"]);
+      vi.mocked(core.listSlotComments).mockResolvedValue([
+        slotCommentViewFixture(),
+      ]);
+
+      await withTestServer(async (baseUrl) => {
+        const body = await gql(baseUrl, COMMENTS_QUERY, { id: slot.id });
+        expect(body.errors).toBeUndefined();
+        expect(body.data?.slotComments).toEqual([
+          { id: "44444444-4444-4444-4444-444444444444", body: "See you there" },
+        ]);
+        expect(core.listSlotComments).toHaveBeenCalledWith(slot.id, {
+          includeHidden: false,
+        });
+      });
+    });
+
+    it("returns an empty thread to signed-in non-members", async () => {
+      const slot = mockSlotWorld();
+      mockSession("guest-1", []);
+
+      await withTestServer(async (baseUrl) => {
+        const body = await gql(baseUrl, COMMENTS_QUERY, { id: slot.id });
+        expect(body.errors).toBeUndefined();
+        expect(body.data?.slotComments).toEqual([]);
+        expect(core.listSlotComments).not.toHaveBeenCalled();
+      });
+    });
+
+    it("lets an elector post a plain comment", async () => {
+      const slot = mockSlotWorld();
+      mockSession("elector-1", ["elector"]);
+      vi.mocked(core.addSlotComment).mockResolvedValue(slotCommentRowFixture());
+      vi.mocked(core.listSlotComments).mockResolvedValue([
+        slotCommentViewFixture(),
+      ]);
+
+      await withTestServer(async (baseUrl) => {
+        const body = await gql(baseUrl, ADD_COMMENT, {
+          id: slot.id,
+          body: "See you there",
+          topic: null,
+        });
+        expect(body.errors).toBeUndefined();
+        expect(body.data?.addSlotComment).toMatchObject({
+          body: "See you there",
+          topicId: null,
+        });
+        expect(core.addSlotComment).toHaveBeenCalledWith(
+          slot.id,
+          "elector-1",
+          "See you there",
+          undefined,
+        );
+      });
+    });
+
+    it("refuses an elector's claim attachment (topic snapshots stay host/admin)", async () => {
+      const slot = mockSlotWorld();
+      mockSession("elector-1", ["elector"]);
+
+      await withTestServer(async (baseUrl) => {
+        const body = await gql(baseUrl, ADD_COMMENT, {
+          id: slot.id,
+          body: "I claim this",
+          topic: "22222222-2222-2222-2222-222222222222",
+        });
+        expect(body.errors?.length).toBeGreaterThan(0);
+        expect(core.addSlotComment).not.toHaveBeenCalled();
+      });
+    });
+
+    it("lets a host post a claim with the availability snapshot", async () => {
+      const slot = mockSlotWorld();
+      const topic = topicFixture({ status: "published", hostId: "host-1" });
+      mockSession("host-1", ["host"]);
+      vi.mocked(core.getTopicById).mockResolvedValue(topic);
+      vi.mocked(core.getAudienceElectorIds).mockResolvedValue(["elector-1"]);
+      vi.mocked(core.computeSlotCounts).mockResolvedValue({
+        green: 1,
+        yellow: 0,
+        red: 0,
+      });
+      vi.mocked(core.addSlotComment).mockResolvedValue(
+        slotCommentRowFixture({ authorId: "host-1", topicId: topic.id }),
+      );
+      vi.mocked(core.listSlotComments).mockResolvedValue([
+        slotCommentViewFixture({
+          authorId: "host-1",
+          topicId: topic.id,
+          topicTitle: topic.title,
+          counts: { green: 1, yellow: 0, red: 0 },
+        }),
+      ]);
+
+      await withTestServer(async (baseUrl) => {
+        const body = await gql(baseUrl, ADD_COMMENT, {
+          id: slot.id,
+          body: "See you there",
+          topic: topic.id,
+        });
+        expect(body.errors).toBeUndefined();
+        expect(body.data?.addSlotComment).toMatchObject({ topicId: topic.id });
+        expect(core.addSlotComment).toHaveBeenCalledWith(
+          slot.id,
+          "host-1",
+          "See you there",
+          { topicId: topic.id, counts: { green: 1, yellow: 0, red: 0 } },
+        );
+      });
+    });
+
+    it("refuses posts when the calendar is disabled", async () => {
+      const slot = slotFixture();
+      vi.mocked(core.getSlotById).mockResolvedValue(slot);
+      vi.mocked(core.getTimetableById).mockResolvedValue(timetableFixture());
+      mockSession("elector-1", ["elector"]);
+
+      await withTestServer(async (baseUrl) => {
+        const body = await gql(baseUrl, ADD_COMMENT, {
+          id: slot.id,
+          body: "hello",
+          topic: null,
+        });
+        expect(body.errors?.length).toBeGreaterThan(0);
+        expect(core.addSlotComment).not.toHaveBeenCalled();
       });
     });
   });

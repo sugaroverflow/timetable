@@ -276,8 +276,9 @@ function CommentRow({
   );
 }
 
-/** The discussion thread + claim composer (host/admin only). Comments are
- * fetched by the row when it unfolds and reloaded after a post. */
+/** The discussion thread + composer (any member since 2026-08-14; claim
+ * attachment stays host/admin). Comments are fetched by the row when it
+ * unfolds and reloaded after a post. */
 export function DiscussionPanel({
   slot,
   slug,

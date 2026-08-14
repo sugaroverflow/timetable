@@ -123,6 +123,16 @@ export function canSeeHostOnly(viewer: Viewer): boolean {
   return isHost(viewer.roles) || isAdmin(viewer.roles);
 }
 
+/** Per-slot discussion threads on the calendar (2026-08-14): open to every
+ * member so what actually happens in a slot is discussed with everyone.
+ * Attaching a topic claim snapshot to a slot comment stays canSeeHostOnly. */
+export function canDiscussSlots(viewer: Viewer): boolean {
+  return (
+    isAuthenticated(viewer) &&
+    (isElector(viewer.roles) || isHost(viewer.roles) || isAdmin(viewer.roles))
+  );
+}
+
 /** Hosts propose topics; admins can also create them (QA #42) and may
  * keep ownership or reassign to a host afterwards. */
 export function canProposeTopics(viewer: Viewer): boolean {
