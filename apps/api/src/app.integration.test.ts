@@ -25,6 +25,7 @@ vi.mock("@timetable/core", async (importOriginal) => {
   return {
     ...actual,
     addSlotComment: vi.fn(),
+    buildCalendar: vi.fn(),
     computeSlotCounts: vi.fn(),
     countViewerPublishedHearts: vi.fn(),
     createLocalUser: vi.fn(),
@@ -309,6 +310,7 @@ afterEach(() => {
   restoreStorageEnv();
   vi.mocked(context.buildContext).mockReset();
   vi.mocked(core.addSlotComment).mockReset();
+  vi.mocked(core.buildCalendar).mockReset();
   vi.mocked(core.computeSlotCounts).mockReset();
   vi.mocked(core.getAudienceElectorIds).mockReset();
   vi.mocked(core.getSlotById).mockReset();
@@ -1646,6 +1648,214 @@ describe("createApiApp", () => {
         });
         expect(body.errors?.length).toBeGreaterThan(0);
         expect(core.addSlotComment).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("topicSlotFit (topic-workbench, 2026-08-14)", () => {
+    const QUERY = `query($s: String!, $t: String!){
+      topicSlotFit(idOrSlug: $s, topicId: $t) {
+        hearterCount
+        slots { slotId freeLocations full topicStatus counts { green } }
+      }
+    }`;
+
+    const calendarTimetable = () =>
+      timetableFixture({ settings: { calendar: { enabled: true } } });
+
+    function calendarSlot(
+      patch: Partial<core.CalendarSlot> = {},
+    ): core.CalendarSlot {
+      return {
+        id: "33333333-3333-3333-3333-333333333333",
+        startsAt: new Date("2026-09-01T18:00:00.000Z"),
+        endsAt: new Date("2026-09-01T20:00:00.000Z"),
+        cellKey: null,
+        createdById: null,
+        locations: [],
+        sessions: [],
+        viewerState: null,
+        counts: { green: 0, yellow: 0, red: 0 },
+        perUser: [],
+        commentCount: 0,
+        ...patch,
+      };
+    }
+
+    function session(
+      patch: Partial<core.CalendarSession> = {},
+    ): core.CalendarSession {
+      return {
+        id: "55555555-5555-5555-5555-555555555555",
+        location: "",
+        status: "proposed",
+        url: "",
+        customTitle: "",
+        topic: null,
+        sessionHost: null,
+        ...patch,
+      };
+    }
+
+    async function request(baseUrl: string, topicId: string) {
+      const res = await fetch(`${baseUrl}/graphql`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: QUERY,
+          variables: { s: "public-calendar", t: topicId },
+        }),
+      });
+      return (await res.json()) as {
+        data?: {
+          topicSlotFit: {
+            hearterCount: number;
+            slots: {
+              slotId: string;
+              freeLocations: string[];
+              full: boolean;
+              topicStatus: string | null;
+              counts: { green: number };
+            }[];
+          } | null;
+        };
+        errors?: unknown[];
+      };
+    }
+
+    it("maps free locations, fullness, and the topic's own booking", async () => {
+      const topic = topicFixture({ status: "published", hostId: "host-1" });
+      mockSession("host-1", ["host"]);
+      vi.mocked(core.getReadableTimetable).mockResolvedValue({
+        timetable: calendarTimetable(),
+        roles: ["host"],
+      });
+      vi.mocked(core.getTopicById).mockResolvedValue(topic);
+      vi.mocked(core.getAudienceElectorIds).mockResolvedValue([
+        "elector-1",
+        "elector-2",
+      ]);
+      vi.mocked(core.buildCalendar).mockResolvedValue([
+        // Two locations, one taken by this very topic.
+        calendarSlot({
+          id: "aaaaaaaa-0000-0000-0000-000000000001",
+          locations: ["Hall", "Classroom"],
+          sessions: [
+            session({
+              location: "Hall",
+              status: "confirmed",
+              topic: {
+                id: topic.id,
+                title: topic.title,
+                topicSlug: null,
+                hostId: "host-1",
+                hostName: null,
+              },
+            }),
+          ],
+          counts: { green: 2, yellow: 0, red: 0 },
+        }),
+        // Location-free slot fully taken by someone else's session.
+        calendarSlot({
+          id: "aaaaaaaa-0000-0000-0000-000000000002",
+          sessions: [session()],
+        }),
+        // Open location-free slot.
+        calendarSlot({ id: "aaaaaaaa-0000-0000-0000-000000000003" }),
+      ]);
+
+      await withTestServer(async (baseUrl) => {
+        const body = await request(baseUrl, topic.id);
+        expect(body.errors).toBeUndefined();
+        expect(body.data?.topicSlotFit?.hearterCount).toBe(2);
+        expect(body.data?.topicSlotFit?.slots).toEqual([
+          {
+            slotId: "aaaaaaaa-0000-0000-0000-000000000001",
+            freeLocations: ["Classroom"],
+            full: false,
+            topicStatus: "confirmed",
+            counts: { green: 2 },
+          },
+          {
+            slotId: "aaaaaaaa-0000-0000-0000-000000000002",
+            freeLocations: [],
+            full: true,
+            topicStatus: null,
+            counts: { green: 0 },
+          },
+          {
+            slotId: "aaaaaaaa-0000-0000-0000-000000000003",
+            freeLocations: [],
+            full: false,
+            topicStatus: null,
+            counts: { green: 0 },
+          },
+        ]);
+        expect(core.getAudienceElectorIds).toHaveBeenCalledWith(
+          "11111111-1111-1111-1111-111111111111",
+          { kind: "hearted_topic", topicId: topic.id },
+        );
+      });
+    });
+
+    it("serves admins for any topic, but other hosts get null", async () => {
+      const topic = topicFixture({ status: "published", hostId: "host-1" });
+      vi.mocked(core.getTopicById).mockResolvedValue(topic);
+      vi.mocked(core.getAudienceElectorIds).mockResolvedValue([]);
+      vi.mocked(core.buildCalendar).mockResolvedValue([]);
+
+      await withTestServer(async (baseUrl) => {
+        mockSession("admin-1", ["admin"]);
+        vi.mocked(core.getReadableTimetable).mockResolvedValue({
+          timetable: calendarTimetable(),
+          roles: ["admin"],
+        });
+        const adminBody = await request(baseUrl, topic.id);
+        expect(adminBody.data?.topicSlotFit?.hearterCount).toBe(0);
+
+        mockSession("host-2", ["host"]);
+        vi.mocked(core.getReadableTimetable).mockResolvedValue({
+          timetable: calendarTimetable(),
+          roles: ["host"],
+        });
+        const otherHost = await request(baseUrl, topic.id);
+        expect(otherHost.data?.topicSlotFit).toBeNull();
+      });
+    });
+
+    it("returns null for non-members, anonymous, disabled calendar, foreign topic", async () => {
+      const topic = topicFixture({ status: "published", hostId: "host-1" });
+
+      await withTestServer(async (baseUrl) => {
+        // Anonymous.
+        vi.mocked(context.buildContext).mockResolvedValue(testContext(null));
+        expect(
+          (await request(baseUrl, topic.id)).data?.topicSlotFit,
+        ).toBeNull();
+
+        // Calendar disabled.
+        mockSession("host-1", ["host"]);
+        vi.mocked(core.getReadableTimetable).mockResolvedValue({
+          timetable: timetableFixture(),
+          roles: ["host"],
+        });
+        vi.mocked(core.getTopicById).mockResolvedValue(topic);
+        expect(
+          (await request(baseUrl, topic.id)).data?.topicSlotFit,
+        ).toBeNull();
+
+        // Foreign topic (another forum's id).
+        vi.mocked(core.getReadableTimetable).mockResolvedValue({
+          timetable: calendarTimetable(),
+          roles: ["host"],
+        });
+        vi.mocked(core.getTopicById).mockResolvedValue(
+          topicFixture({ timetableId: "99999999-9999-9999-9999-999999999999" }),
+        );
+        expect(
+          (await request(baseUrl, topic.id)).data?.topicSlotFit,
+        ).toBeNull();
+        expect(core.buildCalendar).not.toHaveBeenCalled();
       });
     });
   });

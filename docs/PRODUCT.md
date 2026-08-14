@@ -177,6 +177,15 @@ Forum Settings, which adds the Calendar nav link and page. Turning it off
 hides everything again; nothing is deleted. Each slot can carry a URL
 pointing at the real event page once one exists.
 
+**Demand-first scheduling (2026-08-14).** A ❤️ already implies "I'd attend a
+session" (deliberately unstated in UI copy — it was the original
+implication), so hosts schedule from demand rather than supply: each
+published card on My Topics carries a **topic-workbench** panel — upcoming
+slots scored by that topic's hearters' 🟢🟡🔴 availability, a sortable
+best-dates table with inline pencil-in. The calendar page stays the shared
+schedule view; nothing moved off it yet (the trim is a later, deliberate
+step).
+
 **Schedule = pattern × terms.** Admins define weekly time cells ("Tue and
 Thu 19:00–21:00") and named date ranges ("Michaelmas, 29 Sep–12 Dec"); slots
 are generated from the cross product (idempotently — regeneration skips
@@ -191,7 +200,8 @@ information you share":
    painted once and inherited by every generated slot
 3. nothing shared → 🟡 (maybe)
 
-**Sessions.** Each slot carries at most one session — **a topic, or a
+**Sessions.** Each slot carries zero-to-many bookings — one per location
+(2026-08-06) — each **a topic, or a
 host's "office hours"** (a typed topic-less session whose subject is the
 host; its display label is a forum setting, "Office hours" by default,
 never per-session free text) — plus a status: `empty` (open) → `proposed`

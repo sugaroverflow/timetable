@@ -1,4 +1,11 @@
-import { isAdmin, isHost, type Role } from "@timetable/shared";
+import {
+  calendarConfirmPolicy,
+  canProposeSession,
+  isAdmin,
+  isCalendarEnabled,
+  isHost,
+  type Role,
+} from "@timetable/shared";
 
 import { CreateTopicForm } from "@/components/CreateTopicForm";
 import { CreateTopicReveal } from "@/components/CreateTopicReveal";
@@ -55,6 +62,14 @@ export default async function MyTopicsPage({
   const hostLabel = roleLabel(settings.roleLabels, "host");
   const adminLabel = roleLabel(settings.roleLabels, "admin");
   const admin = isAdmin(roles);
+  // topic-workbench (2026-08-14): the scheduling panel mounts on published
+  // topic cards when the calendar is on; pencilling follows the same policy
+  // gate as the calendar page.
+  const calendarOn = isCalendarEnabled(settings);
+  const canPencil = canProposeSession(
+    { userId: data.me?.id ?? null, roles },
+    calendarConfirmPolicy(settings),
+  );
 
   if (!isHost(roles) && !admin) {
     return (
@@ -108,6 +123,8 @@ export default async function MyTopicsPage({
                 canPublishDirectly={Boolean(
                   settings.topics?.hostsPublishDirectly,
                 )}
+                calendarEnabled={calendarOn}
+                canPencilSessions={canPencil}
               />
             ))}
           </ul>

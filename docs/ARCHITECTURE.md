@@ -107,7 +107,10 @@ Codex/agent workflows are separate from the app runtime.
 - person pages at `/f/[slug]/[userSlug]` (per-forum member profiles; a
   userId segment canonically redirects to the member's slug)
 - My Topics (feed-identical cards + manage controls, TipTap editor; admins
-  can create a topic on behalf of another host)
+  can create a topic on behalf of another host; when the calendar is on,
+  published cards carry the topic-workbench — a lazy per-topic scheduling
+  panel: hearters' availability × future slots as a sortable best-dates
+  table with inline pencil-in, 2026-08-14)
 - Pending Topics (the submitted moderation queue — new topics are created
   as `submitted`; there is no draft status)
 - activity timeline (week/day grouping, date range, actor/role/type filters)
@@ -225,6 +228,7 @@ Main queries include:
 - `forumHosts`
 - `calendar` (audience lens + `includePast`; per-elector rows host/admin-only)
 - `slotComments`
+- `topicSlotFit` (topic-workbench: one topic's hearters vs future slots)
 - `myAvailabilityPattern`
 - `dashboard`
 - `myIcsToken`

@@ -11,6 +11,7 @@ import { CommentList } from "@/components/CommentList";
 import { HostOnlyPanel } from "@/components/HostOnlyPanel";
 import { ReadySwitch } from "@/components/ReadySwitch";
 import { TopicEditScope, useTopicEditing } from "@/components/TopicEditScope";
+import { TopicSchedulePanel } from "@/components/TopicSchedulePanel";
 import type { ManagedTopic } from "@/lib/feedTypes";
 import { topicPath } from "@/lib/topicPath";
 import { useGqlAction } from "@/lib/useGqlAction";
@@ -237,6 +238,8 @@ export function TopicManager({
   isAdmin,
   hosts,
   canPublishDirectly = false,
+  calendarEnabled,
+  canPencilSessions,
 }: {
   topic: ManagedTopic;
   slug: string;
@@ -247,6 +250,10 @@ export function TopicManager({
   isAdmin: boolean;
   hosts: { id: string; name: string | null }[];
   canPublishDirectly?: boolean;
+  /** Mount the topic-workbench scheduling panel (2026-08-14). */
+  calendarEnabled: boolean;
+  /** False under confirmPolicy "admins": panel shows demand read-only. */
+  canPencilSessions: boolean;
 }) {
   const permalink = permalinkFor(topic, slug);
   const publicComments = topic.comments ?? [];
@@ -329,6 +336,17 @@ export function TopicManager({
             hostHearters={topic.hostHearters ?? null}
           />
         ) : null}
+
+        {/* topic-workbench (2026-08-14): this topic's demand vs the open
+            slots — the audience-lens math in a per-topic frame. The panel
+            self-gates on calendar-enabled + published. */}
+        <TopicSchedulePanel
+          slug={slug}
+          topicId={topic.id}
+          canPencil={canPencilSessions}
+          calendarEnabled={calendarEnabled}
+          topicStatus={topic.status}
+        />
 
         {/* Drafting thread with the admins (QA #59 round 3). */}
         <AdminCommentsPanel
