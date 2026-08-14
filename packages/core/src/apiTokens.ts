@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 
-import { and, desc, eq, gt, isNull, or } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, or, sql } from "drizzle-orm";
 
 import { apiTokens, db, users, type ApiToken } from "@timetable/db";
 import { normalizeScopes, type TokenScope } from "@timetable/shared";
@@ -72,14 +72,34 @@ export async function createApiToken(
 }
 
 /** A member's tokens, newest first. Revoked ones are included so the UI can
- * show them as revoked rather than having them silently vanish. */
+ * show them as revoked rather than having them silently vanish. Bounded:
+ * active tokens are capped at MAX_ACTIVE_TOKENS_PER_USER, so 200 newest is
+ * always the full active set plus generous revoked/expired history. */
 export async function listApiTokens(userId: string): Promise<ApiTokenRecord[]> {
   const rows = await db
     .select()
     .from(apiTokens)
     .where(eq(apiTokens.userId, userId))
-    .orderBy(desc(apiTokens.createdAt));
+    .orderBy(desc(apiTokens.createdAt))
+    .limit(200);
   return rows.map(toRecord);
+}
+
+/** How many of a member's tokens could still authenticate right now —
+ * unrevoked and unexpired. The creation cap counts these, not history. */
+export async function countActiveApiTokens(userId: string): Promise<number> {
+  const now = new Date();
+  const [row] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(apiTokens)
+    .where(
+      and(
+        eq(apiTokens.userId, userId),
+        isNull(apiTokens.revokedAt),
+        or(isNull(apiTokens.expiresAt), gt(apiTokens.expiresAt, now)),
+      ),
+    );
+  return row?.n ?? 0;
 }
 
 /** Revoke one of the caller's own tokens. Scoped by userId in the WHERE

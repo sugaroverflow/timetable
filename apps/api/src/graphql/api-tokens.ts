@@ -1,10 +1,18 @@
 import {
+  countActiveApiTokens,
   createApiToken,
   listApiTokens,
   revokeApiToken,
   type ApiTokenRecord,
 } from "@timetable/core";
-import { createApiTokenSchema, normalizeScopes } from "@timetable/shared";
+import {
+  createApiTokenSchema,
+  DEFAULT_TOKEN_EXPIRY_DAYS,
+  MAX_ACTIVE_TOKENS_PER_USER,
+  normalizeScopes,
+} from "@timetable/shared";
+
+import { assertActionLimit } from "../http/action-limits";
 
 import { builder } from "./builder";
 import { badRequest, forbidden, requireUser } from "./guards";
@@ -86,23 +94,37 @@ builder.mutationFields((t) => ({
       name: t.arg.string({ required: true }),
       /** Empty list = a read-only token. */
       scopes: t.arg.stringList({ required: true }),
-      /** Null or omitted = never expires. */
+      /** Omitted = the 90-day default. An EXPLICIT null = never expires —
+       * "forever" has to be asked for, it is never what you get by
+       * forgetting the argument. */
       expiresInDays: t.arg.int({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
       const user = await requireUser(ctx);
       refuseTokenAuth(ctx.apiToken);
+      await assertActionLimit(user.id, "tokenMint");
 
       const parsed = createApiTokenSchema.safeParse({
         name: args.name,
         scopes: args.scopes,
-        expiresInDays: args.expiresInDays ?? null,
+        // Preserved as-is: undefined (omitted) and null (explicit) diverge
+        // below.
+        expiresInDays: args.expiresInDays,
       });
       if (!parsed.success) {
         badRequest(parsed.error.issues[0]?.message ?? "Invalid token request");
       }
 
-      const days = parsed.data.expiresInDays ?? null;
+      if ((await countActiveApiTokens(user.id)) >= MAX_ACTIVE_TOKENS_PER_USER) {
+        badRequest(
+          `You already have ${MAX_ACTIVE_TOKENS_PER_USER} active tokens — revoke one you no longer use first.`,
+        );
+      }
+
+      const days =
+        parsed.data.expiresInDays === undefined
+          ? DEFAULT_TOKEN_EXPIRY_DAYS
+          : parsed.data.expiresInDays;
       const expiresAt =
         days === null ? null : new Date(Date.now() + days * 86_400_000);
 

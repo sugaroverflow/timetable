@@ -62,9 +62,14 @@ export function normalizeScopes(raw: readonly string[]): TokenScope[] {
   return API_TOKEN_SCOPES.filter((scope) => raw.includes(scope));
 }
 
-/** How long a new token lasts when the creator doesn't choose. Tokens may
- * also be created with no expiry at all. */
+/** How long a new token lasts when the creator doesn't choose — applied
+ * server-side too, so an API caller that omits the expiry gets 90 days, and
+ * "never expires" only ever happens by explicit request (an explicit null). */
 export const DEFAULT_TOKEN_EXPIRY_DAYS = 90;
+
+/** Ceiling on ACTIVE (unrevoked, unexpired) tokens per member. Nobody needs
+ * more; a runaway or malicious minter does. Enforced at creation. */
+export const MAX_ACTIVE_TOKENS_PER_USER = 25;
 
 /** Offered in the expiry picker; `null` is "no expiry". */
 export const TOKEN_EXPIRY_CHOICES: readonly (number | null)[] = [

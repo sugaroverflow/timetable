@@ -25,6 +25,9 @@ export const ACTION_LIMITS = {
   heart: { windowMs: 60_000, max: 60 },
   /** Topic creation. */
   topic: { windowMs: 60 * 60_000, max: 30 },
+  /** Personal API token creation. Ten fresh credentials an hour is plenty
+   * for humans rotating tokens; a mint loop is what this stops. */
+  tokenMint: { windowMs: 60 * 60_000, max: 10 },
   /** Invite emails, counted per recipient (bulk paste of a cohort is fine). */
   invite: { windowMs: 60 * 60_000, max: 100 },
 } as const;
@@ -35,6 +38,7 @@ const BLOCKED_MESSAGES: Record<LimitedAction, string> = {
   comment: "You're commenting too quickly",
   heart: "You're ❤️-ing too quickly",
   topic: "You're creating topics too quickly",
+  tokenMint: "You're creating API tokens too quickly",
   invite: "Too many invites sent recently",
 };
 

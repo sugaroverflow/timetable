@@ -33,7 +33,9 @@ vi.mock("@timetable/core", async (importOriginal) => {
     buildCalendar: vi.fn(),
     slotSubjectTaken: vi.fn(),
     computeSlotCounts: vi.fn(),
+    countActiveApiTokens: vi.fn(),
     countViewerPublishedHearts: vi.fn(),
+    createApiToken: vi.fn(),
     createLocalUser: vi.fn(),
     deleteTopic: vi.fn(),
     getAudienceElectorIds: vi.fn(),
@@ -366,6 +368,8 @@ afterEach(() => {
   vi.mocked(core.listHostTopics).mockReset();
   vi.mocked(core.markInviteSent).mockReset();
   vi.mocked(core.getCommentById).mockReset();
+  vi.mocked(core.countActiveApiTokens).mockReset();
+  vi.mocked(core.createApiToken).mockReset();
   vi.mocked(core.setMemberRoles).mockReset();
   vi.mocked(core.setTopicReady).mockReset();
   vi.mocked(core.softDeleteComment).mockReset();
@@ -2163,6 +2167,111 @@ describe("createApiApp", () => {
 
         expect(body.errors).toBeUndefined();
         expect(body.data?.forum).toMatchObject({ id: timetable.id });
+      });
+    });
+
+    /** Session-authenticated token minting: the cap and the expiry default
+     * (hardening pass adopting #273). */
+    describe("minting", () => {
+      const NEW_TOKEN = {
+        id: "token-new",
+        userId: "",
+        name: "fresh",
+        prefix: "abcdefgh",
+        scopes: [],
+        lastUsedAt: null,
+        expiresAt: null,
+        revokedAt: null,
+        createdAt: new Date("2026-08-14T00:00:00.000Z"),
+      };
+
+      async function mint(baseUrl: string, args = "") {
+        const res = await fetch(`${baseUrl}/graphql`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            query: `mutation { createApiToken(name: "fresh", scopes: []${args}) { secret } }`,
+          }),
+        });
+        return (await res.json()) as {
+          data: Record<string, unknown> | null;
+          errors?: { message: string }[];
+        };
+      }
+
+      it("defaults an omitted expiry to 90 days, server-side", async () => {
+        mockSession("minter-default", ["elector"]);
+        vi.mocked(core.countActiveApiTokens).mockResolvedValue(0);
+        vi.mocked(core.createApiToken).mockResolvedValue({
+          secret: "tpk_fresh-secret",
+          token: NEW_TOKEN,
+        });
+
+        await withTestServer(async (baseUrl) => {
+          const before = Date.now();
+          const body = await mint(baseUrl);
+          expect(body.errors).toBeUndefined();
+
+          const input = vi.mocked(core.createApiToken).mock.calls[0]?.[1];
+          const expiresAt = input?.expiresAt;
+          expect(expiresAt).toBeInstanceOf(Date);
+          const ninetyDays = 90 * 86_400_000;
+          expect((expiresAt as Date).getTime() - before).toBeGreaterThan(
+            ninetyDays - 60_000,
+          );
+          expect((expiresAt as Date).getTime() - before).toBeLessThan(
+            ninetyDays + 60_000,
+          );
+        });
+      });
+
+      it("still mints a never-expiring token on an EXPLICIT null", async () => {
+        mockSession("minter-never", ["elector"]);
+        vi.mocked(core.countActiveApiTokens).mockResolvedValue(0);
+        vi.mocked(core.createApiToken).mockResolvedValue({
+          secret: "tpk_fresh-secret",
+          token: NEW_TOKEN,
+        });
+
+        await withTestServer(async (baseUrl) => {
+          const body = await mint(baseUrl, ", expiresInDays: null");
+          expect(body.errors).toBeUndefined();
+          expect(
+            vi.mocked(core.createApiToken).mock.calls[0]?.[1],
+          ).toMatchObject({ expiresAt: null });
+        });
+      });
+
+      it("refuses a 26th active token, and never mints it", async () => {
+        mockSession("minter-capped", ["elector"]);
+        vi.mocked(core.countActiveApiTokens).mockResolvedValue(25);
+
+        await withTestServer(async (baseUrl) => {
+          const body = await mint(baseUrl);
+          expect(body.errors?.[0]?.message).toMatch(/25 active tokens/);
+          expect(core.createApiToken).not.toHaveBeenCalled();
+        });
+      });
+
+      it("rate-limits minting to 10 an hour per user", async () => {
+        mockSession("minter-hasty", ["elector"]);
+        vi.mocked(core.countActiveApiTokens).mockResolvedValue(0);
+        vi.mocked(core.createApiToken).mockResolvedValue({
+          secret: "tpk_fresh-secret",
+          token: NEW_TOKEN,
+        });
+
+        await withTestServer(async (baseUrl) => {
+          for (let i = 0; i < 10; i++) {
+            const body = await mint(baseUrl);
+            expect(body.errors).toBeUndefined();
+          }
+          const blocked = await mint(baseUrl);
+          expect(blocked.errors?.[0]?.message).toMatch(
+            /creating API tokens too quickly/,
+          );
+          expect(core.createApiToken).toHaveBeenCalledTimes(10);
+        });
       });
     });
 
