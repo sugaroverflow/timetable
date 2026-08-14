@@ -2490,6 +2490,41 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
   cursor: default;
   opacity: 0.6;
 }
+/* topic-card-tabs (2026-08-14): the My Topics card's section strip —
+   public comments / {host}-only / drafting / scheduling as horizontal
+   tabs instead of stacked collapsibles. */
+.card-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  border-bottom: 1px solid var(--line-strong);
+}
+.card-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 10px;
+  font-size: 12.5px;
+  font-weight: var(--fw-semibold);
+  color: var(--muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.card-tabs button:hover {
+  color: var(--ink);
+}
+.card-tabs button[aria-selected="true"] {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+}
+.card-tab-panel {
+  padding-top: 10px;
+}
+
 /* Neutral segmented state (topic-workbench sort toggle, 2026-08-14). */
 .avseg button.on {
   background: var(--wash-strong);

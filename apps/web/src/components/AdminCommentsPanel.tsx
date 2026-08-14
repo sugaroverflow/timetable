@@ -11,6 +11,53 @@ import { pluralLabel, type RoleLabels } from "@/lib/timetableSettings";
 import { CommentComposer } from "./CommentComposer";
 import { CommentList } from "./CommentList";
 
+/** The drafting thread's body — composer + thread. Shared by the
+ * collapsible panel below and the My Topics card tabs (topic-card-tabs,
+ * 2026-08-14). */
+export function AdminCommentsBody({
+  topicId,
+  comments,
+  canModerate,
+  viewerId = null,
+  slug,
+  adminLabel = "Admin",
+  hostLabel = "Host",
+  roleLabels,
+}: {
+  topicId: string;
+  comments: FeedComment[];
+  canModerate: boolean;
+  viewerId?: string | null;
+  slug?: string;
+  adminLabel?: string;
+  hostLabel?: string;
+  roleLabels?: RoleLabels;
+}) {
+  const admins = pluralLabel(adminLabel);
+  const composerHint = canModerate
+    ? `only the ${hostLabel} and ${admins} can see this`
+    : `only you and ${admins} can see this`;
+  return (
+    <div className="host-thread thread-stack">
+      <CommentComposer
+        topicId={topicId}
+        visibility="admin_only"
+        adminLabel={adminLabel}
+        placeholder={`Add a comment… (${composerHint})`}
+        successMessage="Comment added"
+      />
+      <CommentList
+        comments={comments}
+        canReply={true}
+        canModerate={canModerate}
+        viewerId={viewerId}
+        slug={slug}
+        roleLabels={roleLabels}
+      />
+    </div>
+  );
+}
+
 /** The drafting thread (QA #59 round 3), visible to admins (on Pending
  * Topics) and the topic owner (on My Topics) only — never in the feed.
  * Threaded, with its own composer. Starts expanded when the thread already
@@ -41,9 +88,6 @@ export function AdminCommentsPanel({
   const [expanded, setExpanded] = useState(count > 0);
   const admins = pluralLabel(adminLabel);
   const audience = `you and ${admins} only`;
-  const composerHint = canModerate
-    ? `only the ${hostLabel} and ${admins} can see this`
-    : `only you and ${admins} can see this`;
 
   return (
     <Collapsible.Root
@@ -64,23 +108,16 @@ export function AdminCommentsPanel({
       </Collapsible.Trigger>
       <Collapsible.Panel>
         {expanded && (
-          <div className="host-thread thread-stack">
-            <CommentComposer
-              topicId={topicId}
-              visibility="admin_only"
-              adminLabel={adminLabel}
-              placeholder={`Add a comment… (${composerHint})`}
-              successMessage="Comment added"
-            />
-            <CommentList
-              comments={comments}
-              canReply={true}
-              canModerate={canModerate}
-              viewerId={viewerId}
-              slug={slug}
-              roleLabels={roleLabels}
-            />
-          </div>
+          <AdminCommentsBody
+            topicId={topicId}
+            comments={comments}
+            canModerate={canModerate}
+            viewerId={viewerId}
+            slug={slug}
+            adminLabel={adminLabel}
+            hostLabel={hostLabel}
+            roleLabels={roleLabels}
+          />
         )}
       </Collapsible.Panel>
     </Collapsible.Root>

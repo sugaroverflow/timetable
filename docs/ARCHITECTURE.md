@@ -107,11 +107,13 @@ Codex/agent workflows are separate from the app runtime.
 - person pages at `/f/[slug]/[userSlug]` (per-forum member profiles; a
   userId segment canonically redirects to the member's slug)
 - My Topics (feed-identical cards + manage controls, TipTap editor; admins
-  can create a topic on behalf of another host; when the calendar is on,
-  published cards carry the topic-workbench — a lazy per-topic
-  mini-calendar: hearters' availability across future slots as washed rows
-  (shared `CalendarRowWash` pieces) with the avatar fold, a
-  Date/Availability sort toggle, and pencil/unpencil per row, 2026-08-14)
+  can create a topic on behalf of another host; each card's sections —
+  public comments / host-only / drafting / Scheduling — are one horizontal
+  tab strip (`TopicCardTabs`, 2026-08-14); the Scheduling tab is the
+  topic-workbench — a lazy per-topic mini-calendar: hearters' availability
+  across future slots as washed rows (shared `CalendarRowWash` pieces,
+  month headings + week gaps by date) with the avatar fold, a
+  Date/Availability sort toggle, and pencil/unpencil per row)
 - Pending Topics (the submitted moderation queue — new topics are created
   as `submitted`; there is no draft status)
 - activity timeline (week/day grouping, date range, actor/role/type filters)

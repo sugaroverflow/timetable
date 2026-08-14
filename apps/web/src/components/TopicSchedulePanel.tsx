@@ -1,8 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Collapsible } from "@base-ui/react/collapsible";
-import { CalendarDays, ChevronDown, ChevronRight } from "lucide-react";
+import { Fragment, useEffect, useState } from "react";
 
 import { clientGql } from "@/lib/clientGraphql";
 import { useGqlAction } from "@/lib/useGqlAction";
@@ -13,7 +11,7 @@ import {
   TintLayer,
   type PerUserAvailability,
 } from "./CalendarRowWash";
-import { formatTime } from "./CalendarTable";
+import { formatTime, monthLabel, weekKey } from "./CalendarTable";
 
 const QUERY = `query TopicSchedule($s: String!, $t: String!) {
   topicSlotFit(idOrSlug: $s, topicId: $t) {
@@ -48,8 +46,8 @@ type TopicSchedule = { hearterCount: number; slots: FitRow[] };
 type SortMode = "date" | "availability";
 
 /** Unlike the calendar page (which groups rows under month-year headings),
- * this list mixes terms years apart once sorted by availability — every
- * date carries its year (QA 2026-08-14). */
+ * the availability view mixes terms years apart — every date carries its
+ * year (QA 2026-08-14). */
 function formatFitDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-GB", {
     weekday: "short",
@@ -83,61 +81,24 @@ function onInteractive(e: { target: EventTarget | null }): boolean {
   );
 }
 
-/** topic-workbench v2 (2026-08-14, demand-first scheduling): the per-topic
- * scheduling panel on My Topics as a mini-calendar — one washed row per
- * datetime (pencils are location-less time-intents; a pencil is the host
- * saying "I am available at this time"), expandable to the hearter avatar
- * fold, with a Date/Availability sort toggle. A dashboard only: no
- * comments here — discussion happens on the calendar page. */
-export function TopicSchedulePanel({
+/** topic-workbench (2026-08-14, demand-first scheduling): the per-topic
+ * scheduling pane on My Topics — a mini-calendar of washed datetime rows
+ * over THIS topic's hearters (pencils are location-less time-intents; a
+ * pencil is the host saying "I am available at this time"), expandable to
+ * the hearter avatar fold, with a Date/Availability sort toggle. By date,
+ * rows group under month headings with week gaps, exactly like the
+ * calendar page (past slots are excluded server-side); by availability
+ * the list is flat and ranked. A dashboard only — no comments here.
+ * Rendered inside the topic-card-tabs Scheduling tab. */
+export function TopicScheduleBody({
   slug,
   topicId,
   canPencil,
-  calendarEnabled,
-  topicStatus,
 }: {
   slug: string;
   topicId: string;
   /** False under confirmPolicy "admins" (hosts can't pencil): rows stay
    * informative, the pencil buttons hide. */
-  canPencil: boolean;
-  /** The panel self-gates (keeps TopicManager's complexity budget flat):
-   * calendar on + published topics only. */
-  calendarEnabled: boolean;
-  topicStatus: string;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  if (!calendarEnabled || topicStatus !== "published") return null;
-  return (
-    <Collapsible.Root
-      className="host-panel"
-      open={expanded}
-      onOpenChange={setExpanded}
-    >
-      <Collapsible.Trigger className="host-panel-toggle">
-        {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}{" "}
-        <CalendarDays size={14} aria-hidden /> Scheduling
-      </Collapsible.Trigger>
-      <Collapsible.Panel>
-        {expanded && (
-          <TopicScheduleBody
-            slug={slug}
-            topicId={topicId}
-            canPencil={canPencil}
-          />
-        )}
-      </Collapsible.Panel>
-    </Collapsible.Root>
-  );
-}
-
-function TopicScheduleBody({
-  slug,
-  topicId,
-  canPencil,
-}: {
-  slug: string;
-  topicId: string;
   canPencil: boolean;
 }) {
   const [data, setData] = useState<TopicSchedule | null | undefined>(undefined);
@@ -185,6 +146,7 @@ function TopicScheduleBody({
   }
 
   const sorted = [...data.slots].sort((a, b) => compareRows(a, b, mode));
+  const grouped = mode === "date";
 
   return (
     <div className="stack" style={{ gap: 8 }}>
@@ -221,16 +183,38 @@ function TopicScheduleBody({
         </div>
       ) : (
         <div className="cal-list">
-          {sorted.map((row) => (
-            <WorkbenchRow
-              key={row.slotId}
-              row={row}
-              slug={slug}
-              topicId={topicId}
-              canPencil={canPencil}
-              onReload={() => setReloadKey((k) => k + 1)}
-            />
-          ))}
+          {sorted.map((row, i) => {
+            const divider =
+              grouped &&
+              (i === 0 ||
+                monthLabel(row.startsAt) !==
+                  monthLabel(sorted[i - 1]!.startsAt));
+            const weekStart =
+              grouped &&
+              !divider &&
+              i > 0 &&
+              weekKey(row.startsAt) !== weekKey(sorted[i - 1]!.startsAt);
+            return (
+              <Fragment key={row.slotId}>
+                {divider ? (
+                  <div className="cal-month-row">
+                    <span className="cal-month-inner">
+                      {monthLabel(row.startsAt)}
+                    </span>
+                  </div>
+                ) : null}
+                <WorkbenchRow
+                  row={row}
+                  slug={slug}
+                  topicId={topicId}
+                  canPencil={canPencil}
+                  weekStart={weekStart}
+                  showYear={!grouped}
+                  onReload={() => setReloadKey((k) => k + 1)}
+                />
+              </Fragment>
+            );
+          })}
         </div>
       )}
     </div>
@@ -245,20 +229,32 @@ function WorkbenchRow({
   slug,
   topicId,
   canPencil,
+  weekStart,
+  showYear,
   onReload,
 }: {
   row: FitRow;
   slug: string;
   topicId: string;
   canPencil: boolean;
+  weekStart: boolean;
+  /** The availability view has no month headings to carry the year. */
+  showYear: boolean;
   onReload: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const { run, busy } = useGqlAction();
+  const when = showYear
+    ? formatFitDate(row.startsAt)
+    : new Date(row.startsAt).toLocaleDateString("en-GB", {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+      });
 
   return (
     <div
-      className="cal-row cal-row-expandable"
+      className={`cal-row cal-row-expandable${weekStart ? " cal-week-start" : ""}`}
       role="button"
       tabIndex={0}
       aria-expanded={open}
@@ -279,8 +275,8 @@ function WorkbenchRow({
         />
         <div className="cal-row-line">
           <span className="cal-when">
-            <strong>{formatFitDate(row.startsAt)}</strong>{" "}
-            {formatTime(row.startsAt)} – {formatTime(row.endsAt)}
+            <strong>{when}</strong> {formatTime(row.startsAt)} –{" "}
+            {formatTime(row.endsAt)}
           </span>
           <span className="cal-row-right">
             {row.topicStatus === "confirmed" ? (

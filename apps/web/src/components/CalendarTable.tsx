@@ -41,7 +41,7 @@ export function formatTime(iso: string): string {
     hour12: false,
   });
 }
-function monthLabel(iso: string): string {
+export function monthLabel(iso: string): string {
   return new Date(iso).toLocaleString(undefined, {
     month: "long",
     year: "numeric",
@@ -49,7 +49,7 @@ function monthLabel(iso: string): string {
 }
 
 /** The Monday starting this slot's week (viewer-local) — week-gap key. */
-function weekKey(iso: string): string {
+export function weekKey(iso: string): string {
   const d = new Date(iso);
   d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
   return d.toDateString();

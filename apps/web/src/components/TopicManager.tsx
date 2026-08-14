@@ -3,15 +3,11 @@
 import Link from "next/link";
 import { useState } from "react";
 
-import { AdminCommentsPanel } from "@/components/AdminCommentsPanel";
 import { AdminTopicActions } from "@/components/AdminTopicActions";
 import { CollapsibleTopicBody } from "@/components/CollapsibleTopicBody";
-import { CommentComposer } from "@/components/CommentComposer";
-import { CommentList } from "@/components/CommentList";
-import { HostOnlyPanel } from "@/components/HostOnlyPanel";
 import { ReadySwitch } from "@/components/ReadySwitch";
 import { TopicEditScope, useTopicEditing } from "@/components/TopicEditScope";
-import { TopicSchedulePanel } from "@/components/TopicSchedulePanel";
+import { TopicCardTabs } from "@/components/TopicCardTabs";
 import type { ManagedTopic } from "@/lib/feedTypes";
 import { topicPath } from "@/lib/topicPath";
 import { useGqlAction } from "@/lib/useGqlAction";
@@ -216,18 +212,9 @@ function permalinkFor(topic: ManagedTopic, slug: string): string | null {
   );
 }
 
-/** The {host}-only panel shows for host comments OR received 💙s — the
- * owner's view of who 💙'd their topic lives there (host hearts, QA
- * 2026-08-04). */
-function showsHostPanel(
-  hostComments: unknown[],
-  hostHearters: unknown[] | null | undefined,
-): boolean {
-  return hostComments.length > 0 || (hostHearters?.length ?? 0) > 0;
-}
-
-/** A topic on My Topics — renders like a feed card (cover, description,
- * comments, {host}-only thread; QA #59) with the manage controls below. */
+/** A topic on My Topics — renders like a feed card (cover, description;
+ * QA #59) with the topic-card-tabs section strip and the manage controls
+ * below. */
 export function TopicManager({
   topic,
   slug,
@@ -256,8 +243,6 @@ export function TopicManager({
   canPencilSessions: boolean;
 }) {
   const permalink = permalinkFor(topic, slug);
-  const publicComments = topic.comments ?? [];
-  const hostComments = topic.hostOnlyComments ?? [];
   // Resolved forum labels, reshaped for the threads' author role pills.
   const roleLabels = {
     admin: adminLabel,
@@ -309,54 +294,17 @@ export function TopicManager({
           </>
         }
       >
-        {topic.status === "published" ? (
-          <CommentComposer topicId={topic.id} mentionSlug={slug} />
-        ) : null}
-        {publicComments.length > 0 ? (
-          <CommentList
-            comments={publicComments}
-            canReply={true}
-            canModerate={false}
-            viewerId={viewerId}
-            slug={slug}
-            roleLabels={roleLabels}
-          />
-        ) : null}
-
-        {/* No 💙 toggle on your own topic: read-only row. */}
-        {showsHostPanel(hostComments, topic.hostHearters) ? (
-          <HostOnlyPanel
-            topicId={topic.id}
-            viewerId={viewerId}
-            comments={hostComments}
-            canModerate={false}
-            slug={slug}
-            hostLabel={hostLabel}
-            roleLabels={roleLabels}
-            hostHearters={topic.hostHearters ?? null}
-          />
-        ) : null}
-
-        {/* topic-workbench (2026-08-14): this topic's demand vs the open
-            slots — the audience-lens math in a per-topic frame. The panel
-            self-gates on calendar-enabled + published. */}
-        <TopicSchedulePanel
+        {/* topic-card-tabs (2026-08-14): public comments / {host}-only /
+            drafting thread / scheduling as one horizontal tab strip. */}
+        <TopicCardTabs
+          topic={topic}
           slug={slug}
-          topicId={topic.id}
-          canPencil={canPencilSessions}
-          calendarEnabled={calendarEnabled}
-          topicStatus={topic.status}
-        />
-
-        {/* Drafting thread with the admins (QA #59 round 3). */}
-        <AdminCommentsPanel
-          topicId={topic.id}
           viewerId={viewerId}
-          comments={topic.adminComments ?? []}
-          canModerate={false}
-          slug={slug}
+          hostLabel={hostLabel}
           adminLabel={adminLabel}
           roleLabels={roleLabels}
+          calendarEnabled={calendarEnabled}
+          canPencilSessions={canPencilSessions}
         />
 
         <ManageControls
