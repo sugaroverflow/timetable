@@ -70,7 +70,9 @@ schema/migrations change. Run `npm run format` before committing (Prettier
 defaults; YAML/Markdown are exempt — deploy specs are sed-templated).
 
 Tests are vitest (`packages/shared`, `apps/api`, `apps/web`) + one Playwright
-smoke suite (`tests/e2e/`). Follow existing patterns:
+smoke suite (`tests/e2e/`) — it always starts its own web server on port 3100
+(override with `PLAYWRIGHT_PORT`), so it coexists with a running dev stack.
+Follow existing patterns:
 `apps/web/src/lib/transport.test.ts`, `packages/shared/src/hearts.test.ts`.
 Lint covers everything: `apps/web` has its own Next config; the root
 `eslint.config.mjs` lints `apps/api`, `packages/*`, `tests/`, `scripts/`.
