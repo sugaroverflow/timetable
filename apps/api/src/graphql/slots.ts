@@ -352,6 +352,62 @@ const SlotCommentType = builder
     }),
   });
 
+/** One future slot as seen from a topic's demand (topic-workbench,
+ * 2026-08-14): the topic's hearters' availability counts plus what's still
+ * free at that time. Deliberately slim — never perUser. */
+const TopicSlotFitType = builder
+  .objectRef<{
+    slotId: string;
+    startsAt: Date;
+    endsAt: Date;
+    locations: string[];
+    freeLocations: string[];
+    full: boolean;
+    topicStatus: string | null;
+    counts: { green: number; yellow: number; red: number };
+  }>("TopicSlotFit")
+  .implement({
+    fields: (t) => ({
+      slotId: t.exposeID("slotId"),
+      startsAt: t.string({ resolve: (s) => s.startsAt.toISOString() }),
+      endsAt: t.string({ resolve: (s) => s.endsAt.toISOString() }),
+      /** Locations offered at this time (empty on location-free slots). */
+      locations: t.exposeStringList("locations"),
+      /** Offered locations with no booking yet (== locations on open slots;
+       * empty when the slot is full or location-free-and-booked). */
+      freeLocations: t.exposeStringList("freeLocations"),
+      /** No capacity left at this time. */
+      full: t.exposeBoolean("full"),
+      /** This topic's own booking here, if any: proposed | confirmed. */
+      topicStatus: t.exposeString("topicStatus", { nullable: true }),
+      counts: t.field({
+        type: AvailabilityCountsType,
+        resolve: (s) => s.counts,
+      }),
+    }),
+  });
+
+const TopicScheduleType = builder
+  .objectRef<{
+    hearterCount: number;
+    slots: {
+      slotId: string;
+      startsAt: Date;
+      endsAt: Date;
+      locations: string[];
+      freeLocations: string[];
+      full: boolean;
+      topicStatus: string | null;
+      counts: { green: number; yellow: number; red: number };
+    }[];
+  }>("TopicSchedule")
+  .implement({
+    fields: (t) => ({
+      hearterCount: t.exposeInt("hearterCount"),
+      slots: t.field({ type: [TopicSlotFitType], resolve: (s) => s.slots }),
+    }),
+  });
+
 // ---------------------------------------------------------------------------
 // Queries
 // ---------------------------------------------------------------------------
@@ -398,6 +454,64 @@ builder.queryFields((t) => ({
       return listSlotComments(args.slotId, {
         includeHidden: canManageCalendar(viewer),
       });
+    },
+  }),
+
+  /** The topic-workbench feed (My Topics, 2026-08-14): future slots scored
+   * by THIS topic's hearters' availability — the calendar's audience-lens
+   * math in a per-topic frame. Fetched lazily on panel expand. Null for
+   * anyone but the topic's own host or an admin (the
+   * topicWeightedBreakdown null-for-unauthorized precedent). */
+  topicSlotFit: t.field({
+    type: TopicScheduleType,
+    nullable: true,
+    args: {
+      idOrSlug: t.arg.string({ required: true }),
+      topicId: t.arg.string({ required: true }),
+    },
+    resolve: async (_p, args, ctx) => {
+      if (!ctx.user) return null;
+      const readable = await readTimetable(ctx, args.idOrSlug);
+      if (!readable) return null;
+      if (!isCalendarEnabled(readable.timetable.settings)) return null;
+      const topic = await getTopicById(args.topicId);
+      if (!topic || topic.timetableId !== readable.timetable.id) return null;
+      const viewer = { userId: ctx.user.id, roles: readable.roles };
+      if (!isAdmin(readable.roles) && topic.hostId !== viewer.userId) {
+        return null;
+      }
+      const hearters = await getAudienceElectorIds(readable.timetable.id, {
+        kind: "hearted_topic",
+        topicId: topic.id,
+      });
+      const slots = await buildCalendar(
+        readable.timetable.id,
+        hearters,
+        ctx.user.id,
+      );
+      return {
+        hearterCount: hearters.length,
+        slots: slots.map((s) => {
+          const freeLocations = s.locations.filter(
+            (loc) => !s.sessions.some((x) => x.location === loc),
+          );
+          const full =
+            s.locations.length > 0
+              ? freeLocations.length === 0
+              : s.sessions.length > 0;
+          return {
+            slotId: s.id,
+            startsAt: s.startsAt,
+            endsAt: s.endsAt,
+            locations: s.locations,
+            freeLocations,
+            full,
+            topicStatus:
+              s.sessions.find((x) => x.topic?.id === topic.id)?.status ?? null,
+            counts: s.counts,
+          };
+        }),
+      };
     },
   }),
 
