@@ -1,6 +1,13 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const port = Number(process.env.PLAYWRIGHT_PORT ?? 3000);
+// Default to 3100, not 3000: the suite always starts its own web server
+// (reuse is disabled below), so on 3000 it would fail "port is already used"
+// for anyone running the documented dev stack (`npm run dev`, web on :3000).
+// Nothing ties the tests to 3000 — E2E_TEST_MODE strips Clerk and the API
+// URL is pinned separately. PLAYWRIGHT_PORT overrides; an unset or
+// malformed value falls back to 3100.
+const envPort = Number(process.env.PLAYWRIGHT_PORT);
+const port = Number.isInteger(envPort) && envPort > 0 ? envPort : 3100;
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${port}`;
 
 export default defineConfig({
