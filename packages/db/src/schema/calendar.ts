@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { isNull, relations } from "drizzle-orm";
 import {
   index,
   integer,
@@ -59,9 +59,12 @@ export const timeslots = pgTable(
 );
 
 /** A booking in a timeslot: a session subject (topic, office-hours host,
- * or an admin's custom title) at a location. Several bookings can share a
- * slot — different locations, same time; the location is the contended
- * resource, so (slot, location) is unique. */
+ * or an admin's custom title). Pencils are location-less time-intents
+ * (2026-08-14, demand-first): any number of subjects can pencil the same
+ * time — a pencil is the host saying "I am available at this time" — so
+ * the only uniqueness is one pencil per topic (and one office-hours pencil
+ * per host) per slot. `location` remains as display copy on existing rows
+ * and for the future confirm-time assignment; it no longer contends. */
 export const slotSessions = pgTable(
   "slot_sessions",
   {
@@ -90,7 +93,15 @@ export const slotSessions = pgTable(
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    uniqueIndex("slot_sessions_slot_location_uq").on(t.slotId, t.location),
+    // topicId is nullable and Postgres treats NULLs as distinct, so this
+    // constrains topic sessions only.
+    uniqueIndex("slot_sessions_slot_topic_uq").on(t.slotId, t.topicId),
+    // Office-hours rows only (topic sessions also carry sessionHostId —
+    // a host may pencil several of their topics into one slot).
+    uniqueIndex("slot_sessions_slot_oh_host_uq")
+      .on(t.slotId, t.sessionHostId)
+      .where(isNull(t.topicId)),
+    index("slot_sessions_slot_idx").on(t.slotId),
   ],
 );
 

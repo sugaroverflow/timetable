@@ -21,7 +21,7 @@ import {
   setAvailability,
   setAvailabilityPattern,
   setSlotCommentHidden,
-  slotLocationTaken,
+  slotSubjectTaken,
   updateSlot,
   updateSlotComment,
   updateSlotSessionRow,
@@ -353,36 +353,43 @@ const SlotCommentType = builder
   });
 
 /** One future slot as seen from a topic's demand (topic-workbench,
- * 2026-08-14): the topic's hearters' availability counts plus what's still
- * free at that time. Deliberately slim — never perUser. */
+ * 2026-08-14; v2 same day — pencils are location-less time-intents, so no
+ * location fields): the topic's hearters' availability, both as counts
+ * (the wash) and per hearter (the avatar fold — the caller is the topic's
+ * own host or an admin, exactly who may see per-elector availability). */
+type TopicSlotFitRow = {
+  slotId: string;
+  startsAt: Date;
+  endsAt: Date;
+  /** This topic's own pencil here, for unpencilling. */
+  sessionId: string | null;
+  topicStatus: string | null;
+  counts: { green: number; yellow: number; red: number };
+  perUser: {
+    userId: string;
+    name: string | null;
+    image: string | null;
+    state: string;
+  }[];
+};
+
 const TopicSlotFitType = builder
-  .objectRef<{
-    slotId: string;
-    startsAt: Date;
-    endsAt: Date;
-    locations: string[];
-    freeLocations: string[];
-    full: boolean;
-    topicStatus: string | null;
-    counts: { green: number; yellow: number; red: number };
-  }>("TopicSlotFit")
+  .objectRef<TopicSlotFitRow>("TopicSlotFit")
   .implement({
     fields: (t) => ({
       slotId: t.exposeID("slotId"),
       startsAt: t.string({ resolve: (s) => s.startsAt.toISOString() }),
       endsAt: t.string({ resolve: (s) => s.endsAt.toISOString() }),
-      /** Locations offered at this time (empty on location-free slots). */
-      locations: t.exposeStringList("locations"),
-      /** Offered locations with no booking yet (== locations on open slots;
-       * empty when the slot is full or location-free-and-booked). */
-      freeLocations: t.exposeStringList("freeLocations"),
-      /** No capacity left at this time. */
-      full: t.exposeBoolean("full"),
       /** This topic's own booking here, if any: proposed | confirmed. */
+      sessionId: t.exposeID("sessionId", { nullable: true }),
       topicStatus: t.exposeString("topicStatus", { nullable: true }),
       counts: t.field({
         type: AvailabilityCountsType,
         resolve: (s) => s.counts,
+      }),
+      perUser: t.field({
+        type: [SlotAvailabilityType],
+        resolve: (s) => s.perUser,
       }),
     }),
   });
@@ -390,16 +397,7 @@ const TopicSlotFitType = builder
 const TopicScheduleType = builder
   .objectRef<{
     hearterCount: number;
-    slots: {
-      slotId: string;
-      startsAt: Date;
-      endsAt: Date;
-      locations: string[];
-      freeLocations: string[];
-      full: boolean;
-      topicStatus: string | null;
-      counts: { green: number; yellow: number; red: number };
-    }[];
+    slots: TopicSlotFitRow[];
   }>("TopicSchedule")
   .implement({
     fields: (t) => ({
@@ -492,23 +490,15 @@ builder.queryFields((t) => ({
       return {
         hearterCount: hearters.length,
         slots: slots.map((s) => {
-          const freeLocations = s.locations.filter(
-            (loc) => !s.sessions.some((x) => x.location === loc),
-          );
-          const full =
-            s.locations.length > 0
-              ? freeLocations.length === 0
-              : s.sessions.length > 0;
+          const own = s.sessions.find((x) => x.topic?.id === topic.id);
           return {
             slotId: s.id,
             startsAt: s.startsAt,
             endsAt: s.endsAt,
-            locations: s.locations,
-            freeLocations,
-            full,
-            topicStatus:
-              s.sessions.find((x) => x.topic?.id === topic.id)?.status ?? null,
+            sessionId: own?.id ?? null,
+            topicStatus: own?.status ?? null,
             counts: s.counts,
+            perUser: s.perUser ?? [],
           };
         }),
       };
@@ -624,15 +614,9 @@ builder.mutationFields((t) => ({
         "",
       );
       const { startsAt, endsAt } = parseSlotWindow(args.startsAt, args.endsAt);
+      // Location optional since 2026-08-14 (pencils are location-less
+      // time-intents) — kept as display copy when given.
       const location = (args.location ?? "").trim();
-      // Forums with configured locations require one on every new slot
-      // (slot locations, 2026-08-11); location-free forums stay as-is.
-      if (
-        (readable.timetable.settings.calendar?.locations?.length ?? 0) > 0 &&
-        !location
-      ) {
-        badRequest("Pick a location for this session");
-      }
       const { slot } = await proposeSlot(readable.timetable.id, user.id, {
         startsAt,
         endsAt,
@@ -873,9 +857,11 @@ function parseSlotWindow(
 builder.mutationFields((t) => ({
   /** Book a session into a slot — a topic, (QA 2026-08-03) office hours
    * for `sessionHostId`, or an admin's custom `title` — at a location.
-   * Several bookings can share a slot (bookings model, 2026-08-06); the
-   * location is the contended resource. Who may do what depends on the
-   * forum's confirm policy. */
+   * Pencils are location-less time-intents (2026-08-14): any number of
+   * subjects can share a slot — a pencil is the host saying "I am
+   * available at this time" — and the only exclusivity is one pencil per
+   * subject per slot. `location` is optional display copy. Who may do
+   * what depends on the forum's confirm policy. */
   addSlotSession: t.field({
     type: "Boolean",
     args: {
@@ -908,20 +894,11 @@ builder.mutationFields((t) => ({
         parseCustomTitle(args.title),
       );
       const location = (args.location ?? "").trim();
-      // Slots with offered locations (2026-08-11): the booking must pick
-      // one of them — the location IS the contended resource.
-      if (slot.locations.length > 0) {
-        if (!location) badRequest("Pick a location for this session");
-        if (!slot.locations.includes(location)) {
-          badRequest(`This slot is not offered at "${location}"`);
-        }
-      }
-      if (await slotLocationTaken(slot.id, location)) {
-        badRequest(
-          location
-            ? `"${location}" already has a session at this time`
-            : "This slot already has a session with no location — pick a location",
-        );
+      if (
+        (subject.topicId || subject.sessionHostId) &&
+        (await slotSubjectTaken(slot.id, subject))
+      ) {
+        badRequest("Already pencilled in at this time");
       }
       await addSlotSession(slot.id, {
         location,

@@ -180,11 +180,14 @@ pointing at the real event page once one exists.
 **Demand-first scheduling (2026-08-14).** A ❤️ already implies "I'd attend a
 session" (deliberately unstated in UI copy — it was the original
 implication), so hosts schedule from demand rather than supply: each
-published card on My Topics carries a **topic-workbench** panel — upcoming
-slots scored by that topic's hearters' 🟢🟡🔴 availability, a sortable
-best-dates table with inline pencil-in. The calendar page stays the shared
-schedule view; nothing moved off it yet (the trim is a later, deliberate
-step).
+published card on My Topics carries a **topic-workbench** panel — a
+per-topic mini-calendar of upcoming slots as washed rows (the calendar's
+row-wash look), each expandable to the hearters' avatar fold, with a
+Date / Availability sort toggle (availability order: 🟢 dominates 🟡) and
+a pencil / unpencil control per row. It is a dashboard only — no
+discussion there; the conversation about when/where/who happens on the
+calendar page. The calendar page stays the shared schedule view; nothing
+moved off it yet (the trim is a later, deliberate step).
 
 **Schedule = pattern × terms.** Admins define weekly time cells ("Tue and
 Thu 19:00–21:00") and named date ranges ("Michaelmas, 29 Sep–12 Dec"); slots
@@ -200,19 +203,23 @@ information you share":
    painted once and inherited by every generated slot
 3. nothing shared → 🟡 (maybe)
 
-**Sessions.** Each slot carries zero-to-many bookings — one per location
-(2026-08-06) — each **a topic, or a
-host's "office hours"** (a typed topic-less session whose subject is the
-host; its display label is a forum setting, "Office hours" by default,
-never per-session free text) — plus a status: `empty` (open) → `proposed`
-(pencilled in, under discussion) → `confirmed` (happening; the URL points at
-the real event page, rendered as a "register" pill). Who may pencil/confirm
-is a forum setting expressed as two switches (hosts may pencil / hosts may
-confirm; both off = admins schedule everything). A host only ever acts on
-their own topic or their own office hours and never displaces another
-host's session — collisions stay conversations. Hosts can also propose
-off-piste slots at any time/location; those are born `proposed` and collect
-availability immediately.
+**Sessions.** A pencil is a **location-less time-intent** (2026-08-14):
+the host saying "I am available to run this at this time." Any number of
+subjects can pencil the same slot — the only exclusivity is one pencil per
+topic (and one office-hours pencil per host) per slot; locations no longer
+contend at pencil time (a slot's offered locations, and each booking's
+location, remain as display copy). Each booking is **a topic, or a host's
+"office hours"** (a typed topic-less session whose subject is the host;
+its display label is a forum setting, "Office hours" by default, never
+per-session free text) — plus a status: `proposed` (pencilled, under
+discussion) → `confirmed` (happening; the URL points at the real event
+page, rendered as a "register" pill). Who may pencil/confirm is a forum
+setting expressed as two switches (hosts may pencil / hosts may confirm;
+both off = admins schedule everything). A host only ever acts on their own
+topic or their own office hours and never displaces another host's session
+— collisions stay conversations, in the slot's open discussion thread.
+Hosts can also propose off-piste slots at any time; those are born
+`proposed` and collect availability immediately.
 
 **The calendar page** is a list of row washes (2026-08-05): each slot is
 one rounded block whose background carries the availability chart — three

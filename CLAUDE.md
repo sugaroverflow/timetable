@@ -131,11 +131,15 @@ Stable names for feature pieces, so instructions can reference them precisely.
   part of, batched per chain by the email's thread merge. All comment kinds
   suppress against `comment_seen` (engagement), not page watermarks.
 - **topic-workbench** — `TopicSchedulePanel.tsx` on My Topics cards
-  (published, calendar on): per-topic scheduling panel — the topic's
-  hearters' availability vs future slots (`topicSlotFit` query, lazy on
-  expand) as a sortable **best-dates table** with inline pencil-in. Part of
-  demand-first scheduling (2026-08-14): ❤️ implies "I'd attend" (never
-  stated in UI copy).
+  (published, calendar on): per-topic mini-calendar — the topic's hearters'
+  availability across future slots (`topicSlotFit` query, lazy on expand)
+  as washed rows (shared `CalendarRowWash.tsx`) with the avatar fold, a
+  Date/Availability sort toggle (🟢 dominates 🟡), and pencil/unpencil per
+  row. No discussion here — that's the calendar page. Part of demand-first
+  scheduling (2026-08-14): ❤️ implies "I'd attend" (never stated in UI
+  copy), and a **pencil is a location-less time-intent** — the host saying
+  "I am available at this time"; unique per slot+topic, locations never
+  contend (migration 0037).
 - **digest click-to-read** — `digest_sends` table + `stampDigestLinks`
   (api `email.ts`) + `DigestReadMarker` (app layout): every digest link
   carries `dg=<send id>`; one click marks that email's shown comment
