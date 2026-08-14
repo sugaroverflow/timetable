@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { createMemoryRateLimitStore } from "../http/rate-limit";
+
 import {
+  createTokenRequestBudget,
   extractApiToken,
   getUserFromApiToken,
   looksLikeApiToken,
@@ -104,5 +107,64 @@ describe("getUserFromApiToken", () => {
 
     await expect(getUserFromApiToken(SECRET)).resolves.toBeNull();
     expect(core.touchApiToken).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The bypass-proof half of per-token rate limiting (hardening pass adopting
+ * #273): the budget is charged AFTER the hash lookup succeeds, keyed by the
+ * token's row id. The pre-auth middleware buckets strictly by IP, so a fake
+ * `tpk_` string can neither mint a bucket nor dodge the IP limit.
+ */
+describe("per-token request budget", () => {
+  function trackedStore() {
+    const store = createMemoryRateLimitStore(60_000);
+    const keys: string[] = [];
+    return {
+      keys,
+      store: {
+        hit(key: string, now: number) {
+          keys.push(key);
+          return store.hit(key, now);
+        },
+      },
+    };
+  }
+
+  it("blocks an authenticated token once its budget is spent", async () => {
+    vi.mocked(core.findActiveApiToken).mockResolvedValue(found);
+    const budget = createTokenRequestBudget({
+      store: createMemoryRateLimitStore(60_000),
+      max: 2,
+    });
+
+    await expect(getUserFromApiToken(SECRET, budget)).resolves.not.toBeNull();
+    await expect(getUserFromApiToken(SECRET, budget)).resolves.not.toBeNull();
+    await expect(getUserFromApiToken(SECRET, budget)).rejects.toMatchObject({
+      message: expect.stringContaining("Rate limit reached for this token"),
+      extensions: expect.objectContaining({ code: "RATE_LIMITED" }),
+    });
+  });
+
+  it("keys the bucket by the token's row id, never the presented string", async () => {
+    vi.mocked(core.findActiveApiToken).mockResolvedValue(found);
+    const { keys, store } = trackedStore();
+
+    await getUserFromApiToken(SECRET, createTokenRequestBudget({ store }));
+
+    expect(keys).toHaveLength(1);
+    expect(keys[0]).toContain(":token-budget:token-1");
+    expect(keys[0]).not.toContain(SECRET);
+  });
+
+  it("never charges any bucket for a string that failed authentication", async () => {
+    vi.mocked(core.findActiveApiToken).mockResolvedValue(null);
+    const { keys, store } = trackedStore();
+
+    await expect(
+      getUserFromApiToken(SECRET, createTokenRequestBudget({ store })),
+    ).resolves.toBeNull();
+
+    expect(keys).toHaveLength(0);
   });
 });

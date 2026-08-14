@@ -117,18 +117,15 @@ export function rateLimit(opts: {
   max: number;
   keyPrefix?: string;
   store?: RateLimitStore;
-  /** Override what a request is bucketed by. Returning null falls back to the
-   * client IP. Used to bucket personal-API-token traffic by token instead:
-   * one token can't multiply its budget across IPs, and a shared NAT isn't
-   * starved by one member's script. */
-  clientKey?: (req: Request) => string | null;
 }): (req: Request, res: Response, next: NextFunction) => void {
   const store = opts.store ?? createMemoryRateLimitStore(opts.windowMs);
 
   return async (req, res, next) => {
     const now = Date.now();
-    const client =
-      opts.clientKey?.(req) || req.ip || req.socket.remoteAddress || "unknown";
+    // Always the client IP — never anything the client can vary at will
+    // (an Authorization header, say): a self-chosen key would let a caller
+    // mint a fresh bucket per request and sail past the limit.
+    const client = req.ip || req.socket.remoteAddress || "unknown";
     const key = `${opts.keyPrefix ?? "api"}:${client}`;
 
     try {
