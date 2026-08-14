@@ -1,63 +1,15 @@
 "use client";
 
-import { Tabs } from "@base-ui/react/tabs";
-import { CalendarDays, Lock, MessageCircle, Shield } from "lucide-react";
-
 import { countNested } from "@/lib/commentTree";
 import type { FeedComment, ManagedTopic } from "@/lib/feedTypes";
 import { pluralLabel, type RoleLabels } from "@/lib/timetableSettings";
 
-import { AdminCommentsBody } from "./AdminCommentsPanel";
+import { AdminCommentsBody, AdminCommentsPanel } from "./AdminCommentsPanel";
+import { CardSectionTabs, type CardSection } from "./CardSectionTabs";
 import { CommentComposer } from "./CommentComposer";
 import { CommentList } from "./CommentList";
 import { HostOnlyThreadBody } from "./HostOnlyPanel";
 import { TopicScheduleBody } from "./TopicSchedulePanel";
-
-/** The tab strip labels, count badges included. */
-function CardTabList({
-  publicCount,
-  hostCount,
-  hostHeartCount,
-  adminCount,
-  showHostTab,
-  showScheduleTab,
-  hostLabel,
-  adminsLabel,
-}: {
-  publicCount: number;
-  hostCount: number;
-  hostHeartCount: number;
-  adminCount: number;
-  showHostTab: boolean;
-  showScheduleTab: boolean;
-  hostLabel: string;
-  adminsLabel: string;
-}) {
-  return (
-    <Tabs.List className="card-tabs" aria-label="Topic sections">
-      <Tabs.Tab value="comments">
-        <MessageCircle size={13} aria-hidden /> Comments
-        {publicCount > 0 ? ` (${publicCount})` : ""}
-      </Tabs.Tab>
-      {showHostTab ? (
-        <Tabs.Tab value="host">
-          <Lock size={13} aria-hidden /> {hostLabel}-only
-          {hostCount > 0 ? ` (${hostCount})` : ""}
-          {hostHeartCount > 0 ? ` · 💙 ${hostHeartCount}` : ""}
-        </Tabs.Tab>
-      ) : null}
-      <Tabs.Tab value="admin" title={`Visible to you and ${adminsLabel} only`}>
-        <Shield size={13} aria-hidden /> {adminsLabel}
-        {adminCount > 0 ? ` (${adminCount})` : ""}
-      </Tabs.Tab>
-      {showScheduleTab ? (
-        <Tabs.Tab value="schedule">
-          <CalendarDays size={13} aria-hidden /> Scheduling
-        </Tabs.Tab>
-      ) : null}
-    </Tabs.List>
-  );
-}
 
 /** The public-comments pane: composer (published topics) + thread. */
 function PublicCommentsPane({
@@ -98,11 +50,115 @@ function PublicCommentsPane({
   );
 }
 
-/** topic-card-tabs (2026-08-14): the My Topics card's four sections —
- * public comments / {host}-only / drafting thread / scheduling — as one
- * horizontal tab strip instead of stacked collapsibles (Ed's round-3
- * feedback). Inactive panels stay unmounted (Base UI default), so the
- * Scheduling tab keeps its lazy fetch-on-first-open behaviour. */
+type SectionArgs = {
+  topic: ManagedTopic;
+  slug: string;
+  viewerId: string | null;
+  hostLabel: string;
+  adminLabel: string;
+  roleLabels?: RoleLabels;
+  calendarEnabled: boolean;
+  canPencilSessions: boolean;
+  publicComments: FeedComment[];
+  hostComments: FeedComment[];
+  adminComments: FeedComment[];
+  published: boolean;
+};
+
+function commentsSection(a: SectionArgs): CardSection | null {
+  const count = countNested(a.publicComments);
+  if (!a.published && count === 0) return null;
+  return {
+    value: "comments",
+    icon: "comments",
+    text: "Comments",
+    badge: count > 0 ? `(${count})` : undefined,
+    pane: (
+      <PublicCommentsPane
+        topicId={a.topic.id}
+        published={a.published}
+        comments={a.publicComments}
+        viewerId={a.viewerId}
+        slug={a.slug}
+        roleLabels={a.roleLabels}
+      />
+    ),
+  };
+}
+
+/** Same visibility rule as the old stacked HostOnlyPanel: the section
+ * earns its place when there is host-side content to show. */
+function hostSection(a: SectionArgs): CardSection | null {
+  const hostHearters = a.topic.hostHearters ?? null;
+  const count = countNested(a.hostComments);
+  const hearts = hostHearters?.length ?? 0;
+  if (count === 0 && hearts === 0) return null;
+  return {
+    value: "host",
+    icon: "host",
+    text: `${a.hostLabel}-only`,
+    badge:
+      [count > 0 ? `(${count})` : null, hearts > 0 ? `💙 ${hearts}` : null]
+        .filter(Boolean)
+        .join(" · ") || undefined,
+    pane: (
+      // No 💙 toggle on your own topic: read-only row.
+      <HostOnlyThreadBody
+        topicId={a.topic.id}
+        viewerId={a.viewerId}
+        comments={a.hostComments}
+        canModerate={false}
+        slug={a.slug}
+        hostLabel={a.hostLabel}
+        roleLabels={a.roleLabels}
+        hostHearters={hostHearters}
+      />
+    ),
+  };
+}
+
+function adminSection(a: SectionArgs): CardSection {
+  const count = countNested(a.adminComments);
+  return {
+    value: "admin",
+    icon: "admin",
+    text: pluralLabel(a.adminLabel),
+    badge: count > 0 ? `(${count})` : undefined,
+    pane: (
+      // Drafting thread with the admins (QA #59 round 3).
+      <AdminCommentsBody
+        topicId={a.topic.id}
+        viewerId={a.viewerId}
+        comments={a.adminComments}
+        canModerate={false}
+        slug={a.slug}
+        adminLabel={a.adminLabel}
+        roleLabels={a.roleLabels}
+      />
+    ),
+  };
+}
+
+function scheduleSection(a: SectionArgs): CardSection | null {
+  if (!a.calendarEnabled || !a.published) return null;
+  return {
+    value: "schedule",
+    icon: "schedule",
+    text: "Scheduling",
+    pane: (
+      <TopicScheduleBody
+        slug={a.slug}
+        topicId={a.topic.id}
+        canPencil={a.canPencilSessions}
+      />
+    ),
+  };
+}
+
+/** topic-card-tabs on My Topics (2026-08-14): public comments /
+ * {host}-only / drafting thread / Scheduling as one horizontal strip.
+ * With a single live section (e.g. a fresh submitted topic: drafting
+ * only) the card falls back to the pre-tabs presentation. */
 export function TopicCardTabs({
   topic,
   slug,
@@ -122,80 +178,42 @@ export function TopicCardTabs({
   calendarEnabled: boolean;
   canPencilSessions: boolean;
 }) {
-  const publicComments = topic.comments ?? [];
-  const hostComments = topic.hostOnlyComments ?? [];
-  const adminComments = topic.adminComments ?? [];
-  const hostHearters = topic.hostHearters ?? null;
-  const published = topic.status === "published";
-  const hostHeartCount = hostHearters?.length ?? 0;
-  const hostCount = countNested(hostComments);
-  // Same visibility rule as the old stacked HostOnlyPanel: the tab earns
-  // its place when there is host-side content to show.
-  const showHostTab = hostCount > 0 || hostHeartCount > 0;
-  const showScheduleTab = calendarEnabled && published;
+  const args: SectionArgs = {
+    topic,
+    slug,
+    viewerId,
+    hostLabel,
+    adminLabel,
+    roleLabels,
+    calendarEnabled,
+    canPencilSessions,
+    publicComments: topic.comments ?? [],
+    hostComments: topic.hostOnlyComments ?? [],
+    adminComments: topic.adminComments ?? [],
+    published: topic.status === "published",
+  };
+  const sections = [
+    commentsSection(args),
+    hostSection(args),
+    adminSection(args),
+    scheduleSection(args),
+  ].filter((s): s is CardSection => s !== null);
 
-  return (
-    <Tabs.Root defaultValue="comments">
-      <CardTabList
-        publicCount={countNested(publicComments)}
-        hostCount={hostCount}
-        hostHeartCount={hostHeartCount}
-        adminCount={countNested(adminComments)}
-        showHostTab={showHostTab}
-        showScheduleTab={showScheduleTab}
-        hostLabel={hostLabel}
-        adminsLabel={pluralLabel(adminLabel)}
+  // Single live section = the drafting thread (fresh submitted topic):
+  // fall back to the pre-tabs collapsible rather than a one-tab strip.
+  if (sections.length === 1 && sections[0]!.value === "admin") {
+    return (
+      <AdminCommentsPanel
+        topicId={topic.id}
+        viewerId={viewerId}
+        comments={args.adminComments}
+        canModerate={false}
+        slug={slug}
+        adminLabel={adminLabel}
+        roleLabels={roleLabels}
       />
+    );
+  }
 
-      <Tabs.Panel value="comments" className="card-tab-panel">
-        <PublicCommentsPane
-          topicId={topic.id}
-          published={published}
-          comments={publicComments}
-          viewerId={viewerId}
-          slug={slug}
-          roleLabels={roleLabels}
-        />
-      </Tabs.Panel>
-
-      {showHostTab ? (
-        <Tabs.Panel value="host" className="card-tab-panel">
-          {/* No 💙 toggle on your own topic: read-only row. */}
-          <HostOnlyThreadBody
-            topicId={topic.id}
-            viewerId={viewerId}
-            comments={hostComments}
-            canModerate={false}
-            slug={slug}
-            hostLabel={hostLabel}
-            roleLabels={roleLabels}
-            hostHearters={hostHearters}
-          />
-        </Tabs.Panel>
-      ) : null}
-
-      <Tabs.Panel value="admin" className="card-tab-panel">
-        {/* Drafting thread with the admins (QA #59 round 3). */}
-        <AdminCommentsBody
-          topicId={topic.id}
-          viewerId={viewerId}
-          comments={adminComments}
-          canModerate={false}
-          slug={slug}
-          adminLabel={adminLabel}
-          roleLabels={roleLabels}
-        />
-      </Tabs.Panel>
-
-      {showScheduleTab ? (
-        <Tabs.Panel value="schedule" className="card-tab-panel">
-          <TopicScheduleBody
-            slug={slug}
-            topicId={topic.id}
-            canPencil={canPencilSessions}
-          />
-        </Tabs.Panel>
-      ) : null}
-    </Tabs.Root>
-  );
+  return <CardSectionTabs sections={sections} />;
 }

@@ -1,8 +1,6 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Collapsible } from "@base-ui/react/collapsible";
-import { ChevronDown, ChevronRight, Lock } from "lucide-react";
 
 import { countNested } from "@/lib/commentTree";
 import type { FeedComment, HostHearter } from "@/lib/feedTypes";
@@ -154,70 +152,6 @@ export function HostOnlyThreadBody({
   );
 }
 
-/** Collapsible host-only comment thread with its own composer — separate
- * from the vote-breakdown panel (QA #42). Rendered only for hosts/admins. */
-export function HostOnlyPanel({
-  topicId,
-  comments,
-  canModerate,
-  viewerId = null,
-  slug,
-  hostLabel = "Host",
-  roleLabels,
-  hostHearters = null,
-  canHostHeart = false,
-  viewerHasHostHearted = false,
-}: {
-  topicId: string;
-  comments: FeedComment[];
-  canModerate: boolean;
-  viewerId?: string | null;
-  slug?: string;
-  hostLabel?: string;
-  roleLabels?: RoleLabels;
-  hostHearters?: HostHearter[] | null;
-  /** Eligible host-non-elector viewer — gets the 💙 toggle in the row. */
-  canHostHeart?: boolean;
-  viewerHasHostHearted?: boolean;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const count = countNested(comments);
-
-  return (
-    <Collapsible.Root
-      className="host-panel"
-      open={expanded}
-      onOpenChange={setExpanded}
-    >
-      <Collapsible.Trigger className="host-panel-toggle">
-        {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}{" "}
-        {expanded ? (
-          `Hide ${hostLabel}-only comments`
-        ) : (
-          <>
-            <Lock size={14} aria-hidden /> {hostLabel}-only comments ({count})
-            {hostHearters && hostHearters.length > 0 ? (
-              <> · 💙 {hostHearters.length}</>
-            ) : null}
-          </>
-        )}
-      </Collapsible.Trigger>
-      <Collapsible.Panel>
-        {expanded && (
-          <HostOnlyThreadBody
-            topicId={topicId}
-            comments={comments}
-            canModerate={canModerate}
-            viewerId={viewerId}
-            slug={slug}
-            hostLabel={hostLabel}
-            roleLabels={roleLabels}
-            hostHearters={hostHearters}
-            canHostHeart={canHostHeart}
-            viewerHasHostHearted={viewerHasHostHearted}
-          />
-        )}
-      </Collapsible.Panel>
-    </Collapsible.Root>
-  );
-}
+// The collapsible HostOnlyPanel wrapper was removed 2026-08-14: every
+// surface now reaches the thread through the card-section tabs
+// (CardSectionTabs) — HostOnlyThreadBody above is the whole export.
