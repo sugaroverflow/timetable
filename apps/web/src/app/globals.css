@@ -2504,7 +2504,7 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
   cursor: default;
   opacity: 0.6;
 }
-/* topic-topic-tabs (2026-08-14): the My Topics card's section strip —
+/* topic-tabs (2026-08-14): the My Topics card's tab strip —
    public comments / {host}-only / drafting / scheduling as horizontal
    tabs instead of stacked collapsibles. */
 /* One line, always (QA 2026-08-15): wrapped tabs read as a pile of

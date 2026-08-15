@@ -93,7 +93,7 @@ function HostHeartsActionsRow({
 
 /** The host-only thread's body — 💙 actions row (when hearters are
  * provided), composer, thread. Shared by the collapsible panel below and
- * the My Topics card tabs (topic-topic-tabs, 2026-08-14). */
+ * the My Topics card tabs (topic-tabs, 2026-08-14). */
 export function HostOnlyThreadBody({
   topicId,
   comments,
