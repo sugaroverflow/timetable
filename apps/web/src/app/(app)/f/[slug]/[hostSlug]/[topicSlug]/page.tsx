@@ -5,12 +5,11 @@ import { isHostCommentsEnabled, type Role } from "@timetable/shared";
 
 import { anonGql } from "@/lib/ogCard";
 
-import { AdminCommentsPanel } from "@/components/AdminCommentsPanel";
 import { MarkCommentsSeen } from "@/components/MarkCommentsSeen";
 import { TopicCard } from "@/components/TopicCard";
 import { topicPerms } from "@/lib/feedPage";
 import type { FeedTopic } from "@/lib/feedTypes";
-import { commentTree, TOPIC_FEED_FIELDS } from "@/lib/gqlFragments";
+import { TOPIC_FEED_FIELDS } from "@/lib/gqlFragments";
 import { gqlFetch } from "@/lib/graphql";
 import { displayRolesFromCookies } from "@/lib/previewRoles.server";
 import { parseTimetableSettings, roleLabel } from "@/lib/timetableSettings";
@@ -34,7 +33,6 @@ const QUERY = `
     timetableHosts: forumHosts(idOrSlug: $s) { id name }
     topicPermalink(idOrSlug: $s, topicSlug: $topic) {
       ${TOPIC_FEED_FIELDS}
-      ${commentTree("adminComments")}
     }
   }
 `;
@@ -94,37 +92,9 @@ function StatusBar({ status }: { status: string }) {
   );
 }
 
-/** The drafting thread, for the topic's owner and admins only — the API
- * already gates the data; this gates the chrome (QA 2026-07-28). */
-function DraftingThread({
-  topic,
-  slug,
-  viewerId,
-  canModerate,
-  adminLabel,
-  hostLabel,
-}: {
-  topic: FeedTopic;
-  slug: string;
-  viewerId: string | null;
-  canModerate: boolean;
-  adminLabel: string;
-  hostLabel: string;
-}) {
-  const isOwner = viewerId != null && viewerId === topic.hostId;
-  if (!canModerate && !isOwner) return null;
-  return (
-    <AdminCommentsPanel
-      topicId={topic.id}
-      comments={topic.adminComments ?? []}
-      canModerate={canModerate}
-      viewerId={viewerId}
-      slug={slug}
-      adminLabel={adminLabel}
-      hostLabel={hostLabel}
-    />
-  );
-}
+// The drafting thread was a collapsible panel below the card here until
+// 2026-08-15; it is now the card's own Admins tab, on every surface where
+// its people see the topic.
 
 export default async function TopicPermalinkPage({
   params,
@@ -142,8 +112,11 @@ export default async function TopicPermalinkPage({
     (data.timetable?.viewerRoles ?? []) as Role[],
   );
   const settings = parseTimetableSettings(data.timetable?.settings);
-  const perms = topicPerms(roles, topic.status);
   const viewerId = data.me?.id ?? null;
+  const perms = topicPerms(roles, topic.status, {
+    viewerId,
+    hostId: topic.hostId,
+  });
 
   return (
     // topic-permalink: here the topic title IS the page title, so it
@@ -163,14 +136,6 @@ export default async function TopicPermalinkPage({
         hosts={data.timetableHosts}
         discussionOpen
         hostCommentsEnabled={isHostCommentsEnabled(settings)}
-      />
-      <DraftingThread
-        topic={topic}
-        slug={slug}
-        viewerId={viewerId}
-        canModerate={perms.canModerate}
-        adminLabel={roleLabel(settings.roleLabels, "admin")}
-        hostLabel={roleLabel(settings.roleLabels, "host")}
       />
     </div>
   );

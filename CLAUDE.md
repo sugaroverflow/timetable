@@ -153,6 +153,12 @@ Stable names for feature pieces, so instructions can reference them precisely.
   the Comments tab is unconditional on feed cards — it carries the ❤️.
   Queue mode is the exception: its decision buttons stay above the strip
   (one call to action per card) and the Comments tab has no ❤️ row.
+  **Tabs never vanish** (Ed's rule, 2026-08-15): once a tab has appeared on
+  a topic it stays, so the drafting tab rides EVERY card its people see
+  (owner or admin; `adminComments` is in `TOPIC_FEED_FIELDS`, batched in
+  `decorateFeedTopics`, and the permalink's old DraftingThread panel is
+  gone), and the {host}-only tab shows from publication onward rather than
+  only when it has content.
 - **topic-workbench** — `TopicScheduleBody` in `TopicSchedulePanel.tsx`,
   the Scheduling tab of topic-card-tabs (published, calendar on): per-topic
   mini-calendar — the topic's hearters' availability across future slots

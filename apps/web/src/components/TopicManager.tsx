@@ -227,6 +227,7 @@ export function TopicManager({
   canPublishDirectly = false,
   calendarEnabled,
   canPencilSessions,
+  hostCommentsEnabled,
 }: {
   topic: ManagedTopic;
   slug: string;
@@ -241,6 +242,8 @@ export function TopicManager({
   calendarEnabled: boolean;
   /** False under confirmPolicy "admins": panel shows demand read-only. */
   canPencilSessions: boolean;
+  /** Forum option: without it there is no {host}-only tab at all. */
+  hostCommentsEnabled: boolean;
 }) {
   const permalink = permalinkFor(topic, slug);
   // Resolved forum labels, reshaped for the threads' author role pills.
@@ -304,6 +307,7 @@ export function TopicManager({
           adminLabel={adminLabel}
           roleLabels={roleLabels}
           calendarEnabled={calendarEnabled}
+          hostCommentsEnabled={hostCommentsEnabled}
           canPencilSessions={canPencilSessions}
         />
 

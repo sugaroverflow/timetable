@@ -2235,6 +2235,120 @@ describe("createApiApp", () => {
     });
   });
 
+  describe("feed adminComments (drafting tab, 2026-08-15)", () => {
+    const QUERY = `query($s: String!){
+      topicFeed(idOrSlug: $s) { id adminComments { id body } }
+    }`;
+
+    function feedTopic(hostId: string): core.FeedTopic {
+      return {
+        id: "22222222-2222-2222-2222-222222222222",
+        timetableId: "11111111-1111-1111-1111-111111111111",
+        hostId,
+        hostName: null,
+        hostImage: null,
+        hostSlug: null,
+        title: "A topic",
+        slug: "a-topic",
+        bodyMd: "",
+        coverImageUrl: null,
+        status: "published",
+        publishedAt: new Date("2026-08-01T00:00:00.000Z"),
+        contentUpdatedAt: null,
+        createdAt: new Date("2026-07-01T00:00:00.000Z"),
+        heartCount: 0,
+        weightedScore: 0,
+        l2Score: 0,
+        devotionScore: 0,
+        viewerHasHearted: false,
+        commentCount: 0,
+        latestCommentAt: null,
+        viewerCommentsSeenAt: null,
+      };
+    }
+
+    function draftingNode(): core.CommentNode {
+      return {
+        id: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+        parentId: null,
+        authorId: "admin-1",
+        authorName: null,
+        authorImage: null,
+        authorRoles: ["admin"],
+        body: "Needs a sharper title",
+        visibility: "admin_only",
+        hidden: false,
+        deleted: false,
+        editedAt: null,
+        createdAt: new Date("2026-08-02T00:00:00.000Z"),
+        replies: [],
+      };
+    }
+
+    async function request(baseUrl: string) {
+      const res = await fetch(`${baseUrl}/graphql`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: QUERY, variables: { s: "public" } }),
+      });
+      return (await res.json()) as {
+        data?: { topicFeed: { id: string; adminComments: unknown[] }[] };
+        errors?: unknown[];
+      };
+    }
+
+    it("serves the owner their own drafting thread, batched", async () => {
+      const topic = feedTopic("host-1");
+      // host + elector, so the 💙 prefetch (a separate batched query with
+      // its own coverage) stays out of this test's way.
+      mockSession("host-1", ["host", "elector"]);
+      vi.mocked(core.getReadableTimetable).mockResolvedValue({
+        timetable: timetableFixture(),
+        roles: ["host", "elector"],
+      });
+      vi.mocked(core.buildFeed).mockResolvedValue([topic]);
+      vi.mocked(core.listCommentTreesForTopics).mockResolvedValue(
+        new Map([[topic.id, [draftingNode()]]]),
+      );
+
+      await withTestServer(async (baseUrl) => {
+        const body = await request(baseUrl);
+        expect(body.errors).toBeUndefined();
+        expect(body.data?.topicFeed[0]?.adminComments).toHaveLength(1);
+        // One batched call for the page, not one query per card.
+        expect(core.listCommentTreesForTopics).toHaveBeenCalledWith(
+          [topic.id],
+          {
+            includeHostOnly: false,
+            includeAdminOnly: true,
+            includeHidden: false,
+          },
+        );
+      });
+    });
+
+    it("gives another host nothing, and never asks the database", async () => {
+      const topic = feedTopic("someone-else");
+      mockSession("host-2", ["host", "elector"]);
+      vi.mocked(core.getReadableTimetable).mockResolvedValue({
+        timetable: timetableFixture(),
+        roles: ["host", "elector"],
+      });
+      vi.mocked(core.buildFeed).mockResolvedValue([topic]);
+      vi.mocked(core.listCommentTreesForTopics).mockResolvedValue(new Map());
+
+      await withTestServer(async (baseUrl) => {
+        const body = await request(baseUrl);
+        expect(body.errors).toBeUndefined();
+        expect(body.data?.topicFeed[0]?.adminComments).toEqual([]);
+        expect(core.listCommentTreesForTopics).not.toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ includeAdminOnly: true }),
+        );
+      });
+    });
+  });
+
   describe("addSlotSession (location-less pencils, 2026-08-14)", () => {
     const PENCIL = `mutation($slot: String!, $topic: String!){
       addSlotSession(slotId: $slot, topicId: $topic)

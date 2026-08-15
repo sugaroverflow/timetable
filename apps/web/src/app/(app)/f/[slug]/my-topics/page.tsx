@@ -4,6 +4,7 @@ import {
   isAdmin,
   isCalendarEnabled,
   isHost,
+  isHostCommentsEnabled,
   type Role,
 } from "@timetable/shared";
 
@@ -125,6 +126,7 @@ export default async function MyTopicsPage({
                 )}
                 calendarEnabled={calendarOn}
                 canPencilSessions={canPencil}
+                hostCommentsEnabled={isHostCommentsEnabled(settings)}
               />
             ))}
           </ul>

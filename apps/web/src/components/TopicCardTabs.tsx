@@ -59,6 +59,7 @@ type SectionArgs = {
   roleLabels?: RoleLabels;
   calendarEnabled: boolean;
   canPencilSessions: boolean;
+  hostCommentsEnabled: boolean;
   publicComments: FeedComment[];
   hostComments: FeedComment[];
   adminComments: FeedComment[];
@@ -86,13 +87,17 @@ function commentsSection(a: SectionArgs): CardSection | null {
   };
 }
 
-/** Same visibility rule as the old stacked HostOnlyPanel: the section
- * earns its place when there is host-side content to show. */
+/** From publication onward (Ed, QA 2026-08-15) — the same rule the feed
+ * card uses, so a host's topic doesn't wear different tabs on different
+ * pages, and so the host can START a faculty conversation rather than only
+ * reply to one. Kept for an unpublished topic that already has content, on
+ * the principle that a tab you have seen must not vanish. */
 function hostSection(a: SectionArgs): CardSection | null {
   const hostHearters = a.topic.hostHearters ?? null;
   const count = countNested(a.hostComments);
   const hearts = hostHearters?.length ?? 0;
-  if (count === 0 && hearts === 0) return null;
+  if (!a.hostCommentsEnabled) return null;
+  if (!a.published && count === 0 && hearts === 0) return null;
   return {
     value: "host",
     icon: "host",
@@ -168,6 +173,7 @@ export function TopicCardTabs({
   roleLabels,
   calendarEnabled,
   canPencilSessions,
+  hostCommentsEnabled,
 }: {
   topic: ManagedTopic;
   slug: string;
@@ -177,6 +183,7 @@ export function TopicCardTabs({
   roleLabels?: RoleLabels;
   calendarEnabled: boolean;
   canPencilSessions: boolean;
+  hostCommentsEnabled: boolean;
 }) {
   const args: SectionArgs = {
     topic,
@@ -187,6 +194,7 @@ export function TopicCardTabs({
     roleLabels,
     calendarEnabled,
     canPencilSessions,
+    hostCommentsEnabled,
     publicComments: topic.comments ?? [],
     hostComments: topic.hostOnlyComments ?? [],
     adminComments: topic.adminComments ?? [],
