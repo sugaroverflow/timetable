@@ -101,6 +101,9 @@ export type ManagedTopic = {
   hostImage?: string | null;
   /** Public thread — My Topics renders feed-identical cards (QA #59). */
   comments?: FeedComment[];
+  /** The viewer's comments-seen watermark, for the card's comment-teaser
+   * (My Topics teases like the feed, 2026-08-16). */
+  viewerCommentsSeenAt?: string | null;
   /** Faculty-only thread on published topics. */
   hostOnlyComments?: FeedComment[];
   /** 💙s received — the host-only box shows them to the topic's owner on

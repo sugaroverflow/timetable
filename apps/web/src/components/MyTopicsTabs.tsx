@@ -5,17 +5,23 @@ import type { FeedComment, ManagedTopic } from "@/lib/feedTypes";
 import { pluralLabel, type RoleLabels } from "@/lib/timetableSettings";
 
 import { AdminCommentsBody, AdminCommentsPanel } from "./AdminCommentsPanel";
-import { TopicTabs, type TopicTab } from "./TopicTabs";
 import { CommentComposer } from "./CommentComposer";
 import { CommentList } from "./CommentList";
+import { CommentsOpenScope } from "./CommentsOpenScope";
+import { CommentTeaser } from "./CommentTeaser";
 import { HostOnlyThreadBody } from "./HostOnlyPanel";
 import { TopicScheduleBody } from "./TopicSchedulePanel";
+import { TopicTabs, type TopicTab } from "./TopicTabs";
 
-/** The public-comments pane: composer (published topics) + thread. */
+/** The public-comments pane: composer (published topics) + thread behind
+ * the comment-teaser, exactly as a feed card does it (Ed, QA 2026-08-16 —
+ * My Topics used to open the whole thread). A host's own dashboard is as
+ * much a scrolling list as the feed is. */
 function PublicCommentsPane({
   topicId,
   published,
   comments,
+  seenAt,
   viewerId,
   slug,
   roleLabels,
@@ -23,6 +29,7 @@ function PublicCommentsPane({
   topicId: string;
   published: boolean;
   comments: FeedComment[];
+  seenAt: string | null;
   viewerId: string | null;
   slug: string;
   roleLabels?: RoleLabels;
@@ -33,14 +40,16 @@ function PublicCommentsPane({
         <CommentComposer topicId={topicId} mentionSlug={slug} />
       ) : null}
       {comments.length > 0 ? (
-        <CommentList
-          comments={comments}
-          canReply={true}
-          canModerate={false}
-          viewerId={viewerId}
-          slug={slug}
-          roleLabels={roleLabels}
-        />
+        <CommentTeaser topicId={topicId} comments={comments} seenAt={seenAt}>
+          <CommentList
+            comments={comments}
+            canReply={true}
+            canModerate={false}
+            viewerId={viewerId}
+            slug={slug}
+            roleLabels={roleLabels}
+          />
+        </CommentTeaser>
       ) : (
         <div className="faint" style={{ fontSize: 12 }}>
           No comments yet.
@@ -79,6 +88,7 @@ function commentsTab(a: TabArgs): TopicTab | null {
         topicId={a.topic.id}
         published={a.published}
         comments={a.publicComments}
+        seenAt={a.topic.viewerCommentsSeenAt ?? null}
         viewerId={a.viewerId}
         slug={a.slug}
         roleLabels={a.roleLabels}
@@ -207,8 +217,8 @@ export function MyTopicsTabs({
     schedulingTab(args),
   ].filter((s): s is TopicTab => s !== null);
 
-  // Single live section = the drafting thread (fresh submitted topic):
-  // fall back to the pre-tabs collapsible rather than a one-tab strip.
+  // Single live tab = the drafting thread (fresh submitted topic): fall
+  // back to the pre-tabs collapsible rather than a one-tab strip.
   if (tabs.length === 1 && tabs[0]!.value === "admin") {
     return (
       <AdminCommentsPanel
@@ -223,5 +233,11 @@ export function MyTopicsTabs({
     );
   }
 
-  return <TopicTabs tabs={tabs} />;
+  // The scope is what makes posting a comment unfold the teaser you just
+  // posted into — the same wiring feed cards have (2026-08-16).
+  return (
+    <CommentsOpenScope>
+      <TopicTabs tabs={tabs} />
+    </CommentsOpenScope>
+  );
 }
