@@ -93,7 +93,7 @@ function HostHeartsActionsRow({
 
 /** The host-only thread's body — 💙 actions row (when hearters are
  * provided), composer, thread. Shared by the collapsible panel below and
- * the My Topics card tabs (topic-card-tabs, 2026-08-14). */
+ * the My Topics card tabs (topic-tabs, 2026-08-14). */
 export function HostOnlyThreadBody({
   topicId,
   comments,
@@ -153,5 +153,5 @@ export function HostOnlyThreadBody({
 }
 
 // The collapsible HostOnlyPanel wrapper was removed 2026-08-14: every
-// surface now reaches the thread through the card-section tabs
-// (CardSectionTabs) — HostOnlyThreadBody above is the whole export.
+// surface now reaches the thread through the topic-tabs
+// (TopicTabs) — HostOnlyThreadBody above is the whole export.

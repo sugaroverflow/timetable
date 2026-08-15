@@ -7,7 +7,7 @@ import { AdminTopicActions } from "@/components/AdminTopicActions";
 import { CollapsibleTopicBody } from "@/components/CollapsibleTopicBody";
 import { ReadySwitch } from "@/components/ReadySwitch";
 import { TopicEditScope, useTopicEditing } from "@/components/TopicEditScope";
-import { TopicCardTabs } from "@/components/TopicCardTabs";
+import { MyTopicsTabs } from "@/components/MyTopicsTabs";
 import type { ManagedTopic } from "@/lib/feedTypes";
 import { topicPath } from "@/lib/topicPath";
 import { useGqlAction } from "@/lib/useGqlAction";
@@ -213,7 +213,7 @@ function permalinkFor(topic: ManagedTopic, slug: string): string | null {
 }
 
 /** A topic on My Topics — renders like a feed card (cover, description;
- * QA #59) with the topic-card-tabs section strip and the manage controls
+ * QA #59) with the topic-tabs strip and the manage controls
  * below. */
 export function TopicManager({
   topic,
@@ -297,9 +297,9 @@ export function TopicManager({
           </>
         }
       >
-        {/* topic-card-tabs (2026-08-14): public comments / {host}-only /
+        {/* topic-tabs (2026-08-14): public comments / {host}-only /
             drafting thread / scheduling as one horizontal tab strip. */}
-        <TopicCardTabs
+        <MyTopicsTabs
           topic={topic}
           slug={slug}
           viewerId={viewerId}

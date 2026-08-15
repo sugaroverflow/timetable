@@ -5,7 +5,7 @@ import type { FeedComment, ManagedTopic } from "@/lib/feedTypes";
 import { pluralLabel, type RoleLabels } from "@/lib/timetableSettings";
 
 import { AdminCommentsBody, AdminCommentsPanel } from "./AdminCommentsPanel";
-import { CardSectionTabs, type CardSection } from "./CardSectionTabs";
+import { TopicTabs, type TopicTab } from "./TopicTabs";
 import { CommentComposer } from "./CommentComposer";
 import { CommentList } from "./CommentList";
 import { HostOnlyThreadBody } from "./HostOnlyPanel";
@@ -50,7 +50,7 @@ function PublicCommentsPane({
   );
 }
 
-type SectionArgs = {
+type TabArgs = {
   topic: ManagedTopic;
   slug: string;
   viewerId: string | null;
@@ -66,7 +66,7 @@ type SectionArgs = {
   published: boolean;
 };
 
-function commentsSection(a: SectionArgs): CardSection | null {
+function commentsTab(a: TabArgs): TopicTab | null {
   const count = countNested(a.publicComments);
   if (!a.published && count === 0) return null;
   return {
@@ -92,7 +92,7 @@ function commentsSection(a: SectionArgs): CardSection | null {
  * pages, and so the host can START a faculty conversation rather than only
  * reply to one. Kept for an unpublished topic that already has content, on
  * the principle that a tab you have seen must not vanish. */
-function hostSection(a: SectionArgs): CardSection | null {
+function hostTab(a: TabArgs): TopicTab | null {
   const hostHearters = a.topic.hostHearters ?? null;
   const count = countNested(a.hostComments);
   const hearts = hostHearters?.length ?? 0;
@@ -122,7 +122,7 @@ function hostSection(a: SectionArgs): CardSection | null {
   };
 }
 
-function adminSection(a: SectionArgs): CardSection {
+function adminTab(a: TabArgs): TopicTab {
   const count = countNested(a.adminComments);
   return {
     value: "admin",
@@ -144,7 +144,7 @@ function adminSection(a: SectionArgs): CardSection {
   };
 }
 
-function scheduleSection(a: SectionArgs): CardSection | null {
+function schedulingTab(a: TabArgs): TopicTab | null {
   if (!a.calendarEnabled || !a.published) return null;
   return {
     value: "schedule",
@@ -160,11 +160,11 @@ function scheduleSection(a: SectionArgs): CardSection | null {
   };
 }
 
-/** topic-card-tabs on My Topics (2026-08-14): public comments /
+/** topic-tabs on My Topics (2026-08-14): public comments /
  * {host}-only / drafting thread / Scheduling as one horizontal strip.
  * With a single live section (e.g. a fresh submitted topic: drafting
  * only) the card falls back to the pre-tabs presentation. */
-export function TopicCardTabs({
+export function MyTopicsTabs({
   topic,
   slug,
   viewerId,
@@ -185,7 +185,7 @@ export function TopicCardTabs({
   canPencilSessions: boolean;
   hostCommentsEnabled: boolean;
 }) {
-  const args: SectionArgs = {
+  const args: TabArgs = {
     topic,
     slug,
     viewerId,
@@ -200,16 +200,16 @@ export function TopicCardTabs({
     adminComments: topic.adminComments ?? [],
     published: topic.status === "published",
   };
-  const sections = [
-    commentsSection(args),
-    hostSection(args),
-    adminSection(args),
-    scheduleSection(args),
-  ].filter((s): s is CardSection => s !== null);
+  const tabs = [
+    commentsTab(args),
+    hostTab(args),
+    adminTab(args),
+    schedulingTab(args),
+  ].filter((s): s is TopicTab => s !== null);
 
   // Single live section = the drafting thread (fresh submitted topic):
   // fall back to the pre-tabs collapsible rather than a one-tab strip.
-  if (sections.length === 1 && sections[0]!.value === "admin") {
+  if (tabs.length === 1 && tabs[0]!.value === "admin") {
     return (
       <AdminCommentsPanel
         topicId={topic.id}
@@ -223,5 +223,5 @@ export function TopicCardTabs({
     );
   }
 
-  return <CardSectionTabs sections={sections} />;
+  return <TopicTabs tabs={tabs} />;
 }

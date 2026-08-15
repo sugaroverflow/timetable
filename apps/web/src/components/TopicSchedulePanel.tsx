@@ -91,7 +91,7 @@ function onInteractive(e: { target: EventTarget | null }): boolean {
  * rows group under month headings with week gaps, exactly like the
  * calendar page (past slots are excluded server-side); by availability
  * the list is flat and ranked. A dashboard only — no comments here.
- * Rendered inside the topic-card-tabs Scheduling tab. */
+ * Rendered inside the topic-tabs Scheduling tab. */
 export function TopicScheduleBody({
   slug,
   topicId,

@@ -2504,7 +2504,7 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
   cursor: default;
   opacity: 0.6;
 }
-/* topic-card-tabs (2026-08-14): the My Topics card's section strip —
+/* topic-tabs (2026-08-14): the My Topics card's tab strip —
    public comments / {host}-only / drafting / scheduling as horizontal
    tabs instead of stacked collapsibles. */
 /* One line, always (QA 2026-08-15): wrapped tabs read as a pile of
@@ -2513,7 +2513,7 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
    says what it is), which Ed prefers to sideways scrolling. Overflow stays
    scrollable as a silent last resort, with the `local`/`scroll` background
    trick showing an edge shadow only when something really is cut off. */
-.card-tabs {
+.topic-tabs {
   display: flex;
   flex-wrap: nowrap;
   gap: 2px;
@@ -2542,10 +2542,10 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
       )
       right / 12px 100% no-repeat scroll;
 }
-.card-tabs::-webkit-scrollbar {
+.topic-tabs::-webkit-scrollbar {
   display: none;
 }
-.card-tabs button {
+.topic-tabs button {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -2559,14 +2559,14 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
   cursor: pointer;
   white-space: nowrap;
 }
-.card-tabs button:hover {
+.topic-tabs button:hover {
   color: var(--ink);
 }
-.card-tabs button[aria-selected="true"] {
+.topic-tabs button[aria-selected="true"] {
   color: var(--ink);
   border-bottom-color: var(--ink);
 }
-.card-tab-panel {
+.topic-tab-panel {
   padding-top: 10px;
 }
 /* The strip's own bottom rule IS the divider above whatever leads the
@@ -2574,13 +2574,13 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
    doubled line (QA 2026-08-15). Rules FURTHER down the pane (the actions
    row's divider above the comments, say) are real dividers and stay.
    Untabbed cards (one section, rendered bare) keep theirs too. */
-.card-tab-panel
+.topic-tab-panel
   > :is(.card-actions, .comment-section, .host-thread):first-child {
   border-top: 0;
   padding-top: 0;
 }
 @media (max-width: 480px) {
-  .card-tabs button {
+  .topic-tabs button {
     padding: 7px 8px;
   }
 }
@@ -2588,7 +2588,7 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
    or more (two always fit). Clipped rather than `display: none` so the
    label stays in the accessible name (QA 2026-08-15). */
 @media (max-width: 640px) {
-  .card-tabs:has(button:nth-child(3)) button[aria-selected="false"] .tab-text {
+  .topic-tabs:has(button:nth-child(3)) button[aria-selected="false"] .tab-text {
     position: absolute;
     width: 1px;
     height: 1px;

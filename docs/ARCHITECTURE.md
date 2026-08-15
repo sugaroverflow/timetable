@@ -107,9 +107,9 @@ Codex/agent workflows are separate from the app runtime.
 - person pages at `/f/[slug]/[userSlug]` (per-forum member profiles; a
   userId segment canonically redirects to the member's slug)
 - My Topics (feed-identical cards + manage controls, TipTap editor; admins
-  can create a topic on behalf of another host; each card's sections —
+  can create a topic on behalf of another host; each card’s tabs —
   public comments / host-only / drafting / Scheduling — are one horizontal
-  tab strip (`TopicCardTabs`, 2026-08-14); the Scheduling tab is the
+  tab strip (topic-tabs: `MyTopicsTabs`, 2026-08-14); the Scheduling tab is the
   topic-workbench — a lazy per-topic mini-calendar: hearters' availability
   across future slots as washed rows (shared `CalendarRowWash` pieces,
   month headings + week gaps by date) with the avatar fold, a
