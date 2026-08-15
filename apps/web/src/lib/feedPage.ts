@@ -80,6 +80,10 @@ function isTopicNew(topic: FeedTopic, lastSeenAt: string | null): boolean {
 export function topicPerms(
   roles: Role[],
   status: FeedTopic["status"],
+  /** The drafting thread is the topic owner's private line to the admins,
+   * so its tab needs to know whose topic this is (topic-tabs, 2026-08-15).
+   * Omitted (permalink's own call passes them) means "not the owner". */
+  ownership?: { viewerId: string | null; hostId: string },
 ): FeedPerms {
   const published = status === "published";
   return {
@@ -90,6 +94,14 @@ export function topicPerms(
     canComment: roles.length > 0 && published,
     canHostOnly: isHost(roles) || isAdmin(roles),
     canModerate: isAdmin(roles),
+    // Once a tab appears on a topic it should never vanish (Ed, QA
+    // 2026-08-15) — so the drafting thread rides every surface where its
+    // people see the topic, not just My Topics and the permalink.
+    canSeeAdminThread:
+      isAdmin(roles) ||
+      (ownership != null &&
+        ownership.viewerId != null &&
+        ownership.viewerId === ownership.hostId),
     // The sessions tab's inline 🟢🟡🔴 toggle — the elector's existing
     // per-slot calendar write, re-homed (sessions tab, 2026-08-14). Same
     // gate as the calendar page's own toggle.
@@ -116,7 +128,10 @@ export type FeedPage = {
 export function topicCardProps(page: FeedPage, topic: FeedTopic) {
   return {
     topic,
-    perms: topicPerms(page.roles, topic.status),
+    perms: topicPerms(page.roles, topic.status, {
+      viewerId: page.viewerId,
+      hostId: topic.hostId,
+    }),
     slug: page.slug,
     viewerId: page.viewerId,
     isNew: isTopicNew(topic, page.lastSeenAt),

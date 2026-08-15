@@ -33,7 +33,11 @@ export const MANAGED_TOPIC_FIELDS = `
  * page — everything a TopicCard renders. The feed additionally selects
  * contentUpdatedAt for its "new since last visit" highlights. The per-elector
  * weightedBreakdown is deliberately NOT selected here: BreakdownToggle
- * fetches it lazily on first expand (it costs ~4 queries per topic). */
+ * fetches it lazily on first expand (it costs ~4 queries per topic).
+ * adminComments IS selected (topic-tabs' drafting tab, 2026-08-15) — two
+ * trees put this fragment at ~230 of GRAPHQL_MAX_COST (500); the API
+ * returns [] to everyone but the topic's owner and admins, and batches the
+ * fetch for those. */
 export const TOPIC_FEED_FIELDS = `
   id hostId hostName hostImage hostSlug title slug bodyMd bodyHtml coverImageUrl status
   heartCount weightedScore viewerHasHearted commentCount viewerCommentsSeenAt
@@ -41,4 +45,5 @@ export const TOPIC_FEED_FIELDS = `
   sessionSlotCount
   publishedAt createdAt
   ${commentTree()}
+  ${commentTree("adminComments")}
 `;

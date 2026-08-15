@@ -85,6 +85,11 @@ type GqlTopic = FeedTopic & {
    * (topicFeed); single-topic paths leave it unset and the field resolver
    * falls back to a per-topic query. */
   prefetchedComments?: CommentNode[];
+  /** The drafting thread, batch-prefetched the same way for the viewers
+   * entitled to it (their own topics, or all of them for an admin) — the
+   * topic-tabs Admins tab now rides every card, so the per-topic fallback
+   * would be an N+1 across a feed page (2026-08-15). Unset = fall back. */
+  prefetchedAdminComments?: CommentNode[];
   /** Future slots where this topic is pencilled/confirmed (sessions tab,
    * 2026-08-14) — batch-attached like viewerHasHostHearted; unset (feeds
    * that never attach it, calendar off) serves as 0. */
@@ -222,6 +227,7 @@ const TopicType = builder.objectRef<GqlTopic>("Topic").implement({
       type: [CommentType],
       resolve: async (tp, _args, ctx) => {
         if (!(tp.canModerate || ctx.user?.id === tp.hostId)) return [];
+        if (tp.prefetchedAdminComments) return tp.prefetchedAdminComments;
         const tree = await listCommentTree(tp.id, {
           includeHostOnly: false,
           includeAdminOnly: true,
@@ -429,6 +435,22 @@ async function decorateFeedTopics(
         includeHidden: flags.canModerate,
       })
     : new Map<string, CommentNode[]>();
+  // The drafting thread rides every card as a tab now (2026-08-15), so
+  // prefetch it in the same batched shape — but only when the viewer is
+  // entitled to any of it: an admin, or a host with topics on this page.
+  const adminThreadIds = new Set(
+    flags.canModerate
+      ? topicIds
+      : feed.filter((tp) => tp.hostId === viewerUserId).map((tp) => tp.id),
+  );
+  const adminTrees =
+    adminThreadIds.size > 0
+      ? await listCommentTreesForTopics([...adminThreadIds], {
+          includeHostOnly: false,
+          includeAdminOnly: true,
+          includeHidden: false,
+        })
+      : new Map<string, CommentNode[]>();
   const viewerHostHearted = await viewerHostHeartedSet(
     viewerUserId,
     viewer,
@@ -442,6 +464,13 @@ async function decorateFeedTopics(
     ...flags,
     viewerHasHostHearted: viewerHostHearted.has(tp.id),
     prefetchedComments: commentTrees.get(tp.id) ?? [],
+    // Only for the topics this viewer may see it on — everyone else keeps
+    // it unset, and the field resolver's own gate returns [] anyway.
+    prefetchedAdminComments: adminThreadIds.has(tp.id)
+      ? (adminTrees.get(tp.id) ?? []).filter(
+          (c) => c.visibility === "admin_only",
+        )
+      : undefined,
     sessionSlotCount: sessionSlotCounts.get(tp.id) ?? 0,
   }));
 }

@@ -2,10 +2,11 @@ import Link from "next/link";
 
 import type { FeedTopic } from "@/lib/feedTypes";
 import { topicPath } from "@/lib/topicPath";
-import type { RoleLabels } from "@/lib/timetableSettings";
+import { pluralLabel, type RoleLabels } from "@/lib/timetableSettings";
 
 import { countNested } from "@/lib/commentTree";
 
+import { AdminCommentsBody } from "./AdminCommentsPanel";
 import { AdminTopicActions } from "./AdminTopicActions";
 import { Avatar } from "./Avatar";
 import { CardSectionTabs, type CardSection } from "./CardSectionTabs";
@@ -28,6 +29,8 @@ export type FeedPerms = {
   canComment: boolean;
   canHostOnly: boolean;
   canModerate: boolean;
+  /** The drafting thread's tab: the topic's own host, or any admin. */
+  canSeeAdminThread: boolean;
   /** Electors only: the sessions tab's inline 🟢🟡🔴 toggle — their
    * existing per-slot calendar write, re-homed (2026-08-14). */
   canSetAvailability: boolean;
@@ -223,19 +226,7 @@ function CommentSection({
  * leading the {host}-only tab — so a viewer meets exactly one action bar
  * at a time, and its 💬 count is unambiguously that thread's. This is why
  * the Comments tab is unconditional: it carries the ❤️. */
-function buildFeedSections({
-  topic,
-  perms,
-  slug,
-  publicComments,
-  hostComments,
-  discussionOpen,
-  viewerId,
-  hostLabel,
-  roleLabels,
-  hostCommentsEnabled,
-  actionsRow,
-}: {
+type SectionArgs = {
   topic: FeedTopic;
   perms: FeedPerms;
   slug: string;
@@ -244,83 +235,124 @@ function buildFeedSections({
   discussionOpen: boolean;
   viewerId: string | null;
   hostLabel: string;
+  adminLabel: string;
   roleLabels: RoleLabels;
   hostCommentsEnabled: boolean;
   /** The ❤️ row — null in queue mode, where the decision buttons stand
    * above the strip as the card's one call to action. */
   actionsRow: React.ReactNode;
-}): CardSection[] {
-  const sections: CardSection[] = [];
-  const publicCount = countNested(publicComments);
-  sections.push({
+};
+
+/** Unconditional: it carries the ❤️ row, so every card has it. */
+function commentsSection(a: SectionArgs): CardSection {
+  const count = countNested(a.publicComments);
+  return {
     value: "comments",
     icon: "comments",
     text: "Comments",
-    badge: publicCount > 0 ? `(${publicCount})` : undefined,
+    badge: count > 0 ? `(${count})` : undefined,
     pane: (
       <>
-        {actionsRow}
+        {a.actionsRow}
         <CommentSection
-          topic={topic}
-          perms={perms}
-          slug={slug}
-          publicComments={publicComments}
-          open={discussionOpen}
-          viewerId={viewerId}
-          roleLabels={roleLabels}
+          topic={a.topic}
+          perms={a.perms}
+          slug={a.slug}
+          publicComments={a.publicComments}
+          open={a.discussionOpen}
+          viewerId={a.viewerId}
+          roleLabels={a.roleLabels}
         />
       </>
     ),
-  });
-  if (perms.canHostOnly && hostCommentsEnabled) {
-    const hostCount = countNested(hostComments);
-    const heartCount = topic.hostHearters?.length ?? 0;
-    sections.push({
-      value: "host",
-      icon: "host",
-      text: `${hostLabel}-only`,
-      badge:
-        [
-          hostCount > 0 ? `(${hostCount})` : null,
-          heartCount > 0 ? `💙 ${heartCount}` : null,
-        ]
-          .filter(Boolean)
-          .join(" · ") || undefined,
-      pane: (
-        <HostOnlyThreadBody
-          topicId={topic.id}
-          comments={hostComments}
-          canModerate={perms.canModerate}
-          viewerId={viewerId}
-          slug={slug}
-          hostLabel={hostLabel}
-          roleLabels={roleLabels}
-          hostHearters={topic.hostHearters}
-          canHostHeart={perms.canHostHeart}
-          viewerHasHostHearted={topic.viewerHasHostHearted}
-        />
-      ),
-    });
-  }
-  // sessions-tab (2026-08-14): where this topic is pencilled/confirmed on
-  // future slots — for every viewer of the card (sessions are public on
-  // the calendar page); the inline availability toggle is elector-only.
-  if (topic.sessionSlotCount > 0) {
-    sections.push({
-      value: "schedule",
-      icon: "schedule",
-      text: "Sessions",
-      badge: `(${topic.sessionSlotCount})`,
-      pane: (
-        <SessionsTabBody
-          slug={slug}
-          topicId={topic.id}
-          canSetAvailability={perms.canSetAvailability}
-        />
-      ),
-    });
-  }
-  return sections;
+  };
+}
+
+function hostSection(a: SectionArgs): CardSection | null {
+  if (!a.perms.canHostOnly || !a.hostCommentsEnabled) return null;
+  const count = countNested(a.hostComments);
+  const hearts = a.topic.hostHearters?.length ?? 0;
+  return {
+    value: "host",
+    icon: "host",
+    text: `${a.hostLabel}-only`,
+    badge:
+      [count > 0 ? `(${count})` : null, hearts > 0 ? `💙 ${hearts}` : null]
+        .filter(Boolean)
+        .join(" · ") || undefined,
+    pane: (
+      <HostOnlyThreadBody
+        topicId={a.topic.id}
+        comments={a.hostComments}
+        canModerate={a.perms.canModerate}
+        viewerId={a.viewerId}
+        slug={a.slug}
+        hostLabel={a.hostLabel}
+        roleLabels={a.roleLabels}
+        hostHearters={a.topic.hostHearters}
+        canHostHeart={a.perms.canHostHeart}
+        viewerHasHostHearted={a.topic.viewerHasHostHearted}
+      />
+    ),
+  };
+}
+
+/** The drafting thread (QA 2026-08-15): the topic owner's private line to
+ * the admins, now on every surface where those two see the topic rather
+ * than only My Topics and the permalink — a tab that comes and goes by
+ * surface is a tab you go looking for. The API serves the data to nobody
+ * else, so this gate only mirrors it. */
+function adminSection(a: SectionArgs): CardSection | null {
+  if (!a.perms.canSeeAdminThread) return null;
+  const comments = a.topic.adminComments ?? [];
+  const count = countNested(comments);
+  return {
+    value: "admin",
+    icon: "admin",
+    text: pluralLabel(a.adminLabel),
+    badge: count > 0 ? `(${count})` : undefined,
+    pane: (
+      <AdminCommentsBody
+        topicId={a.topic.id}
+        comments={comments}
+        canModerate={a.perms.canModerate}
+        viewerId={a.viewerId}
+        slug={a.slug}
+        adminLabel={a.adminLabel}
+        hostLabel={a.hostLabel}
+        roleLabels={a.roleLabels}
+      />
+    ),
+  };
+}
+
+/** sessions-tab (2026-08-14): where this topic is pencilled/confirmed on
+ * future slots — for every viewer of the card (sessions are public on the
+ * calendar page); the inline availability toggle is elector-only. */
+function sessionsSection(a: SectionArgs): CardSection | null {
+  if (a.topic.sessionSlotCount === 0) return null;
+  return {
+    value: "schedule",
+    icon: "schedule",
+    text: "Sessions",
+    badge: `(${a.topic.sessionSlotCount})`,
+    pane: (
+      <SessionsTabBody
+        slug={a.slug}
+        topicId={a.topic.id}
+        canSetAvailability={a.perms.canSetAvailability}
+      />
+    ),
+  };
+}
+
+function buildFeedSections(args: SectionArgs): CardSection[] {
+  return [
+    commentsSection(args),
+    hostSection(args),
+    adminSection(args),
+    sessionsSection(args),
+  ].filter((s): s is CardSection => s !== null);
 }
 
 /** Collapsed by default; the Topic Queue shows the whole body. */
@@ -476,6 +508,7 @@ export function TopicCard({
               discussionOpen,
               viewerId,
               hostLabel,
+              adminLabel,
               roleLabels,
               hostCommentsEnabled,
               actionsRow: queueControls ? null : (

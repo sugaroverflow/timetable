@@ -77,7 +77,8 @@ export type FeedTopic = {
   createdAt: string;
   comments: FeedComment[];
   /** Drafting thread — the API serves it only to the topic's owner and
-   * admins; selected by the permalink page alone. */
+   * admins, and every card selects it now that it has a tab (2026-08-15);
+   * [] for everyone else. */
   adminComments?: FeedComment[];
 };
 
