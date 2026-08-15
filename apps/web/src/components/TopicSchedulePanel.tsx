@@ -149,6 +149,12 @@ export function TopicScheduleBody({
 
   const sorted = [...data.slots].sort((a, b) => compareRows(a, b, mode));
   const grouped = mode === "date";
+  // Your own slots ride at the top as well as staying in place below (Ed,
+  // QA 2026-08-15) — the summary of what you've said you're free for,
+  // without punching a hole in the date-ordered list underneath.
+  const pinned = data.slots
+    .filter((r) => r.topicStatus !== null)
+    .sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));
 
   return (
     <div className="stack" style={{ gap: 8 }}>
@@ -179,6 +185,26 @@ export function TopicScheduleBody({
           ))}
         </div>
       </div>
+      {pinned.length > 0 ? (
+        <div className="cal-list">
+          <div className="cal-month-row">
+            <span className="cal-month-inner">Your sessions</span>
+          </div>
+          {pinned.map((row) => (
+            <WorkbenchRow
+              key={`pinned-${row.slotId}`}
+              row={row}
+              slug={slug}
+              topicId={topicId}
+              canPencil={canPencil}
+              weekStart={false}
+              showYear
+              pinned
+              onReload={() => setReloadKey((k) => k + 1)}
+            />
+          ))}
+        </div>
+      ) : null}
       {sorted.length === 0 ? (
         <div className="faint" style={{ fontSize: 12 }}>
           No upcoming slots on the calendar.
@@ -225,7 +251,78 @@ export function TopicScheduleBody({
 
 /** One washed datetime row, calendar-style: the tint IS the availability
  * chart; clicking the row folds open the hearter avatars (the accordion);
- * the right cluster is the pencil state/action. */
+ * the right cluster is the pencil state/action. Pinned copies (the "Your
+ * sessions" group) are the same row with the avatar fold locked open —
+ * they don't collapse, so there is nothing to click. */
+/** The row's right cluster: this topic's own state here, and the one
+ * action that changes it. A confirmed session is the admins' to undo. */
+function PencilControls({
+  row,
+  topicId,
+  canPencil,
+  onReload,
+}: {
+  row: FitRow;
+  topicId: string;
+  canPencil: boolean;
+  onReload: () => void;
+}) {
+  const { run, busy } = useGqlAction();
+  if (row.topicStatus === "confirmed") {
+    return <span className="pill pill-host">confirmed</span>;
+  }
+  if (row.topicStatus === "proposed") {
+    return (
+      <>
+        <span className="pill" title="Pencilled in — under discussion">
+          ✎ pencilled
+        </span>
+        {canPencil && row.sessionId ? (
+          <button
+            type="button"
+            className="btn"
+            disabled={busy}
+            onClick={() =>
+              void run(
+                CLEAR_SESSION,
+                { session: row.sessionId },
+                {
+                  success: "Unpencilled",
+                  errorFallback: "Could not unpencil",
+                  onSuccess: onReload,
+                },
+              )
+            }
+          >
+            Unpencil
+          </button>
+        ) : null}
+      </>
+    );
+  }
+  if (!canPencil) return null;
+  return (
+    <button
+      type="button"
+      className="btn"
+      disabled={busy}
+      onClick={() =>
+        void run(
+          ADD_SESSION,
+          { slot: row.slotId, topic: topicId },
+          {
+            success: "Pencilled in",
+            errorFallback: "Could not pencil in",
+            onSuccess: onReload,
+          },
+        )
+      }
+    >
+      Pencil in
+    </button>
+  );
+}
+
 function WorkbenchRow({
   row,
   slug,
@@ -233,6 +330,7 @@ function WorkbenchRow({
   canPencil,
   weekStart,
   showYear,
+  pinned = false,
   onReload,
 }: {
   row: FitRow;
@@ -242,10 +340,12 @@ function WorkbenchRow({
   weekStart: boolean;
   /** The availability view has no month headings to carry the year. */
   showYear: boolean;
+  /** The copy at the top of the list: avatars always showing, no fold. */
+  pinned?: boolean;
   onReload: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const { run, busy } = useGqlAction();
+  const expanded = pinned || open;
   const when = showYear
     ? formatFitDate(row.startsAt)
     : new Date(row.startsAt).toLocaleDateString("en-GB", {
@@ -256,24 +356,28 @@ function WorkbenchRow({
 
   return (
     <div
-      className={`cal-row cal-row-expandable${weekStart ? " cal-week-start" : ""}`}
-      role="button"
-      tabIndex={0}
-      aria-expanded={open}
-      onClick={(e) => {
-        if (!onInteractive(e)) setOpen((o) => !o);
-      }}
-      onKeyDown={(e) => {
-        if (e.key !== "Enter" && e.key !== " ") return;
-        if (e.target !== e.currentTarget) return;
-        e.preventDefault();
-        setOpen((o) => !o);
-      }}
+      className={`cal-row${pinned ? "" : " cal-row-expandable"}${weekStart ? " cal-week-start" : ""}`}
+      {...(pinned
+        ? {}
+        : {
+            role: "button",
+            tabIndex: 0,
+            "aria-expanded": open,
+            onClick: (e: React.MouseEvent) => {
+              if (!onInteractive(e)) setOpen((o) => !o);
+            },
+            onKeyDown: (e: React.KeyboardEvent) => {
+              if (e.key !== "Enter" && e.key !== " ") return;
+              if (e.target !== e.currentTarget) return;
+              e.preventDefault();
+              setOpen((o) => !o);
+            },
+          })}
     >
       <div className="cal-row-head">
         <TintLayer
           counts={row.counts}
-          avatarCounts={open ? tallyStates(row.perUser) : null}
+          avatarCounts={expanded ? tallyStates(row.perUser) : null}
         />
         <div className="cal-row-line">
           <span className="cal-when">
@@ -281,54 +385,12 @@ function WorkbenchRow({
             {formatTime(row.endsAt)}
           </span>
           <span className="cal-row-right">
-            {row.topicStatus === "confirmed" ? (
-              <span className="pill pill-host">confirmed</span>
-            ) : row.topicStatus === "proposed" ? (
-              <>
-                <span className="pill" title="Pencilled in — under discussion">
-                  ✎ pencilled
-                </span>
-                {canPencil && row.sessionId ? (
-                  <button
-                    type="button"
-                    className="btn"
-                    disabled={busy}
-                    onClick={() =>
-                      void run(
-                        CLEAR_SESSION,
-                        { session: row.sessionId },
-                        {
-                          success: "Unpencilled",
-                          errorFallback: "Could not unpencil",
-                          onSuccess: onReload,
-                        },
-                      )
-                    }
-                  >
-                    Unpencil
-                  </button>
-                ) : null}
-              </>
-            ) : canPencil ? (
-              <button
-                type="button"
-                className="btn"
-                disabled={busy}
-                onClick={() =>
-                  void run(
-                    ADD_SESSION,
-                    { slot: row.slotId, topic: topicId },
-                    {
-                      success: "Pencilled in",
-                      errorFallback: "Could not pencil in",
-                      onSuccess: onReload,
-                    },
-                  )
-                }
-              >
-                Pencil in
-              </button>
-            ) : null}
+            <PencilControls
+              row={row}
+              topicId={topicId}
+              canPencil={canPencil}
+              onReload={onReload}
+            />
           </span>
         </div>
         {/* Who else is here (QA 2026-08-15): pencils never contend, so this
@@ -344,7 +406,7 @@ function WorkbenchRow({
             ))}
           </div>
         ) : null}
-        {open ? <FoldAvatars perUser={row.perUser} slug={slug} /> : null}
+        {expanded ? <FoldAvatars perUser={row.perUser} slug={slug} /> : null}
       </div>
     </div>
   );

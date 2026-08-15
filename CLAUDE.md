@@ -168,7 +168,11 @@ Stable names for feature pieces, so instructions can reference them precisely.
   toggle (🟢 dominates 🟡), and pencil/unpencil per row. By date the rows
   group under month headings with week gaps (calendar idiom; past slots
   excluded server-side); by availability the list is flat and ranked, with
-  years on every date. Each row also names the OTHER sessions already on
+  years on every date. The panel leads with a **"Your sessions"** group
+  (QA 2026-08-16): this topic's pencilled/confirmed slots pinned at the
+  top, avatars locked open, no fold — and they ALSO stay in place in the
+  list below (Ed's call: the date list keeps no holes).
+  Each row also names the OTHER sessions already on
   that slot (`others` on `topicSlotFit`; ✎/✓ + label, QA 2026-08-15) —
   company, not conflict, since pencils never contend.
   No discussion here — that's the calendar page.
