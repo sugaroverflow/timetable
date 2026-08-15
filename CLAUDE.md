@@ -127,7 +127,9 @@ Stable names for feature pieces, so instructions can reference them precisely.
   latest) + a "💬 n comments" pill that reveals the tree; the permalink
   page passes `discussionOpen` and skips it. "Seen" = engagement only
   (teaser expand / permalink visit via `markCommentsSeen`), never feed
-  scrolling.
+  scrolling. My Topics teases too (Ed, 2026-08-16) — hence
+  `ManagedTopic.viewerCommentsSeenAt` and the `CommentsOpenScope` around
+  its strip; only the PUBLIC thread teases, faculty/drafting open fully.
 - **chain-reply digests** — `loadChainScope` in `packages/core/src/digests.ts`:
   the `replies` digest kind covers new comments in chains the recipient is
   part of, batched per chain by the email's thread merge. All comment kinds

@@ -16,6 +16,7 @@ import {
   listHostTopics,
   listSubmittedTopics,
   listTimetableHosts,
+  loadCommentsSeen,
   logActivity,
   markTopicSeen,
   moderateTopic,
@@ -99,6 +100,9 @@ type GqlTopic = FeedTopic & {
 /** ManagedTopic rows with the three comment threads optionally prefetched
  * (hostDashboard batches them; other paths fall back per topic). */
 type GqlManagedTopic = Topic & {
+  /** The viewer's comments-seen watermark, for the card's comment-teaser
+   * (My Topics matches the feed, 2026-08-16). */
+  viewerCommentsSeenAt?: Date | null;
   prefetchedComments?: CommentNode[];
   prefetchedHostOnlyComments?: CommentNode[];
   prefetchedAdminComments?: CommentNode[];
@@ -244,9 +248,12 @@ const TopicType = builder.objectRef<GqlTopic>("Topic").implement({
  * the same root-visibility filters as the per-field fallbacks below. */
 async function attachManagedCommentTrees(
   rows: Topic[],
+  /** Present for My Topics, whose cards tease the public thread against
+   * the viewer's own watermark; the moderation queue passes none. */
+  viewerUserId?: string,
 ): Promise<GqlManagedTopic[]> {
   const ids = rows.map((tp) => tp.id);
-  const [publicTrees, hostTrees, adminTrees] = await Promise.all([
+  const [publicTrees, hostTrees, adminTrees, seen] = await Promise.all([
     listCommentTreesForTopics(ids, {
       includeHostOnly: false,
       includeHidden: false,
@@ -260,9 +267,11 @@ async function attachManagedCommentTrees(
       includeAdminOnly: true,
       includeHidden: false,
     }),
+    loadCommentsSeen(viewerUserId ?? null, ids),
   ]);
   return rows.map((tp) => ({
     ...tp,
+    viewerCommentsSeenAt: seen.get(tp.id) ?? null,
     prefetchedComments: publicTrees.get(tp.id) ?? [],
     prefetchedHostOnlyComments: (hostTrees.get(tp.id) ?? []).filter(
       (c) => c.visibility === "host_only",
@@ -305,6 +314,13 @@ const ManagedTopicType = builder
         nullable: true,
         resolve: async (tp) =>
           (await getPerson(tp.timetableId, tp.hostId))?.image ?? null,
+      }),
+      /** The viewer's own comments-seen watermark — the teaser's "new
+       * since you last engaged" line (2026-08-16). Unset (the moderation
+       * queue, which doesn't tease) reads as never engaged. */
+      viewerCommentsSeenAt: t.string({
+        nullable: true,
+        resolve: (tp) => tp.viewerCommentsSeenAt?.toISOString() ?? null,
       }),
       /** Public comment thread — lets My Topics render feed-identical cards
        * (QA #59). */
@@ -591,7 +607,7 @@ builder.queryFields((t) => ({
       const readable = await readTimetable(ctx, args.idOrSlug);
       if (!readable) return [];
       const rows = await listHostTopics(readable.timetable.id, ctx.user.id);
-      return attachManagedCommentTrees(rows);
+      return attachManagedCommentTrees(rows, ctx.user.id);
     },
   }),
 

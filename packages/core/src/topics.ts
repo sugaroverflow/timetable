@@ -568,8 +568,9 @@ async function loadCommentStats(
 }
 
 /** The viewer's per-topic comments-seen watermarks, batch-loaded for a
- * feed page. Empty for signed-out viewers. */
-async function loadCommentsSeen(
+ * feed page — and for the My Topics dashboard, whose cards carry the same
+ * comment-teaser (2026-08-16). Empty for signed-out viewers. */
+export async function loadCommentsSeen(
   viewerUserId: string | null,
   topicIds: string[],
 ): Promise<Map<string, Date>> {

@@ -37,6 +37,7 @@ const QUERY = `
     timetableHosts: forumHosts(idOrSlug: $s) { id name }
     hostDashboard(idOrSlug: $s) {
       ${MANAGED_TOPIC_FIELDS}
+      viewerCommentsSeenAt
       hostHearters { userId name image slug }
       ${commentTree()}
       ${commentTree("hostOnlyComments")}
