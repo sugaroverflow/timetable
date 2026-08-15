@@ -394,7 +394,26 @@ type TopicSlotFitRow = {
     image: string | null;
     state: string;
   }[];
+  /** Who ELSE is here (QA 2026-08-15): pencils never contend, but a host
+   * choosing when to run their topic wants to see the company — and a
+   * confirmed session means the room race has already started. */
+  others: { id: string; label: string; status: string }[];
 };
+
+/** One other booking on a workbench row — display copy only (no links,
+ * no ids beyond the key), since the workbench is a dashboard. */
+const TopicSlotOtherType = builder
+  .objectRef<{ id: string; label: string; status: string }>("TopicSlotOther")
+  .implement({
+    fields: (t) => ({
+      id: t.exposeID("id"),
+      /** "Ann Kelly: Quantum ethics", "Hannah — Office hours", or an
+       * admin custom title. */
+      label: t.exposeString("label"),
+      /** proposed (pencilled) | confirmed. */
+      status: t.exposeString("status"),
+    }),
+  });
 
 const TopicSlotFitType = builder
   .objectRef<TopicSlotFitRow>("TopicSlotFit")
@@ -413,6 +432,10 @@ const TopicSlotFitType = builder
       perUser: t.field({
         type: [SlotAvailabilityType],
         resolve: (s) => s.perUser,
+      }),
+      others: t.field({
+        type: [TopicSlotOtherType],
+        resolve: (s) => s.others,
       }),
     }),
   });
@@ -530,6 +553,7 @@ builder.queryFields((t) => ({
         hearters,
         ctx.user.id,
       );
+      const ohLabel = officeHoursLabel(readable.timetable.settings);
       return {
         hearterCount: hearters.length,
         slots: slots.map((s) => {
@@ -542,6 +566,16 @@ builder.queryFields((t) => ({
             topicStatus: own?.status ?? null,
             counts: s.counts,
             perUser: s.perUser ?? [],
+            others: s.sessions
+              .filter((x) => x.id !== own?.id)
+              .map((x) => ({
+                id: x.id,
+                label: x.topic
+                  ? `${x.topic.hostName ?? "…"}: ${x.topic.title}`
+                  : x.customTitle ||
+                    `${x.sessionHost?.name ?? "…"} — ${ohLabel}`,
+                status: x.status,
+              })),
           };
         }),
       };

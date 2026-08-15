@@ -142,6 +142,10 @@ Stable names for feature pieces, so instructions can reference them precisely.
   💬 button / top-composer snap the strip back to Comments through
   CommentsOpenScope. The collapsible `HostOnlyPanel` wrapper is gone
   (2026-08-14); `AdminCommentsPanel`'s survives on permalink + moderation.
+  The strip never wraps (QA 2026-08-15): it scrolls horizontally, its
+  bottom rule is an inset shadow (a scroll container would clip a hung
+  underline), and `.card-tab-panel` suppresses nested threads' own top
+  rules so a tab never opens on a doubled line.
 - **topic-workbench** — `TopicScheduleBody` in `TopicSchedulePanel.tsx`,
   the Scheduling tab of topic-card-tabs (published, calendar on): per-topic
   mini-calendar — the topic's hearters' availability across future slots
@@ -150,7 +154,10 @@ Stable names for feature pieces, so instructions can reference them precisely.
   toggle (🟢 dominates 🟡), and pencil/unpencil per row. By date the rows
   group under month headings with week gaps (calendar idiom; past slots
   excluded server-side); by availability the list is flat and ranked, with
-  years on every date. No discussion here — that's the calendar page.
+  years on every date. Each row also names the OTHER sessions already on
+  that slot (`others` on `topicSlotFit`; ✎/✓ + label, QA 2026-08-15) —
+  company, not conflict, since pencils never contend.
+  No discussion here — that's the calendar page.
   Part of demand-first scheduling (2026-08-14): ❤️ implies "I'd attend"
   (never stated in UI copy), and a **pencil is a location-less
   time-intent** — the host saying "I am available at this time"; unique

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Tabs } from "@base-ui/react/tabs";
-import { CalendarDays, Lock, MessageCircle, Shield } from "lucide-react";
+import { CalendarDays, Library, MessageCircle, Shield } from "lucide-react";
 
 import { useCommentsOpen } from "./CommentsOpenScope";
 
@@ -21,7 +21,10 @@ export type CardSection = {
 
 const ICONS = {
   comments: MessageCircle,
-  host: Lock,
+  // 📚 not 🔒 (Ed, 2026-08-15): the {host}-only thread is the faculty
+  // common room, not a locked box — lucide's shelf of books is the
+  // line-art of that emoji, so the strip stays one icon family.
+  host: Library,
   admin: Shield,
   schedule: CalendarDays,
 } as const;
