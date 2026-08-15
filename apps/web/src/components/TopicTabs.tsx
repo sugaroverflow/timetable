@@ -45,7 +45,7 @@ export function TopicTabs({
   tabs: TopicTab[];
   followCommentsOpen?: boolean;
 }) {
-  const { requestId } = useCommentsOpen();
+  const { requestId, requestToggle } = useCommentsOpen();
   const [tab, setTab] = useState(tabs[0]?.value ?? "comments");
   // Render-phase adjustment (the React "information from previous renders"
   // pattern): every open-the-comments request snaps the strip back to the
@@ -68,7 +68,20 @@ export function TopicTabs({
             // The label is a span so narrow screens can drop it from the
             // UNSELECTED tabs (icon + count only, QA 2026-08-15) — it stays
             // in the accessible name, and `title` covers hover.
-            <Tabs.Tab key={s.value} value={s.value} title={s.text}>
+            <Tabs.Tab
+              key={s.value}
+              value={s.value}
+              title={s.text}
+              // Clicking the Comments tab you are already on opens the
+              // tree, and clicking it again folds it back (Ed, QA
+              // 2026-08-16) — Base UI fires no value change for a click on
+              // the active tab, so the toggle rides the click itself.
+              onClick={
+                s.value === "comments" && tab === "comments"
+                  ? requestToggle
+                  : undefined
+              }
+            >
               <Icon size={13} aria-hidden />
               <span className="tab-text">{s.text}</span>
               {s.badge ? <span className="tab-badge">{s.badge}</span> : null}

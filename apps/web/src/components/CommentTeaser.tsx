@@ -68,21 +68,31 @@ export function CommentTeaser({
   const [open, setOpen] = useState(() =>
     treeContains(comments, searchParams.get("reply")),
   );
-  // The card's 💬 button and top-composer also open the tree
-  // (comments-open-scope, QA 2026-08-13) — derived, not mirrored state.
-  const { requestId } = useCommentsOpen();
-  const opened = open || requestId > 0;
+  // The card's 💬 button and top-composer open the tree; the Comments tab
+  // button flips it (comments-open-scope). Render-phase adjustment — the
+  // React "information from previous renders" pattern, as in TopicTabs.
+  const { requestId, toggleId } = useCommentsOpen();
+  const [seenRequest, setSeenRequest] = useState(requestId);
+  const [seenToggle, setSeenToggle] = useState(toggleId);
+  if (requestId !== seenRequest) {
+    setSeenRequest(requestId);
+    setOpen(true);
+  }
+  if (toggleId !== seenToggle) {
+    setSeenToggle(toggleId);
+    setOpen((o) => !o);
+  }
   // Opening (click, deep link, 💬, or posting) is the engagement signal —
-  // mark once.
+  // mark once. Folding it back again doesn't un-see what you read.
   const marked = useRef(false);
   useEffect(() => {
-    if (!opened || marked.current) return;
+    if (!open || marked.current) return;
     marked.current = true;
     markCommentsSeen(topicId);
-  }, [opened, topicId]);
+  }, [open, topicId]);
   const total = countNested(comments);
   if (total === 0) return null;
-  if (opened) return <>{children}</>;
+  if (open) return <>{children}</>;
 
   const openTree = () => setOpen(true);
 
