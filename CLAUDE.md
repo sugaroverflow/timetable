@@ -132,12 +132,13 @@ Stable names for feature pieces, so instructions can reference them precisely.
   the `replies` digest kind covers new comments in chains the recipient is
   part of, batched per chain by the email's thread merge. All comment kinds
   suppress against `comment_seen` (engagement), not page watermarks.
-- **card-section tabs** — `CardSectionTabs.tsx` (generic strip) +
-  `TopicCardTabs.tsx` (My Topics assembly) + `buildFeedSections` in
-  `TopicCard.tsx` (feed/permalink/queue): a topic card's parallel sections
-  ("activities" — naming TBD with Ed) — public comments / {host}-only /
-  drafting thread / Scheduling — render as one horizontal tab strip when
-  ≥2 are live, and bare (the pre-tabs presentation) when only one is.
+- **topic-tabs** — `TopicTabs.tsx` (generic strip) + `MyTopicsTabs.tsx`
+  (My Topics assembly) + `buildTopicTabs` in `TopicCard.tsx`
+  (feed/permalink/queue): a topic card's parallel spaces — the comments
+  tab / {host}-only tab / drafting tab / sessions tab / Scheduling tab —
+  render as one horizontal strip when ≥2 are live, and bare (the pre-tabs
+  presentation) when only one is. Ed's vocabulary (2026-08-15): the strip
+  is "topic-tabs", a pane is "the sessions tab", "the comments tab", …
   Inactive panels unmount, so lazy fetches stay lazy; on feed cards the
   💬 button / top-composer snap the strip back to Comments through
   CommentsOpenScope. The collapsible `HostOnlyPanel` wrapper is gone
@@ -145,7 +146,7 @@ Stable names for feature pieces, so instructions can reference them precisely.
   The strip never wraps (QA 2026-08-15): under 640px with ≥3 tabs the
   UNSELECTED labels are clipped to icon + count (scrolling is only a last
   resort), its bottom rule is an inset shadow (a scroll container would
-  clip a hung underline), and `.card-tab-panel` suppresses its first
+  clip a hung underline), and `.topic-tab-panel` suppresses its first
   block's own top rule so a tab never opens on a doubled line.
   **The strip sits ABOVE the action bars** (Ed, QA 2026-08-15): ❤️ leads
   the Comments tab, 💙 leads the {host}-only tab, so exactly one action
@@ -160,7 +161,7 @@ Stable names for feature pieces, so instructions can reference them precisely.
   gone), and the {host}-only tab shows from publication onward rather than
   only when it has content.
 - **topic-workbench** — `TopicScheduleBody` in `TopicSchedulePanel.tsx`,
-  the Scheduling tab of topic-card-tabs (published, calendar on): per-topic
+  the Scheduling tab of topic-tabs (published, calendar on): per-topic
   mini-calendar — the topic's hearters' availability across future slots
   (`topicSlotFit` query, lazy on tab open) as washed rows (shared
   `CalendarRowWash.tsx`) with the avatar fold, a Date/Availability sort

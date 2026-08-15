@@ -9,7 +9,7 @@ import { countNested } from "@/lib/commentTree";
 import { AdminCommentsBody } from "./AdminCommentsPanel";
 import { AdminTopicActions } from "./AdminTopicActions";
 import { Avatar } from "./Avatar";
-import { CardSectionTabs, type CardSection } from "./CardSectionTabs";
+import { TopicTabs, type TopicTab } from "./TopicTabs";
 import { CollapsibleTopicBody } from "./CollapsibleTopicBody";
 import { CommentComposer } from "./CommentComposer";
 import { CommentList } from "./CommentList";
@@ -84,7 +84,7 @@ function TopicHead({
 /* The role-gated action rows that close out the card: host actions, admin
  * actions. (The ❤️ breakdown moved to the actions-row disclosure — any
  * signed-in viewer, QA 2026-07-27; the host-only thread moved into the
- * card-section tabs, 2026-08-14.) */
+ * topic-tabs, 2026-08-14.) */
 function TopicTail({
   topic,
   perms,
@@ -216,17 +216,17 @@ function CommentSection({
   );
 }
 
-/** The card's sections ("activities"): the public discussion always, the
- * {host}-only thread for host/admin viewers when the forum option is on,
- * the topic's sessions when it has any. One section renders bare — exactly
- * the pre-tabs card; two make the tab strip (2026-08-14).
+/** The card's tabs: the public discussion always, the {host}-only thread
+ * for host/admin viewers when the forum option is on, the drafting thread
+ * for the owner and admins, the topic's sessions when it has any. One tab
+ * renders bare — exactly the pre-tabs card; two make the strip.
  *
  * The tabs sit ABOVE the action bars, not below (Ed, QA 2026-08-15): each
  * heart lives inside its own thread — ❤️ leading the Comments tab, 💙
  * leading the {host}-only tab — so a viewer meets exactly one action bar
  * at a time, and its 💬 count is unambiguously that thread's. This is why
  * the Comments tab is unconditional: it carries the ❤️. */
-type SectionArgs = {
+type TabArgs = {
   topic: FeedTopic;
   perms: FeedPerms;
   slug: string;
@@ -244,7 +244,7 @@ type SectionArgs = {
 };
 
 /** Unconditional: it carries the ❤️ row, so every card has it. */
-function commentsSection(a: SectionArgs): CardSection {
+function commentsTab(a: TabArgs): TopicTab {
   const count = countNested(a.publicComments);
   return {
     value: "comments",
@@ -268,7 +268,7 @@ function commentsSection(a: SectionArgs): CardSection {
   };
 }
 
-function hostSection(a: SectionArgs): CardSection | null {
+function hostTab(a: TabArgs): TopicTab | null {
   if (!a.perms.canHostOnly || !a.hostCommentsEnabled) return null;
   const count = countNested(a.hostComments);
   const hearts = a.topic.hostHearters?.length ?? 0;
@@ -302,7 +302,7 @@ function hostSection(a: SectionArgs): CardSection | null {
  * than only My Topics and the permalink — a tab that comes and goes by
  * surface is a tab you go looking for. The API serves the data to nobody
  * else, so this gate only mirrors it. */
-function adminSection(a: SectionArgs): CardSection | null {
+function adminTab(a: TabArgs): TopicTab | null {
   if (!a.perms.canSeeAdminThread) return null;
   const comments = a.topic.adminComments ?? [];
   const count = countNested(comments);
@@ -329,7 +329,7 @@ function adminSection(a: SectionArgs): CardSection | null {
 /** sessions-tab (2026-08-14): where this topic is pencilled/confirmed on
  * future slots — for every viewer of the card (sessions are public on the
  * calendar page); the inline availability toggle is elector-only. */
-function sessionsSection(a: SectionArgs): CardSection | null {
+function sessionsTab(a: TabArgs): TopicTab | null {
   if (a.topic.sessionSlotCount === 0) return null;
   return {
     value: "schedule",
@@ -346,13 +346,13 @@ function sessionsSection(a: SectionArgs): CardSection | null {
   };
 }
 
-function buildFeedSections(args: SectionArgs): CardSection[] {
+function buildTopicTabs(args: TabArgs): TopicTab[] {
   return [
-    commentsSection(args),
-    hostSection(args),
-    adminSection(args),
-    sessionsSection(args),
-  ].filter((s): s is CardSection => s !== null);
+    commentsTab(args),
+    hostTab(args),
+    adminTab(args),
+    sessionsTab(args),
+  ].filter((s): s is TopicTab => s !== null);
 }
 
 /** Collapsed by default; the Topic Queue shows the whole body. */
@@ -497,9 +497,9 @@ export function TopicCard({
         <CommentsOpenScope>
           {queueControls}
 
-          <CardSectionTabs
+          <TopicTabs
             followCommentsOpen
-            sections={buildFeedSections({
+            tabs={buildTopicTabs({
               topic,
               perms,
               slug,

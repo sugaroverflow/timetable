@@ -12,7 +12,7 @@ import { CommentComposer } from "./CommentComposer";
 import { CommentList } from "./CommentList";
 
 /** The drafting thread's body — composer + thread. Shared by the
- * collapsible panel below and the My Topics card tabs (topic-card-tabs,
+ * collapsible panel below and the My Topics card tabs (topic-topic-tabs,
  * 2026-08-14). */
 export function AdminCommentsBody({
   topicId,

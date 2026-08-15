@@ -186,7 +186,7 @@ pointing at the real event page once one exists.
 **Demand-first scheduling (2026-08-14).** A ❤️ already implies "I'd attend a
 session" (deliberately unstated in UI copy — it was the original
 implication), so hosts schedule from demand rather than supply: each
-My Topics card carries **topic-card-tabs** — public comments /
+My Topics card carries **topic-tabs** — public comments /
 {host}-only / drafting thread / **Scheduling** as one horizontal tab
 strip — and the Scheduling tab is the **topic-workbench**: a per-topic
 mini-calendar of upcoming slots as washed rows (the calendar's row-wash
