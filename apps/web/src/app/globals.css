@@ -1816,7 +1816,8 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
 }
 /* With bookings below, the when-line gives up its 52px centring — the
    line and the booking rows make the row's height together. */
-.cal-row-line:has(+ .cal-row-sessions) {
+.cal-row-line:has(+ .cal-row-sessions),
+.cal-row-line:has(+ .cal-row-others) {
   min-height: 0;
   padding-bottom: 0;
 }
@@ -1828,6 +1829,18 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
   gap: 2px;
   padding: 2px 14px 9px 32px;
   font-size: var(--text-md);
+}
+/* topic-workbench: the other sessions already on this slot — quieter than
+   the calendar page's booking lines, since here they are context for the
+   host's own pencil, not the subject (QA 2026-08-15). */
+.cal-row-others {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 12px;
+  padding: 1px 14px 8px 32px;
+  font-size: var(--text-sm);
+  color: var(--muted);
 }
 .cal-when {
   flex: none;
@@ -2034,7 +2047,8 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
     min-height: 44px;
   }
   /* Bookings already live on their own rows; tighten the indent. */
-  .cal-row-sessions {
+  .cal-row-sessions,
+  .cal-row-others {
     padding-left: 24px;
   }
   /* No avatar override: --face's 15px clamp floor covers narrow rows. */
@@ -2493,11 +2507,42 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
 /* topic-card-tabs (2026-08-14): the My Topics card's section strip —
    public comments / {host}-only / drafting / scheduling as horizontal
    tabs instead of stacked collapsibles. */
+/* One line, always (QA 2026-08-15): wrapped tabs read as a pile of
+   buttons — the shared baseline is what says "tabs". Narrow screens scroll
+   the strip instead, with the scroll-shadow trick (`local` covers hide the
+   `scroll` shadows until there really is something off-edge) as the only
+   hint that more tabs exist. */
 .card-tabs {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 2px;
-  border-bottom: 1px solid var(--line-strong);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  /* Inset, not border-bottom: the strip is a scroll container now, so a
+     selected underline hung past the content box (the old -1px margin)
+     would be clipped. The tab's own 2px border covers this line. */
+  box-shadow: inset 0 -1px 0 var(--line-strong);
+  background:
+    linear-gradient(to right, var(--card), transparent) left / 24px 100%
+      no-repeat local,
+    linear-gradient(to left, var(--card), transparent) right / 24px 100%
+      no-repeat local,
+    linear-gradient(
+        to right,
+        color-mix(in srgb, var(--ink) 14%, transparent),
+        transparent
+      )
+      left / 12px 100% no-repeat scroll,
+    linear-gradient(
+        to left,
+        color-mix(in srgb, var(--ink) 14%, transparent),
+        transparent
+      )
+      right / 12px 100% no-repeat scroll;
+}
+.card-tabs::-webkit-scrollbar {
+  display: none;
 }
 .card-tabs button {
   display: inline-flex;
@@ -2510,7 +2555,6 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -2523,6 +2567,19 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
 }
 .card-tab-panel {
   padding-top: 10px;
+}
+/* The strip's own bottom rule IS the pane's divider — nested threads drop
+   theirs, or every comments tab opens with a doubled line (QA 2026-08-15).
+   Untabbed cards (one section, rendered bare) keep their divider. */
+.card-tab-panel .comment-section,
+.card-tab-panel .host-thread {
+  border-top: 0;
+  padding-top: 0;
+}
+@media (max-width: 480px) {
+  .card-tabs button {
+    padding: 7px 8px;
+  }
 }
 
 /* Neutral segmented state (topic-workbench sort toggle, 2026-08-14). */

@@ -20,6 +20,7 @@ const QUERY = `query TopicSchedule($s: String!, $t: String!) {
       slotId startsAt endsAt sessionId topicStatus
       counts { green yellow red }
       perUser { userId name image state }
+      others { id label status }
     }
   }
 }`;
@@ -39,6 +40,7 @@ type FitRow = {
   topicStatus: "proposed" | "confirmed" | null;
   counts: { green: number; yellow: number; red: number };
   perUser: PerUserAvailability[];
+  others: { id: string; label: string; status: string }[];
 };
 
 type TopicSchedule = { hearterCount: number; slots: FitRow[] };
@@ -329,6 +331,19 @@ function WorkbenchRow({
             ) : null}
           </span>
         </div>
+        {/* Who else is here (QA 2026-08-15): pencils never contend, so this
+            is company, not conflict — but a confirmed session here means
+            the room race has started. */}
+        {row.others.length > 0 ? (
+          <div className="cal-row-others">
+            {row.others.map((o) => (
+              <span key={o.id}>
+                <span aria-hidden>{o.status === "confirmed" ? "✓" : "✎"}</span>{" "}
+                {o.label}
+              </span>
+            ))}
+          </div>
+        ) : null}
         {open ? <FoldAvatars perUser={row.perUser} slug={slug} /> : null}
       </div>
     </div>

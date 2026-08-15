@@ -1733,6 +1733,7 @@ describe("createApiApp", () => {
           slotId sessionId topicStatus
           counts { green }
           perUser { userId state }
+          others { id label status }
         }
       }
     }`;
@@ -1793,6 +1794,7 @@ describe("createApiApp", () => {
               topicStatus: string | null;
               counts: { green: number };
               perUser: { userId: string; state: string }[];
+              others: { id: string; label: string; status: string }[];
             }[];
           } | null;
         };
@@ -1829,7 +1831,16 @@ describe("createApiApp", () => {
                 hostName: null,
               },
             }),
-            session({ id: "55555555-5555-5555-5555-555555555552" }),
+            session({
+              id: "55555555-5555-5555-5555-555555555552",
+              topic: {
+                id: "topic-2",
+                title: "Quantum ethics",
+                topicSlug: null,
+                hostId: "host-2",
+                hostName: "Ann",
+              },
+            }),
           ],
           counts: { green: 2, yellow: 0, red: 0 },
           perUser: [
@@ -1840,7 +1851,9 @@ describe("createApiApp", () => {
         // A slot with only someone else's session — no own pencil.
         calendarSlot({
           id: "aaaaaaaa-0000-0000-0000-000000000002",
-          sessions: [session()],
+          sessions: [
+            session({ sessionHost: { id: "host-3", name: "Hannah" } }),
+          ],
         }),
       ]);
 
@@ -1858,6 +1871,15 @@ describe("createApiApp", () => {
               { userId: "elector-1", state: "green" },
               { userId: "elector-2", state: "green" },
             ],
+            // Everyone else's session on this slot — the topic's own is
+            // never echoed back as an "other" (QA 2026-08-15).
+            others: [
+              {
+                id: "55555555-5555-5555-5555-555555555552",
+                label: "Ann: Quantum ethics",
+                status: "proposed",
+              },
+            ],
           },
           {
             slotId: "aaaaaaaa-0000-0000-0000-000000000002",
@@ -1865,6 +1887,13 @@ describe("createApiApp", () => {
             topicStatus: null,
             counts: { green: 0 },
             perUser: [],
+            others: [
+              {
+                id: "55555555-5555-5555-5555-555555555555",
+                label: "Hannah — Office hours",
+                status: "proposed",
+              },
+            ],
           },
         ]);
         expect(core.getAudienceElectorIds).toHaveBeenCalledWith(
