@@ -142,10 +142,17 @@ Stable names for feature pieces, so instructions can reference them precisely.
   💬 button / top-composer snap the strip back to Comments through
   CommentsOpenScope. The collapsible `HostOnlyPanel` wrapper is gone
   (2026-08-14); `AdminCommentsPanel`'s survives on permalink + moderation.
-  The strip never wraps (QA 2026-08-15): it scrolls horizontally, its
-  bottom rule is an inset shadow (a scroll container would clip a hung
-  underline), and `.card-tab-panel` suppresses nested threads' own top
-  rules so a tab never opens on a doubled line.
+  The strip never wraps (QA 2026-08-15): under 640px with ≥3 tabs the
+  UNSELECTED labels are clipped to icon + count (scrolling is only a last
+  resort), its bottom rule is an inset shadow (a scroll container would
+  clip a hung underline), and `.card-tab-panel` suppresses its first
+  block's own top rule so a tab never opens on a doubled line.
+  **The strip sits ABOVE the action bars** (Ed, QA 2026-08-15): ❤️ leads
+  the Comments tab, 💙 leads the {host}-only tab, so exactly one action
+  bar is on screen and its 💬 count is unambiguously that thread's. Hence
+  the Comments tab is unconditional on feed cards — it carries the ❤️.
+  Queue mode is the exception: its decision buttons stay above the strip
+  (one call to action per card) and the Comments tab has no ❤️ row.
 - **topic-workbench** — `TopicScheduleBody` in `TopicSchedulePanel.tsx`,
   the Scheduling tab of topic-card-tabs (published, calendar on): per-topic
   mini-calendar — the topic's hearters' availability across future slots

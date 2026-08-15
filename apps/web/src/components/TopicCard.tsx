@@ -126,16 +126,16 @@ function TopicTail({
   );
 }
 
-/** The actions slot: queue mode swaps the normal heart/comment row for the
- * big decision buttons — one call to action per card. */
-function ActionsSlot({
+/** The ❤️ row, which now leads the Comments tab (QA 2026-08-15). Queue
+ * mode has none: its big decision buttons stand above the strip instead,
+ * keeping one call to action per card. */
+function FeedActionsRow({
   topic,
   perms,
   slug,
   viewerId,
   viewerHeartCount,
   electorLabel,
-  queueControls,
 }: {
   topic: FeedTopic;
   perms: FeedPerms;
@@ -143,9 +143,7 @@ function ActionsSlot({
   viewerId: string | null;
   viewerHeartCount: number | null;
   electorLabel: string;
-  queueControls: React.ReactNode;
 }) {
-  if (queueControls) return <>{queueControls}</>;
   return (
     <TopicActionsRow
       topicId={topic.id}
@@ -215,10 +213,16 @@ function CommentSection({
   );
 }
 
-/** The card's sections ("activities"): public discussion always (when the
- * viewer can comment or comments exist), the {host}-only thread for
- * host/admin viewers when the forum option is on. One section renders
- * bare — exactly the pre-tabs card; two make the tab strip (2026-08-14). */
+/** The card's sections ("activities"): the public discussion always, the
+ * {host}-only thread for host/admin viewers when the forum option is on,
+ * the topic's sessions when it has any. One section renders bare — exactly
+ * the pre-tabs card; two make the tab strip (2026-08-14).
+ *
+ * The tabs sit ABOVE the action bars, not below (Ed, QA 2026-08-15): each
+ * heart lives inside its own thread — ❤️ leading the Comments tab, 💙
+ * leading the {host}-only tab — so a viewer meets exactly one action bar
+ * at a time, and its 💬 count is unambiguously that thread's. This is why
+ * the Comments tab is unconditional: it carries the ❤️. */
 function buildFeedSections({
   topic,
   perms,
@@ -230,6 +234,7 @@ function buildFeedSections({
   hostLabel,
   roleLabels,
   hostCommentsEnabled,
+  actionsRow,
 }: {
   topic: FeedTopic;
   perms: FeedPerms;
@@ -241,16 +246,20 @@ function buildFeedSections({
   hostLabel: string;
   roleLabels: RoleLabels;
   hostCommentsEnabled: boolean;
+  /** The ❤️ row — null in queue mode, where the decision buttons stand
+   * above the strip as the card's one call to action. */
+  actionsRow: React.ReactNode;
 }): CardSection[] {
   const sections: CardSection[] = [];
   const publicCount = countNested(publicComments);
-  if (perms.canComment || publicCount > 0) {
-    sections.push({
-      value: "comments",
-      icon: "comments",
-      text: "Comments",
-      badge: publicCount > 0 ? `(${publicCount})` : undefined,
-      pane: (
+  sections.push({
+    value: "comments",
+    icon: "comments",
+    text: "Comments",
+    badge: publicCount > 0 ? `(${publicCount})` : undefined,
+    pane: (
+      <>
+        {actionsRow}
         <CommentSection
           topic={topic}
           perms={perms}
@@ -260,9 +269,9 @@ function buildFeedSections({
           viewerId={viewerId}
           roleLabels={roleLabels}
         />
-      ),
-    });
-  }
+      </>
+    ),
+  });
   if (perms.canHostOnly && hostCommentsEnabled) {
     const hostCount = countNested(hostComments);
     const heartCount = topic.hostHearters?.length ?? 0;
@@ -364,9 +373,11 @@ function TopicContent({
   );
 }
 
-/* Element order per QA #42: title, author, cover, description,
- * hearts + comments, comment bar, then the two collapsed panels
- * (vote breakdown, host-only comments), host actions, admin actions. */
+/* Element order (QA #42, revised 2026-08-15): title, author, cover,
+ * description, then the topic-tabs strip — and INSIDE the open tab its own
+ * action bar (❤️ + 💬 on Comments, 💙 + 💬 on {host}-only) above that
+ * thread's composer and comments — then host actions, admin actions. The
+ * strip sits above the action bars, so only one is ever on screen. */
 export function TopicCard({
   topic,
   perms,
@@ -446,18 +457,13 @@ export function TopicCard({
         }
       >
         {/* comments-open-scope: the 💬 button and top-composer unfold the
-            teaser below them (QA 2026-08-13) — and, when the card has
-            section tabs, switch the strip back to Comments. */}
+            teaser below them (QA 2026-08-13) — and switch the strip back
+            to Comments, which matters for the queue's decision buttons and
+            for deep links now that the ❤️ row lives inside that tab. The
+            {host}-only thread's own 💬 overrides the click, so it never
+            drags you out of its tab. */}
         <CommentsOpenScope>
-          <ActionsSlot
-            topic={topic}
-            perms={perms}
-            slug={slug}
-            viewerId={viewerId}
-            viewerHeartCount={viewerHeartCount}
-            electorLabel={electorLabel}
-            queueControls={queueControls}
-          />
+          {queueControls}
 
           <CardSectionTabs
             followCommentsOpen
@@ -472,6 +478,16 @@ export function TopicCard({
               hostLabel,
               roleLabels,
               hostCommentsEnabled,
+              actionsRow: queueControls ? null : (
+                <FeedActionsRow
+                  topic={topic}
+                  perms={perms}
+                  slug={slug}
+                  viewerId={viewerId}
+                  viewerHeartCount={viewerHeartCount}
+                  electorLabel={electorLabel}
+                />
+              ),
             })}
           />
         </CommentsOpenScope>

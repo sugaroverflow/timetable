@@ -2508,10 +2508,11 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
    public comments / {host}-only / drafting / scheduling as horizontal
    tabs instead of stacked collapsibles. */
 /* One line, always (QA 2026-08-15): wrapped tabs read as a pile of
-   buttons — the shared baseline is what says "tabs". Narrow screens scroll
-   the strip instead, with the scroll-shadow trick (`local` covers hide the
-   `scroll` shadows until there really is something off-edge) as the only
-   hint that more tabs exist. */
+   buttons — the shared baseline is what says "tabs". Narrow screens shed
+   the UNSELECTED labels instead (icon + count; the selected tab always
+   says what it is), which Ed prefers to sideways scrolling. Overflow stays
+   scrollable as a silent last resort, with the `local`/`scroll` background
+   trick showing an edge shadow only when something really is cut off. */
 .card-tabs {
   display: flex;
   flex-wrap: nowrap;
@@ -2568,17 +2569,32 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
 .card-tab-panel {
   padding-top: 10px;
 }
-/* The strip's own bottom rule IS the pane's divider — nested threads drop
-   theirs, or every comments tab opens with a doubled line (QA 2026-08-15).
-   Untabbed cards (one section, rendered bare) keep their divider. */
-.card-tab-panel .comment-section,
-.card-tab-panel .host-thread {
+/* The strip's own bottom rule IS the divider above whatever leads the
+   pane — the pane's first block drops its own, or every tab opens on a
+   doubled line (QA 2026-08-15). Rules FURTHER down the pane (the actions
+   row's divider above the comments, say) are real dividers and stay.
+   Untabbed cards (one section, rendered bare) keep theirs too. */
+.card-tab-panel
+  > :is(.card-actions, .comment-section, .host-thread):first-child {
   border-top: 0;
   padding-top: 0;
 }
 @media (max-width: 480px) {
   .card-tabs button {
     padding: 7px 8px;
+  }
+}
+/* Icon + count only on the tabs you are NOT on, once a card carries three
+   or more (two always fit). Clipped rather than `display: none` so the
+   label stays in the accessible name (QA 2026-08-15). */
+@media (max-width: 640px) {
+  .card-tabs:has(button:nth-child(3)) button[aria-selected="false"] .tab-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 }
 

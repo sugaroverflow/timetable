@@ -65,9 +65,13 @@ export function CardSectionTabs({
         {sections.map((s) => {
           const Icon = ICONS[s.icon];
           return (
-            <Tabs.Tab key={s.value} value={s.value}>
-              <Icon size={13} aria-hidden /> {s.text}
-              {s.badge ? ` ${s.badge}` : ""}
+            // The label is a span so narrow screens can drop it from the
+            // UNSELECTED tabs (icon + count only, QA 2026-08-15) — it stays
+            // in the accessible name, and `title` covers hover.
+            <Tabs.Tab key={s.value} value={s.value} title={s.text}>
+              <Icon size={13} aria-hidden />
+              <span className="tab-text">{s.text}</span>
+              {s.badge ? <span className="tab-badge">{s.badge}</span> : null}
             </Tabs.Tab>
           );
         })}
