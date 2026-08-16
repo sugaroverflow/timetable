@@ -386,85 +386,20 @@ const SlotCommentType = builder
     }),
   });
 
-/** One future slot as seen from a topic's demand (topic-workbench,
- * 2026-08-14; v2 same day — pencils are location-less time-intents, so no
- * location fields): the topic's hearters' availability, both as counts
- * (the wash) and per hearter (the avatar fold — the caller is the topic's
- * own host or an admin, exactly who may see per-elector availability). */
-type TopicSlotFitRow = {
-  slotId: string;
-  startsAt: Date;
-  endsAt: Date;
-  /** This topic's own pencil here, for unpencilling. */
-  sessionId: string | null;
-  topicStatus: string | null;
-  counts: { green: number; yellow: number; red: number };
-  perUser: {
-    userId: string;
-    name: string | null;
-    image: string | null;
-    state: string;
-  }[];
-  /** Who ELSE is here (QA 2026-08-15): pencils never contend, but a host
-   * choosing when to run their topic wants to see the company — and a
-   * confirmed session means the room race has already started. */
-  others: { id: string; label: string; status: string }[];
-  /** The slot's own discussion, which the workbench row unfolds just like
-   * a calendar row (QA 2026-08-16) — one conversation per timeslot,
-   * wherever you meet it. */
-  commentCount: number;
-};
-
-/** One other booking on a workbench row — display copy only (no links,
- * no ids beyond the key), since the workbench is a dashboard. */
-const TopicSlotOtherType = builder
-  .objectRef<{ id: string; label: string; status: string }>("TopicSlotOther")
-  .implement({
-    fields: (t) => ({
-      id: t.exposeID("id"),
-      /** "Ann Kelly: Quantum ethics", "Hannah — Office hours", or an
-       * admin custom title. */
-      label: t.exposeString("label"),
-      /** proposed (pencilled) | confirmed. */
-      status: t.exposeString("status"),
-    }),
-  });
-
-const TopicSlotFitType = builder
-  .objectRef<TopicSlotFitRow>("TopicSlotFit")
-  .implement({
-    fields: (t) => ({
-      slotId: t.exposeID("slotId"),
-      startsAt: t.string({ resolve: (s) => s.startsAt.toISOString() }),
-      endsAt: t.string({ resolve: (s) => s.endsAt.toISOString() }),
-      /** This topic's own booking here, if any: proposed | confirmed. */
-      sessionId: t.exposeID("sessionId", { nullable: true }),
-      topicStatus: t.exposeString("topicStatus", { nullable: true }),
-      counts: t.field({
-        type: AvailabilityCountsType,
-        resolve: (s) => s.counts,
-      }),
-      perUser: t.field({
-        type: [SlotAvailabilityType],
-        resolve: (s) => s.perUser,
-      }),
-      others: t.field({
-        type: [TopicSlotOtherType],
-        resolve: (s) => s.others,
-      }),
-      commentCount: t.exposeInt("commentCount"),
-    }),
-  });
-
+/** The topic-workbench's payload (2026-08-16): ordinary calendar slots,
+ * scored against THIS topic's hearters instead of the whole forum. It
+ * returns the same shape the calendar query does because the workbench
+ * renders the same rows — the slim projection it used to send is what let
+ * the two surfaces drift apart. */
 const TopicScheduleType = builder
   .objectRef<{
     hearterCount: number;
-    slots: TopicSlotFitRow[];
+    slots: GqlSlot[];
   }>("TopicSchedule")
   .implement({
     fields: (t) => ({
       hearterCount: t.exposeInt("hearterCount"),
-      slots: t.field({ type: [TopicSlotFitType], resolve: (s) => s.slots }),
+      slots: t.field({ type: [TimeslotType], resolve: (s) => s.slots }),
     }),
   });
 
@@ -552,6 +487,7 @@ builder.queryFields((t) => ({
     args: {
       idOrSlug: t.arg.string({ required: true }),
       topicId: t.arg.string({ required: true }),
+      includePast: t.arg.boolean({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
       if (!ctx.user) return null;
@@ -572,33 +508,14 @@ builder.queryFields((t) => ({
         readable.timetable.id,
         hearters,
         ctx.user.id,
+        { includePast: args.includePast ?? false },
       );
-      const ohLabel = officeHoursLabel(readable.timetable.settings);
+      // Only the topic's host or an admin gets here, so the wash and the
+      // avatar fold travel; the flag is computed rather than assumed.
+      const hostOnly = canSeeHostOnly(viewer);
       return {
         hearterCount: hearters.length,
-        slots: slots.map((s) => {
-          const own = s.sessions.find((x) => x.topic?.id === topic.id);
-          return {
-            slotId: s.id,
-            startsAt: s.startsAt,
-            endsAt: s.endsAt,
-            sessionId: own?.id ?? null,
-            topicStatus: own?.status ?? null,
-            counts: s.counts,
-            perUser: s.perUser ?? [],
-            others: s.sessions
-              .filter((x) => x.id !== own?.id)
-              .map((x) => ({
-                id: x.id,
-                label: x.topic
-                  ? `${x.topic.hostName ?? "…"}: ${x.topic.title}`
-                  : x.customTitle ||
-                    `${x.sessionHost?.name ?? "…"} — ${ohLabel}`,
-                status: x.status,
-              })),
-            commentCount: s.commentCount,
-          };
-        }),
+        slots: slots.map((s) => ({ ...s, canSeeHostOnly: hostOnly })),
       };
     },
   }),

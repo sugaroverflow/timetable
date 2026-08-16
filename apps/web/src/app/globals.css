@@ -2642,6 +2642,27 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
   }
 }
 
+/* A calendar card's heading as a fold control (Ed, QA 2026-08-16): the
+   workbench's "Your sessions" and "Scheduling" sections each collapse.
+   Inherits the section-title type — it IS the heading, not a button
+   sitting next to one. */
+.cal-section-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
+.cal-section-toggle:hover {
+  color: var(--ink);
+}
+
 /* Neutral segmented state (topic-workbench sort toggle, 2026-08-14). */
 .avseg button.on {
   background: var(--wash-strong);

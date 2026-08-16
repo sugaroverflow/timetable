@@ -1840,14 +1840,16 @@ describe("createApiApp", () => {
   });
 
   describe("topicSlotFit (topic-workbench, 2026-08-14)", () => {
+    // Calendar rows since 2026-08-16 (decision 10a): the workbench renders
+    // the calendar's own component, so it asks for the calendar's own shape.
     const QUERY = `query($s: String!, $t: String!){
       topicSlotFit(idOrSlug: $s, topicId: $t) {
         hearterCount
         slots {
-          slotId sessionId topicStatus
+          id commentCount
+          sessions { id status topic { id } }
           counts { green }
           perUser { userId state }
-          others { id label status }
         }
       }
     }`;
@@ -1903,12 +1905,15 @@ describe("createApiApp", () => {
           topicSlotFit: {
             hearterCount: number;
             slots: {
-              slotId: string;
-              sessionId: string | null;
-              topicStatus: string | null;
-              counts: { green: number };
-              perUser: { userId: string; state: string }[];
-              others: { id: string; label: string; status: string }[];
+              id: string;
+              commentCount: number;
+              sessions: {
+                id: string;
+                status: string;
+                topic: { id: string } | null;
+              }[];
+              counts: { green: number } | null;
+              perUser: { userId: string; state: string }[] | null;
             }[];
           } | null;
         };
@@ -1916,7 +1921,7 @@ describe("createApiApp", () => {
       };
     }
 
-    it("maps the topic's own pencil, counts, and per-hearter states", async () => {
+    it("serves whole calendar rows, scored against this topic's hearters", async () => {
       const topic = topicFixture({ status: "published", hostId: "host-1" });
       mockSession("host-1", ["host"]);
       vi.mocked(core.getReadableTimetable).mockResolvedValue({
@@ -1977,37 +1982,43 @@ describe("createApiApp", () => {
         expect(body.data?.topicSlotFit?.hearterCount).toBe(2);
         expect(body.data?.topicSlotFit?.slots).toEqual([
           {
-            slotId: "aaaaaaaa-0000-0000-0000-000000000001",
-            sessionId: "55555555-5555-5555-5555-555555555551",
-            topicStatus: "confirmed",
+            id: "aaaaaaaa-0000-0000-0000-000000000001",
+            commentCount: 0,
+            // Every booking on the slot, this topic's own included — the
+            // row renders them as session lines, exactly as the calendar
+            // page does (2026-08-16).
+            sessions: [
+              {
+                id: "55555555-5555-5555-5555-555555555551",
+                status: "confirmed",
+                topic: { id: topic.id },
+              },
+              {
+                id: "55555555-5555-5555-5555-555555555552",
+                status: "proposed",
+                topic: { id: "topic-2" },
+              },
+            ],
+            // The wash is this topic's hearters, not the whole forum's —
+            // the workbench's one genuinely local thing.
             counts: { green: 2 },
             perUser: [
               { userId: "elector-1", state: "green" },
               { userId: "elector-2", state: "green" },
             ],
-            // Everyone else's session on this slot — the topic's own is
-            // never echoed back as an "other" (QA 2026-08-15).
-            others: [
-              {
-                id: "55555555-5555-5555-5555-555555555552",
-                label: "Ann: Quantum ethics",
-                status: "proposed",
-              },
-            ],
           },
           {
-            slotId: "aaaaaaaa-0000-0000-0000-000000000002",
-            sessionId: null,
-            topicStatus: null,
-            counts: { green: 0 },
-            perUser: [],
-            others: [
+            id: "aaaaaaaa-0000-0000-0000-000000000002",
+            commentCount: 0,
+            sessions: [
               {
                 id: "55555555-5555-5555-5555-555555555555",
-                label: "Hannah — Office hours",
                 status: "proposed",
+                topic: null,
               },
             ],
+            counts: { green: 0 },
+            perUser: [],
           },
         ]);
         expect(core.getAudienceElectorIds).toHaveBeenCalledWith(

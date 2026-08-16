@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { Fragment, useState } from "react";
-import { ChevronDown, ChevronUp, MessageCircle } from "lucide-react";
+import { ChevronDown, ChevronRight, MessageCircle } from "lucide-react";
 
 import type {
   CalendarPerms,
@@ -27,11 +26,14 @@ export type CalendarTableRow = { slot: CalendarSlot; past: boolean };
 
 // "Fri 9 Oct" / "14:00" — en-GB pinned for day-before-month and 24h time
 // (QA 2026-08-02; the viewer's own locale gave "Fri, Oct 9 02:00 PM").
-function formatDate(iso: string): string {
+// An UNGROUPED list has no month heading to carry the year, so it shows
+// one (the rule Ed kept, 2026-08-16).
+function formatDate(iso: string, withYear = false): string {
   return new Date(iso).toLocaleDateString("en-GB", {
     weekday: "short",
     day: "numeric",
     month: "short",
+    ...(withYear ? { year: "numeric" } : {}),
   });
 }
 export function formatTime(iso: string): string {
@@ -134,17 +136,23 @@ function RowLine({
   past,
   perms,
   canExpand,
+  showYear,
+  action,
 }: {
   slot: CalendarSlot;
   past: boolean;
   perms: CalendarPerms;
   canExpand: boolean;
+  showYear: boolean;
+  /** The caller's own per-row control — the workbench's one-click Pencil
+   * in / Unpencil for the topic whose panel this is (2026-08-16). */
+  action: React.ReactNode;
 }) {
   return (
     <div className="cal-row-line">
       <span className="cal-when">
-        <strong>{formatDate(slot.startsAt)}</strong> {formatTime(slot.startsAt)}{" "}
-        – {formatTime(slot.endsAt)}
+        <strong>{formatDate(slot.startsAt, showYear)}</strong>{" "}
+        {formatTime(slot.startsAt)} – {formatTime(slot.endsAt)}
       </span>
       {/* Where this time is offered (slot locations, 2026-08-11); each
           booking's own location rides on its session line below. */}
@@ -170,6 +178,7 @@ function RowLine({
             compact
           />
         ) : null}
+        {action}
       </span>
     </div>
   );
@@ -185,6 +194,8 @@ function RowHead({
   officeHoursLabel,
   canExpand,
   open,
+  showYear,
+  action,
 }: {
   slot: CalendarSlot;
   past: boolean;
@@ -193,6 +204,8 @@ function RowHead({
   officeHoursLabel: string;
   canExpand: boolean;
   open: boolean;
+  showYear: boolean;
+  action: React.ReactNode;
 }) {
   return (
     <div className="cal-row-head">
@@ -205,7 +218,14 @@ function RowHead({
           avatarCounts={open && slot.perUser ? tallyStates(slot.perUser) : null}
         />
       ) : null}
-      <RowLine slot={slot} past={past} perms={perms} canExpand={canExpand} />
+      <RowLine
+        slot={slot}
+        past={past}
+        perms={perms}
+        canExpand={canExpand}
+        showYear={showYear}
+        action={action}
+      />
       {slot.sessions.length > 0 ? (
         <div className="cal-row-sessions">
           {slot.sessions.map((session) => (
@@ -237,11 +257,16 @@ function SlotRow({
   adminLabel,
   officeHoursLabel,
   roleLabels,
+  showYear,
+  action,
 }: {
   slot: CalendarSlot;
   past: boolean;
   /** True when this slot starts a new (Mon-first) week — bigger gap. */
   weekStart: boolean;
+  /** Ungrouped lists carry the year (no month heading to hold it). */
+  showYear: boolean;
+  action: React.ReactNode;
   slug: string;
   locations: string[];
   perms: CalendarPerms;
@@ -302,6 +327,8 @@ function SlotRow({
         officeHoursLabel={officeHoursLabel}
         canExpand={canExpand}
         open={open}
+        showYear={showYear}
+        action={action}
       />
       {open ? (
         <SlotDetail
@@ -340,10 +367,11 @@ export function CalendarTable({
   adminLabel = "Admin",
   officeHoursLabel = "Office hours",
   roleLabels,
-  showingPast,
-  base,
   title = "Calendar",
-  showPastToggle = true,
+  grouped = true,
+  collapsible = false,
+  pastToggle = null,
+  rowAction,
 }: {
   rows: CalendarTableRow[];
   slug: string;
@@ -356,45 +384,60 @@ export function CalendarTable({
   officeHoursLabel?: string;
   /** Forum role labels for the discussion authors' role pills. */
   roleLabels?: RoleLabels;
-  showingPast: boolean;
-  base: string;
-  /** "Your sessions" for the host's own pinned copy above the chronology
-   * (Ed, QA 2026-08-16); the full calendar keeps the default. */
+  /** "Your sessions", "Scheduling", … — the card's heading. */
   title?: string;
-  /** Only the full chronology offers the past — a pinned group of your
-   * own upcoming sessions has no history to show. */
-  showPastToggle?: boolean;
+  /** Month headings and week gaps (the chronology). False for a list in
+   * some other order — availability-ranked, say — whose rows then carry
+   * the year instead (2026-08-16). */
+  grouped?: boolean;
+  /** Fold the whole card away by its heading (Ed, QA 2026-08-16: the
+   * workbench's two sections each fold). */
+  collapsible?: boolean;
+  /** Show past / Hide past, when this list offers the past at all. The
+   * caller owns it: a page link on the calendar, a state toggle in the
+   * workbench. */
+  pastToggle?: React.ReactNode;
+  /** A per-row control in the right cluster — the workbench's one-click
+   * pencil. */
+  rowAction?: (slot: CalendarSlot) => React.ReactNode;
 }) {
-  const pastToggle = (
-    <Link
-      className="topic-body-toggle"
-      href={showingPast ? `${base}/calendar` : `${base}/calendar?past=1`}
-    >
-      {showingPast ? (
-        <>
-          <ChevronUp size={14} aria-hidden /> Hide past
-        </>
-      ) : (
-        <>
-          <ChevronDown size={14} aria-hidden /> Show past
-        </>
-      )}
-    </Link>
-  );
+  const [open, setOpen] = useState(true);
+  const showRows = !collapsible || open;
 
   return (
     <div className="card">
       <h3 className="section-title" style={{ marginBottom: 8 }}>
-        {title}
+        {collapsible ? (
+          <button
+            type="button"
+            className="cal-section-toggle"
+            aria-expanded={open}
+            onClick={() => setOpen((o) => !o)}
+          >
+            {open ? (
+              <ChevronDown size={14} aria-hidden />
+            ) : (
+              <ChevronRight size={14} aria-hidden />
+            )}
+            {title}
+            <span className="faint">{rows.length}</span>
+          </button>
+        ) : (
+          title
+        )}
+        {/* Ungrouped lists have no month heading to carry it. */}
+        {!grouped ? pastToggle : null}
       </h3>
-      <div className="cal-list">
+      <div className="cal-list" hidden={!showRows}>
         {rows.map(({ slot, past }, i) => {
           const month = monthLabel(slot.startsAt);
           const divider =
-            i === 0 || month !== monthLabel(rows[i - 1]!.slot.startsAt);
+            grouped &&
+            (i === 0 || month !== monthLabel(rows[i - 1]!.slot.startsAt));
           // Bigger gap between Sunday and Monday — skipped when a month
           // heading already breaks the run.
           const weekStart =
+            grouped &&
             !divider &&
             i > 0 &&
             weekKey(slot.startsAt) !== weekKey(rows[i - 1]!.slot.startsAt);
@@ -406,7 +449,7 @@ export function CalendarTable({
                     {month}
                     {/* The past toggle rides in the FIRST month break
                         (QA 2026-08-03). */}
-                    {i === 0 && showPastToggle ? pastToggle : null}
+                    {i === 0 ? pastToggle : null}
                   </span>
                 </div>
               ) : null}
@@ -422,6 +465,8 @@ export function CalendarTable({
                 adminLabel={adminLabel}
                 officeHoursLabel={officeHoursLabel}
                 roleLabels={roleLabels}
+                showYear={!grouped}
+                action={rowAction?.(slot) ?? null}
               />
             </Fragment>
           );

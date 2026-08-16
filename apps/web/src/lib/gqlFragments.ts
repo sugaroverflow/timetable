@@ -22,6 +22,21 @@ export function commentTree(field = "comments"): string {
   return `${field} { ${selection} }`;
 }
 
+/** Everything a calendar ROW renders (CalendarTable) — shared by the
+ * calendar page and the topic-workbench, which render the same rows since
+ * 2026-08-16. Counts and perUser come back null for viewers who may not
+ * see group availability; the row handles that. */
+export const CALENDAR_SLOT_FIELDS = `
+  id startsAt endsAt cellKey locations commentCount viewerState
+  sessions {
+    id location status url customTitle
+    topic { id title topicSlug hostId hostName }
+    sessionHost { id name }
+  }
+  counts { green yellow red }
+  perUser { userId name image state }
+`;
+
 /** ManagedTopic selection shared by My Topics and Pending Topics — the
  * superset (hostName/hostImage render only on the moderation queue's
  * cards, but sharing one fragment beats two drifting lists). */

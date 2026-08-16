@@ -169,29 +169,26 @@ Stable names for feature pieces, so instructions can reference them precisely.
   gone), and the {host}-only tab shows from publication onward rather than
   only when it has content.
 - **topic-workbench** — `TopicScheduleBody` in `TopicSchedulePanel.tsx`,
-  the Scheduling tab of topic-tabs (published, calendar on): per-topic
-  mini-calendar — the topic's hearters' availability across future slots
-  (`topicSlotFit` query, lazy on tab open) as washed rows (shared
-  `CalendarRowWash.tsx`) with the avatar fold, a Date/Availability sort
-  toggle (🟢 dominates 🟡), and pencil/unpencil per row. By date the rows
-  group under month headings with week gaps (calendar idiom; past slots
-  excluded server-side); by availability the list is flat and ranked, with
-  years on every date. The panel leads with a **"Your sessions"** group
-  (QA 2026-08-16): this topic's pencilled/confirmed slots pinned at the
-  top, avatars locked open, no fold — and they ALSO stay in place in the
-  list below (Ed's call: the date list keeps no holes).
-  Each row also names the OTHER sessions already on
-  that slot (`others` on `topicSlotFit`; ✎/✓ + label, QA 2026-08-15) —
-  company, not conflict, since pencils never contend.
-  Unfolding a row also opens the SLOT'S OWN chat — the same thread the
-  calendar page shows, via the shared `DiscussionPanel` (Ed, QA
-  2026-08-16: one conversation per timeslot, wherever you meet it), and a
-  post from here carries THIS topic's claim chip + snapshot. Pinned rows
-  carry avatars only. The calendar page likewise leads with its own
-  **"Your sessions"** card (`MySessions` in `calendar/page.tsx`, QA
-  2026-08-16): the viewer's future topic sessions + office hours, same
-  `CalendarTable` rows, read off the UNFILTERED calendar and repeated in
-  the chronology below.
+  the Scheduling tab of topic-tabs (published, calendar on): a per-topic
+  mini-calendar built from the CALENDAR'S OWN ROWS (`CalendarTable` — one
+  row implementation since 2026-08-16; the parallel one is what let the
+  surfaces drift). `topicSlotFit` returns calendar slots scored against
+  this topic's hearters, lazily on tab open. Four things stay local: the
+  wash is this topic's hearters; each row's right cluster carries a
+  one-click Pencil in / Unpencil (`CalendarTable`'s `rowAction`); a
+  Date/Availability toggle (🟢 dominates 🟡) where ranked = ungrouped =
+  years on every date; and the past is off until you press Show past
+  (state here, a `?past=1` link on the calendar page — hence `pastToggle`
+  being a node the caller passes). Everything else is calendar behaviour:
+  rooms, session lines, the avatar fold, the slot chat (a post from here
+  carries this topic's claim chip), session and admin controls in the
+  fold. Two cards, each folding by its heading (`collapsible`): **"Your
+  sessions"** (this topic's upcoming pencils/confirmations as ordinary
+  rows, also present in the list below) and **"Calendar"**. The calendar
+  page leads with its own **"Your sessions"** card (`MySessions` in
+  `calendar/page.tsx`): the viewer's future topic sessions + office
+  hours, read off the UNFILTERED calendar and repeated in the chronology
+  below.
   Part of demand-first scheduling (2026-08-14): ❤️ implies "I'd attend"
   (never stated in UI copy), and a **pencil is a location-less
   time-intent** — the host saying "I am available at this time"; unique

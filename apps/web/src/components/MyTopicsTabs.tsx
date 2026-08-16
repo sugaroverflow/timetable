@@ -1,6 +1,7 @@
 "use client";
 
 import { countNested } from "@/lib/commentTree";
+import type { WorkbenchCalendar } from "@/lib/calendarTypes";
 import type { FeedComment, ManagedTopic } from "@/lib/feedTypes";
 import { pluralLabel, type RoleLabels } from "@/lib/timetableSettings";
 
@@ -66,11 +67,9 @@ type TabArgs = {
   hostLabel: string;
   adminLabel: string;
   roleLabels?: RoleLabels;
-  calendarEnabled: boolean;
-  canPencilSessions: boolean;
+  /** Null when the forum has no calendar: no Scheduling tab. */
+  calendar: WorkbenchCalendar | null;
   hostCommentsEnabled: boolean;
-  /** Admin viewers may hide comments in a slot chat. */
-  canModerate: boolean;
   publicComments: FeedComment[];
   hostComments: FeedComment[];
   adminComments: FeedComment[];
@@ -157,7 +156,7 @@ function adminTab(a: TabArgs): TopicTab {
 }
 
 function schedulingTab(a: TabArgs): TopicTab | null {
-  if (!a.calendarEnabled || !a.published) return null;
+  if (!a.calendar || !a.published) return null;
   return {
     value: "schedule",
     icon: "schedule",
@@ -165,11 +164,16 @@ function schedulingTab(a: TabArgs): TopicTab | null {
     pane: (
       <TopicScheduleBody
         slug={a.slug}
-        topicId={a.topic.id}
-        topicTitle={a.topic.title}
-        canPencil={a.canPencilSessions}
-        viewerId={a.viewerId}
-        canModerate={a.canModerate}
+        topic={{
+          id: a.topic.id,
+          title: a.topic.title,
+          hostId: a.topic.hostId ?? a.viewerId ?? "",
+          hostName: a.topic.hostName ?? null,
+        }}
+        perms={a.calendar.perms}
+        locations={a.calendar.locations}
+        officeHoursLabel={a.calendar.officeHoursLabel}
+        adminLabel={a.adminLabel}
         roleLabels={a.roleLabels}
       />
     ),
@@ -187,10 +191,8 @@ export function MyTopicsTabs({
   hostLabel,
   adminLabel,
   roleLabels,
-  calendarEnabled,
-  canPencilSessions,
+  calendar,
   hostCommentsEnabled,
-  canModerate,
 }: {
   topic: ManagedTopic;
   slug: string;
@@ -198,10 +200,8 @@ export function MyTopicsTabs({
   hostLabel: string;
   adminLabel: string;
   roleLabels?: RoleLabels;
-  calendarEnabled: boolean;
-  canPencilSessions: boolean;
+  calendar: WorkbenchCalendar | null;
   hostCommentsEnabled: boolean;
-  canModerate: boolean;
 }) {
   const args: TabArgs = {
     topic,
@@ -210,10 +210,8 @@ export function MyTopicsTabs({
     hostLabel,
     adminLabel,
     roleLabels,
-    calendarEnabled,
-    canPencilSessions,
+    calendar,
     hostCommentsEnabled,
-    canModerate,
     publicComments: topic.comments ?? [],
     hostComments: topic.hostOnlyComments ?? [],
     adminComments: topic.adminComments ?? [],
