@@ -26,6 +26,8 @@ import { renderMarkdown } from "../markdown";
 import { isSysadmin } from "../auth/sysadmin";
 import { builder } from "./builder";
 import {
+  assertOptionalHttpUrl,
+  capLength,
   forbidden,
   loadTimetableAndViewer,
   notFound,
@@ -304,6 +306,9 @@ builder.mutationFields((t) => ({
       image: t.arg.string({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
+      capLength(args.name, 120, "Name");
+      capLength(args.bio, 2000, "Bio");
+      assertOptionalHttpUrl(args.image, "Image URL");
       const { user, readable } = await loadTimetableAndViewer(
         ctx,
         args.idOrSlug,
@@ -413,6 +418,8 @@ builder.mutationFields((t) => ({
       image: t.arg.string({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
+      capLength(args.bio, 2000, "Bio");
+      assertOptionalHttpUrl(args.image, "Image URL");
       const { user, readable } = await requireAdminTimetable(
         ctx,
         args.idOrSlug,

@@ -4,9 +4,11 @@ import {
   canManageCalendar,
   canModerate,
   canProposeTopics,
+  canSeeComments,
   canSeeHostOnly,
   canSeePersonProfile,
   isCalendarEnabled,
+  isMember,
   type Privacy,
   type Role,
   type TimetableSettings,
@@ -241,24 +243,28 @@ export async function buildDataExport(
 ): Promise<DataExport> {
   const hostOnly = canSeeHostOnly(viewer);
   const moderate = canModerate(viewer);
+  // Mirror the resolvers' privacy gates (QA #42 matrix): on hosts_only /
+  // no_comments forums the public gets no comment threads, and elector
+  // identity (who hearts what) belongs to members on any non-public forum.
+  const seesComments = canSeeComments(timetable.privacy, viewer);
+  const seesElectorIds =
+    viewer.sysadmin || isMember(viewer.roles) || timetable.privacy === "public";
 
   const feed = await buildFeed(timetable.id, viewer.userId, {});
-  const heartRows = await loadPublishedHearts(timetable.id);
-  const heartsByTopic = new Map<string, string[]>();
-  for (const h of heartRows) {
-    const list = heartsByTopic.get(h.topicId) ?? [];
-    list.push(h.electorId);
-    heartsByTopic.set(h.topicId, list);
-  }
+  const heartsByTopic = seesElectorIds
+    ? await heartersByTopic(timetable.id)
+    : new Map<string, string[]>();
 
-  const trees = await listCommentTreesForTopics(
-    feed.map((t) => t.id),
-    {
-      includeHostOnly: hostOnly,
-      includeAdminOnly: moderate,
-      includeHidden: false,
-    },
-  );
+  const trees = seesComments
+    ? await listCommentTreesForTopics(
+        feed.map((t) => t.id),
+        {
+          includeHostOnly: hostOnly,
+          includeAdminOnly: moderate,
+          includeHidden: false,
+        },
+      )
+    : new Map<string, CommentNode[]>();
 
   const topics: ExportTopic[] = feed.map((t) => ({
     id: t.id,
@@ -309,6 +315,8 @@ export async function buildDataExport(
     ? await calendarExport(timetable.id, viewer)
     : undefined;
 
+  // Role-gated keys are undefined for viewers who don't get them —
+  // JSON serialisation drops them from the download entirely.
   return {
     readme: README,
     forum: {
@@ -319,9 +327,22 @@ export async function buildDataExport(
     },
     topics,
     people,
-    ...(myTopics ? { myTopics } : {}),
-    ...(pendingTopics ? { pendingTopics } : {}),
-    ...(heartEvents ? { heartEvents } : {}),
-    ...(calendar ? { calendar } : {}),
+    myTopics,
+    pendingTopics,
+    heartEvents,
+    calendar,
   };
+}
+
+/** Current post-cutoff hearter ids per published topic. */
+async function heartersByTopic(
+  timetableId: string,
+): Promise<Map<string, string[]>> {
+  const map = new Map<string, string[]>();
+  for (const h of await loadPublishedHearts(timetableId)) {
+    const list = map.get(h.topicId) ?? [];
+    list.push(h.electorId);
+    map.set(h.topicId, list);
+  }
+  return map;
 }

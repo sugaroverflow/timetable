@@ -28,6 +28,7 @@ vi.mock("./auth/api-token", async (importOriginal) => {
 
 const clerk = await import("./auth/clerk");
 const apiToken = await import("./auth/api-token");
+const core = await import("@timetable/core");
 
 const TOKEN_HEADER = "Bearer tpk_abcdefghijklmnopqrstuvwxyz0123456789";
 
@@ -115,5 +116,70 @@ describe("buildContext with a personal API token", () => {
     expect(ctx.user?.id).toBe("session-user");
     expect(ctx.apiToken).toBeNull();
     expect(apiToken.getUserFromApiToken).not.toHaveBeenCalled();
+  });
+});
+
+describe("buildContext view-as preview", () => {
+  it("keeps a view-as preview inside the forum it was granted in", async () => {
+    // Admin of forum-a previews member-9 there; forum-b shares that member.
+    // The preview identity must not exist in forum-b (audit 2026-08-17).
+    vi.mocked(clerk.getUserFromRequest).mockResolvedValue({
+      id: "admin-1",
+      email: null,
+      name: null,
+      image: null,
+    });
+    const forumA = {
+      timetable: { id: "ta", slug: "forum-a", privacy: "private" },
+      roles: ["admin"],
+    };
+    const forumB = {
+      timetable: { id: "tb", slug: "forum-b", privacy: "private" },
+      roles: ["elector"],
+    };
+    vi.mocked(core.getReadableTimetable).mockImplementation(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      async (userId: any, idOrSlug: any): Promise<any> => {
+        if (idOrSlug === "forum-a") return forumA;
+        // forum-b is private: readable for member-9, not anonymously.
+        if (idOrSlug === "forum-b")
+          return userId === "member-9" ? forumB : null;
+        return null;
+      },
+    );
+    vi.mocked(core.getPerson).mockResolvedValue({
+      userId: "member-9",
+      name: "Member Nine",
+      image: null,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+    vi.mocked(core.getViewerRoles).mockResolvedValue(["elector"]);
+
+    const ctx = await buildContext({
+      authHeader: "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6ImFiYyJ9.e30.sig",
+      viewAsHeader: "forum-a:member-9",
+    });
+
+    expect(ctx.user?.id).toBe("member-9");
+    expect(ctx.impersonation?.timetableId).toBe("ta");
+
+    // Inside the granted forum: the target's roles.
+    const inside = await ctx.getViewer("ta");
+    expect(inside).toEqual({
+      userId: "member-9",
+      roles: ["elector"],
+      sysadmin: false,
+    });
+
+    // Any other forum: anonymous, and no role lookup even happens.
+    vi.mocked(core.getViewerRoles).mockClear();
+    const outside = await ctx.getViewer("tb");
+    expect(outside).toEqual({ userId: null, roles: [], sysadmin: false });
+    expect(core.getViewerRoles).not.toHaveBeenCalled();
+
+    // readableTimetable re-resolves other forums as the anonymous public:
+    // private forum-b is simply not there.
+    const readableB = await ctx.readableTimetable?.("forum-b");
+    expect(readableB).toBeNull();
   });
 });

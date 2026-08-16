@@ -1,3 +1,5 @@
+import { createHash, timingSafeEqual } from "node:crypto";
+
 import {
   Router,
   type NextFunction,
@@ -55,7 +57,7 @@ import {
   getOrCreateClerkUser,
   replaceClerkEmail,
 } from "../auth/clerk";
-import { isSysadmin } from "../auth/sysadmin";
+import { isSysadmin, isSysadminEmail } from "../auth/sysadmin";
 import { buildContext, type ApiContext } from "../context";
 import {
   linkBase,
@@ -158,6 +160,28 @@ function parseBody<T>(
 }
 
 /**
+ * Operator status is derived from users.email (auth/sysadmin.ts), so no
+ * admin-writable path may create or re-point an account at a
+ * SYSADMIN_EMAILS address — combined with a held sign-in ticket that would
+ * be a forum-admin → sysadmin escalation. True = refused (403 sent).
+ */
+function refuseSysadminAddress(res: Response, email: string): boolean {
+  if (isSysadminEmail(email, env.sysadminEmails)) {
+    res.status(403).json({ error: "This address is reserved" });
+    return true;
+  }
+  return false;
+}
+
+/** Constant-time secret comparison; hashing first makes the lengths equal
+ * so timingSafeEqual is usable (and leaks nothing about the length). */
+function secretsEqual(presented: string, expected: string): boolean {
+  const a = createHash("sha256").update(presented).digest();
+  const b = createHash("sha256").update(expected).digest();
+  return timingSafeEqual(a, b);
+}
+
+/**
  * POST /api/forums
  * Create a timetable; the creator becomes owner + admin.
  */
@@ -170,6 +194,7 @@ restRouter.post(
 
     const input = parseBody(createTimetableSchema, req, res);
     if (!input) return;
+    if (!(await enforceActionLimit(res, user.id, "forum"))) return;
 
     const timetable = await createTimetable(user.id, input);
     // Notify opted-in sysadmins — fire-and-forget so an email hiccup can
@@ -322,6 +347,7 @@ restRouter.post(
     const input = parseBody(addPersonSchema, req, res);
     if (!input) return;
     if (!(await enforceActionLimit(res, user.id, "invite"))) return;
+    if (refuseSysadminAddress(res, input.email)) return;
 
     const email = normalizeEmail(input.email);
     const clerkUser = await getOrCreateClerkUser(email, input.name ?? null);
@@ -370,6 +396,7 @@ restRouter.patch(
     if (!admin) return;
     const input = parseBody(updateMemberEmailSchema, req, res);
     if (!input) return;
+    if (refuseSysadminAddress(res, input.email)) return;
 
     const { membership } = admin;
     try {
@@ -553,15 +580,16 @@ type UploadAuth =
   | { ok: true; timetableId?: string }
   | { ok: false; status: number; error: string };
 
-/** Cover uploads target a timetable: resolve it and check the viewer's
- * role there (hosts for topic covers, admins for the timetable cover).
- * Other purposes need no timetable. */
+/** Forum-branding uploads target a timetable: resolve it and check the
+ * viewer's role there (hosts for topic covers, admins for the timetable
+ * cover AND icon — the icon was un-gated until the 2026-08-17 audit).
+ * Only profile images need no timetable. */
 async function authorizeUpload(
   userId: string,
   purpose: UploadPurpose,
   timetableIdOrSlug: unknown,
 ): Promise<UploadAuth> {
-  if (purpose !== "topic-cover" && purpose !== "timetable-cover") {
+  if (purpose === "profile-image") {
     return { ok: true };
   }
 
@@ -580,7 +608,10 @@ async function authorizeUpload(
   ) {
     return { ok: false, status: 403, error: "Hosts only" };
   }
-  if (purpose === "timetable-cover" && !canEditSettings(viewer)) {
+  if (
+    (purpose === "timetable-cover" || purpose === "timetable-icon") &&
+    !canEditSettings(viewer)
+  ) {
     return { ok: false, status: 403, error: "Admins only" };
   }
   return { ok: true, timetableId: readable.timetable.id };
@@ -632,6 +663,7 @@ restRouter.post(
       res.status(400).json({ error: "Invalid upload purpose" });
       return;
     }
+    if (!(await enforceActionLimit(res, user.id, "upload"))) return;
 
     const auth = await authorizeUpload(
       user.id,
@@ -743,14 +775,15 @@ restRouter.post(
 restRouter.post(
   "/jobs/digests",
   h(async (req, res) => {
-    const secret = process.env.CRON_SECRET;
+    const secret = env.cronSecret;
     if (!secret) {
       res
         .status(503)
         .json({ error: "Digests not configured (CRON_SECRET unset)" });
       return;
     }
-    if (req.headers["x-cron-secret"] !== secret) {
+    const presented = req.headers["x-cron-secret"];
+    if (typeof presented !== "string" || !secretsEqual(presented, secret)) {
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
