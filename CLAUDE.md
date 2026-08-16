@@ -185,8 +185,9 @@ Stable names for feature pieces, so instructions can reference them precisely.
   one-click Pencil in / Unpencil (`CalendarTable`'s `rowAction`); a
   Date/Availability toggle (🟢 dominates 🟡) where ranked = ungrouped =
   years on every date; and the past is off until you press Show past
-  (state here, a `?past=1` link on the calendar page — hence `pastToggle`
-  being a node the caller passes). Everything else is calendar behaviour:
+  (state here, via the controls row; the calendar page keeps its own
+  `?past=1` link through `pastToggle`). Everything else is calendar
+  behaviour:
   rooms, session lines, the avatar fold, the slot chat (a post from here
   carries this topic's claim chip), session and admin controls in the
   fold. Two bare sections (`card={false}` — no inner cards, quiet
@@ -247,8 +248,9 @@ Stable names for feature pieces, so instructions can reference them precisely.
   update even when `__html` is unchanged, recreating the children. Any DOM
   patched inside such a container (see `CollapsibleTopicBody`) must be
   re-applied in an every-commit layout effect, not keyed on props.
-- The API refuses to boot when `SPACES_BUCKET` is set without
-  `SPACES_KEY`/`SPACES_SECRET` — keep app specs and workflow env in sync.
+- In production the API refuses to boot when `SPACES_BUCKET` is set without
+  `SPACES_KEY`/`SPACES_SECRET` (outside production it warns and 503s
+  uploads) — keep app specs and workflow env in sync.
 - Modules bundled into Next's `opengraph-image` routes (`lib/ogCard.tsx` and
   anything it imports) must NOT import `@timetable/*` workspace packages —
   the OG routes' separate compilation can't resolve them (typecheck passes;
