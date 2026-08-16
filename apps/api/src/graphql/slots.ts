@@ -525,9 +525,15 @@ builder.queryFields((t) => ({
       const hostOnly = canSeeHostOnly(viewer);
       // Only a host/admin viewer will be shown the wash, so only they need
       // an audience computed — everyone else's counts would be nulled by
-      // the gate anyway (2026-08-16).
+      // the gate anyway (2026-08-16). The audience is THIS topic's
+      // hearters, as in the workbench: a wash on a topic's card should
+      // chart that topic's demand, not the whole forum's (Ed, QA
+      // 2026-08-16).
       const audienceIds = hostOnly
-        ? await getAudienceElectorIds(readable.timetable.id, { kind: "all" })
+        ? await getAudienceElectorIds(readable.timetable.id, {
+            kind: "hearted_topic",
+            topicId: topic.id,
+          })
         : [];
       const slots = await buildCalendar(
         readable.timetable.id,

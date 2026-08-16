@@ -41,9 +41,14 @@ const ICONS = {
 export function TopicTabs({
   tabs,
   followCommentsOpen = false,
+  stripWhenSingle = false,
 }: {
   tabs: TopicTab[];
   followCommentsOpen?: boolean;
+  /** Render the strip even for one tab. My Topics sets this so a fresh
+   * submitted topic (drafting thread only) wears the same furniture as
+   * its published neighbours (Ed, QA 2026-08-16). */
+  stripWhenSingle?: boolean;
 }) {
   const { requestId, requestToggle } = useCommentsOpen();
   const [tab, setTab] = useState(tabs[0]?.value ?? "comments");
@@ -57,7 +62,7 @@ export function TopicTabs({
   }
 
   if (tabs.length === 0) return null;
-  if (tabs.length === 1) return <>{tabs[0]!.pane}</>;
+  if (tabs.length === 1 && !stripWhenSingle) return <>{tabs[0]!.pane}</>;
 
   return (
     <Tabs.Root value={tab} onValueChange={(v) => setTab(String(v))}>

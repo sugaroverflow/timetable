@@ -125,7 +125,12 @@ Stable names for feature pieces, so instructions can reference them precisely.
   discussion under the always-visible composer — previews new top-level
   comments (vs the per-topic `comment_seen` watermark, padded to the three
   latest) + a "💬 n comments" pill that reveals the tree; the permalink
-  page passes `discussionOpen` and skips it. "Seen" = engagement only
+  page passes `discussionOpen` and skips it. Clicking a preview line
+  opens the tree focused on that comment's chain-tail composer (a shallow
+  `?reply=` write into the existing deep-link focus; the pill opens
+  unfocused), and previews + pill are indented to the comment text column
+  (36px) with 4px extra air under the composer (Ed, QA 2026-08-16).
+  "Seen" = engagement only
   (teaser expand / permalink visit via `markCommentsSeen`), never feed
   scrolling. My Topics teases too (Ed, 2026-08-16) — hence
   `ManagedTopic.viewerCommentsSeenAt` and the `CommentsOpenScope` around
@@ -142,7 +147,9 @@ Stable names for feature pieces, so instructions can reference them precisely.
   (feed/permalink/queue): a topic card's parallel spaces — the comments
   tab / {host}-only tab / drafting tab / sessions tab / Scheduling tab —
   render as one horizontal strip when ≥2 are live, and bare (the pre-tabs
-  presentation) when only one is. Ed's vocabulary (2026-08-15): the strip
+  presentation) when only one is — except My Topics, which passes
+  `stripWhenSingle` so even a drafting-only card wears the strip (Ed,
+  2026-08-16). Ed's vocabulary (2026-08-15): the strip
   is "topic-tabs", a pane is "the sessions tab", "the comments tab", …
   Inactive panels unmount, so lazy fetches stay lazy; on feed cards the
   💬 button / top-composer snap the strip back to Comments through
@@ -182,9 +189,11 @@ Stable names for feature pieces, so instructions can reference them precisely.
   being a node the caller passes). Everything else is calendar behaviour:
   rooms, session lines, the avatar fold, the slot chat (a post from here
   carries this topic's claim chip), session and admin controls in the
-  fold. Two cards, each folding by its heading (`collapsible`): **"Your
-  sessions"** (this topic's upcoming pencils/confirmations as ordinary
-  rows, also present in the list below) and **"Calendar"**. The calendar
+  fold. Two bare sections (`card={false}` — no inner cards, quiet
+  `.cal-subhead` headings, no counters; Ed, QA 2026-08-16), each folding
+  by its heading (`collapsible`): **"Your sessions"** (this topic's
+  upcoming pencils/confirmations as ordinary rows, also present in the
+  list below) and **"Calendar"**. The calendar
   page leads with its own **"Your sessions"** card (`MySessions` in
   `calendar/page.tsx`): the viewer's future topic sessions + office
   hours, read off the UNFILTERED calendar and repeated in the chronology
@@ -201,10 +210,12 @@ Stable names for feature pieces, so instructions can reference them precisely.
   pencilled/confirmed, lazily fetched on tab open (`topicSessions` query;
   the `sessionSlotCount` scalar on feed topics gates the tab without
   fetching rows) and rendered as CALENDAR ROWS (`CalendarTable`, ungrouped
-  so dates carry the year — 2026-08-16, decision 13). A viewer gets what
+  so dates carry the year, bare — `title={null} card={false}`, the tab
+  strip is its heading — 2026-08-16, decision 13). A viewer gets what
   the calendar page would give them: bookings, rooms, their own 🟢🟡🔴,
   the slot chat behind the fold; the wash stays host/admin-only because
-  `counts` is gated everywhere. `topicSessions` builds ONLY this topic's
+  `counts` is gated everywhere, and charts THIS topic's hearters (the
+  workbench's audience; Ed, QA 2026-08-16). `topicSessions` builds ONLY this topic's
   slots (`listTopicSessionSlotIds` → `buildCalendar({ slotIds })`), never
   the forum's whole schedule. No lens: a comment posted from a card is a
   plain slot comment — claiming a time is the calendar's and the

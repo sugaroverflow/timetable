@@ -1457,6 +1457,11 @@ optgroup {
   flex-direction: column;
   align-items: flex-start;
   gap: 6px;
+  /* A little air under the composer (10px section gap + 4 = the card's
+     14px rhythm), and the previews + pill indented to the comment text
+     column — 26px .avatar-sm + 10px .comment gap (Ed, QA 2026-08-16). */
+  margin-top: 4px;
+  padding-left: 36px;
 }
 .teaser-snippet {
   border: none;
@@ -2661,6 +2666,21 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
 }
 .cal-section-toggle:hover {
   color: var(--ink);
+}
+/* The bare table's heading (card={false}: workbench sections inside a tab
+   panel, 2026-08-16) — a quiet sans subhead, not the card-level serif
+   .section-title, since the topic card's own title is levels above it. */
+.cal-subhead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--muted);
+}
+.cal-subhead .topic-body-toggle {
+  margin-top: 0;
 }
 
 /* Neutral segmented state (topic-workbench sort toggle, 2026-08-14). */

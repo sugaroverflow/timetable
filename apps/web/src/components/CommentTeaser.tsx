@@ -16,7 +16,8 @@ function snippet(body: string, max = 90): string {
 }
 
 /** One top-level comment's preview line: "name: comment (x replies)".
- * Clicking it opens the tree, like the pill. */
+ * Clicking it opens the tree focused on this comment's reply composer
+ * (Ed, QA 2026-08-16) — the pill opens the tree unfocused. */
 function TeaserLine({
   comment,
   onOpen,
@@ -95,6 +96,16 @@ export function CommentTeaser({
   if (open) return <>{children}</>;
 
   const openTree = () => setOpen(true);
+  // A teaser line lands you ON that dialogue: shallow-write ?reply=<id>
+  // (Next wires history.replaceState into useSearchParams) and the
+  // chain-tail composer answering that comment focuses itself through
+  // the existing deep-link path once the tree mounts.
+  const openTreeAt = (commentId: string) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("reply", commentId);
+    window.history.replaceState(null, "", url);
+    setOpen(true);
+  };
 
   const seen = seenAt ? Date.parse(seenAt) : null;
   const roots = comments.filter((c) => !c.deleted);
@@ -110,7 +121,7 @@ export function CommentTeaser({
   return (
     <div className="comment-teaser">
       {preview.map((c) => (
-        <TeaserLine key={c.id} comment={c} onOpen={openTree} />
+        <TeaserLine key={c.id} comment={c} onOpen={() => openTreeAt(c.id)} />
       ))}
       <button type="button" className="teaser-toggle" onClick={openTree}>
         💬 {total} {total === 1 ? "comment" : "comments"}

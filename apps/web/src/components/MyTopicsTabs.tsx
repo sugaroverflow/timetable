@@ -5,7 +5,7 @@ import type { WorkbenchCalendar } from "@/lib/calendarTypes";
 import type { FeedComment, ManagedTopic } from "@/lib/feedTypes";
 import { pluralLabel, type RoleLabels } from "@/lib/timetableSettings";
 
-import { AdminCommentsBody, AdminCommentsPanel } from "./AdminCommentsPanel";
+import { AdminCommentsBody } from "./AdminCommentsPanel";
 import { CommentComposer } from "./CommentComposer";
 import { CommentList } from "./CommentList";
 import { CommentsOpenScope } from "./CommentsOpenScope";
@@ -181,9 +181,9 @@ function schedulingTab(a: TabArgs): TopicTab | null {
 }
 
 /** topic-tabs on My Topics (2026-08-14): public comments /
- * {host}-only / drafting thread / Scheduling as one horizontal strip.
- * With a single live section (e.g. a fresh submitted topic: drafting
- * only) the card falls back to the pre-tabs presentation. */
+ * {host}-only / drafting thread / Scheduling as one horizontal strip —
+ * even with a single live tab (a fresh submitted topic: drafting only),
+ * so every card on the page wears the same furniture (Ed, 2026-08-16). */
 export function MyTopicsTabs({
   topic,
   slug,
@@ -224,27 +224,13 @@ export function MyTopicsTabs({
     schedulingTab(args),
   ].filter((s): s is TopicTab => s !== null);
 
-  // Single live tab = the drafting thread (fresh submitted topic): fall
-  // back to the pre-tabs collapsible rather than a one-tab strip.
-  if (tabs.length === 1 && tabs[0]!.value === "admin") {
-    return (
-      <AdminCommentsPanel
-        topicId={topic.id}
-        viewerId={viewerId}
-        comments={args.adminComments}
-        canModerate={false}
-        slug={slug}
-        adminLabel={adminLabel}
-        roleLabels={roleLabels}
-      />
-    );
-  }
-
   // The scope is what makes posting a comment unfold the teaser you just
-  // posted into — the same wiring feed cards have (2026-08-16).
+  // posted into — the same wiring feed cards have (2026-08-16). Even a
+  // fresh submitted topic (drafting thread only) wears the strip, so
+  // every card on the page carries the same furniture (Ed, 2026-08-16).
   return (
     <CommentsOpenScope>
-      <TopicTabs tabs={tabs} />
+      <TopicTabs tabs={tabs} stripWhenSingle />
     </CommentsOpenScope>
   );
 }
