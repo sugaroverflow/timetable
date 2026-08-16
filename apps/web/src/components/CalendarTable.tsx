@@ -337,6 +337,8 @@ export function CalendarTable({
   roleLabels,
   showingPast,
   base,
+  title = "Calendar",
+  showPastToggle = true,
 }: {
   rows: CalendarTableRow[];
   slug: string;
@@ -351,6 +353,12 @@ export function CalendarTable({
   roleLabels?: RoleLabels;
   showingPast: boolean;
   base: string;
+  /** "Your sessions" for the host's own pinned copy above the chronology
+   * (Ed, QA 2026-08-16); the full calendar keeps the default. */
+  title?: string;
+  /** Only the full chronology offers the past — a pinned group of your
+   * own upcoming sessions has no history to show. */
+  showPastToggle?: boolean;
 }) {
   const pastToggle = (
     <Link
@@ -372,7 +380,7 @@ export function CalendarTable({
   return (
     <div className="card">
       <h3 className="section-title" style={{ marginBottom: 8 }}>
-        Calendar
+        {title}
       </h3>
       <div className="cal-list">
         {rows.map(({ slot, past }, i) => {
@@ -393,7 +401,7 @@ export function CalendarTable({
                     {month}
                     {/* The past toggle rides in the FIRST month break
                         (QA 2026-08-03). */}
-                    {i === 0 ? pastToggle : null}
+                    {i === 0 && showPastToggle ? pastToggle : null}
                   </span>
                 </div>
               ) : null}

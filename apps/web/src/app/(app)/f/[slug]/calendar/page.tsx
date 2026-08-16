@@ -182,6 +182,25 @@ function hasSession(slot: CalendarSlot): boolean {
   return slot.sessions.length > 0;
 }
 
+/** Your sessions (Ed, QA 2026-08-16): future slots carrying something of
+ * the viewer's own — a session on a topic they host, or their office
+ * hours. Admin custom sessions belong to nobody, so they never qualify.
+ * Deliberately read off the UNFILTERED calendar: yours shouldn't vanish
+ * because you narrowed the view below. */
+function selectMySessionSlots(
+  slots: CalendarSlot[],
+  viewerId: string | null,
+): CalendarSlot[] {
+  if (!viewerId) return [];
+  return slots.filter(
+    (slot) =>
+      !isPast(slot) &&
+      slot.sessions.some(
+        (s) => s.topic?.hostId === viewerId || s.sessionHost?.id === viewerId,
+      ),
+  );
+}
+
 /** ?show=sessions|open — the calendar's two jobs (what's happening vs
  * where's free) as separate views; default is the full chronology. */
 function filterBySlotState(
@@ -366,6 +385,55 @@ function CalendarBody({
   );
 }
 
+/** Your own upcoming sessions, pinned above everything else (Ed, QA
+ * 2026-08-16) — the same rows the chronology below repeats, in the same
+ * component, so a session can't look different in the two places. Renders
+ * nothing for a viewer who hosts none. */
+function MySessions({
+  slots,
+  slug,
+  locations,
+  perms,
+  claimTopics,
+  lensTopic,
+  adminLabel,
+  ohLabel,
+  roleLabels,
+  past,
+  base,
+}: {
+  slots: CalendarSlot[];
+  slug: string;
+  locations: string[];
+  perms: CalendarPerms;
+  claimTopics: TopicOption[];
+  lensTopic: TopicOption | null;
+  adminLabel: string;
+  ohLabel: string;
+  roleLabels?: RoleLabels;
+  past: boolean;
+  base: string;
+}) {
+  if (slots.length === 0) return null;
+  return (
+    <CalendarTable
+      title="Your sessions"
+      showPastToggle={false}
+      rows={slots.map((slot) => ({ slot, past: false }))}
+      slug={slug}
+      locations={locations}
+      perms={perms}
+      claimTopics={claimTopics}
+      lensTopic={lensTopic}
+      adminLabel={adminLabel}
+      officeHoursLabel={ohLabel}
+      roleLabels={roleLabels}
+      showingPast={past}
+      base={base}
+    />
+  );
+}
+
 /** The action cards between toolbar and table, gated per role. */
 function CalendarCards({
   slug,
@@ -462,6 +530,7 @@ export default async function CalendarPage({
     filterByLocation(data.calendar, location),
     show,
   );
+  const mySessionSlots = selectMySessionSlots(data.calendar, viewerId);
 
   return (
     <div className="stack">
@@ -476,6 +545,20 @@ export default async function CalendarPage({
           Subscribe (ICS)
         </a>
       </div>
+
+      <MySessions
+        slots={mySessionSlots}
+        slug={slug}
+        locations={calendarSettings.locations}
+        perms={perms}
+        claimTopics={claimTopics}
+        lensTopic={lensTopic}
+        adminLabel={adminLabel}
+        ohLabel={officeHoursLabel(settings)}
+        roleLabels={settings.roleLabels}
+        past={past}
+        base={base}
+      />
 
       <CalendarCards
         slug={slug}
