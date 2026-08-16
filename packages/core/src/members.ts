@@ -28,14 +28,22 @@ export async function createMembershipWithProfile(args: {
     .where(eq(users.id, args.userId))
     .limit(1);
   const slug = await ensureMemberSlug(args.timetableId, account?.name ?? null);
-  await db.insert(timetableMemberships).values({
-    userId: args.userId,
-    timetableId: args.timetableId,
-    roles: args.roles,
-    name: account?.name ?? null,
-    image: account?.image ?? null,
-    slug,
-  });
+  // Concurrent first-sign-in paths (JIT claim + REST claim) can race to
+  // create the same membership; the (userId, timetableId) unique makes the
+  // loser a no-op instead of a 500 (audit 2026-08-17).
+  await db
+    .insert(timetableMemberships)
+    .values({
+      userId: args.userId,
+      timetableId: args.timetableId,
+      roles: args.roles,
+      name: account?.name ?? null,
+      image: account?.image ?? null,
+      slug,
+    })
+    .onConflictDoNothing({
+      target: [timetableMemberships.userId, timetableMemberships.timetableId],
+    });
 }
 
 export async function getMembershipById(

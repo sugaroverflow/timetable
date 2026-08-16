@@ -197,6 +197,9 @@ export const comments = pgTable(
   (t) => [
     index("comments_topic_idx").on(t.topicId),
     index("comments_parent_idx").on(t.parentId),
+    // The digest cron resolves each recipient's chain scope by author
+    // (loadChainScope) — without this it full-scans comments per user.
+    index("comments_author_idx").on(t.authorId),
   ],
 );
 

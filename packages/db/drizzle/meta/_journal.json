@@ -281,6 +281,13 @@
       "when": 1786750748399,
       "tag": "0039_cute_vulcan",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1786923918141,
+      "tag": "0040_gorgeous_night_nurse",
+      "breakpoints": true
     }
   ]
 }

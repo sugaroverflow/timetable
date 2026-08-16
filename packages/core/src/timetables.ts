@@ -71,11 +71,22 @@ export async function createTimetable(
 
   if (!timetable) throw new Error("Failed to create timetable");
 
-  await createMembershipWithProfile({
-    userId: ownerId,
-    timetableId: timetable.id,
-    roles: ["owner", "admin"],
-  });
+  // If seeding the owner membership fails (slug race, crash), the forum
+  // must not survive ownerless — nobody could administer it (audit
+  // 2026-08-17). Compensating delete rather than a transaction:
+  // createMembershipWithProfile reads/writes through the shared `db`
+  // handle, and the new row is invisible to everyone until membership
+  // exists, so the window is harmless.
+  try {
+    await createMembershipWithProfile({
+      userId: ownerId,
+      timetableId: timetable.id,
+      roles: ["owner", "admin"],
+    });
+  } catch (err) {
+    await db.delete(timetables).where(eq(timetables.id, timetable.id));
+    throw err;
+  }
 
   return timetable;
 }
