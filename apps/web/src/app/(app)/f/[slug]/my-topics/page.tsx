@@ -1,10 +1,7 @@
 import {
-  calendarConfirmPolicy,
   isAdmin,
-  isCalendarEnabled,
   isHost,
   isHostCommentsEnabled,
-  officeHoursLabel,
   type Role,
 } from "@timetable/shared";
 
@@ -12,8 +9,7 @@ import { CreateTopicForm } from "@/components/CreateTopicForm";
 import { CreateTopicReveal } from "@/components/CreateTopicReveal";
 import { ListSortControl } from "@/components/ListSortControl";
 import { TopicManager } from "@/components/TopicManager";
-import { buildCalendarPerms } from "@/lib/calendarPerms";
-import type { WorkbenchCalendar } from "@/lib/calendarTypes";
+import { buildWorkbenchCalendar } from "@/lib/calendarPerms";
 import type { ManagedTopic } from "@/lib/feedTypes";
 import { commentTree, MANAGED_TOPIC_FIELDS } from "@/lib/gqlFragments";
 import { gqlFetch } from "@/lib/graphql";
@@ -47,23 +43,6 @@ const QUERY = `
     }
   }
 `;
-
-/** topic-workbench (2026-08-14; calendar rows since 2026-08-16): the
- * Scheduling tab renders the calendar's own rows, so it needs the
- * calendar's own permissions, rooms and office-hours word. Null when the
- * forum has the calendar switched off — then there's no tab. */
-function buildWorkbenchCalendar(
-  settings: ReturnType<typeof parseTimetableSettings>,
-  roles: Role[],
-  viewerId: string | null,
-): WorkbenchCalendar | null {
-  if (!isCalendarEnabled(settings)) return null;
-  return {
-    perms: buildCalendarPerms(roles, viewerId, calendarConfirmPolicy(settings)),
-    locations: settings.calendar?.locations ?? [],
-    officeHoursLabel: officeHoursLabel(settings),
-  };
-}
 
 export default async function MyTopicsPage({
   params,

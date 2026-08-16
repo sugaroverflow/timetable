@@ -3,63 +3,48 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import type { CalendarSlot, WorkbenchCalendar } from "@/lib/calendarTypes";
 import { clientGql } from "@/lib/clientGraphql";
+import { CALENDAR_SLOT_FIELDS } from "@/lib/gqlFragments";
+import type { RoleLabels } from "@/lib/timetableSettings";
 
-import { AvailabilityControl } from "./AvailabilityControl";
-import { formatTime } from "./CalendarTable";
+import { CalendarTable } from "./CalendarTable";
 
 const QUERY = `query TopicSessions($s: String!, $t: String!) {
-  topicSessions(idOrSlug: $s, topicId: $t) {
-    slotId startsAt endsAt status location viewerState
-  }
+  topicSessions(idOrSlug: $s, topicId: $t) { ${CALENDAR_SLOT_FIELDS} }
 }`;
 
-type SessionRow = {
-  slotId: string;
-  startsAt: string;
-  endsAt: string;
-  status: "proposed" | "confirmed";
-  location: string;
-  viewerState: string | null;
-};
-
-/** A flat list can mix months (and, terms apart, years), so every date
- * carries its year — the topic-workbench's availability-view rule; en-GB
- * pinned for day-before-month (QA 2026-08-02). */
-function formatSessionDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-/** sessions-tab (2026-08-14): the elector side of demand-first scheduling
- * — the Sessions tab of topic-tabs on feed/permalink/queue cards (NOT My
- * Topics, whose host has the Scheduling tab). Every future slot where
- * this topic is pencilled/confirmed, fetched lazily on first mount (the
- * inactive tab panel is unmounted, so mounting = tab opened), each row
- * carrying the SessionLine status idiom and — electors only — the
- * viewer's own inline 🟢🟡🔴 toggle: the existing per-slot calendar
- * write, re-homed. No group washes/counts/avatars here by design
- * (deferred privacy question). */
+/** sessions-tab (2026-08-14; calendar rows since 2026-08-16, decision 13):
+ * the Sessions tab of topic-tabs on feed/permalink/queue cards (NOT My
+ * Topics, whose host has the Scheduling tab). Every future slot where this
+ * topic is pencilled or confirmed, fetched lazily on first mount (the
+ * inactive tab panel is unmounted, so mounting = tab opened) and rendered
+ * as ordinary calendar rows: bookings, rooms, the elector's own 🟢🟡🔴,
+ * and the slot's chat behind the fold. The wash stays host/admin-only,
+ * exactly as on the calendar page — a card can't leak what the calendar
+ * doesn't. */
 export function SessionsTabBody({
   slug,
   topicId,
-  canSetAvailability,
+  calendar,
+  adminLabel,
+  roleLabels,
 }: {
   slug: string;
   topicId: string;
-  /** Electors only — everyone else reads the schedule without a toggle. */
-  canSetAvailability: boolean;
+  /** Null while the forum's calendar is off — then there's no tab. */
+  calendar: WorkbenchCalendar | null;
+  adminLabel: string;
+  roleLabels?: RoleLabels;
 }) {
-  const [rows, setRows] = useState<SessionRow[] | null | undefined>(undefined);
+  const [rows, setRows] = useState<CalendarSlot[] | null | undefined>(
+    undefined,
+  );
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    clientGql<{ topicSessions: SessionRow[] | null }>(QUERY, {
+    clientGql<{ topicSessions: CalendarSlot[] | null }>(QUERY, {
       s: slug,
       t: topicId,
     })
@@ -88,7 +73,7 @@ export function SessionsTabBody({
       </div>
     );
   }
-  if (rows === null || rows.length === 0) {
+  if (!calendar || rows === null || rows.length === 0) {
     return (
       <div className="faint" style={{ fontSize: 12 }}>
         No upcoming sessions.
@@ -98,50 +83,24 @@ export function SessionsTabBody({
 
   return (
     <div className="stack" style={{ gap: 8 }}>
-      {rows.map((row) => (
-        <div
-          key={row.slotId}
-          className="row wrap"
-          style={{ gap: 8, alignItems: "center" }}
-        >
-          <span className="cal-when">
-            <strong>{formatSessionDate(row.startsAt)}</strong>{" "}
-            {formatTime(row.startsAt)} – {formatTime(row.endsAt)}
-          </span>
-          {/* SessionLine's status idiom; a pencil is location-less, so the
-              location renders only once confirmed. */}
-          {row.status === "confirmed" && row.location ? (
-            <span className="cal-where">{row.location}</span>
-          ) : null}
-          {row.status === "confirmed" ? (
-            <span className="pill pill-host">confirmed</span>
-          ) : (
-            <span className="pill" title="Pencilled in — under discussion">
-              ✎ pencilled
-            </span>
-          )}
-          {canSetAvailability ? (
-            <span className="cal-row-right">
-              <AvailabilityControl
-                slotId={row.slotId}
-                state={row.viewerState}
-                compact
-                onSet={(state) =>
-                  setRows((prev) =>
-                    Array.isArray(prev)
-                      ? prev.map((r) =>
-                          r.slotId === row.slotId
-                            ? { ...r, viewerState: state }
-                            : r,
-                        )
-                      : prev,
-                  )
-                }
-              />
-            </span>
-          ) : null}
-        </div>
-      ))}
+      <CalendarTable
+        title="Sessions"
+        // A flat list of a topic's own dates, not a chronology — so no
+        // month headings, and the rows carry their year.
+        grouped={false}
+        rows={rows.map((slot) => ({ slot, past: false }))}
+        slug={slug}
+        locations={calendar.locations}
+        perms={calendar.perms}
+        // No claim/lens here: this card is about the topic, but the tab is
+        // where you find out WHEN it runs — arguing for a time is the
+        // calendar's and the workbench's job.
+        claimTopics={[]}
+        lensTopic={null}
+        adminLabel={adminLabel}
+        officeHoursLabel={calendar.officeHoursLabel}
+        roleLabels={roleLabels}
+      />
       <Link
         href={`/f/${slug}/calendar`}
         className="faint"

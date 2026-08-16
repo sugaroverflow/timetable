@@ -307,9 +307,10 @@ export async function deleteSlotSessionRow(sessionId: string): Promise<void> {
 
 export async function listSlots(
   timetableId: string,
-  opts: { includePast?: boolean; now?: Date } = {},
+  opts: { includePast?: boolean; now?: Date; slotIds?: string[] } = {},
 ): Promise<Timeslot[]> {
   const now = opts.now ?? new Date();
+  if (opts.slotIds?.length === 0) return [];
   return db
     .select()
     .from(timeslots)
@@ -320,6 +321,9 @@ export async function listSlots(
         // Date mapping and threw at runtime on hosted Postgres (dev QA
         // 2026-07-31).
         opts.includePast ? undefined : gte(timeslots.endsAt, now),
+        // A named handful — the sessions tab wants only the slots its
+        // topic is booked into, not the forum's whole schedule.
+        opts.slotIds ? inArray(timeslots.id, opts.slotIds) : undefined,
       ),
     )
     .orderBy(asc(timeslots.startsAt));
@@ -947,10 +951,11 @@ export async function buildCalendar(
   timetableId: string,
   audienceIds: string[],
   viewerUserId: string | null,
-  opts: { includePast?: boolean } = {},
+  opts: { includePast?: boolean; slotIds?: string[] } = {},
 ): Promise<CalendarSlot[]> {
   const slots = await listSlots(timetableId, {
     includePast: opts.includePast,
+    slotIds: opts.slotIds,
   });
   if (slots.length === 0) return [];
   const related = await loadSlotRelatedRows(
@@ -1050,43 +1055,21 @@ function toCalendarSlot(
 
 // --------------------------------------------------------------------------
 // Sessions tab (2026-08-14): a topic's future sessions as its feed card
-// shows them — the elector side of demand-first scheduling.
+// shows them — the elector side of demand-first scheduling. The card
+// renders CALENDAR ROWS (2026-08-16), so the tab asks which slots to
+// build rather than projecting its own row shape.
 // --------------------------------------------------------------------------
 
-/** One future slot where the topic is pencilled/confirmed, as the card's
- * sessions tab renders it. `viewerState` is the VIEWER'S OWN availability
- * only (explicit answer → pattern cell → yellow, exactly the calendar
- * page's resolution); group counts/perUser are deliberately absent —
- * whether electors may see group availability is an open privacy
- * question. */
-export type TopicSessionRow = {
-  slotId: string;
-  startsAt: Date;
-  endsAt: Date;
-  /** proposed (pencilled) | confirmed. */
-  status: SlotStatus;
-  /** Display copy — empty on location-less pencils. */
-  location: string;
-  viewerState: AvailabilityState | null;
-};
-
-/** The topic's sessions on future slots, soonest first. A null
- * `viewerUserId` (anonymous) leaves every viewerState null. */
-export async function listTopicSessions(
+/** The future slots this topic is booked into. The sessions tab feeds
+ * these ids to buildCalendar, which then does its availability and
+ * session work for a handful of slots instead of the whole schedule. */
+export async function listTopicSessionSlotIds(
   timetableId: string,
   topicId: string,
-  viewerUserId: string | null,
   now = new Date(),
-): Promise<TopicSessionRow[]> {
+): Promise<string[]> {
   const rows = await db
-    .select({
-      slotId: timeslots.id,
-      startsAt: timeslots.startsAt,
-      endsAt: timeslots.endsAt,
-      cellKey: timeslots.cellKey,
-      status: slotSessions.status,
-      location: slotSessions.location,
-    })
+    .selectDistinct({ slotId: timeslots.id })
     .from(slotSessions)
     .innerJoin(timeslots, eq(timeslots.id, slotSessions.slotId))
     .where(
@@ -1096,39 +1079,8 @@ export async function listTopicSessions(
         // gte, never a raw sql template (Date-mapping gotcha, 2026-07-31).
         gte(timeslots.endsAt, now),
       ),
-    )
-    .orderBy(asc(timeslots.startsAt));
-  if (rows.length === 0) return [];
-
-  let explicit = new Map<string, AvailabilityState>();
-  let pattern: PatternCells | undefined;
-  if (viewerUserId) {
-    const availRows = await db
-      .select({ slotId: availability.slotId, state: availability.state })
-      .from(availability)
-      .where(
-        and(
-          inArray(
-            availability.slotId,
-            rows.map((r) => r.slotId),
-          ),
-          eq(availability.userId, viewerUserId),
-        ),
-      );
-    explicit = new Map(availRows.map((r) => [r.slotId, r.state]));
-    pattern = await getAvailabilityPattern(timetableId, viewerUserId);
-  }
-
-  return rows.map((r) => ({
-    slotId: r.slotId,
-    startsAt: r.startsAt,
-    endsAt: r.endsAt,
-    status: r.status,
-    location: r.location,
-    viewerState: viewerUserId
-      ? resolveState(explicit.get(r.slotId), r.cellKey, pattern)
-      : null,
-  }));
+    );
+  return rows.map((r) => r.slotId);
 }
 
 /** Per-topic counts of sessions on future slots, batched for a feed page

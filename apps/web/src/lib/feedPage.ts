@@ -7,6 +7,7 @@ import {
   type Role,
 } from "@timetable/shared";
 
+import { buildWorkbenchCalendar } from "@/lib/calendarPerms";
 import type { FeedPerms } from "@/components/TopicCard";
 import type { FeedTopic } from "@/lib/feedTypes";
 import { TOPIC_FEED_FIELDS } from "@/lib/gqlFragments";
@@ -102,10 +103,6 @@ export function topicPerms(
       (ownership != null &&
         ownership.viewerId != null &&
         ownership.viewerId === ownership.hostId),
-    // The sessions tab's inline 🟢🟡🔴 toggle — the elector's existing
-    // per-slot calendar write, re-homed (sessions tab, 2026-08-14). Same
-    // gate as the calendar page's own toggle.
-    canSetAvailability: isElector(roles),
   };
 }
 
@@ -141,6 +138,9 @@ export function topicCardProps(page: FeedPage, topic: FeedTopic) {
     viewerHeartCount: page.viewerHeartCount,
     hosts: page.hosts,
     hostCommentsEnabled: isHostCommentsEnabled(page.settings),
+    // The Sessions tab renders calendar rows (2026-08-16), so a card
+    // carries the same calendar context the calendar page builds.
+    calendar: buildWorkbenchCalendar(page.settings, page.roles, page.viewerId),
   };
 }
 

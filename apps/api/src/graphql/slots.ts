@@ -17,7 +17,7 @@ import {
   getTopicById,
   getViewerRoles,
   listSlotComments,
-  listTopicSessions,
+  listTopicSessionSlotIds,
   logActivity,
   proposeSlot,
   setAvailability,
@@ -31,7 +31,6 @@ import {
   type CalendarSlot,
   type PatternCells,
   type SlotInput,
-  type TopicSessionRow,
 } from "@timetable/core";
 import type {
   AvailabilityState,
@@ -403,26 +402,6 @@ const TopicScheduleType = builder
     }),
   });
 
-/** One future slot on a topic card's sessions tab (2026-08-14): public
- * session facts plus the viewer's OWN availability. Group counts/perUser
- * are deliberately never exposed here — whether electors may see group
- * availability is a deferred privacy question. */
-const TopicSessionType = builder
-  .objectRef<TopicSessionRow>("TopicSession")
-  .implement({
-    fields: (t) => ({
-      slotId: t.exposeID("slotId"),
-      startsAt: t.string({ resolve: (s) => s.startsAt.toISOString() }),
-      endsAt: t.string({ resolve: (s) => s.endsAt.toISOString() }),
-      /** proposed (pencilled) | confirmed. */
-      status: t.exposeString("status"),
-      /** Display copy — empty on location-less pencils. */
-      location: t.exposeString("location"),
-      /** The viewer's own 🟢🟡🔴 answer; null when signed out. */
-      viewerState: t.exposeString("viewerState", { nullable: true }),
-    }),
-  });
-
 // ---------------------------------------------------------------------------
 // Queries
 // ---------------------------------------------------------------------------
@@ -527,7 +506,7 @@ builder.queryFields((t) => ({
    * (topicWeightedBreakdown precedent): unreadable forum / calendar off /
    * foreign or unpublished topic. */
   topicSessions: t.field({
-    type: [TopicSessionType],
+    type: [TimeslotType],
     nullable: true,
     args: {
       idOrSlug: t.arg.string({ required: true }),
@@ -540,11 +519,26 @@ builder.queryFields((t) => ({
       const topic = await getTopicById(args.topicId);
       if (!topic || topic.timetableId !== readable.timetable.id) return null;
       if (topic.status !== "published") return null;
-      return listTopicSessions(
+      const slotIds = await listTopicSessionSlotIds(
         readable.timetable.id,
         topic.id,
-        ctx.user?.id ?? null,
       );
+      if (slotIds.length === 0) return [];
+      const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
+      const hostOnly = canSeeHostOnly(viewer);
+      // Only a host/admin viewer will be shown the wash, so only they need
+      // an audience computed — everyone else's counts would be nulled by
+      // the gate anyway (2026-08-16).
+      const audienceIds = hostOnly
+        ? await getAudienceElectorIds(readable.timetable.id, { kind: "all" })
+        : [];
+      const slots = await buildCalendar(
+        readable.timetable.id,
+        audienceIds,
+        viewer.userId,
+        { slotIds },
+      );
+      return slots.map((s) => ({ ...s, canSeeHostOnly: hostOnly }));
     },
   }),
 

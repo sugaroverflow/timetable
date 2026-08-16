@@ -200,13 +200,15 @@ Stable names for feature pieces, so instructions can reference them precisely.
   host's Scheduling tab instead): every future slot where the topic is
   pencilled/confirmed, lazily fetched on tab open (`topicSessions` query;
   the `sessionSlotCount` scalar on feed topics gates the tab without
-  fetching rows), each row a date/time + SessionLine-style status pill
-  and — electors only — the inline 🟢🟡🔴 toggle, which IS the elector's
-  existing per-slot calendar write (`AvailabilityControl` /
-  `setAvailability`, re-homed). Visible to anyone who can see the card,
-  anonymous included (viewerState null). NO group washes/counts/avatars
-  by design — electors seeing group availability is a deferred privacy
-  question; never leak counts or perUser here.
+  fetching rows) and rendered as CALENDAR ROWS (`CalendarTable`, ungrouped
+  so dates carry the year — 2026-08-16, decision 13). A viewer gets what
+  the calendar page would give them: bookings, rooms, their own 🟢🟡🔴,
+  the slot chat behind the fold; the wash stays host/admin-only because
+  `counts` is gated everywhere. `topicSessions` builds ONLY this topic's
+  slots (`listTopicSessionSlotIds` → `buildCalendar({ slotIds })`), never
+  the forum's whole schedule. No lens: a comment posted from a card is a
+  plain slot comment — claiming a time is the calendar's and the
+  workbench's gesture.
 - **digest click-to-read** — `digest_sends` table + `stampDigestLinks`
   (api `email.ts`) + `DigestReadMarker` (app layout): every digest link
   carries `dg=<send id>`; one click marks that email's shown comment

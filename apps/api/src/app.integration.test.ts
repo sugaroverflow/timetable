@@ -50,7 +50,7 @@ vi.mock("@timetable/core", async (importOriginal) => {
     getSlotById: vi.fn(),
     listCommentTreesForTopics: vi.fn(),
     listSlotComments: vi.fn(),
-    listTopicSessions: vi.fn(),
+    listTopicSessionSlotIds: vi.fn(),
     getTopicById: vi.fn(),
     getMembership: vi.fn(),
     getMembershipById: vi.fn(),
@@ -384,7 +384,7 @@ afterEach(() => {
   vi.mocked(core.getSlotById).mockReset();
   vi.mocked(core.listCommentTreesForTopics).mockReset();
   vi.mocked(core.listSlotComments).mockReset();
-  vi.mocked(core.listTopicSessions).mockReset();
+  vi.mocked(core.listTopicSessionSlotIds).mockReset();
   vi.mocked(core.countViewerPublishedHearts).mockReset();
   vi.mocked(core.createLocalUser).mockReset();
   vi.mocked(core.deleteTopic).mockReset();
@@ -2090,26 +2090,46 @@ describe("createApiApp", () => {
     });
   });
 
-  describe("topicSessions (sessions-tab, 2026-08-14)", () => {
+  describe("topicSessions (sessions-tab; calendar rows since 2026-08-16)", () => {
     const QUERY = `query($s: String!, $t: String!){
       topicSessions(idOrSlug: $s, topicId: $t) {
-        slotId startsAt endsAt status location viewerState
+        id viewerState commentCount
+        counts { green }
+        perUser { userId }
+        sessions { id status location }
       }
     }`;
 
     const calendarTimetable = () =>
       timetableFixture({ settings: { calendar: { enabled: true } } });
 
-    function sessionRow(
-      patch: Partial<core.TopicSessionRow> = {},
-    ): core.TopicSessionRow {
+    function slotRow(
+      patch: Partial<core.CalendarSlot> = {},
+    ): core.CalendarSlot {
       return {
-        slotId: "33333333-3333-3333-3333-333333333333",
+        id: "33333333-3333-3333-3333-333333333333",
         startsAt: new Date("2026-09-01T18:00:00.000Z"),
         endsAt: new Date("2026-09-01T20:00:00.000Z"),
-        status: "proposed",
-        location: "",
+        cellKey: null,
+        createdById: null,
+        locations: [],
+        sessions: [
+          {
+            id: "55555555-5555-5555-5555-555555555555",
+            location: "",
+            status: "proposed",
+            url: "",
+            customTitle: "",
+            topic: null,
+            sessionHost: null,
+          },
+        ],
         viewerState: null,
+        counts: { green: 4, yellow: 1, red: 0 },
+        perUser: [
+          { userId: "elector-9", name: null, image: null, state: "green" },
+        ],
+        commentCount: 2,
         ...patch,
       };
     }
@@ -2127,12 +2147,12 @@ describe("createApiApp", () => {
         data?: {
           topicSessions:
             | {
-                slotId: string;
-                startsAt: string;
-                endsAt: string;
-                status: string;
-                location: string;
+                id: string;
                 viewerState: string | null;
+                commentCount: number;
+                counts: { green: number } | null;
+                perUser: { userId: string }[] | null;
+                sessions: { id: string; status: string; location: string }[];
               }[]
             | null;
         };
@@ -2140,7 +2160,7 @@ describe("createApiApp", () => {
       };
     }
 
-    it("maps rows for a member, with their own viewerState", async () => {
+    it("builds only the topic's own slots, and hides the wash from an elector", async () => {
       const topic = topicFixture({ status: "published" });
       mockSession("elector-1", ["elector"]);
       vi.mocked(core.getReadableTimetable).mockResolvedValue({
@@ -2148,16 +2168,11 @@ describe("createApiApp", () => {
         roles: ["elector"],
       });
       vi.mocked(core.getTopicById).mockResolvedValue(topic);
-      vi.mocked(core.listTopicSessions).mockResolvedValue([
-        sessionRow({ viewerState: "green" }),
-        sessionRow({
-          slotId: "33333333-3333-3333-3333-333333333334",
-          startsAt: new Date("2026-09-08T18:00:00.000Z"),
-          endsAt: new Date("2026-09-08T20:00:00.000Z"),
-          status: "confirmed",
-          location: "Main hall",
-          viewerState: "yellow",
-        }),
+      vi.mocked(core.listTopicSessionSlotIds).mockResolvedValue([
+        "33333333-3333-3333-3333-333333333333",
+      ]);
+      vi.mocked(core.buildCalendar).mockResolvedValue([
+        slotRow({ viewerState: "green" }),
       ]);
 
       await withTestServer(async (baseUrl) => {
@@ -2165,26 +2180,29 @@ describe("createApiApp", () => {
         expect(body.errors).toBeUndefined();
         expect(body.data?.topicSessions).toEqual([
           {
-            slotId: "33333333-3333-3333-3333-333333333333",
-            startsAt: "2026-09-01T18:00:00.000Z",
-            endsAt: "2026-09-01T20:00:00.000Z",
-            status: "proposed",
-            location: "",
+            id: "33333333-3333-3333-3333-333333333333",
             viewerState: "green",
-          },
-          {
-            slotId: "33333333-3333-3333-3333-333333333334",
-            startsAt: "2026-09-08T18:00:00.000Z",
-            endsAt: "2026-09-08T20:00:00.000Z",
-            status: "confirmed",
-            location: "Main hall",
-            viewerState: "yellow",
+            commentCount: 2,
+            // Group availability is host/admin-only (2026-08-16); the
+            // elector keeps their own answer and the session facts.
+            counts: null,
+            perUser: null,
+            sessions: [
+              {
+                id: "55555555-5555-5555-5555-555555555555",
+                status: "proposed",
+                location: "",
+              },
+            ],
           },
         ]);
-        expect(core.listTopicSessions).toHaveBeenCalledWith(
+        // The tab builds THIS topic's slots, never the forum's whole
+        // schedule — and skips the audience query it wouldn't show.
+        expect(core.buildCalendar).toHaveBeenCalledWith(
           "11111111-1111-1111-1111-111111111111",
-          topic.id,
+          [],
           "elector-1",
+          { slotIds: ["33333333-3333-3333-3333-333333333333"] },
         );
       });
     });
@@ -2197,17 +2215,45 @@ describe("createApiApp", () => {
         roles: [],
       });
       vi.mocked(core.getTopicById).mockResolvedValue(topic);
-      vi.mocked(core.listTopicSessions).mockResolvedValue([sessionRow()]);
+      vi.mocked(core.listTopicSessionSlotIds).mockResolvedValue([
+        "33333333-3333-3333-3333-333333333333",
+      ]);
+      vi.mocked(core.buildCalendar).mockResolvedValue([slotRow()]);
 
       await withTestServer(async (baseUrl) => {
         const body = await request(baseUrl, topic.id);
         expect(body.errors).toBeUndefined();
         expect(body.data?.topicSessions).toHaveLength(1);
         expect(body.data?.topicSessions?.[0]?.viewerState).toBeNull();
-        expect(core.listTopicSessions).toHaveBeenCalledWith(
+        expect(body.data?.topicSessions?.[0]?.counts).toBeNull();
+      });
+    });
+
+    it("gives a host the wash, over the forum's electors", async () => {
+      const topic = topicFixture({ status: "published" });
+      mockSession("host-1", ["host"]);
+      vi.mocked(core.getReadableTimetable).mockResolvedValue({
+        timetable: calendarTimetable(),
+        roles: ["host"],
+      });
+      vi.mocked(core.getTopicById).mockResolvedValue(topic);
+      vi.mocked(core.listTopicSessionSlotIds).mockResolvedValue([
+        "33333333-3333-3333-3333-333333333333",
+      ]);
+      vi.mocked(core.getAudienceElectorIds).mockResolvedValue(["elector-9"]);
+      vi.mocked(core.buildCalendar).mockResolvedValue([slotRow()]);
+
+      await withTestServer(async (baseUrl) => {
+        const body = await request(baseUrl, topic.id);
+        expect(body.data?.topicSessions?.[0]?.counts).toEqual({ green: 4 });
+        expect(body.data?.topicSessions?.[0]?.perUser).toEqual([
+          { userId: "elector-9" },
+        ]);
+        // The card's sessions tab shows the whole forum's availability,
+        // not a lens — it isn't a per-topic view like the workbench.
+        expect(core.getAudienceElectorIds).toHaveBeenCalledWith(
           "11111111-1111-1111-1111-111111111111",
-          topic.id,
-          null,
+          { kind: "all" },
         );
       });
     });
@@ -2256,7 +2302,7 @@ describe("createApiApp", () => {
           (await request(baseUrl, topic.id)).data?.topicSessions,
         ).toBeNull();
 
-        expect(core.listTopicSessions).not.toHaveBeenCalled();
+        expect(core.listTopicSessionSlotIds).not.toHaveBeenCalled();
       });
     });
   });

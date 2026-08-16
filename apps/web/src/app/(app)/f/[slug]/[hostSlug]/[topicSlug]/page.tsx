@@ -7,6 +7,7 @@ import { anonGql } from "@/lib/ogCard";
 
 import { MarkCommentsSeen } from "@/components/MarkCommentsSeen";
 import { TopicCard } from "@/components/TopicCard";
+import { buildWorkbenchCalendar } from "@/lib/calendarPerms";
 import { topicPerms } from "@/lib/feedPage";
 import type { FeedTopic } from "@/lib/feedTypes";
 import { TOPIC_FEED_FIELDS } from "@/lib/gqlFragments";
@@ -136,6 +137,7 @@ export default async function TopicPermalinkPage({
         hosts={data.timetableHosts}
         discussionOpen
         hostCommentsEnabled={isHostCommentsEnabled(settings)}
+        calendar={buildWorkbenchCalendar(settings, roles, viewerId)}
       />
     </div>
   );
