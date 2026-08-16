@@ -139,7 +139,6 @@ export function ModerationCard({
           canModerate={true}
           slug={slug}
           adminLabel={adminLabel}
-          hostLabel={hostLabel}
           roleLabels={roleLabels}
         />
         <AdminTopicActions

@@ -299,6 +299,7 @@ export function TopicScheduleBody({
       {mine.length > 0 ? (
         <CalendarTable
           title="Your sessions"
+          card={false}
           collapsible
           rows={mine.map((slot) => ({ slot, past: false }))}
           {...shared}
@@ -311,6 +312,7 @@ export function TopicScheduleBody({
       ) : (
         <CalendarTable
           title="Calendar"
+          card={false}
           collapsible
           grouped={mode === "date"}
           rows={sorted.map((slot) => ({ slot, past: isPast(slot) }))}

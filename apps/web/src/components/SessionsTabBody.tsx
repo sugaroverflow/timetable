@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import type { CalendarSlot, WorkbenchCalendar } from "@/lib/calendarTypes";
@@ -22,7 +21,7 @@ const QUERY = `query TopicSessions($s: String!, $t: String!) {
  * as ordinary calendar rows: bookings, rooms, the elector's own 🟢🟡🔴,
  * and the slot's chat behind the fold. The wash stays host/admin-only,
  * exactly as on the calendar page — a card can't leak what the calendar
- * doesn't. */
+ * doesn't — and charts THIS topic's hearters (Ed, QA 2026-08-16). */
 export function SessionsTabBody({
   slug,
   topicId,
@@ -81,33 +80,27 @@ export function SessionsTabBody({
     );
   }
 
+  // Bare rows: the tab strip is the heading, the card is the frame, and
+  // the sidebar already links the calendar (Ed, QA 2026-08-16).
   return (
-    <div className="stack" style={{ gap: 8 }}>
-      <CalendarTable
-        title="Sessions"
-        // A flat list of a topic's own dates, not a chronology — so no
-        // month headings, and the rows carry their year.
-        grouped={false}
-        rows={rows.map((slot) => ({ slot, past: false }))}
-        slug={slug}
-        locations={calendar.locations}
-        perms={calendar.perms}
-        // No claim/lens here: this card is about the topic, but the tab is
-        // where you find out WHEN it runs — arguing for a time is the
-        // calendar's and the workbench's job.
-        claimTopics={[]}
-        lensTopic={null}
-        adminLabel={adminLabel}
-        officeHoursLabel={calendar.officeHoursLabel}
-        roleLabels={roleLabels}
-      />
-      <Link
-        href={`/f/${slug}/calendar`}
-        className="faint"
-        style={{ fontSize: 12 }}
-      >
-        Open the calendar
-      </Link>
-    </div>
+    <CalendarTable
+      title={null}
+      card={false}
+      // A flat list of a topic's own dates, not a chronology — so no
+      // month headings, and the rows carry their year.
+      grouped={false}
+      rows={rows.map((slot) => ({ slot, past: false }))}
+      slug={slug}
+      locations={calendar.locations}
+      perms={calendar.perms}
+      // No claim/lens here: this card is about the topic, but the tab is
+      // where you find out WHEN it runs — arguing for a time is the
+      // calendar's and the workbench's job.
+      claimTopics={[]}
+      lensTopic={null}
+      adminLabel={adminLabel}
+      officeHoursLabel={calendar.officeHoursLabel}
+      roleLabels={roleLabels}
+    />
   );
 }

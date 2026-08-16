@@ -21,7 +21,6 @@ export function AdminCommentsBody({
   viewerId = null,
   slug,
   adminLabel = "Admin",
-  hostLabel = "Host",
   roleLabels,
 }: {
   topicId: string;
@@ -30,13 +29,13 @@ export function AdminCommentsBody({
   viewerId?: string | null;
   slug?: string;
   adminLabel?: string;
-  hostLabel?: string;
   roleLabels?: RoleLabels;
 }) {
   const admins = pluralLabel(adminLabel);
-  const composerHint = canModerate
-    ? `only the ${hostLabel} and ${admins} can see this`
-    : `only you and ${admins} can see this`;
+  // One string for every viewer (Ed, QA 2026-08-16, extending 2026-08-11's
+  // panel-trigger ruling): naming "the {Host}" read as ALL hosts seeing
+  // the thread, when the audience is just you and the admins.
+  const composerHint = `only you and the ${admins} can see this`;
   return (
     <div className="host-thread thread-stack">
       <CommentComposer
@@ -63,8 +62,7 @@ export function AdminCommentsBody({
  * Threaded, with its own composer. Starts expanded when the thread already
  * has comments so feedback is never missed. Copy says "you and {Admins}
  * only" for every viewer (Ed, 2026-08-11 — "the {Host} and {Admins}" read
- * as the whole faculty); admins get the owner named in the hint so nobody
- * assumes the thread is admin-private (QA 2026-07-29). */
+ * as the whole faculty). */
 export function AdminCommentsPanel({
   topicId,
   comments,
@@ -72,7 +70,6 @@ export function AdminCommentsPanel({
   viewerId = null,
   slug,
   adminLabel = "Admin",
-  hostLabel = "Host",
   roleLabels,
 }: {
   topicId: string;
@@ -81,7 +78,6 @@ export function AdminCommentsPanel({
   viewerId?: string | null;
   slug?: string;
   adminLabel?: string;
-  hostLabel?: string;
   roleLabels?: RoleLabels;
 }) {
   const count = countNested(comments);
@@ -115,7 +111,6 @@ export function AdminCommentsPanel({
             viewerId={viewerId}
             slug={slug}
             adminLabel={adminLabel}
-            hostLabel={hostLabel}
             roleLabels={roleLabels}
           />
         )}

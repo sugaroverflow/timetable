@@ -320,7 +320,6 @@ function adminTab(a: TabArgs): TopicTab | null {
         viewerId={a.viewerId}
         slug={a.slug}
         adminLabel={a.adminLabel}
-        hostLabel={a.hostLabel}
         roleLabels={a.roleLabels}
       />
     ),

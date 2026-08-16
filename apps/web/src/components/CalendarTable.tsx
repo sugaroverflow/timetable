@@ -349,6 +349,55 @@ function SlotRow({
   );
 }
 
+/** The list's heading: card lists get the serif section title, bare
+ * lists the quiet sans subhead; a collapsible list's title is the fold
+ * toggle. The past toggle rides here when there is no month heading to
+ * carry it (ungrouped lists). */
+function TableHeading({
+  title,
+  card,
+  grouped,
+  collapsible,
+  open,
+  onToggle,
+  pastToggle,
+}: {
+  title: string;
+  card: boolean;
+  grouped: boolean;
+  collapsible: boolean;
+  open: boolean;
+  onToggle: () => void;
+  pastToggle: React.ReactNode;
+}) {
+  return (
+    <h3
+      className={card ? "section-title" : "cal-subhead"}
+      style={{ marginBottom: 8 }}
+    >
+      {collapsible ? (
+        <button
+          type="button"
+          className="cal-section-toggle"
+          aria-expanded={open}
+          onClick={onToggle}
+        >
+          {open ? (
+            <ChevronDown size={14} aria-hidden />
+          ) : (
+            <ChevronRight size={14} aria-hidden />
+          )}
+          {title}
+        </button>
+      ) : (
+        title
+      )}
+      {/* Ungrouped lists have no month heading to carry it. */}
+      {!grouped ? pastToggle : null}
+    </h3>
+  );
+}
+
 /**
  * The calendar as a list of row washes (2026-08-05 — replaced the table
  * with its meters, hairlines, and week rules): each slot is one rounded
@@ -368,9 +417,12 @@ export function CalendarTable({
   officeHoursLabel = "Office hours",
   roleLabels,
   title = "Calendar",
+  card = true,
   grouped = true,
   collapsible = false,
-  pastToggle = null,
+  // No default (each one is a complexity point) — undefined renders as
+  // nothing, same as null.
+  pastToggle,
   rowAction,
 }: {
   rows: CalendarTableRow[];
@@ -384,8 +436,13 @@ export function CalendarTable({
   officeHoursLabel?: string;
   /** Forum role labels for the discussion authors' role pills. */
   roleLabels?: RoleLabels;
-  /** "Your sessions", "Scheduling", … — the card's heading. */
-  title?: string;
+  /** "Your sessions", "Calendar", … — the heading. Null for a list that
+   * needs none (the sessions tab IS its own heading, 2026-08-16). */
+  title?: string | null;
+  /** False renders the bare list — for lists already inside something
+   * (a topic card's tab panel), where a card-in-card reads as clutter
+   * (Ed, QA 2026-08-16). The heading also drops to the small variant. */
+  card?: boolean;
   /** Month headings and week gaps (the chronology). False for a list in
    * some other order — availability-ranked, say — whose rows then carry
    * the year instead (2026-08-16). */
@@ -405,73 +462,81 @@ export function CalendarTable({
   const showRows = !collapsible || open;
 
   return (
-    <div className="card">
-      <h3 className="section-title" style={{ marginBottom: 8 }}>
-        {collapsible ? (
-          <button
-            type="button"
-            className="cal-section-toggle"
-            aria-expanded={open}
-            onClick={() => setOpen((o) => !o)}
-          >
-            {open ? (
-              <ChevronDown size={14} aria-hidden />
-            ) : (
-              <ChevronRight size={14} aria-hidden />
-            )}
-            {title}
-            <span className="faint">{rows.length}</span>
-          </button>
-        ) : (
-          title
-        )}
-        {/* Ungrouped lists have no month heading to carry it. */}
-        {!grouped ? pastToggle : null}
-      </h3>
-      <div className="cal-list" hidden={!showRows}>
-        {rows.map(({ slot, past }, i) => {
-          const month = monthLabel(slot.startsAt);
-          const divider =
-            grouped &&
-            (i === 0 || month !== monthLabel(rows[i - 1]!.slot.startsAt));
-          // Bigger gap between Sunday and Monday — skipped when a month
-          // heading already breaks the run.
-          const weekStart =
-            grouped &&
-            !divider &&
-            i > 0 &&
-            weekKey(slot.startsAt) !== weekKey(rows[i - 1]!.slot.startsAt);
-          return (
-            <Fragment key={slot.id}>
-              {divider ? (
-                <div className="cal-month-row">
-                  <span className="cal-month-inner">
-                    {month}
-                    {/* The past toggle rides in the FIRST month break
-                        (QA 2026-08-03). */}
-                    {i === 0 ? pastToggle : null}
-                  </span>
-                </div>
-              ) : null}
-              <SlotRow
-                slot={slot}
-                past={past}
-                weekStart={weekStart}
-                slug={slug}
-                locations={locations}
-                perms={perms}
-                claimTopics={claimTopics}
-                lensTopic={lensTopic}
-                adminLabel={adminLabel}
-                officeHoursLabel={officeHoursLabel}
-                roleLabels={roleLabels}
-                showYear={!grouped}
-                action={rowAction?.(slot) ?? null}
-              />
-            </Fragment>
-          );
-        })}
-      </div>
+    <div className={card ? "card" : undefined}>
+      {title != null ? (
+        <TableHeading
+          title={title}
+          card={card}
+          grouped={grouped}
+          collapsible={collapsible}
+          open={open}
+          onToggle={() => setOpen((o) => !o)}
+          pastToggle={pastToggle}
+        />
+      ) : null}
+      {/* Conditional render, not `hidden` — .cal-list's own display rule
+          out-specifies the attribute (the fold bug, QA 2026-08-16). */}
+      {showRows ? (
+        <div className="cal-list">
+          {rows.map(({ slot, past }, i) => {
+            const month = monthLabel(slot.startsAt);
+            const divider =
+              grouped &&
+              (i === 0 || month !== monthLabel(rows[i - 1]!.slot.startsAt));
+            // Bigger gap between Sunday and Monday — skipped when a month
+            // heading already breaks the run.
+            const weekStart =
+              grouped &&
+              !divider &&
+              i > 0 &&
+              weekKey(slot.startsAt) !== weekKey(rows[i - 1]!.slot.startsAt);
+            return (
+              <Fragment key={slot.id}>
+                {divider ? (
+                  <MonthRow
+                    month={month}
+                    toggle={i === 0 ? pastToggle : null}
+                  />
+                ) : null}
+                <SlotRow
+                  slot={slot}
+                  past={past}
+                  weekStart={weekStart}
+                  slug={slug}
+                  locations={locations}
+                  perms={perms}
+                  claimTopics={claimTopics}
+                  lensTopic={lensTopic}
+                  adminLabel={adminLabel}
+                  officeHoursLabel={officeHoursLabel}
+                  roleLabels={roleLabels}
+                  showYear={!grouped}
+                  action={rowAction?.(slot) ?? null}
+                />
+              </Fragment>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** A month heading between row groups; the past toggle rides in the
+ * FIRST month break (QA 2026-08-03). */
+function MonthRow({
+  month,
+  toggle,
+}: {
+  month: string;
+  toggle: React.ReactNode;
+}) {
+  return (
+    <div className="cal-month-row">
+      <span className="cal-month-inner">
+        {month}
+        {toggle}
+      </span>
     </div>
   );
 }

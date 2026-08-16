@@ -2245,11 +2245,11 @@ describe("createApiApp", () => {
         expect(body.data?.topicSessions?.[0]?.perUser).toEqual([
           { userId: "elector-9" },
         ]);
-        // The card's sessions tab shows the whole forum's availability,
-        // not a lens — it isn't a per-topic view like the workbench.
+        // The wash charts THIS topic's hearters, as in the workbench
+        // (Ed, QA 2026-08-16) — a card's wash is that topic's demand.
         expect(core.getAudienceElectorIds).toHaveBeenCalledWith(
           "11111111-1111-1111-1111-111111111111",
-          { kind: "all" },
+          { kind: "hearted_topic", topicId: topic.id },
         );
       });
     });
