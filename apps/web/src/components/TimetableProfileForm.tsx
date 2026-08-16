@@ -75,7 +75,7 @@ function IdentityFields({
           />
         </div>
         {value.slug !== slug ? (
-          <p className="faint" style={{ margin: "4px 0 0", fontSize: 12 }}>
+          <p className="hint" style={{ margin: "4px 0 0" }}>
             Changing the URL is safe — /f/{slug} will permanently redirect here,
             so old links and bookmarks keep working.
           </p>
@@ -109,7 +109,7 @@ function IdentityFields({
           onChange={(e) => onChange({ customDomain: e.target.value })}
           placeholder="forum.2026.newspeak.house"
         />
-        <p className="faint" style={{ margin: "4px 0 0", fontSize: 12 }}>
+        <p className="hint" style={{ margin: "4px 0 0" }}>
           Saved for later — custom-domain routing isn&rsquo;t wired up yet.
         </p>
       </div>

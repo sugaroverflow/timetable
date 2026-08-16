@@ -57,7 +57,7 @@ export default async function SettingsPage({
 
   return (
     <div className="stack">
-      <div className="grid grid-2">
+      <div className="grid">
         <TimetableProfileForm
           slug={slug}
           name={first.timetable.name}
@@ -114,7 +114,7 @@ export default async function SettingsPage({
         </CollapsibleSection>
       </div>
 
-      <div className="grid grid-2">
+      <div className="grid">
         <InviteForm timetableId={first.timetable.id} />
 
         <div className="stack">

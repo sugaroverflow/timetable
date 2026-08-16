@@ -92,7 +92,7 @@ export function ProposeSlotForm({
   return (
     <div className="card stack" style={{ gap: 10 }}>
       <form onSubmit={submit} className="stack" style={{ gap: 8 }}>
-        <p className="faint" style={{ margin: 0, fontSize: 12 }}>
+        <p className="hint" style={{ margin: 0 }}>
           Off the usual grid — breakfast, a full day, the park. It appears as a
           pencilled slot and starts collecting availability right away; the
           location is what the new timeslot offers (the room itself is decided

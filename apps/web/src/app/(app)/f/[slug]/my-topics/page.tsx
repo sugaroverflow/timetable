@@ -83,7 +83,7 @@ export default async function MyTopicsPage({
     : undefined;
 
   return (
-    <div className="grid grid-2">
+    <div className="grid">
       <div className="stack">
         <div className="page-head">
           <h2 className="page-title">My Topics</h2>

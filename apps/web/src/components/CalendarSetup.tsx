@@ -448,7 +448,7 @@ export function CalendarSetup({
           Set up the schedule
         </h3>
         <div className="stack" style={{ gap: 6 }}>
-          <strong style={{ fontSize: 13 }}>
+          <strong className="field-heading">
             When{locations.length > 0 ? " and where" : ""} can sessions happen?
           </strong>
           <div className="row wrap" style={{ gap: 6 }}>
@@ -471,7 +471,7 @@ export function CalendarSetup({
         </div>
 
         <div className="stack" style={{ gap: 6 }}>
-          <strong style={{ fontSize: 13 }}>During which dates?</strong>
+          <strong className="field-heading">During which dates?</strong>
           <div className="row wrap" style={{ gap: 6 }}>
             {terms.map((term, i) => (
               <button
@@ -522,8 +522,8 @@ export function CalendarSetup({
         </div>
 
         <div className="stack" style={{ gap: 6 }}>
-          <strong style={{ fontSize: 13 }}>One-off dates</strong>
-          <p className="faint" style={{ margin: 0, fontSize: 12 }}>
+          <strong className="field-heading">One-off dates</strong>
+          <p className="hint" style={{ margin: 0 }}>
             Release extra dates outside the weekly pattern — e.g. when a rarer
             location becomes available. A date the calendar already has simply
             gains the location.

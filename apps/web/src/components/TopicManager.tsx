@@ -34,9 +34,8 @@ function DeleteTopicButton({
   if (!confirming) {
     return (
       <button
-        className="btn btn-ghost"
+        className="btn btn-ghost error-text"
         type="button"
-        style={{ color: "var(--red)" }}
         onClick={() => setConfirming(true)}
       >
         Delete
@@ -49,9 +48,8 @@ function DeleteTopicButton({
         Delete this topic and its comments forever?
       </span>
       <button
-        className="btn"
+        className="btn error-text"
         type="button"
-        style={{ color: "var(--red)" }}
         disabled={busy}
         onClick={() => onDelete(topicId)}
       >

@@ -171,9 +171,7 @@ function ElectorRowItem({
         <tr className="elector-hearts-row">
           <td colSpan={5}>
             {elector.heartedTopics.length === 0 ? (
-              <span className="faint" style={{ fontSize: 12 }}>
-                No ❤️s yet.
-              </span>
+              <span className="hint">No ❤️s yet.</span>
             ) : (
               <HeartedTopicsTable
                 slug={slug}

@@ -210,7 +210,7 @@ export function DigestSettingsForm({
       </div>
       {cadence !== "never" ? (
         <div className="stack" style={{ gap: 8, marginBottom: 12 }}>
-          <strong style={{ fontSize: 13 }}>What to include</strong>
+          <strong className="field-heading">What to include</strong>
           {visibleKinds.map((kind) => {
             const applies = digestKindApplies(kind, roles);
             return (

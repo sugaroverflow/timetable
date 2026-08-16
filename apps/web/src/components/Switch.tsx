@@ -31,7 +31,7 @@ export function Switch({
       <span className="ui-switch-label">
         {label}
         {hint ? (
-          <span className="faint" style={{ display: "block", fontSize: 12 }}>
+          <span className="hint" style={{ display: "block" }}>
             {hint}
           </span>
         ) : null}

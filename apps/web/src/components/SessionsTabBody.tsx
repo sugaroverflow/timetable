@@ -59,25 +59,13 @@ export function SessionsTabBody({
   }, [slug, topicId]);
 
   if (failed) {
-    return (
-      <div className="faint" style={{ fontSize: 12 }}>
-        Couldn&rsquo;t load the sessions.
-      </div>
-    );
+    return <div className="hint">Couldn&rsquo;t load the sessions.</div>;
   }
   if (rows === undefined) {
-    return (
-      <div className="faint" style={{ fontSize: 12 }}>
-        Loading…
-      </div>
-    );
+    return <div className="hint">Loading…</div>;
   }
   if (!calendar || rows === null || rows.length === 0) {
-    return (
-      <div className="faint" style={{ fontSize: 12 }}>
-        No upcoming sessions.
-      </div>
-    );
+    return <div className="hint">No upcoming sessions.</div>;
   }
 
   // Bare rows: the tab strip is the heading, the card is the frame, and

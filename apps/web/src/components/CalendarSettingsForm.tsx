@@ -72,7 +72,7 @@ export function CalendarSettingsForm({
     <div className="stack" style={{ gap: 12 }}>
       <div>
         <h3 className="settings-subtitle">Calendar</h3>
-        <p className="faint" style={{ margin: "2px 0 0", fontSize: 12 }}>
+        <p className="hint" style={{ margin: "2px 0 0" }}>
           Collect availability and schedule sessions into timeslots.
         </p>
       </div>

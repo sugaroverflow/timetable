@@ -57,7 +57,7 @@ export function HostCommentsForm({
     <form onSubmit={submit} className="stack" style={{ gap: 12 }}>
       <div>
         <h3 className="settings-subtitle">{hostLabel}-only comments</h3>
-        <p className="faint" style={{ margin: "2px 0 0", fontSize: 12 }}>
+        <p className="hint" style={{ margin: "2px 0 0" }}>
           A comment thread on each topic that only {hosts}s and {admins}s see,
           with a 💙 row where {hosts}s show interest in each other&rsquo;s
           topics. 💙s never affect the {electors}s&rsquo; vote. In a forum where

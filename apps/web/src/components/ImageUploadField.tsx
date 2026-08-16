@@ -104,7 +104,7 @@ export function ImageUploadField({
     <div className="field">
       <label htmlFor={id}>{label}</label>
       {hint ? (
-        <p className="faint" style={{ margin: "0 0 5px", fontSize: 12 }}>
+        <p className="hint" style={{ margin: "0 0 5px" }}>
           {hint}
         </p>
       ) : null}

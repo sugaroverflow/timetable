@@ -62,8 +62,6 @@
   --amber-100: #fff4e0; /* status/feedback warning surface */
   --amber-ink: #a9700f;
   --amber-ink-d: #e0b24d;
-  --amber-line: #f3e0b8;
-  --amber-line-d: #5a4a2a;
   --amber-950: #3a2f1a;
 
   /* Danger red */
@@ -145,7 +143,6 @@
   --yellow-soft: var(--yellow-100);
   --warning-ink: var(--amber-ink);
   --warning-soft: var(--amber-100);
-  --warning-line: var(--amber-line);
 
   /* --- Status: danger / availability "can't" --- */
   --red: var(--red-500);
@@ -300,7 +297,6 @@ html[data-theme="dark"] {
   --yellow-soft: var(--amber-950);
   --warning-ink: var(--amber-ink-d);
   --warning-soft: var(--amber-950);
-  --warning-line: var(--amber-line-d);
 
   /* Status: danger */
   --red: var(--red-400);
