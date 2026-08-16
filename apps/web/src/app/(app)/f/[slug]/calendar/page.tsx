@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 import { auth } from "@clerk/nextjs/server";
 import {
@@ -30,6 +31,8 @@ import type {
   CalendarSlot,
   TopicOption,
 } from "@/lib/calendarTypes";
+import { buildCalendarPerms } from "@/lib/calendarPerms";
+import { CALENDAR_SLOT_FIELDS } from "@/lib/gqlFragments";
 import { gqlFetch } from "@/lib/graphql";
 import { displayRolesFromCookies } from "@/lib/previewRoles.server";
 import {
@@ -52,21 +55,10 @@ type Data = {
   myAvailabilityPattern?: string | null;
 };
 
-const SLOT_FIELDS = `
-  id startsAt endsAt cellKey locations commentCount viewerState
-  sessions {
-    id location status url customTitle
-    topic { id title topicSlug hostId hostName }
-    sessionHost { id name }
-  }
-  counts { green yellow red }
-  perUser { userId name image state }
-`;
-
 const QUERY = `
   query Calendar($s: String!, $audience: String, $past: Boolean) {
     timetable: forum(idOrSlug: $s) { viewerRoles settings calendarHasSlots }
-    calendar(idOrSlug: $s, audience: $audience, includePast: $past) { ${SLOT_FIELDS} }
+    calendar(idOrSlug: $s, audience: $audience, includePast: $past) { ${CALENDAR_SLOT_FIELDS} }
     topicFeed(idOrSlug: $s) { id title hostId hostName heartCount }
   }
 `;
@@ -75,7 +67,7 @@ const QUERY_AUTHED = `
   query CalendarAuthed($s: String!, $audience: String, $past: Boolean) {
     timetable: forum(idOrSlug: $s) { viewerRoles settings calendarHasSlots }
     me { id }
-    calendar(idOrSlug: $s, audience: $audience, includePast: $past) { ${SLOT_FIELDS} }
+    calendar(idOrSlug: $s, audience: $audience, includePast: $past) { ${CALENDAR_SLOT_FIELDS} }
     topicFeed(idOrSlug: $s) { id title hostId hostName heartCount }
     myIcsToken
     myAvailabilityPattern(idOrSlug: $s)
@@ -223,24 +215,6 @@ function findLensTopic(
   return topicFeed.find((t) => t.id === id) ?? null;
 }
 
-function buildPerms(
-  roles: Role[],
-  viewerId: string | null,
-  policy: ReturnType<typeof calendarConfirmPolicy>,
-): CalendarPerms {
-  const viewer: Viewer = { userId: viewerId, roles };
-  const admin = isAdmin(roles);
-  return {
-    canSetAvailability: isElector(roles),
-    canSeeHostOnly: isHost(roles) || admin,
-    canAdmin: admin,
-    canDiscuss: canDiscussSlots(viewer),
-    canPropose: canProposeSession(viewer, policy),
-    canConfirm: canConfirmSession(viewer, policy),
-    viewerId,
-  };
-}
-
 function parsePattern(
   raw: string | null | undefined,
 ): Record<string, AvailabilityState> {
@@ -334,6 +308,34 @@ function CalendarEmpty({
   );
 }
 
+/** Show past / Hide past, which on this page is a link rather than state
+ * (the past is a server-side fetch: `?past=1`). It rides in the table's
+ * first month heading (QA 2026-08-03). */
+function PastToggle({
+  showingPast,
+  base,
+}: {
+  showingPast: boolean;
+  base: string;
+}) {
+  return (
+    <Link
+      className="topic-body-toggle"
+      href={showingPast ? `${base}/calendar` : `${base}/calendar?past=1`}
+    >
+      {showingPast ? (
+        <>
+          <ChevronUp size={14} aria-hidden /> Hide past
+        </>
+      ) : (
+        <>
+          <ChevronDown size={14} aria-hidden /> Show past
+        </>
+      )}
+    </Link>
+  );
+}
+
 /** Legend + the slot table (or the empty state). */
 function CalendarBody({
   slug,
@@ -377,8 +379,7 @@ function CalendarBody({
         adminLabel={adminLabel}
         officeHoursLabel={ohLabel}
         roleLabels={roleLabels}
-        showingPast={past}
-        base={base}
+        pastToggle={<PastToggle showingPast={past} base={base} />}
       />
       {perms.canSeeHostOnly || perms.canSetAvailability ? <Legend /> : null}
     </div>
@@ -399,8 +400,6 @@ function MySessions({
   adminLabel,
   ohLabel,
   roleLabels,
-  past,
-  base,
 }: {
   slots: CalendarSlot[];
   slug: string;
@@ -411,14 +410,11 @@ function MySessions({
   adminLabel: string;
   ohLabel: string;
   roleLabels?: RoleLabels;
-  past: boolean;
-  base: string;
 }) {
   if (slots.length === 0) return null;
   return (
     <CalendarTable
       title="Your sessions"
-      showPastToggle={false}
       rows={slots.map((slot) => ({ slot, past: false }))}
       slug={slug}
       locations={locations}
@@ -428,8 +424,6 @@ function MySessions({
       adminLabel={adminLabel}
       officeHoursLabel={ohLabel}
       roleLabels={roleLabels}
-      showingPast={past}
-      base={base}
     />
   );
 }
@@ -516,7 +510,11 @@ export default async function CalendarPage({
   if (gate) return gate;
 
   const viewerId = data.me?.id ?? null;
-  const perms = buildPerms(roles, viewerId, calendarConfirmPolicy(settings));
+  const perms = buildCalendarPerms(
+    roles,
+    viewerId,
+    calendarConfirmPolicy(settings),
+  );
   const adminLabel = roleLabel(settings.roleLabels, "admin");
   const calendarSettings = { locations: [], ...(settings.calendar ?? {}) };
 
@@ -556,8 +554,6 @@ export default async function CalendarPage({
         adminLabel={adminLabel}
         ohLabel={officeHoursLabel(settings)}
         roleLabels={settings.roleLabels}
-        past={past}
-        base={base}
       />
 
       <CalendarCards

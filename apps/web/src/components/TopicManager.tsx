@@ -8,6 +8,7 @@ import { CollapsibleTopicBody } from "@/components/CollapsibleTopicBody";
 import { ReadySwitch } from "@/components/ReadySwitch";
 import { TopicEditScope, useTopicEditing } from "@/components/TopicEditScope";
 import { MyTopicsTabs } from "@/components/MyTopicsTabs";
+import type { WorkbenchCalendar } from "@/lib/calendarTypes";
 import type { ManagedTopic } from "@/lib/feedTypes";
 import { topicPath } from "@/lib/topicPath";
 import { useGqlAction } from "@/lib/useGqlAction";
@@ -225,8 +226,7 @@ export function TopicManager({
   isAdmin,
   hosts,
   canPublishDirectly = false,
-  calendarEnabled,
-  canPencilSessions,
+  calendar,
   hostCommentsEnabled,
 }: {
   topic: ManagedTopic;
@@ -238,10 +238,9 @@ export function TopicManager({
   isAdmin: boolean;
   hosts: { id: string; name: string | null }[];
   canPublishDirectly?: boolean;
-  /** Mount the topic-workbench scheduling panel (2026-08-14). */
-  calendarEnabled: boolean;
-  /** False under confirmPolicy "admins": panel shows demand read-only. */
-  canPencilSessions: boolean;
+  /** The forum's calendar context for the Scheduling tab, or null when
+   * the calendar is off (2026-08-16). */
+  calendar: WorkbenchCalendar | null;
   /** Forum option: without it there is no {host}-only tab at all. */
   hostCommentsEnabled: boolean;
 }) {
@@ -306,10 +305,8 @@ export function TopicManager({
           hostLabel={hostLabel}
           adminLabel={adminLabel}
           roleLabels={roleLabels}
-          calendarEnabled={calendarEnabled}
+          calendar={calendar}
           hostCommentsEnabled={hostCommentsEnabled}
-          canPencilSessions={canPencilSessions}
-          canModerate={isAdmin}
         />
 
         <ManageControls

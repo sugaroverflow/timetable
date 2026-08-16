@@ -48,6 +48,15 @@ export type CalendarSlot = {
   commentCount: number;
 };
 
+/** What a surface outside the calendar page needs to render calendar
+ * rows: who the viewer is, the forum's rooms, and its office-hours word.
+ * Null where the forum has the calendar switched off (2026-08-16). */
+export type WorkbenchCalendar = {
+  perms: CalendarPerms;
+  locations: string[];
+  officeHoursLabel: string;
+};
+
 export type TopicOption = {
   id: string;
   title: string;
