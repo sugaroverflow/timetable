@@ -69,6 +69,8 @@ type TabArgs = {
   calendarEnabled: boolean;
   canPencilSessions: boolean;
   hostCommentsEnabled: boolean;
+  /** Admin viewers may hide comments in a slot chat. */
+  canModerate: boolean;
   publicComments: FeedComment[];
   hostComments: FeedComment[];
   adminComments: FeedComment[];
@@ -165,6 +167,9 @@ function schedulingTab(a: TabArgs): TopicTab | null {
         slug={a.slug}
         topicId={a.topic.id}
         canPencil={a.canPencilSessions}
+        viewerId={a.viewerId}
+        canModerate={a.canModerate}
+        roleLabels={a.roleLabels}
       />
     ),
   };
@@ -184,6 +189,7 @@ export function MyTopicsTabs({
   calendarEnabled,
   canPencilSessions,
   hostCommentsEnabled,
+  canModerate,
 }: {
   topic: ManagedTopic;
   slug: string;
@@ -194,6 +200,7 @@ export function MyTopicsTabs({
   calendarEnabled: boolean;
   canPencilSessions: boolean;
   hostCommentsEnabled: boolean;
+  canModerate: boolean;
 }) {
   const args: TabArgs = {
     topic,
@@ -205,6 +212,7 @@ export function MyTopicsTabs({
     calendarEnabled,
     canPencilSessions,
     hostCommentsEnabled,
+    canModerate,
     publicComments: topic.comments ?? [],
     hostComments: topic.hostOnlyComments ?? [],
     adminComments: topic.adminComments ?? [],

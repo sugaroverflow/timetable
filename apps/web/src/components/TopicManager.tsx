@@ -309,6 +309,7 @@ export function TopicManager({
           calendarEnabled={calendarEnabled}
           hostCommentsEnabled={hostCommentsEnabled}
           canPencilSessions={canPencilSessions}
+          canModerate={isAdmin}
         />
 
         <ManageControls

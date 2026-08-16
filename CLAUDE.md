@@ -183,7 +183,11 @@ Stable names for feature pieces, so instructions can reference them precisely.
   Each row also names the OTHER sessions already on
   that slot (`others` on `topicSlotFit`; ✎/✓ + label, QA 2026-08-15) —
   company, not conflict, since pencils never contend.
-  No discussion here — that's the calendar page, which leads with its own
+  Unfolding a row also opens the SLOT'S OWN chat — the same thread the
+  calendar page shows, via the shared `DiscussionPanel` (Ed, QA
+  2026-08-16: one conversation per timeslot, wherever you meet it; posts
+  are plain comments, claims belong to the calendar's lens). Pinned rows
+  carry avatars only. The calendar page likewise leads with its own
   **"Your sessions"** card (`MySessions` in `calendar/page.tsx`, QA
   2026-08-16): the viewer's future topic sessions + office hours, same
   `CalendarTable` rows, read off the UNFILTERED calendar and repeated in

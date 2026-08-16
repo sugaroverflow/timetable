@@ -398,6 +398,10 @@ type TopicSlotFitRow = {
    * choosing when to run their topic wants to see the company — and a
    * confirmed session means the room race has already started. */
   others: { id: string; label: string; status: string }[];
+  /** The slot's own discussion, which the workbench row unfolds just like
+   * a calendar row (QA 2026-08-16) — one conversation per timeslot,
+   * wherever you meet it. */
+  commentCount: number;
 };
 
 /** One other booking on a workbench row — display copy only (no links,
@@ -437,6 +441,7 @@ const TopicSlotFitType = builder
         type: [TopicSlotOtherType],
         resolve: (s) => s.others,
       }),
+      commentCount: t.exposeInt("commentCount"),
     }),
   });
 
@@ -576,6 +581,7 @@ builder.queryFields((t) => ({
                     `${x.sessionHost?.name ?? "…"} — ${ohLabel}`,
                 status: x.status,
               })),
+            commentCount: s.commentCount,
           };
         }),
       };
