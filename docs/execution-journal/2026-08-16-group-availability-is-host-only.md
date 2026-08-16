@@ -27,3 +27,21 @@ The web's `CalendarSlot.counts` is nullable to match, and the two places
 that render it (the tint layer, the claim chip's live preview) now check.
 Tests cover the calendar query for host vs elector, and claim snapshots
 for the same pair.
+
+## Correction: claim snapshots stay readable
+
+Ed, the same day: "I'm fine with snapshots — they don't have avatars
+attached, and are used in the booking discussions."
+
+So the stripping described above is reverted; only the LIVE counts are
+gated. The distinction is worth stating, because it decides future cases:
+
+- The **live wash** is ambient data. Nobody chose to publish it; it's just
+  what the calendar knows about everyone's availability. Host/admin only.
+- A **claim snapshot** is an argument. A host attached "🟢 5 🟡 2" to a
+  comment to make a case for a time, in a thread every member can read.
+  Hiding the numbers from half the room would leave the argument
+  unreadable — and it names nobody.
+
+`slotComments` returns its rows untouched again; `Timeslot.counts` keeps
+its gate.

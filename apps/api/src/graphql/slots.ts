@@ -368,9 +368,10 @@ const SlotCommentType = builder
       body: t.exposeString("body"),
       topicId: t.exposeID("topicId", { nullable: true }),
       topicTitle: t.exposeString("topicTitle", { nullable: true }),
-      /** The claim's frozen snapshot. Stripped for non-hosts by the
-       * `slotComments` resolver — gating live counts would mean nothing
-       * if the same tallies sat one click into the chat (2026-08-16). */
+      /** The claim's frozen snapshot, readable by anyone in the thread
+       * (Ed, 2026-08-16). It carries no avatars, and it IS the argument
+       * its author chose to publish — unlike the live wash, which is
+       * ambient data and stays host/admin-only. */
       counts: t.field({
         type: AvailabilityCountsType,
         nullable: true,
@@ -445,13 +446,9 @@ builder.queryFields((t) => ({
       const { viewer, timetable } = await loadSlotAndViewer(ctx, args.slotId);
       if (!isCalendarEnabled(timetable.settings)) return [];
       if (!canDiscussSlots(viewer)) return [];
-      const comments = await listSlotComments(args.slotId, {
+      return listSlotComments(args.slotId, {
         includeHidden: canManageCalendar(viewer),
       });
-      // Claim snapshots carry group availability, so they answer to the
-      // same gate as the live counts (2026-08-16).
-      if (canSeeHostOnly(viewer)) return comments;
-      return comments.map((c) => ({ ...c, counts: null }));
     },
   }),
 
