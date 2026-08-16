@@ -66,6 +66,47 @@ const MEMBERS_QUERY = `
   }
 `;
 
+function personAnchor(userId: string): string {
+  return `person-${userId}`;
+}
+
+type Section = { role: Role; heading: string; people: Person[] };
+
+/**
+ * The page's table of contents (QA 2026-08-16): every person, under their
+ * role, in the order the sections below list them — a forum can carry a
+ * lot of people, and jump links to three headings only told you where the
+ * sections started. The role heading still jumps to its section; each
+ * name jumps to that person's card. Avatars ride along (Ed) because a
+ * face is faster to find in a list than a name.
+ */
+function PeopleContents({ sections }: { sections: Section[] }) {
+  return (
+    <nav className="people-toc card" aria-label="People on this page">
+      {sections.map((section) => (
+        <div key={section.role} className="people-toc-group">
+          <a className="people-toc-link" href={`#people-${section.role}`}>
+            {section.heading}
+            <span className="faint">{section.people.length}</span>
+          </a>
+          <div className="people-toc-people">
+            {section.people.map((person) => (
+              <a
+                key={person.userId}
+                className="people-toc-person"
+                href={`#${personAnchor(person.userId)}`}
+              >
+                <Avatar name={person.name} image={person.image} small />
+                {person.name ?? "Member"}
+              </a>
+            ))}
+          </div>
+        </div>
+      ))}
+    </nav>
+  );
+}
+
 function PersonTopics({ slug, person }: { slug: string; person: Person }) {
   if (person.publishedTopics.length === 0) return null;
   return (
@@ -154,7 +195,8 @@ function PersonCard({
   const canPreview = canEdit && person.userId !== meId;
   const canManage = canEdit && member != null;
   return (
-    <li className="card stack">
+    // The anchor every table-of-contents entry points at.
+    <li className="card stack people-card" id={personAnchor(person.userId)}>
       <div className="person-head">
         {/* Photo and name both click through to the person's page (links
             pass 2026-08-03 — the name used to go to their filtered feed,
@@ -252,19 +294,9 @@ export default async function PeoplePage({
         />
       ) : (
         <>
-          {visibleSections.length > 1 ? (
-            <nav className="people-toc" aria-label="Jump to section">
-              {visibleSections.map((section) => (
-                <a
-                  key={section.role}
-                  className="people-toc-link"
-                  href={`#people-${section.role}`}
-                >
-                  {section.heading}
-                  <span className="faint">{section.people.length}</span>
-                </a>
-              ))}
-            </nav>
+          {/* Below four people the page is its own contents. */}
+          {data.timetablePeople.length > 3 ? (
+            <PeopleContents sections={visibleSections} />
           ) : null}
           {visibleSections.map((section) => (
             <section
