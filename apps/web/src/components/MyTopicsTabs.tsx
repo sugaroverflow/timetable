@@ -52,9 +52,7 @@ function PublicCommentsPane({
           />
         </CommentTeaser>
       ) : (
-        <div className="faint" style={{ fontSize: 12 }}>
-          No comments yet.
-        </div>
+        <div className="hint">No comments yet.</div>
       )}
     </div>
   );

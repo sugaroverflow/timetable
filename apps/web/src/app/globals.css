@@ -45,7 +45,6 @@ h3 {
 :focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
-  border-radius: var(--radius-xs);
 }
 
 /* Lucide icons inline with text sit ON the baseline by default and look
@@ -122,10 +121,6 @@ html[data-theme="dark"] .mode-light-only {
   cursor: pointer;
   line-height: 0;
   border-radius: 50%;
-}
-.account-trigger:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
 }
 .account-menu {
   min-width: 200px;
@@ -236,8 +231,6 @@ html[data-theme="dark"] .mode-light-only {
   box-shadow: var(--shadow);
 }
 
-/* Single-column everywhere (QA #42): .grid-2 keeps its name but no longer
-   splits into columns at any width. */
 .grid {
   display: grid;
   gap: 14px;
@@ -328,6 +321,11 @@ textarea {
 }
 .error-text {
   color: var(--red);
+}
+/* Default size for bare error text; zero-specificity so elements with
+   their own type scale (.btn) keep it when they adopt the class. */
+:where(.error-text) {
+  font-size: var(--text-sm);
 }
 
 /* Badges / role pills */
@@ -433,7 +431,7 @@ textarea {
   gap: 4px;
   align-self: flex-start;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--wash);
   padding: 3px 11px;
   font-size: var(--text-xs);
@@ -642,7 +640,7 @@ textarea {
   font-size: 20px;
   line-height: 1;
   background: var(--card);
-  border: 1px solid var(--border);
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
   cursor: pointer;
 }
@@ -970,6 +968,12 @@ textarea {
   border-radius: var(--radius-sm);
   background: var(--card);
 }
+/* The TipTap content area sets outline: none; the wrapper carries the
+   keyboard focus ring instead. */
+.rte:focus-within {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
 .rte-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -1185,6 +1189,12 @@ textarea {
 .feed-search input::placeholder {
   color: var(--muted);
 }
+/* The inner input sets outline: none; the pill carries the keyboard focus
+   ring instead. */
+.feed-search:focus-within {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
 
 /* Search-match highlight (CSS Custom Highlight API — ranges are marked
    without touching the DOM, so the markdown-rendered bodies stay inert).
@@ -1237,8 +1247,10 @@ optgroup {
 
 /* Toolbar dropdowns never wear the focus ring (QA 2026-08-10): Chrome
    marks a clicked select :focus-visible, so the global ring appeared on
-   every click — the open dropdown is feedback enough. Scoped here;
-   standard form selects elsewhere keep the ring for keyboard users. */
+   every click — the open dropdown is feedback enough. That same Chrome
+   behaviour means CSS can't restore a keyboard-only ring here without
+   bringing the click ring back; the a11y trade stays a known open item
+   (audit 2026-08-17). */
 .select-minimal select:focus-visible,
 .feed-toolbar select:focus-visible {
   outline: none;
@@ -1552,9 +1564,9 @@ optgroup {
   max-height: 220px;
   overflow-y: auto;
   background: var(--card);
-  border: 1px solid var(--border);
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-pop, 0 8px 24px rgba(0, 0, 0, 0.16));
+  box-shadow: var(--shadow-pop);
 }
 .mention-option {
   display: flex;
@@ -1617,18 +1629,12 @@ optgroup {
 }
 /* Pending-queue readiness (2026-08-06): host-declared signal, not a
    status — ready reads as "go", drafting stays muted. */
-.status-ready {
-  background: var(--green-soft);
-  color: var(--green-ink);
-}
-.status-drafting {
-  background: var(--status-neutral-bg);
-  color: var(--status-neutral-ink);
-}
+.status-ready,
 .status-published {
   background: var(--green-soft);
   color: var(--green-ink);
 }
+.status-drafting,
 .status-unpublished,
 .status-archived {
   background: var(--status-neutral-bg);
@@ -1659,21 +1665,6 @@ optgroup {
 }
 .avail-btn.red {
   background: var(--red-soft);
-}
-.dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  display: inline-block;
-}
-.dot.green {
-  background: var(--green);
-}
-.dot.yellow {
-  background: var(--yellow);
-}
-.dot.red {
-  background: var(--red);
 }
 .weekday-grid {
   display: flex;
@@ -1851,8 +1842,7 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
 }
 /* With bookings below, the when-line gives up its 52px centring — the
    line and the booking rows make the row's height together. */
-.cal-row-line:has(+ .cal-row-sessions),
-.cal-row-line:has(+ .cal-row-others) {
+.cal-row-line:has(+ .cal-row-sessions) {
   min-height: 0;
   padding-bottom: 0;
 }
@@ -1864,18 +1854,6 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
   gap: 2px;
   padding: 2px 14px 9px 32px;
   font-size: var(--text-md);
-}
-/* topic-workbench: the other sessions already on this slot — quieter than
-   the calendar page's booking lines, since here they are context for the
-   host's own pencil, not the subject (QA 2026-08-15). */
-.cal-row-others {
-  position: relative;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px 12px;
-  padding: 1px 14px 8px 32px;
-  font-size: var(--text-sm);
-  color: var(--muted);
 }
 .cal-when {
   flex: none;
@@ -2033,7 +2011,7 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
   height: var(--face, 17px);
   font-size: calc(var(--face, 17px) * 0.41);
   flex: none;
-  box-shadow: 0 0 0 1px rgb(255 255 255 / 55%);
+  box-shadow: 0 0 0 1px var(--card);
 }
 .cal-fold-avatars .cal-person-link {
   flex: none;
@@ -2083,8 +2061,7 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
     min-height: 44px;
   }
   /* Bookings already live on their own rows; tighten the indent. */
-  .cal-row-sessions,
-  .cal-row-others {
+  .cal-row-sessions {
     padding-left: 24px;
   }
   /* No avatar override: --face's 15px clamp floor covers narrow rows. */
@@ -2602,6 +2579,12 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
   color: var(--ink);
   border-bottom-color: var(--ink);
 }
+/* The count riding a tab label (e.g. "Comments 3"). */
+.tab-badge {
+  font-size: var(--text-2xs);
+  font-weight: var(--fw-normal);
+  color: var(--faint);
+}
 /* One rhythm inside every tab (QA 2026-08-16, after the ❤️ pill collided
    with the comments rule): the pane is a 10px-gapped stack, exactly like
    .thread-stack, so the Comments tab and the {host}-only tab lay their
@@ -2812,4 +2795,16 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
 /* Hairline divider above an action row (was inline borderTop:1px solid var(--line)). */
 .divider-top {
   border-top: 1px solid var(--line);
+}
+
+/* Small helper text under a control (was inline className="faint"
+   style={{ fontSize: 12 }}). */
+.hint {
+  color: var(--faint);
+  font-size: var(--text-xs);
+}
+
+/* Bold form-field label (was inline fontSize: 13 on <strong>). */
+.field-heading {
+  font-size: var(--text-sm);
 }

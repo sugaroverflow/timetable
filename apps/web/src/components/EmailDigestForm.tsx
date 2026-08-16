@@ -100,7 +100,7 @@ export function EmailDigestForm({
     <form onSubmit={submit} className="stack" style={{ gap: 12 }}>
       <div>
         <h3 className="settings-subtitle">Email digest</h3>
-        <p className="faint" style={{ margin: "2px 0 0", fontSize: 12 }}>
+        <p className="hint" style={{ margin: "2px 0 0" }}>
           A regular email summary of forum activity — comments on their topics,
           replies, and new topics. New members start with this default; each
           person can switch it on or off on their Notifications page.
@@ -113,7 +113,7 @@ export function EmailDigestForm({
       />
       {enabled ? (
         <div className="stack" style={{ gap: 8 }}>
-          <strong style={{ fontSize: 13 }}>
+          <strong className="field-heading">
             Default contents (members can change their own)
           </strong>
           {DIGEST_KINDS.map((kind) => (

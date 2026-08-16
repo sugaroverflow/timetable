@@ -146,9 +146,8 @@ export function PersonAdminPanel({
                 Remove {name ?? email ?? "this member"} from the forum?
               </span>
               <button
-                className="btn"
+                className="btn error-text"
                 type="button"
-                style={{ color: "var(--red)" }}
                 disabled={pending}
                 onClick={() => void remove()}
               >
@@ -164,9 +163,8 @@ export function PersonAdminPanel({
             </>
           ) : (
             <button
-              className="btn btn-ghost"
+              className="btn btn-ghost error-text"
               type="button"
-              style={{ color: "var(--red)" }}
               onClick={() => setConfirming(true)}
             >
               Remove from forum

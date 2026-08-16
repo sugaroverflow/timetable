@@ -179,11 +179,7 @@ export function MemberRolesEditor({
       <div className="row wrap" style={{ justifyContent: "space-between" }}>
         <div>
           <strong>{name ?? email ?? "Unknown user"}</strong>
-          {email ? (
-            <div className="faint" style={{ fontSize: 12 }}>
-              {email}
-            </div>
-          ) : null}
+          {email ? <div className="hint">{email}</div> : null}
         </div>
         {isOwner ? <span className="pill pill-owner">Owner</span> : null}
       </div>

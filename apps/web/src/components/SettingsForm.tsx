@@ -278,7 +278,7 @@ function EmojiPicker({
   return (
     <div className="field" style={{ marginTop: 12 }}>
       <label>Or pick an emoji icon</label>
-      <p className="faint" style={{ marginTop: 0, fontSize: 12 }}>
+      <p className="hint" style={{ marginTop: 0 }}>
         An emoji is used instead of an uploaded image.
       </p>
       <div className="emoji-grid" role="group" aria-label="Icon emoji">
@@ -500,7 +500,7 @@ export function SettingsForm({
   return (
     <form onSubmit={submit} className="card">
       <CollapsibleSection title="Theme">
-        <p className="faint" style={{ marginTop: 0, fontSize: 12 }}>
+        <p className="hint" style={{ marginTop: 0 }}>
           Colours preview live — Save to keep them, Discard to revert.
         </p>
 

@@ -46,25 +46,13 @@ export function BreakdownPanelBody({
   }, [slug, topicId]);
 
   if (failed) {
-    return (
-      <div className="faint" style={{ fontSize: 12 }}>
-        Couldn&rsquo;t load the breakdown.
-      </div>
-    );
+    return <div className="hint">Couldn&rsquo;t load the breakdown.</div>;
   }
   if (rows === null) {
-    return (
-      <div className="faint" style={{ fontSize: 12 }}>
-        Loading…
-      </div>
-    );
+    return <div className="hint">Loading…</div>;
   }
   if (rows.length === 0) {
-    return (
-      <div className="faint" style={{ fontSize: 12 }}>
-        No ❤️ yet.
-      </div>
-    );
+    return <div className="hint">No ❤️ yet.</div>;
   }
   return <BreakdownTable slug={slug} rows={rows} electorLabel={electorLabel} />;
 }
@@ -130,25 +118,13 @@ export function HostHeartBreakdownPanelBody({
   }, [slug, topicId]);
 
   if (failed) {
-    return (
-      <div className="faint" style={{ fontSize: 12 }}>
-        Couldn&rsquo;t load the breakdown.
-      </div>
-    );
+    return <div className="hint">Couldn&rsquo;t load the breakdown.</div>;
   }
   if (rows === null) {
-    return (
-      <div className="faint" style={{ fontSize: 12 }}>
-        Loading…
-      </div>
-    );
+    return <div className="hint">Loading…</div>;
   }
   if (rows.length === 0) {
-    return (
-      <div className="faint" style={{ fontSize: 12 }}>
-        No 💙 yet.
-      </div>
-    );
+    return <div className="hint">No 💙 yet.</div>;
   }
   return <BreakdownTable slug={slug} rows={rows} electorLabel={hostLabel} />;
 }

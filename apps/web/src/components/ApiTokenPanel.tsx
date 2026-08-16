@@ -101,7 +101,7 @@ function ScopeCheckboxes({
   return (
     <div className="field">
       <label>What may it do?</label>
-      <p className="faint" style={{ margin: "0 0 6px", fontSize: 12 }}>
+      <p className="hint" style={{ margin: "0 0 6px" }}>
         Reading needs no permission — every token can read whatever you can
         read. Tick only what this token needs to write.
       </p>
@@ -118,10 +118,7 @@ function ScopeCheckboxes({
           />
           <span>
             {SCOPE_LABELS[scope].label}
-            <span className="faint" style={{ fontSize: 12 }}>
-              {" "}
-              — {SCOPE_LABELS[scope].description}
-            </span>
+            <span className="hint"> — {SCOPE_LABELS[scope].description}</span>
           </span>
         </label>
       ))}

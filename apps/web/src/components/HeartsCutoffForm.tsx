@@ -50,7 +50,7 @@ export function HeartsCutoffForm({
     <div className="stack" style={{ gap: 12 }}>
       <div>
         <h3 className="settings-subtitle">Hearts count from</h3>
-        <p className="faint" style={{ margin: "2px 0 0", fontSize: 12 }}>
+        <p className="hint" style={{ margin: "2px 0 0" }}>
           Hearts placed before this moment are ignored in every count and vote
           weight, and everyone&rsquo;s Topic Queue starts over — a fresh-eyes
           review of every topic, ❤️&rsquo;d ones included. Default is the

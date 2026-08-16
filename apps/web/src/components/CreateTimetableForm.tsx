@@ -55,7 +55,7 @@ export function CreateTimetableForm() {
             setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, "-"));
           }}
         />
-        <p className="faint" style={{ fontSize: 12, margin: "4px 0 0" }}>
+        <p className="hint" style={{ margin: "4px 0 0" }}>
           {effectiveSlug
             ? `Your forum will live at /f/${effectiveSlug}`
             : "Lowercase letters, numbers, and hyphens. Set once — it can't be changed later."}
@@ -79,9 +79,7 @@ export function CreateTimetableForm() {
         </select>
       </div>
 
-      {state.error ? (
-        <p style={{ color: "var(--red)", fontSize: 13 }}>{state.error}</p>
-      ) : null}
+      {state.error ? <p className="error-text">{state.error}</p> : null}
 
       <button className="btn btn-primary" type="submit" disabled={pending}>
         {pending ? "Creating…" : "Create forum"}

@@ -53,9 +53,7 @@ function ModerationContent({
               topic.title
             )}
           </h3>
-          <div className="faint" style={{ fontSize: 12 }}>
-            by {chip(topic.hostName ?? hostLabel)}
-          </div>
+          <div className="hint">by {chip(topic.hostName ?? hostLabel)}</div>
         </div>
         {/* Readiness badge — earns its keep in the "All" view, where ready
             and still-drafting topics sit together (2026-08-06). */}

@@ -537,8 +537,7 @@ export function AdminSlotControls({
         </button>
         <button
           type="button"
-          className="btn btn-ghost"
-          style={{ color: "var(--red)" }}
+          className="btn btn-ghost error-text"
           disabled={busy}
           onClick={() => {
             if (confirm("Delete this timeslot?"))

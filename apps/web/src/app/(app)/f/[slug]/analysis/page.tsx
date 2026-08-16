@@ -134,9 +134,7 @@ function ElectorActivityCard({
               chosen host's topics (independent of the topics table's). */}
           <span className="row wrap" style={{ gap: 10, alignItems: "center" }}>
             {hostFilter}
-            <span className="faint" style={{ fontSize: 12 }}>
-              {rows.length} shown
-            </span>
+            <span className="hint">{rows.length} shown</span>
           </span>
         </div>
         {rows.length === 0 ? (
@@ -176,12 +174,10 @@ function HostActivityCard({
           className="row wrap"
           style={{ justifyContent: "space-between", marginBottom: 12 }}
         >
-          <p className="faint" style={{ margin: 0, fontSize: 12 }}>
+          <p className="hint" style={{ margin: 0 }}>
             Only visible to {adminsPlural.toLowerCase()}
           </p>
-          <span className="faint" style={{ fontSize: 12 }}>
-            {rows.length} shown
-          </span>
+          <span className="hint">{rows.length} shown</span>
         </div>
         {rows.length === 0 ? (
           <p className="faint" style={{ fontSize: 13 }}>

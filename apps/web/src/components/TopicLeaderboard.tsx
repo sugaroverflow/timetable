@@ -258,7 +258,7 @@ export function TopicLeaderboard({
             </SelectMinimal>
           </span>
         </div>
-        <p className="faint" style={{ marginTop: 0, fontSize: 12 }}>
+        <p className="hint" style={{ marginTop: 0 }}>
           {mode.description}
         </p>
         {sorted.length === 0 ? (

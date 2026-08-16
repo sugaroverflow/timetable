@@ -128,7 +128,7 @@ function PencilAction({
 function PanelHead({ hearterCount }: { hearterCount: number }) {
   if (hearterCount > 0) return null;
   return (
-    <span className="faint" style={{ fontSize: 12 }}>
+    <span className="hint">
       No ❤️s yet — the washes fill in as people ❤️ this topic.
     </span>
   );
@@ -241,22 +241,14 @@ export function TopicScheduleBody({
   }, [slug, topic.id, reloadKey, showPast]);
 
   if (failed) {
-    return (
-      <div className="faint" style={{ fontSize: 12 }}>
-        Couldn&rsquo;t load the schedule.
-      </div>
-    );
+    return <div className="hint">Couldn&rsquo;t load the schedule.</div>;
   }
   if (data === undefined) {
-    return (
-      <div className="faint" style={{ fontSize: 12 }}>
-        Loading…
-      </div>
-    );
+    return <div className="hint">Loading…</div>;
   }
   if (data === null) {
     return (
-      <div className="faint" style={{ fontSize: 12 }}>
+      <div className="hint">
         Scheduling isn&rsquo;t available for this topic.
       </div>
     );
@@ -303,9 +295,7 @@ export function TopicScheduleBody({
         />
       ) : null}
       {data.slots.length === 0 ? (
-        <div className="faint" style={{ fontSize: 12 }}>
-          No slots on the calendar.
-        </div>
+        <div className="hint">No slots on the calendar.</div>
       ) : (
         <CalendarTable
           title="Calendar"

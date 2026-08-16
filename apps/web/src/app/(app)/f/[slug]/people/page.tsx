@@ -112,9 +112,7 @@ function PersonTopics({ slug, person }: { slug: string; person: Person }) {
   if (person.publishedTopics.length === 0) return null;
   return (
     <div className="person-topics">
-      <div className="faint" style={{ fontSize: 12 }}>
-        Topics
-      </div>
+      <div className="hint">Topics</div>
       <ul>
         {person.publishedTopics.map((topic) => {
           const href = topicPath(slug, person.slug, topic.slug);

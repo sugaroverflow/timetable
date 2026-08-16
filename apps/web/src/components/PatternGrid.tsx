@@ -68,7 +68,7 @@ export function PatternGrid({
       <h3 className="section-title" style={{ marginBottom: 10 }}>
         Your weekly pattern
       </h3>
-      <p className="faint" style={{ marginTop: 0, fontSize: 12 }}>
+      <p className="hint" style={{ marginTop: 0 }}>
         Tap a time to cycle 🟡 maybe → 🟢 available → 🔴 can’t. Slots you
         haven’t answered individually use this — we use whatever availability
         information you share.
