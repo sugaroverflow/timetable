@@ -519,6 +519,14 @@ function withAlpha(hex: string, aa: string): string {
   return HEX_COLOUR.test(hex) ? hex + aa : hex;
 }
 
+/** Sink-side guard (audit 2026-08-17): every write path validates colours
+ * (guards.ts), but these values come from a JSON.parse of a DB string and
+ * end up verbatim inside a server-rendered <style> tag — a non-hex value
+ * from any future write path or manual DB edit would be stored XSS for
+ * every visitor. Re-check at the boundary; invalid values just vanish. */
+const safeHex = (v: string | undefined): string | undefined =>
+  v && HEX_COLOUR.test(v) ? v : undefined;
+
 /** Accents carry into dark mode (with optional dark overrides): primary
  * drives the accent colours, secondary the host-only panel colours. */
 function accentVars(
@@ -526,10 +534,12 @@ function accentVars(
   dark: boolean,
 ): Record<string, string> {
   const vars: Record<string, string> = {};
-  const primary = dark ? (theme.dark?.primary ?? theme.primary) : theme.primary;
-  const secondary = dark
-    ? (theme.dark?.secondary ?? theme.secondary)
-    : theme.secondary;
+  const primary = safeHex(
+    dark ? (theme.dark?.primary ?? theme.primary) : theme.primary,
+  );
+  const secondary = safeHex(
+    dark ? (theme.dark?.secondary ?? theme.secondary) : theme.secondary,
+  );
   if (primary) {
     vars["--primary"] = primary;
     vars["--primary-soft"] = withAlpha(primary, "1a");
@@ -548,10 +558,14 @@ function accentVars(
 function baseVars(theme: ThemeSettings, dark: boolean): Record<string, string> {
   const source = (dark ? theme.dark : theme) ?? {};
   const vars: Record<string, string> = {};
-  if (source.background) vars["--bg"] = source.background;
-  if (source.topbar) vars["--topbar"] = source.topbar;
-  if (source.topbarText) vars["--topbar-ink"] = source.topbarText;
-  if (source.text) vars["--ink"] = source.text;
+  const bg = safeHex(source.background);
+  const topbar = safeHex(source.topbar);
+  const topbarText = safeHex(source.topbarText);
+  const text = safeHex(source.text);
+  if (bg) vars["--bg"] = bg;
+  if (topbar) vars["--topbar"] = topbar;
+  if (topbarText) vars["--topbar-ink"] = topbarText;
+  if (text) vars["--ink"] = text;
   return vars;
 }
 
