@@ -2596,18 +2596,32 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
   color: var(--ink);
   border-bottom-color: var(--ink);
 }
+/* One rhythm inside every tab (QA 2026-08-16, after the ❤️ pill collided
+   with the comments rule): the pane is a 10px-gapped stack, exactly like
+   .thread-stack, so the Comments tab and the {host}-only tab lay their
+   action bars out identically. The strip's own bottom rule is the pane's
+   only divider — nested blocks drop theirs, the bar drops its padding,
+   and the card-level pull rules (which assume the card's 14px stack gap
+   sits below the bar — there is none here, so they simply overlapped)
+   are reset. Untabbed cards, which DO live in that stack, keep all of it. */
 .topic-tab-panel {
   padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
-/* The strip's own bottom rule IS the divider above whatever leads the
-   pane — the pane's first block drops its own, or every tab opens on a
-   doubled line (QA 2026-08-15). Rules FURTHER down the pane (the actions
-   row's divider above the comments, say) are real dividers and stay.
-   Untabbed cards (one section, rendered bare) keep theirs too. */
-.topic-tab-panel
-  > :is(.card-actions, .comment-section, .host-thread):first-child {
+.topic-tab-panel > .card-actions {
+  border-top: 0;
+  padding: 0;
+}
+.topic-tab-panel > .comment-section,
+.topic-tab-panel .host-thread {
   border-top: 0;
   padding-top: 0;
+}
+.topic-tab-panel .card-actions + .comment-section,
+.topic-tab-panel .card-actions + .comments {
+  margin-top: 0;
 }
 @media (max-width: 480px) {
   .topic-tabs button {
