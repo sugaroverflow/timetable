@@ -76,16 +76,17 @@ type Section = { role: Role; heading: string; people: Person[] };
  * The page's table of contents (QA 2026-08-16): every person, under their
  * role, in the order the sections below list them — a forum can carry a
  * lot of people, and jump links to three headings only told you where the
- * sections started. The role heading still jumps to its section; each
- * name jumps to that person's card. Avatars ride along (Ed) because a
- * face is faster to find in a list than a name.
+ * sections started. Role headings stack down the page with their people
+ * flowing across and wrapping underneath (Ed's layout, 2026-08-16). The
+ * heading still jumps to its section; each name jumps to that person's
+ * card. Avatars ride along because a face is faster to find than a name.
  */
 function PeopleContents({ sections }: { sections: Section[] }) {
   return (
     <nav className="people-toc card" aria-label="People on this page">
       {sections.map((section) => (
         <div key={section.role} className="people-toc-group">
-          <a className="people-toc-link" href={`#people-${section.role}`}>
+          <a className="people-toc-heading" href={`#people-${section.role}`}>
             {section.heading}
             <span className="faint">{section.people.length}</span>
           </a>
