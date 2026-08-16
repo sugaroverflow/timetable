@@ -2676,6 +2676,8 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
   align-items: center;
   gap: 8px;
   margin: 0;
+  /* Explicit — the global h1–h3 rule sets serif, and this is an h3. */
+  font-family: var(--sans);
   font-size: var(--text-base);
   font-weight: var(--fw-semibold);
   color: var(--ink);
@@ -2683,11 +2685,19 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
 .cal-subhead .topic-body-toggle {
   margin-top: 0;
 }
-/* A heading-level control (the workbench's sort toggle) sits on the
-   heading's right edge. */
-.cal-heading-extra {
-  margin-left: auto;
-  font-weight: var(--fw-normal);
+/* The controls row under a table's heading (workbench: sort toggle left,
+   Show past right), folding with the rows. Rendered unconditionally —
+   :empty hides it when the caller passes none. */
+.cal-table-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.cal-table-controls:empty {
+  display: none;
 }
 
 /* Neutral segmented state (topic-workbench sort toggle, 2026-08-14). */

@@ -193,9 +193,11 @@ Stable names for feature pieces, so instructions can reference them precisely.
   `.cal-subhead` headings, no counters; Ed, QA 2026-08-16), each folding
   by its heading (`collapsible`): **"Your Sessions"** (this topic's
   upcoming pencils/confirmations as ordinary rows, also present in the
-  list below) and **"Calendar"** — whose heading carries the
-  Date/Availability sort toggle (`headingExtra`), since that list is what
-  it sorts (Ed, QA 2026-08-16). The calendar
+  list below) and **"Calendar"** — under whose heading a controls row
+  (`CalendarTable`'s `controls`) carries the Date/Availability sort
+  toggle on the left and Show past on the right, since that list is what
+  they act on (Ed, QA 2026-08-16 round 3; the "Availability of the n ❤️"
+  helper line is gone, only the zero-❤️ explainer remains). The calendar
   page leads with its own **"Your Sessions"** card (`MySessions` in
   `calendar/page.tsx`): the viewer's future topic sessions + office
   hours, read off the UNFILTERED calendar and repeated in the chronology
