@@ -1245,13 +1245,14 @@ optgroup {
   background: var(--card);
 }
 
-/* Toolbar dropdowns don't wear the focus ring on CLICK (QA 2026-08-10):
-   Chrome marks a clicked select :focus-visible, so the global ring
-   appeared on every click — the open dropdown is feedback enough. Only
-   mouse focus is suppressed; keyboard focus (:focus-visible) falls
-   through to the global ring. */
-.select-minimal select:focus:not(:focus-visible),
-.feed-toolbar select:focus:not(:focus-visible) {
+/* Toolbar dropdowns never wear the focus ring (QA 2026-08-10): Chrome
+   marks a clicked select :focus-visible, so the global ring appeared on
+   every click — the open dropdown is feedback enough. That same Chrome
+   behaviour means CSS can't restore a keyboard-only ring here without
+   bringing the click ring back; the a11y trade stays a known open item
+   (audit 2026-08-17). */
+.select-minimal select:focus-visible,
+.feed-toolbar select:focus-visible {
   outline: none;
 }
 
