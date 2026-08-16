@@ -180,7 +180,11 @@ Stable names for feature pieces, so instructions can reference them precisely.
   Each row also names the OTHER sessions already on
   that slot (`others` on `topicSlotFit`; ✎/✓ + label, QA 2026-08-15) —
   company, not conflict, since pencils never contend.
-  No discussion here — that's the calendar page.
+  No discussion here — that's the calendar page, which leads with its own
+  **"Your sessions"** card (`MySessions` in `calendar/page.tsx`, QA
+  2026-08-16): the viewer's future topic sessions + office hours, same
+  `CalendarTable` rows, read off the UNFILTERED calendar and repeated in
+  the chronology below.
   Part of demand-first scheduling (2026-08-14): ❤️ implies "I'd attend"
   (never stated in UI copy), and a **pencil is a location-less
   time-intent** — the host saying "I am available at this time"; unique
