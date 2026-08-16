@@ -92,13 +92,15 @@ Codex/agent workflows are separate from the app runtime.
   with section nav, a "Report a bug" link, and the timetable switcher (with
   visibility pills) in its footer
 - topic feed with infinite scroll, sort controls (the four heart
-  normalisations, latest comments, newest-including-edits, seeded random),
+  normalisations, latest comments, latest created, latest updated —
+  content edits count — and seeded random), a search box (server-side
+  match, highlighted hits on the cards, a "No topics match" empty state),
   host filter with profile card, and "new since last visit" highlights;
-  electors also get the **Topic Queue** (`/f/[slug]/queue`, its own
+  every member gets the **Topic Queue** (`/f/[slug]/queue`, its own
   sidebar page with a red never-seen badge; old `?sort=queue` redirects):
-  one unhearted topic at a time in a per-user stable shuffle with big
-  🔁/❤️ decision buttons, round-based with an explicit restart
-  (`packages/core/src/queue.ts`);
+  one unhearted topic at a time in a per-user stable shuffle — electors
+  decide with big 🔁/❤️ buttons, other members read through — round-based
+  with an explicit restart (`packages/core/src/queue.ts`);
   hosts/admins get a sortable per-elector breakdown table (the shared
   `BreakdownTable` component: L1/L2/devotion weights + hearted-at, footer
   sums matching the topic's scores, names linking to person pages)
@@ -111,13 +113,16 @@ Codex/agent workflows are separate from the app runtime.
   public comments / host-only / drafting / Scheduling — are one horizontal
   tab strip (topic-tabs: `MyTopicsTabs`, 2026-08-14); the Scheduling tab is the
   topic-workbench — a lazy per-topic mini-calendar: hearters' availability
-  across future slots as washed rows (shared `CalendarRowWash` pieces,
-  month headings + week gaps by date) with the avatar fold, a
-  Date/Availability sort toggle, and pencil/unpencil per row)
+  across future slots as the calendar's own rows (`CalendarTable`, the one
+  row implementation since 2026-08-16; the sessions tab renders with the
+  same component) with the avatar fold, a Date/Availability sort toggle,
+  and pencil/unpencil per row)
 - Pending Topics (the submitted moderation queue — new topics are created
   as `submitted`; there is no draft status)
 - activity timeline (week/day grouping, date range, actor/role/type filters)
-- notifications pane (comments on your topics, replies to you, unread badge)
+- notifications pane (comments on your topics, replies to you, @mentions,
+  and session pencilled/confirmed/cleared changes on topics you ❤️'d;
+  unread badge)
 - People page (role-grouped members, bios, admin editing; admins get an
   add-person card plus per-member invite state and a View as → Send invite →
   Edit profile action stack)
@@ -135,6 +140,8 @@ Codex/agent workflows are separate from the app runtime.
 - Analysis page (`/f/[slug]/analysis`): topics analysis table with ❤️ and 💬
   normalisations, per-table host filters, elector activity table with
   per-row topic folds, admin-only host activity table
+- per-forum API page (`/f/[slug]/api`): the JSON export download, personal
+  API token management, GraphQL endpoint docs, and the Atom/ICS feed URLs
 - `/admin` sysadmin dashboard (SYSADMIN_EMAILS-gated forum overview/delete)
 - `/timetables` resolver → last-engaged timetable's feed, or the create screen
 - social preview (Open Graph) cards for the app, forums, topics, and people
@@ -188,11 +195,13 @@ REST routes currently include:
 | `POST /api/forums/:id/people` | Admin add-person: silently create the Clerk user + local row + membership in one call, no email |
 | `POST /api/memberships/:id/invite` | Admin send (or resend) the invite email via Resend; records `inviteSentAt` |
 | `PATCH /api/memberships/:id/roles` | Change member roles |
+| `PATCH /api/memberships/:id/email` | Admin fixes a never-signed-in member's address (409 once they have signed in) |
 | `DELETE /api/memberships/:id` | Remove a member (the owner can never be removed) |
 | `POST /api/jobs/digests` | Cron-protected digest job |
+| `POST /api/forums/:idOrSlug/digest-test` | Admin-only: send the requesting admin a test digest built from sample data |
 | `GET /api/forums/:idOrSlug/calendar.ics` | Calendar feed |
 | `GET /api/forums/:idOrSlug/feed.atom` | Atom feed of the newest published topics (anonymous-only — private forums 404) |
-| `GET /api/forums/:idOrSlug/export` | Read-only JSON export of a forum's public data |
+| `GET /api/forums/:idOrSlug/export` | Read-only, role-filtered JSON export of everything the viewer can read (calendar included when enabled) |
 | `DELETE /api/forums/:id` | Delete a forum (sysadmin dashboard) |
 | `POST /api/uploads` | Signed direct browser uploads to S3-compatible storage |
 | `GET /health` | Health check |
@@ -222,7 +231,8 @@ Main queries include:
 - `forumMembers`
 - `forumPeople` / `person` (People page and person pages, with published
   topics per person)
-- `topicFeed` (sort + seed + host + hearted-by-me filters, offset paging)
+- `topicFeed` (sort + seed + search `q` + host / hearted-by /
+  hearted-by-me / host-hearted-by-me filters, offset paging)
 - `topicPermalink`
 - `hostDashboard`
 - `moderationQueue` (submitted topics)
@@ -233,12 +243,14 @@ Main queries include:
 - `calendar` (audience lens + `includePast`; per-elector rows host/admin-only)
 - `slotComments`
 - `topicSlotFit` (topic-workbench: one topic's hearters vs future slots)
-- `topicSessions` (sessions tab: a topic's future sessions + the viewer's
-  OWN availability only; any viewer of a readable forum, anonymous included)
+- `topicSessions` (sessions tab: a topic's future sessions for any viewer
+  of a readable forum, anonymous included; hosts/admins also get the
+  availability wash — counts and per-elector rows charted on this topic's
+  hearters — while everyone else gets only their own 🟢🟡🔴)
 - `myAvailabilityPattern`
 - `dashboard`
 - `myIcsToken`
-- `timetableRouteByDomain`
+- `forumRouteByDomain`
 - `forumByDomain`
 
 The `dashboard` query accepts optional host and elector-activity filters for
@@ -251,8 +263,9 @@ Main mutations cover:
 
 - topic creation (hosts and admins; `createTopic` takes an admin-only
   `hostId` to create on behalf of another host, logged as `topic.reassign`),
-  editing, submission, moderation, unpublishing, and owner reassignment
-  (`reassignTopic`)
+  editing, submission, the host's "Ready to publish" signal
+  (`setTopicReady`, 2026-08-06), moderation, unpublishing, and owner
+  reassignment (`reassignTopic`)
 - heart toggling and the timetable hearts cutoff (`setHeartsCountFrom`);
   host 💙 toggling (`hostHeartTopic`, host-non-electors only — tallies and
   the per-topic host breakdown are admin-only, attribution rides the
@@ -293,8 +306,8 @@ Main mutations cover:
 Hearts, comments, invites, and first sign-ins are logged as activity events
 alongside moderation and lifecycle actions.
 
-The web proxy uses `timetableRouteByDomain` to rewrite custom-domain requests
-onto the existing `/f/[slug]` route tree.
+The web proxy queries `forumRouteByDomain` (aliased `timetableRouteByDomain`)
+to rewrite custom-domain requests onto the existing `/f/[slug]` route tree.
 
 ## Auth Flow
 
@@ -407,7 +420,10 @@ option (`hostComments.enabled`, default on — hides the host-only thread and
 `timetables.heartsCountFrom` is the heart-count cutoff; `topics.slug` +
 `timetable_memberships.slug` power permalinks (member profiles are
 per-forum); `topics.contentUpdatedAt` tracks content edits
-for "newest" sorting; memberships carry `lastSeenFeedAt` and
+for "newest" sorting; `topics.readyAt` is the host's "Ready to publish"
+signal on a submitted topic (null = still drafting; the Pending page and
+sidebar badge filter on it, unpublishing clears it); memberships carry
+`lastSeenFeedAt` and
 `lastSeenNotificationsAt` watermarks, `inviteSentAt` (null = added by an
 admin but never invited), the per-forum `digestSettings` JSON +
 `lastDigestAt` send watermark (2026-08-11, falling back to the user-level

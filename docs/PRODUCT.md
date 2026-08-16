@@ -66,6 +66,12 @@ in the topic's **drafting thread**: admin-only comments that the topic's
 owner can also see and reply to, never rendered in the feed. Pending Topics
 shows the submitted queue.
 
+A submitted topic starts as "still drafting"; when the host is done they
+flip its **Ready to publish** switch. Admins see a ready / still-drafting
+badge on each pending card, the Pending page filters by it (ready topics
+are the default slice), and the sidebar's Pending badge counts only ready
+topics.
+
 Admins publish, unpublish, edit inline, hide comments, reassign a topic's
 owner, and can create a topic on behalf of another host. A forum can instead
 let **hosts publish their own topics without review** (Forum Settings) —
@@ -78,15 +84,18 @@ freeze at first publish).
 ## The Feed
 
 "All Topics" is a single-column feed with infinite scroll. It sorts by ❤️s
-(any of the four normalisations below), latest comments, newest (content
-edits count as new, without triggering email), or **Shuffle** — a seeded
-random order, and the default. Topics published or edited since the member's
+(any of the four normalisations below), 💬 latest comments, 📚 latest
+created, ✏️ latest updated (content edits count, without triggering email),
+or **Shuffle** — a seeded random order, and the default. A search box
+filters the feed, highlights the matches on the cards, and shows a "No
+topics match" empty state. Topics published or edited since the member's
 last visit are highlighted, and filtering by a host shows their profile card
 above their topics.
 
-Electors also get the **Topic Queue**: one unhearted topic at a time in a
-per-user stable shuffle with big 🔁/❤️ decision buttons — a low-friction way
-to work through everything they haven't voted on yet, round by round.
+Every member gets the **Topic Queue**: one unhearted topic at a time in a
+per-user stable shuffle — electors decide with big 🔁/❤️ buttons, other
+members read through — a low-friction way to work through everything they
+haven't seen yet, round by round.
 
 ## ❤️s and Weighting
 
@@ -156,7 +165,8 @@ Topics carry up to three comment threads:
 When a card has more than one live section for its viewer (threads,
 scheduling), they render as one horizontal **tab strip** (2026-08-14) —
 Comments first and default, count badges on the labels; a card with a
-single live section keeps the plain pre-tabs presentation. The actions
+single live section keeps the plain pre-tabs presentation — except on
+My Topics, where even a single-tab card wears the strip. The actions
 row's 💬 button always lands on the Comments tab.
 
 Threading is **dialogue-first** (2026-08-13): the composer sits at the top
@@ -180,7 +190,7 @@ edit and delete their own comments; admins can hide them.
 The calendar helps hosts find times their people can make and see what's
 already spoken for. It is **off by default** — a forum switches it on in
 Forum Settings, which adds the Calendar nav link and page. Turning it off
-hides everything again; nothing is deleted. Each slot can carry a URL
+hides everything again; nothing is deleted. Each session can carry a URL
 pointing at the real event page once one exists.
 
 **Demand-first scheduling (2026-08-14).** A ❤️ already implies "I'd attend a
@@ -206,8 +216,9 @@ date/time, a ✎ pencilled / confirmed pill (plus the location once
 confirmed), and, for electors, their own inline 🟢🟡🔴 toggle: the same
 per-slot availability answer as the calendar page, written from the card.
 The list is visible to everyone who can see the card (sessions are public
-on the calendar page), but shows no group availability — whether electors
-should see the group's washes is a deliberately open privacy question.
+on the calendar page). Group availability is host/admin-only everywhere
+(decided 2026-08-16): on the sessions tab the wash charts this topic's
+hearters, and electors see only their own 🟢🟡🔴.
 
 **Schedule = pattern × terms.** Admins define weekly time cells ("Tue and
 Thu 19:00–21:00") and named date ranges ("Michaelmas, 29 Sep–12 Dec"); slots
@@ -294,10 +305,11 @@ Admin surfaces:
   filters, an elector activity table with per-row topic folds, and an
   admin-only host activity table
 - **Forum Settings** — name, visibility, custom role labels with a live
-  preview sentence, digest defaults, calendar setup and policies, the topics
-  policy (hosts publish directly), the host-thread option, the ❤️ cutoff,
-  and the custom domain field (marked "coming soon" — routing is not wired
-  up yet)
+  preview sentence, digest defaults, the calendar policies (enable, confirm
+  rules, locations — the schedule itself is built on the Calendar page),
+  the topics policy (hosts publish directly), the host-thread option, the
+  ❤️ cutoff, and the custom domain field (marked "coming soon" — routing is
+  not wired up yet)
 - **Theme** — primary/secondary/background/topbar/text colours with live
   preview, curated font pairings, a dark-mode palette, cover image, and icon
 
@@ -371,6 +383,16 @@ topics, a read-only JSON export of a forum's readable data including its
 calendar (the forum's "API" page), and Open Graph social cards for forums,
 topics, and people.
 
+### The API page
+
+Each forum's machine-readable access is collected on its API page: the
+JSON export as a one-click download; **personal API tokens** — long-lived
+bearer credentials for scripts, account-wide, reading whatever the account
+can read, with writes opted in per token and the account's own permissions
+as the ceiling (moderation, forum settings, member management, and token
+administration stay session-only no matter what a token is granted); the
+GraphQL endpoint's documentation; and the forum's Atom and ICS feed URLs.
+
 ## Status
 
 The product is live at [topic.forum](https://topic.forum), with hosted dev at
@@ -388,7 +410,6 @@ and the git log — this document describes the present.
 - The digest and invite email templates are provisional — the product's
   emails have not been designed yet.
 - The in-app notifications pane has no per-item read state or mark-all-read.
-- The activity feed is refresh-based, not live (#58).
 - Calendar sync is one-way ICS export only. Importing electors' personal
   calendars (a secret ICS URL fetched server-side, deriving busy/free per
   slot as a layer between explicit answers and the pattern) is the designed
