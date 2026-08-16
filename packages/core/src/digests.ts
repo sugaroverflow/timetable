@@ -318,13 +318,20 @@ async function loadDigestContext(
   const memberships = withEffective.filter(
     (m) => m.effective.enabled && isDigestDue(m.effective, now),
   );
+  // First digest for a membership: fall back to the pre-2026-08-11 global
+  // watermark if the user has one, but never further back than the
+  // configured window — users.lastDigestAt is frozen (nothing writes it
+  // since the per-forum split), so unbounded it would make a new member's
+  // first digest span months of history (audit 2026-08-17).
   const sinceByForum = new Map(
-    memberships.map((m) => [
-      m.timetableId,
-      m.lastDigestAt ??
-        recipient.lastDigestAt ??
-        new Date(now.getTime() - digestWindowDays(m.effective) * dayMs),
-    ]),
+    memberships.map((m) => {
+      const floor = new Date(
+        now.getTime() - digestWindowDays(m.effective) * dayMs,
+      );
+      const legacy = recipient.lastDigestAt;
+      const fallback = legacy && legacy > floor ? legacy : floor;
+      return [m.timetableId, m.lastDigestAt ?? fallback];
+    }),
   );
 
   return {
@@ -1378,6 +1385,7 @@ async function assignmentActivities(
   ctx: DigestContext,
   since: Date,
 ): Promise<RawActivity[]> {
+  if (ctx.forumIds.length === 0) return [];
   const rows = await db
     .select({
       payload: activityEvents.payload,
@@ -1387,6 +1395,12 @@ async function assignmentActivities(
     .from(activityEvents)
     .where(
       and(
+        // Scope to the recipient's forums so the (timetableId, createdAt)
+        // index applies — without it this seq-scans the whole append-only
+        // table once per recipient (audit 2026-08-17). The per-forum
+        // filter downstream already dropped foreign rows; this just stops
+        // fetching them.
+        inArray(activityEvents.timetableId, ctx.forumIds),
         eq(activityEvents.action, "topic.reassign"),
         gt(activityEvents.createdAt, since),
         sql`${activityEvents.payload}->>'newHostId' = ${ctx.recipient.id}`,

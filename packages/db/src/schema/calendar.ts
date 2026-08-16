@@ -110,6 +110,9 @@ export const slotSessions = pgTable(
       .on(t.slotId, t.location)
       .where(sql`${t.status} = 'confirmed' and ${t.location} <> ''`),
     index("slot_sessions_slot_idx").on(t.slotId),
+    // Topic-first lookups run on every feed page (sessionSlotCount) and
+    // the sessions tab; all other indexes here lead with slotId.
+    index("slot_sessions_topic_idx").on(t.topicId),
   ],
 );
 

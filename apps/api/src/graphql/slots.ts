@@ -221,6 +221,24 @@ function isConfirmedLocationConflict(err: unknown): boolean {
   return false;
 }
 
+/** Same backstop for the pencil uniques (slot_topic / slot_oh_host):
+ * slotSubjectTaken is a pre-flight read, so a concurrent double-pencil
+ * reaches the insert — map it to the same friendly error instead of a 500
+ * (audit 2026-08-17). */
+function isPencilSubjectConflict(err: unknown): boolean {
+  for (let e = err; e instanceof Error; e = e.cause as Error) {
+    const code = (e as { code?: unknown }).code;
+    if (
+      code === "23505" &&
+      (e.message.includes("slot_sessions_slot_topic_uq") ||
+        e.message.includes("slot_sessions_slot_oh_host_uq"))
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -979,14 +997,21 @@ builder.mutationFields((t) => ({
       ) {
         badRequest("Already pencilled in at this time");
       }
-      await addSlotSession(slot.id, {
-        topicId: subject.topicId,
-        sessionHostId: subject.sessionHostId,
-        customTitle: subject.customTitle,
-        status,
-        url: parseSessionUrl(args.url),
-        createdById: user.id,
-      });
+      try {
+        await addSlotSession(slot.id, {
+          topicId: subject.topicId,
+          sessionHostId: subject.sessionHostId,
+          customTitle: subject.customTitle,
+          status,
+          url: parseSessionUrl(args.url),
+          createdById: user.id,
+        });
+      } catch (err) {
+        if (isPencilSubjectConflict(err)) {
+          badRequest("Already pencilled in at this time");
+        }
+        throw err;
+      }
       await logActivity({
         timetableId: timetable.id,
         actorId: user.id,
