@@ -122,40 +122,39 @@ function PencilAction({
   );
 }
 
-/** What the panel says about itself: whose availability you're reading,
- * and the Date/Availability ranking toggle. */
-function PanelHead({
-  hearterCount,
+/** What the panel says about itself: whose availability you're reading. */
+function PanelHead({ hearterCount }: { hearterCount: number }) {
+  return (
+    <span className="faint" style={{ fontSize: 12 }}>
+      {hearterCount === 0
+        ? "No ❤️s yet — the washes fill in as people ❤️ this topic."
+        : `Availability of the ${hearterCount} ❤️ on this topic. Pencil in every time you could run it.`}
+    </span>
+  );
+}
+
+/** The Date/Availability ranking toggle — rides the Calendar section's
+ * heading, since that list is what it sorts (Ed, QA 2026-08-16). */
+function SortToggle({
   mode,
   onMode,
 }: {
-  hearterCount: number;
   mode: SortMode;
   onMode: (mode: SortMode) => void;
 }) {
   return (
-    <div
-      className="row wrap"
-      style={{ gap: 8, alignItems: "center", justifyContent: "space-between" }}
-    >
-      <span className="faint" style={{ fontSize: 12 }}>
-        {hearterCount === 0
-          ? "No ❤️s yet — the washes fill in as people ❤️ this topic."
-          : `Availability of the ${hearterCount} ❤️ on this topic. Pencil in every time you could run it.`}
-      </span>
-      <div className="avseg" role="group" aria-label="Sort slots">
-        {(["date", "availability"] as const).map((m) => (
-          <button
-            key={m}
-            type="button"
-            className={mode === m ? "on" : ""}
-            aria-pressed={mode === m}
-            onClick={() => onMode(m)}
-          >
-            {m === "date" ? "By date" : "By availability"}
-          </button>
-        ))}
-      </div>
+    <div className="avseg" role="group" aria-label="Sort slots">
+      {(["date", "availability"] as const).map((m) => (
+        <button
+          key={m}
+          type="button"
+          className={mode === m ? "on" : ""}
+          aria-pressed={mode === m}
+          onClick={() => onMode(m)}
+        >
+          {m === "date" ? "By date" : "By availability"}
+        </button>
+      ))}
     </div>
   );
 }
@@ -291,14 +290,10 @@ export function TopicScheduleBody({
 
   return (
     <div className="stack" style={{ gap: 8 }}>
-      <PanelHead
-        hearterCount={data.hearterCount}
-        mode={mode}
-        onMode={setMode}
-      />
+      <PanelHead hearterCount={data.hearterCount} />
       {mine.length > 0 ? (
         <CalendarTable
-          title="Your sessions"
+          title="Your Sessions"
           card={false}
           collapsible
           rows={mine.map((slot) => ({ slot, past: false }))}
@@ -314,6 +309,7 @@ export function TopicScheduleBody({
           title="Calendar"
           card={false}
           collapsible
+          headingExtra={<SortToggle mode={mode} onMode={setMode} />}
           grouped={mode === "date"}
           rows={sorted.map((slot) => ({ slot, past: isPast(slot) }))}
           pastToggle={

@@ -1922,12 +1922,13 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
 .section-body {
   margin-top: 10px;
 }
-/* Month headings between row groups — primary colour, with the past
-   toggle riding in the FIRST month break (QA 2026-08-03). Padding lines
-   the text up with the rows' 14px inset. */
+/* Month headings between row groups — muted eyebrows (primary-blue read
+   as links, Ed QA 2026-08-16), with the past toggle riding in the FIRST
+   month break (QA 2026-08-03). Padding lines the text up with the rows'
+   14px inset. */
 .cal-month-row {
   padding: 8px 14px 1px;
-  color: var(--primary);
+  color: var(--muted);
   font-size: var(--text-xs);
   font-weight: var(--fw-bold);
   text-transform: uppercase;
@@ -2668,19 +2669,25 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
   color: var(--ink);
 }
 /* The bare table's heading (card={false}: workbench sections inside a tab
-   panel, 2026-08-16) — a quiet sans subhead, not the card-level serif
-   .section-title, since the topic card's own title is levels above it. */
+   panel, 2026-08-16) — sans, full ink, a step above the month eyebrows
+   but below the card-level serif .section-title (Ed, QA 2026-08-16). */
 .cal-subhead {
   display: flex;
   align-items: center;
   gap: 8px;
   margin: 0;
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
   font-weight: var(--fw-semibold);
-  color: var(--muted);
+  color: var(--ink);
 }
 .cal-subhead .topic-body-toggle {
   margin-top: 0;
+}
+/* A heading-level control (the workbench's sort toggle) sits on the
+   heading's right edge. */
+.cal-heading-extra {
+  margin-left: auto;
+  font-weight: var(--fw-normal);
 }
 
 /* Neutral segmented state (topic-workbench sort toggle, 2026-08-14). */

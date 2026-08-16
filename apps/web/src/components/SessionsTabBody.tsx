@@ -92,7 +92,16 @@ export function SessionsTabBody({
       rows={rows.map((slot) => ({ slot, past: false }))}
       slug={slug}
       locations={calendar.locations}
-      perms={calendar.perms}
+      // A host browsing someone else's card mustn't meet a pencil-in
+      // control here (Ed, QA 2026-08-16): with no claim topics it could
+      // only cross-book their office hours into this topic's slot. The
+      // tab is a viewer surface — booking gestures live on the calendar
+      // and the workbench. Admins keep their full slot controls.
+      perms={
+        calendar.perms.canAdmin
+          ? calendar.perms
+          : { ...calendar.perms, canPropose: false }
+      }
       // No claim/lens here: this card is about the topic, but the tab is
       // where you find out WHEN it runs — arguing for a time is the
       // calendar's and the workbench's job.

@@ -10343,6 +10343,14 @@ Discussion:
   Counts: 7 green, 3 yellow, 2 red
   Text: Claiming this one for Knowledge Infrastructure — Monday evenings get the serious crowd.
 
+### Slot: slot-w2-mon-dr
+Date: mon+2
+Start: 18:00
+End: 21:00
+Location: Drawing Room
+Off-grid: yes
+Topics:
+
 ### Slot: slot-w2-tue
 Date: tue+2
 Start: 18:00
@@ -10361,6 +10369,14 @@ Availability:
 Discussion:
 - Author: host-eli
   Text: Herds, Birds, and Words here? The Hall's acoustics suit the starling recordings.
+
+### Slot: slot-w2-tue-classroom
+Date: tue+2
+Start: 18:00
+End: 21:00
+Location: Classroom
+Off-grid: yes
+Topics:
 
 ### Slot: slot-w2-wed
 Date: wed+2
@@ -10460,6 +10476,14 @@ Discussion:
 - Author: host-zara
   Text: Provisionally pencilling Commoning in here — will firm up once Future Crafting has happened.
 
+### Slot: slot-w3-tue-classroom
+Date: tue+3
+Start: 18:00
+End: 21:00
+Location: Classroom
+Off-grid: yes
+Topics:
+
 ### Slot: slot-w3-wed
 Date: wed+3
 Start: 18:00
@@ -10468,11 +10492,27 @@ Location: Drawing Room
 Off-grid: yes
 Topics:
 
+### Slot: slot-w3-wed-hall
+Date: wed+3
+Start: 18:00
+End: 21:00
+Location: Hall
+Off-grid: yes
+Topics:
+
 ### Slot: slot-w3-thu
 Date: thu+3
 Start: 18:00
 End: 21:00
 Location: Classroom
+Off-grid: yes
+Topics:
+
+### Slot: slot-w3-thu-dr
+Date: thu+3
+Start: 18:00
+End: 21:00
+Location: Drawing Room
 Off-grid: yes
 Topics:
 
