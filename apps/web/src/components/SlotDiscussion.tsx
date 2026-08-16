@@ -280,17 +280,24 @@ function CommentRow({
  * attachment stays host/admin). Comments are fetched by the row when it
  * unfolds and reloaded after a post. */
 export function DiscussionPanel({
-  slot,
+  slotId,
+  counts,
   slug,
-  perms,
+  viewerId,
+  canModerate,
   lensTopic,
   comments,
   roleLabels,
   onReload,
 }: {
-  slot: CalendarSlot;
+  /** Takes the slot's id and counts rather than a CalendarSlot, so the
+   * topic-workbench rows can carry the same thread (QA 2026-08-16). */
+  slotId: string;
+  /** Drives the claim chip's preview snapshot; only read with a lens. */
+  counts: { green: number; yellow: number; red: number };
   slug: string;
-  perms: CalendarPerms;
+  viewerId: string | null;
+  canModerate: boolean;
   /** The page's active topic lens — posting attaches it + the snapshot;
    * "All electors" (null) posts a plain comment (QA 2026-08-03). */
   lensTopic: TopicOption | null;
@@ -307,7 +314,7 @@ export function DiscussionPanel({
     if (!text) return;
     void run(
       ADD_COMMENT,
-      { id: slot.id, body: text, topic: lensTopic?.id ?? null },
+      { id: slotId, body: text, topic: lensTopic?.id ?? null },
       {
         errorFallback: "Could not post",
         onSuccess: async () => {
@@ -325,8 +332,8 @@ export function DiscussionPanel({
           key={c.id}
           comment={c}
           slug={slug}
-          viewerId={perms.viewerId}
-          canModerate={perms.canAdmin}
+          viewerId={viewerId}
+          canModerate={canModerate}
           roleLabels={roleLabels}
           onChanged={onReload}
         />
@@ -359,7 +366,7 @@ export function DiscussionPanel({
               the server snapshots on post (QA 2026-08-06, replaced the
               "Posting attaches…" sentence). */}
           {lensTopic ? (
-            <ClaimChip title={lensTopic.title} counts={slot.counts} preview />
+            <ClaimChip title={lensTopic.title} counts={counts} preview />
           ) : null}
         </form>
       </ComposerRow>

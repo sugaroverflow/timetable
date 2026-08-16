@@ -88,9 +88,11 @@ function SlotDetail({
   return (
     <div className="cal-row-detail">
       <DiscussionPanel
-        slot={slot}
+        slotId={slot.id}
+        counts={slot.counts}
         slug={slug}
-        perms={perms}
+        viewerId={perms.viewerId}
+        canModerate={perms.canAdmin}
         lensTopic={lensTopic}
         comments={comments}
         roleLabels={roleLabels}
