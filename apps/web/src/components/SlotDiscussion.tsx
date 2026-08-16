@@ -298,9 +298,11 @@ export function DiscussionPanel({
   slug: string;
   viewerId: string | null;
   canModerate: boolean;
-  /** The page's active topic lens — posting attaches it + the snapshot;
-   * "All electors" (null) posts a plain comment (QA 2026-08-03). */
-  lensTopic: TopicOption | null;
+  /** The active topic lens — posting attaches it + the snapshot; null
+   * ("All electors" on the calendar) posts a plain comment (QA
+   * 2026-08-03). Structural, not TopicOption: the workbench's lens is
+   * simply the topic whose panel you are in (Ed, QA 2026-08-16). */
+  lensTopic: { id: string; title: string } | null;
   comments: SlotComment[] | null;
   roleLabels?: RoleLabels;
   onReload: () => Promise<void>;
