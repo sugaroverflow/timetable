@@ -1,5 +1,7 @@
 import { SignUp } from "@clerk/nextjs";
 
+import { e2eTestMode } from "@/env";
+
 export default function SignUpPage() {
   return (
     <main className="container auth-page">
@@ -7,7 +9,7 @@ export default function SignUpPage() {
         <h1>Create account</h1>
         <p>Create an account to create and join forums.</p>
       </div>
-      {process.env.E2E_TEST_MODE === "1" ? null : (
+      {e2eTestMode ? null : (
         <SignUp
           path="/sign-up"
           routing="path"

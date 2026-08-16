@@ -5,7 +5,7 @@ import {
   type NextRequest,
 } from "next/server";
 
-import { env } from "@/env";
+import { e2eTestMode, env } from "@/env";
 import { canonicalHosts, redirectTargetHost } from "@/lib/canonicalHost";
 
 // Next 16 renamed the "middleware" convention to "proxy". Clerk attaches auth
@@ -202,7 +202,7 @@ export default function proxy(request: NextRequest, event: NextFetchEvent) {
 
   // Playwright smoke tests render anonymous shell routes without Clerk's
   // development-browser handshake or real Clerk credentials.
-  if (process.env.E2E_TEST_MODE === "1") {
+  if (e2eTestMode) {
     return routeRequest(request);
   }
   return clerkProxy(request, event);

@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import "./tokens.css";
 import "./globals.css";
 
-import { env } from "@/env";
+import { e2eTestMode, env } from "@/env";
 import { emojiFavicon } from "@/lib/favicon";
 
 export const metadata: Metadata = {
@@ -71,7 +71,7 @@ export default function RootLayout({
     </html>
   );
 
-  if (process.env.E2E_TEST_MODE === "1") return content;
+  if (e2eTestMode) return content;
 
   return <ClerkProvider appearance={clerkAppearance}>{content}</ClerkProvider>;
 }

@@ -77,7 +77,7 @@ const QUERY_AUTHED = `
 function buildIcsUrl(slug: string, token: string | null | undefined): string {
   return (
     `${env.apiUrl}/api/forums/${slug}/calendar.ics` +
-    (token ? `?token=${token}` : "")
+    (token ? `?token=${encodeURIComponent(token)}` : "")
   );
 }
 
