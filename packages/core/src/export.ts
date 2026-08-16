@@ -1,14 +1,26 @@
-import type { Topic } from "@timetable/db";
+import type { AvailabilityState, Topic } from "@timetable/db";
 import {
+  canDiscussSlots,
+  canManageCalendar,
   canModerate,
   canProposeTopics,
   canSeeHostOnly,
   canSeePersonProfile,
+  isCalendarEnabled,
   type Privacy,
   type Role,
+  type TimetableSettings,
   type Viewer,
 } from "@timetable/shared";
 
+import {
+  buildCalendar,
+  getAudienceElectorIds,
+  listSlotComments,
+  type CalendarSession,
+  type SlotCommentView,
+  type SlotCounts,
+} from "./calendar";
 import { listCommentTreesForTopics, type CommentNode } from "./comments";
 import { listHeartEvents, type HeartEvent } from "./heartEvents";
 import { listPeople } from "./members";
@@ -23,9 +35,7 @@ import {
  * The read-only data export behind GET /api/forums/:id/export and the
  * forum's "API" page: everything the viewer's role can already read in the
  * app, as one timestamped JSON document. Role filtering reuses the same
- * shared permission checks as the GraphQL resolvers. Timeslot/calendar data
- * is not included yet — adding it is an open todo (docs/PRODUCT.md, Known
- * gaps).
+ * shared permission checks as the GraphQL resolvers.
  */
 
 export type ExportTopic = {
@@ -72,6 +82,33 @@ export type ExportManagedTopic = {
   comments: CommentNode[];
 };
 
+/** One timeslot, role-filtered exactly like the calendar page: sessions
+ * are public to any reader of the forum, discussions belong to members,
+ * availability (tallies + per-elector states) to hosts/admins. */
+export type ExportSlot = {
+  id: string;
+  startsAt: Date;
+  endsAt: Date;
+  /** Locations offered at this time (empty on location-free slots). */
+  locations: string[];
+  /** The slot's bookings: pencilled/confirmed topics, office hours,
+   * admin custom events. */
+  sessions: CalendarSession[];
+  /** Signed-in members: the exporting user's own 🟢🟡🔴 for this slot. */
+  viewerAvailability?: AvailabilityState | null;
+  /** Hosts/admins: elector availability tallies. */
+  availability?: SlotCounts;
+  /** Hosts/admins: each answering elector's state. */
+  availabilityByUser?: {
+    userId: string;
+    name: string | null;
+    state: AvailabilityState;
+  }[];
+  /** Members: the slot's discussion, oldest first — claim comments carry
+   * `topicId`/`topicTitle` and a frozen `counts` snapshot. */
+  comments?: SlotCommentView[];
+};
+
 export type DataExport = {
   readme: string;
   forum: {
@@ -90,6 +127,8 @@ export type DataExport = {
    * on each topic (current, post-cutoff state), this history survives
    * un-hearts and cutoff resets. */
   heartEvents?: HeartEvent[];
+  /** Forums with the calendar on: every timeslot, past included. */
+  calendar?: { slots: ExportSlot[] };
 };
 
 const README = [
@@ -106,7 +145,11 @@ const README = [
   "`heartEvents` — present for admins: the append-only ledger of every ❤️",
   "(kind `heart`) and 💙 (kind `host_heart`) add/remove, oldest first;",
   "unlike per-topic `hearts` it is unaffected by the hearts cutoff, so",
-  "past voting rounds can be reconstructed from it.",
+  "past voting rounds can be reconstructed from it. `calendar` — present",
+  "when the forum's calendar is enabled: every timeslot (past included)",
+  "with its sessions; members also get each slot's discussion and their",
+  "own availability answer; hosts and admins additionally get the elector",
+  "availability tallies and per-elector states.",
 ].join(" ");
 
 async function managedTopics(rows: Topic[]): Promise<ExportManagedTopic[]> {
@@ -129,8 +172,71 @@ async function managedTopics(rows: Topic[]): Promise<ExportManagedTopic[]> {
   }));
 }
 
+/** The calendar section: the same role-filtered view the calendar page
+ * serves, past slots included (the export is an archive). */
+async function calendarExport(
+  timetableId: string,
+  viewer: Viewer,
+): Promise<{ slots: ExportSlot[] }> {
+  const hostOnly = canSeeHostOnly(viewer);
+  // The wash audience — only computed for viewers who get the tallies.
+  const audience = hostOnly
+    ? await getAudienceElectorIds(timetableId, { kind: "all" })
+    : [];
+  const slots = await buildCalendar(timetableId, audience, viewer.userId, {
+    includePast: true,
+  });
+  // Slot discussions are members-only (canDiscussSlots); admins also see
+  // hidden messages, as on the calendar page.
+  const commentsBySlot = canDiscussSlots(viewer)
+    ? new Map(
+        await Promise.all(
+          slots
+            .filter((s) => s.commentCount > 0)
+            .map(
+              async (s) =>
+                [
+                  s.id,
+                  await listSlotComments(s.id, {
+                    includeHidden: canManageCalendar(viewer),
+                  }),
+                ] as const,
+            ),
+        ),
+      )
+    : null;
+
+  return {
+    slots: slots.map((s) => ({
+      id: s.id,
+      startsAt: s.startsAt,
+      endsAt: s.endsAt,
+      locations: s.locations,
+      sessions: s.sessions,
+      ...(viewer.userId ? { viewerAvailability: s.viewerState } : {}),
+      ...(hostOnly
+        ? {
+            availability: s.counts,
+            availabilityByUser: s.perUser.map((p) => ({
+              userId: p.userId,
+              name: p.name,
+              state: p.state,
+            })),
+          }
+        : {}),
+      ...(commentsBySlot ? { comments: commentsBySlot.get(s.id) ?? [] } : {}),
+    })),
+  };
+}
+
 export async function buildDataExport(
-  timetable: { id: string; name: string; slug: string; privacy: Privacy },
+  timetable: {
+    id: string;
+    name: string;
+    slug: string;
+    privacy: Privacy;
+    settings: TimetableSettings;
+  },
   viewer: Viewer,
 ): Promise<DataExport> {
   const hostOnly = canSeeHostOnly(viewer);
@@ -199,6 +305,9 @@ export async function buildDataExport(
   const heartEvents = moderate
     ? await listHeartEvents(timetable.id)
     : undefined;
+  const calendar = isCalendarEnabled(timetable.settings)
+    ? await calendarExport(timetable.id, viewer)
+    : undefined;
 
   return {
     readme: README,
@@ -213,5 +322,6 @@ export async function buildDataExport(
     ...(myTopics ? { myTopics } : {}),
     ...(pendingTopics ? { pendingTopics } : {}),
     ...(heartEvents ? { heartEvents } : {}),
+    ...(calendar ? { calendar } : {}),
   };
 }

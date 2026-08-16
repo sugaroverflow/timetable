@@ -42,8 +42,11 @@ export default async function ApiPage({
           scores, and the user ids currently hearting each topic; and member
           profiles. Hosts additionally receive their own topics in every status
           with comment threads. Admins additionally receive the pending
-          (submitted) queue. The file&rsquo;s <code>readme</code> field
-          describes its structure.
+          (submitted) queue. When the forum&rsquo;s calendar is on, the export
+          also carries every timeslot with its sessions; members additionally
+          get each slot&rsquo;s discussion and their own availability answer,
+          and hosts and admins the elector availability tallies. The
+          file&rsquo;s <code>readme</code> field describes its structure.
         </p>
         <ExportDownloadButton slug={slug} />
       </section>
@@ -97,6 +100,17 @@ export default async function ApiPage({
           newest 50, with full topic bodies, no authentication. The feed exists
           only while the forum is readable without signing in; feed readers also
           discover it automatically from any forum page.
+        </p>
+      </section>
+
+      <section className="stack">
+        <h3 className="section-title">Calendar feed (ICS)</h3>
+        <p>
+          Forums with the calendar enabled serve it as an ICS feed at{" "}
+          <code>{`${env.apiUrl}/api/forums/${slug}/calendar.ics`}</code> — paste
+          it into any calendar app to subscribe. Public forums need no
+          authentication; on a private forum the calendar page&rsquo;s
+          &ldquo;Subscribe (ICS)&rdquo; button carries your personal feed token.
         </p>
       </section>
 

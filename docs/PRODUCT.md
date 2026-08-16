@@ -367,8 +367,9 @@ plumbing and are only ever sent when an admin explicitly triggers them.
 Calendar sync is one-way ICS export
 (`GET /api/forums/:idOrSlug/calendar.ics`); private forums require a
 per-user ICS token. There is also a public Atom feed of newly published
-topics, a read-only JSON export of a forum's readable data (the forum's
-"API" page), and Open Graph social cards for forums, topics, and people.
+topics, a read-only JSON export of a forum's readable data including its
+calendar (the forum's "API" page), and Open Graph social cards for forums,
+topics, and people.
 
 ## Status
 
@@ -396,8 +397,6 @@ and the git log — this document describes the present.
   admin's browser clock, the app renders viewer-local, and digest emails
   format in UTC — fine while forums are single-timezone, wrong the day one
   isn't.
-- The forum data export and API page exclude timeslot/availability data;
-  adding calendar data to the export surface is an open todo.
 - Feed pagination is offset-based behind infinite scroll; cursor pagination
   is a future scalability item.
 - A full copy review is an open todo: read every user-facing string in one
