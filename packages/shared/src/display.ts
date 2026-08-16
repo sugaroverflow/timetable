@@ -6,7 +6,7 @@
 
 /** How many avatar palette slots exist (web: tokens.css --avatar-1…8;
  * email: its literal AVATAR_PALETTE — email clients can't read CSS). */
-export const AVATAR_SLOT_COUNT = 8;
+const AVATAR_SLOT_COUNT = 8;
 
 /** Deterministic palette slot (0-based) for a name/id seed — the SAME
  * hash in app and email, so a person's avatar colour matches across

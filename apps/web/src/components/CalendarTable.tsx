@@ -36,14 +36,14 @@ function formatDate(iso: string, withYear = false): string {
     ...(withYear ? { year: "numeric" } : {}),
   });
 }
-export function formatTime(iso: string): string {
+function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString("en-GB", {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
   });
 }
-export function monthLabel(iso: string): string {
+function monthLabel(iso: string): string {
   return new Date(iso).toLocaleString(undefined, {
     month: "long",
     year: "numeric",
@@ -51,7 +51,7 @@ export function monthLabel(iso: string): string {
 }
 
 /** The Monday starting this slot's week (viewer-local) — week-gap key. */
-export function weekKey(iso: string): string {
+function weekKey(iso: string): string {
   const d = new Date(iso);
   d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
   return d.toDateString();

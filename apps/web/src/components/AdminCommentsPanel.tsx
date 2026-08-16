@@ -87,7 +87,7 @@ export function AdminCommentsPanel({
 
   return (
     <Collapsible.Root
-      className="host-panel admin-panel"
+      className="host-panel"
       open={expanded}
       onOpenChange={setExpanded}
     >

@@ -144,7 +144,7 @@ export function HostActivityTable({
 
   return (
     <div className="table-wrap">
-      <table className="data-table sortable-table">
+      <table className="data-table">
         <thead>
           <tr>
             <SortHeader label={hostLabel} {...headerProps("name")} />

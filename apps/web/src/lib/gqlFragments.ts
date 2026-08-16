@@ -27,7 +27,7 @@ export function commentTree(field = "comments"): string {
  * 2026-08-16. Counts and perUser come back null for viewers who may not
  * see group availability; the row handles that. */
 export const CALENDAR_SLOT_FIELDS = `
-  id startsAt endsAt cellKey locations commentCount viewerState
+  id startsAt endsAt locations commentCount viewerState
   sessions {
     id location status url customTitle
     topic { id title topicSlug hostId hostName }
@@ -47,15 +47,16 @@ export const MANAGED_TOPIC_FIELDS = `
 /** Topic selection shared by the feed (feedPage.ts) and the topic permalink
  * page — everything a TopicCard renders. The feed additionally selects
  * contentUpdatedAt for its "new since last visit" highlights. The per-elector
- * weightedBreakdown is deliberately NOT selected here: BreakdownToggle
- * fetches it lazily on first expand (it costs ~4 queries per topic).
+ * weightedBreakdown is deliberately NOT selected here: BreakdownPanel /
+ * BreakdownCaret fetch it lazily on first expand (it costs ~4 queries per
+ * topic).
  * adminComments IS selected (topic-tabs' drafting tab, 2026-08-15) — two
  * trees put this fragment at ~230 of GRAPHQL_MAX_COST (500); the API
  * returns [] to everyone but the topic's owner and admins, and batches the
  * fetch for those. */
 export const TOPIC_FEED_FIELDS = `
   id hostId hostName hostImage hostSlug title slug bodyMd bodyHtml coverImageUrl status
-  heartCount weightedScore viewerHasHearted commentCount viewerCommentsSeenAt
+  heartCount viewerHasHearted commentCount viewerCommentsSeenAt
   viewerHasHostHearted hostHearters { userId name image slug }
   sessionSlotCount
   publishedAt createdAt

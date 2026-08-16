@@ -3,11 +3,6 @@
 import { useState } from "react";
 import { Send } from "lucide-react";
 
-import type {
-  CalendarPerms,
-  CalendarSlot,
-  TopicOption,
-} from "@/lib/calendarTypes";
 import { clientGql } from "@/lib/clientGraphql";
 import type { RoleLabels } from "@/lib/timetableSettings";
 import { useGqlAction } from "@/lib/useGqlAction";
