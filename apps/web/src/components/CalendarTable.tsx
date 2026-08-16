@@ -361,7 +361,6 @@ function TableHeading({
   open,
   onToggle,
   pastToggle,
-  extra,
 }: {
   title: string;
   card: boolean;
@@ -370,7 +369,6 @@ function TableHeading({
   open: boolean;
   onToggle: () => void;
   pastToggle: React.ReactNode;
-  extra: React.ReactNode;
 }) {
   return (
     <h3
@@ -396,9 +394,6 @@ function TableHeading({
       )}
       {/* Ungrouped lists have no month heading to carry it. */}
       {!grouped ? pastToggle : null}
-      {/* The caller's heading-level control (the workbench's sort toggle
-          rides its Calendar heading — that list is what it sorts). */}
-      {extra ? <span className="cal-heading-extra">{extra}</span> : null}
     </h3>
   );
 }
@@ -428,7 +423,7 @@ export function CalendarTable({
   // No defaults (each one is a complexity point) — undefined renders as
   // nothing, same as null.
   pastToggle,
-  headingExtra,
+  controls,
   rowAction,
 }: {
   rows: CalendarTableRow[];
@@ -460,9 +455,10 @@ export function CalendarTable({
    * caller owns it: a page link on the calendar, a state toggle in the
    * workbench. */
   pastToggle?: React.ReactNode;
-  /** A control riding the heading's right edge — the workbench's sort
-   * toggle on its Calendar section (Ed, QA 2026-08-16). */
-  headingExtra?: React.ReactNode;
+  /** A controls row UNDER the heading, folding with the rows — the
+   * workbench's sort toggle (left) + Show past (right); space-between
+   * comes from .cal-table-controls (Ed, QA 2026-08-16 round 3). */
+  controls?: React.ReactNode;
   /** A per-row control in the right cluster — the workbench's one-click
    * pencil. */
   rowAction?: (slot: CalendarSlot) => React.ReactNode;
@@ -481,52 +477,56 @@ export function CalendarTable({
           open={open}
           onToggle={() => setOpen((o) => !o)}
           pastToggle={pastToggle}
-          extra={headingExtra}
         />
       ) : null}
       {/* Conditional render, not `hidden` — .cal-list's own display rule
           out-specifies the attribute (the fold bug, QA 2026-08-16). */}
       {showRows ? (
-        <div className="cal-list">
-          {rows.map(({ slot, past }, i) => {
-            const month = monthLabel(slot.startsAt);
-            const divider =
-              grouped &&
-              (i === 0 || month !== monthLabel(rows[i - 1]!.slot.startsAt));
-            // Bigger gap between Sunday and Monday — skipped when a month
-            // heading already breaks the run.
-            const weekStart =
-              grouped &&
-              !divider &&
-              i > 0 &&
-              weekKey(slot.startsAt) !== weekKey(rows[i - 1]!.slot.startsAt);
-            return (
-              <Fragment key={slot.id}>
-                {divider ? (
-                  <MonthRow
-                    month={month}
-                    toggle={i === 0 ? pastToggle : null}
+        <>
+          {/* Unconditional div + :empty rule, not a ternary — CalendarTable
+              sits at the complexity limit. */}
+          <div className="cal-table-controls">{controls}</div>
+          <div className="cal-list">
+            {rows.map(({ slot, past }, i) => {
+              const month = monthLabel(slot.startsAt);
+              const divider =
+                grouped &&
+                (i === 0 || month !== monthLabel(rows[i - 1]!.slot.startsAt));
+              // Bigger gap between Sunday and Monday — skipped when a month
+              // heading already breaks the run.
+              const weekStart =
+                grouped &&
+                !divider &&
+                i > 0 &&
+                weekKey(slot.startsAt) !== weekKey(rows[i - 1]!.slot.startsAt);
+              return (
+                <Fragment key={slot.id}>
+                  {divider ? (
+                    <MonthRow
+                      month={month}
+                      toggle={i === 0 ? pastToggle : null}
+                    />
+                  ) : null}
+                  <SlotRow
+                    slot={slot}
+                    past={past}
+                    weekStart={weekStart}
+                    slug={slug}
+                    locations={locations}
+                    perms={perms}
+                    claimTopics={claimTopics}
+                    lensTopic={lensTopic}
+                    adminLabel={adminLabel}
+                    officeHoursLabel={officeHoursLabel}
+                    roleLabels={roleLabels}
+                    showYear={!grouped}
+                    action={rowAction?.(slot) ?? null}
                   />
-                ) : null}
-                <SlotRow
-                  slot={slot}
-                  past={past}
-                  weekStart={weekStart}
-                  slug={slug}
-                  locations={locations}
-                  perms={perms}
-                  claimTopics={claimTopics}
-                  lensTopic={lensTopic}
-                  adminLabel={adminLabel}
-                  officeHoursLabel={officeHoursLabel}
-                  roleLabels={roleLabels}
-                  showYear={!grouped}
-                  action={rowAction?.(slot) ?? null}
-                />
-              </Fragment>
-            );
-          })}
-        </div>
+                </Fragment>
+              );
+            })}
+          </div>
+        </>
       ) : null}
     </div>
   );

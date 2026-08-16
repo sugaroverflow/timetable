@@ -122,19 +122,21 @@ function PencilAction({
   );
 }
 
-/** What the panel says about itself: whose availability you're reading. */
+/** Only the zero-hearters explainer survives — the "Availability of the
+ * n ❤️…" helper line is gone (Ed, QA 2026-08-16 round 3); an empty wash
+ * still deserves a why. */
 function PanelHead({ hearterCount }: { hearterCount: number }) {
+  if (hearterCount > 0) return null;
   return (
     <span className="faint" style={{ fontSize: 12 }}>
-      {hearterCount === 0
-        ? "No ❤️s yet — the washes fill in as people ❤️ this topic."
-        : `Availability of the ${hearterCount} ❤️ on this topic. Pencil in every time you could run it.`}
+      No ❤️s yet — the washes fill in as people ❤️ this topic.
     </span>
   );
 }
 
-/** The Date/Availability ranking toggle — rides the Calendar section's
- * heading, since that list is what it sorts (Ed, QA 2026-08-16). */
+/** The Date/Availability ranking toggle — sits in the controls row under
+ * the Calendar heading, since that list is what it sorts (Ed, QA
+ * 2026-08-16; moved off the heading itself in round 3). */
 function SortToggle({
   mode,
   onMode,
@@ -309,15 +311,19 @@ export function TopicScheduleBody({
           title="Calendar"
           card={false}
           collapsible
-          headingExtra={<SortToggle mode={mode} onMode={setMode} />}
+          // Sort left, Show past right (Ed, QA 2026-08-16 round 3) —
+          // .cal-table-controls space-betweens them under the heading.
+          controls={
+            <>
+              <SortToggle mode={mode} onMode={setMode} />
+              <PastToggle
+                showPast={showPast}
+                onToggle={() => setShowPast((p) => !p)}
+              />
+            </>
+          }
           grouped={mode === "date"}
           rows={sorted.map((slot) => ({ slot, past: isPast(slot) }))}
-          pastToggle={
-            <PastToggle
-              showPast={showPast}
-              onToggle={() => setShowPast((p) => !p)}
-            />
-          }
           {...shared}
         />
       )}
