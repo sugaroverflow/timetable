@@ -196,7 +196,10 @@ function RowHead({
 }) {
   return (
     <div className="cal-row-head">
-      {perms.canSeeHostOnly ? (
+      {/* The wash needs the counts, which the API serves to hosts and
+          admins only (2026-08-16) — belt and braces, since the gate that
+          nulls them is the same one this checks. */}
+      {perms.canSeeHostOnly && slot.counts ? (
         <TintLayer
           counts={slot.counts}
           avatarCounts={open && slot.perUser ? tallyStates(slot.perUser) : null}

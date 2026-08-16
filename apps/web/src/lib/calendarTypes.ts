@@ -34,7 +34,9 @@ export type CalendarSlot = {
   locations: string[];
   sessions: CalendarSession[];
   viewerState: AvailabilityState | null;
-  counts: { green: number; yellow: number; red: number };
+  /** Group availability — null for electors and anonymous viewers, who
+   * never see the wash (host/admin only since 2026-08-16). */
+  counts: { green: number; yellow: number; red: number } | null;
   perUser:
     | {
         userId: string;

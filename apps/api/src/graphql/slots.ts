@@ -326,7 +326,15 @@ const TimeslotType = builder.objectRef<GqlSlot>("Timeslot").implement({
       type: [SlotSessionType],
       resolve: (s) => s.sessions,
     }),
-    counts: t.field({ type: AvailabilityCountsType, resolve: (s) => s.counts }),
+    /** Group availability is host/admin-only (Ed, 2026-08-16 — decided
+     * the deferred question): electors and anonymous viewers get null,
+     * not a number they could add up. The wash was already hidden from
+     * them in the UI; the payload now matches. */
+    counts: t.field({
+      type: AvailabilityCountsType,
+      nullable: true,
+      resolve: (s) => (s.canSeeHostOnly ? s.counts : null),
+    }),
     // Per-elector availability is host/admin-only.
     perUser: t.field({
       type: [SlotAvailabilityType],
@@ -361,6 +369,9 @@ const SlotCommentType = builder
       body: t.exposeString("body"),
       topicId: t.exposeID("topicId", { nullable: true }),
       topicTitle: t.exposeString("topicTitle", { nullable: true }),
+      /** The claim's frozen snapshot. Stripped for non-hosts by the
+       * `slotComments` resolver — gating live counts would mean nothing
+       * if the same tallies sat one click into the chat (2026-08-16). */
       counts: t.field({
         type: AvailabilityCountsType,
         nullable: true,
@@ -520,9 +531,13 @@ builder.queryFields((t) => ({
       const { viewer, timetable } = await loadSlotAndViewer(ctx, args.slotId);
       if (!isCalendarEnabled(timetable.settings)) return [];
       if (!canDiscussSlots(viewer)) return [];
-      return listSlotComments(args.slotId, {
+      const comments = await listSlotComments(args.slotId, {
         includeHidden: canManageCalendar(viewer),
       });
+      // Claim snapshots carry group availability, so they answer to the
+      // same gate as the live counts (2026-08-16).
+      if (canSeeHostOnly(viewer)) return comments;
+      return comments.map((c) => ({ ...c, counts: null }));
     },
   }),
 
