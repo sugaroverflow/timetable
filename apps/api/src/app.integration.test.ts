@@ -1566,6 +1566,82 @@ describe("createApiApp", () => {
     });
   });
 
+  describe("calendar counts (host/admin only, 2026-08-16)", () => {
+    const QUERY = `query($s: String!){
+      calendar(idOrSlug: $s) { id counts { green } perUser { userId } }
+    }`;
+
+    async function request(baseUrl: string) {
+      const res = await fetch(`${baseUrl}/graphql`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: QUERY, variables: { s: "public" } }),
+      });
+      return (await res.json()) as {
+        data?: {
+          calendar: {
+            id: string;
+            counts: { green: number } | null;
+            perUser: unknown[] | null;
+          }[];
+        };
+        errors?: unknown[];
+      };
+    }
+
+    function mockCalendarWorld(roles: string[]) {
+      vi.mocked(core.getReadableTimetable).mockResolvedValue({
+        timetable: timetableFixture({
+          settings: { calendar: { enabled: true } },
+        }),
+        roles: roles as never,
+      });
+      vi.mocked(core.getAudienceElectorIds).mockResolvedValue(["elector-1"]);
+      vi.mocked(core.buildCalendar).mockResolvedValue([
+        {
+          id: "33333333-3333-3333-3333-333333333333",
+          startsAt: new Date("2026-09-01T18:00:00.000Z"),
+          endsAt: new Date("2026-09-01T20:00:00.000Z"),
+          cellKey: null,
+          createdById: null,
+          locations: [],
+          sessions: [],
+          viewerState: null,
+          counts: { green: 3, yellow: 1, red: 0 },
+          perUser: [
+            { userId: "elector-1", name: null, image: null, state: "green" },
+          ],
+          commentCount: 0,
+        },
+      ]);
+    }
+
+    it("serves the wash to a host", async () => {
+      mockSession("host-1", ["host"]);
+      mockCalendarWorld(["host"]);
+
+      await withTestServer(async (baseUrl) => {
+        const body = await request(baseUrl);
+        expect(body.data?.calendar[0]?.counts).toEqual({ green: 3 });
+        expect(body.data?.calendar[0]?.perUser).toHaveLength(1);
+      });
+    });
+
+    it("gives an elector neither counts nor names", async () => {
+      mockSession("elector-1", ["elector"]);
+      mockCalendarWorld(["elector"]);
+
+      await withTestServer(async (baseUrl) => {
+        const body = await request(baseUrl);
+        // The row is still there — an elector reads the schedule and sets
+        // their own availability; they just can't total everyone else's.
+        expect(body.data?.calendar).toHaveLength(1);
+        expect(body.data?.calendar[0]?.counts).toBeNull();
+        expect(body.data?.calendar[0]?.perUser).toBeNull();
+      });
+    });
+  });
+
   describe("slot discussion (open to every member, 2026-08-14)", () => {
     const calendarTimetable = () =>
       timetableFixture({ settings: { calendar: { enabled: true } } });
@@ -1609,6 +1685,44 @@ describe("createApiApp", () => {
         expect(core.listSlotComments).toHaveBeenCalledWith(slot.id, {
           includeHidden: false,
         });
+      });
+    });
+
+    it("strips claim snapshots for an elector, keeps them for a host", async () => {
+      const CLAIM_QUERY = `query($id: String!){
+        slotComments(slotId: $id) { id topicTitle counts { green yellow red } }
+      }`;
+      const slot = mockSlotWorld();
+      vi.mocked(core.listSlotComments).mockResolvedValue([
+        slotCommentViewFixture({
+          topicId: "topic-1",
+          topicTitle: "Quantum ethics",
+          counts: { green: 5, yellow: 2, red: 1 },
+        }),
+      ]);
+
+      await withTestServer(async (baseUrl) => {
+        // Group availability is host/admin-only (2026-08-16), and a frozen
+        // claim snapshot is group availability.
+        mockSession("elector-1", ["elector"]);
+        const elector = await gql(baseUrl, CLAIM_QUERY, { id: slot.id });
+        expect(elector.data?.slotComments).toEqual([
+          {
+            id: "44444444-4444-4444-4444-444444444444",
+            topicTitle: "Quantum ethics",
+            counts: null,
+          },
+        ]);
+
+        mockSession("host-1", ["host"]);
+        const host = await gql(baseUrl, CLAIM_QUERY, { id: slot.id });
+        expect(host.data?.slotComments).toEqual([
+          {
+            id: "44444444-4444-4444-4444-444444444444",
+            topicTitle: "Quantum ethics",
+            counts: { green: 5, yellow: 2, red: 1 },
+          },
+        ]);
       });
     });
 

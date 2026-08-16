@@ -293,8 +293,9 @@ export function DiscussionPanel({
   /** Takes the slot's id and counts rather than a CalendarSlot, so the
    * topic-workbench rows can carry the same thread (QA 2026-08-16). */
   slotId: string;
-  /** Drives the claim chip's preview snapshot; only read with a lens. */
-  counts: { green: number; yellow: number; red: number };
+  /** Drives the claim chip's preview snapshot; only read with a lens,
+   * and null for anyone who may not see group availability. */
+  counts: { green: number; yellow: number; red: number } | null;
   slug: string;
   viewerId: string | null;
   canModerate: boolean;
