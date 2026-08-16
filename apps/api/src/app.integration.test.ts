@@ -1688,7 +1688,7 @@ describe("createApiApp", () => {
       });
     });
 
-    it("strips claim snapshots for an elector, keeps them for a host", async () => {
+    it("shows claim snapshots to everyone in the thread", async () => {
       const CLAIM_QUERY = `query($id: String!){
         slotComments(slotId: $id) { id topicTitle counts { green yellow red } }
       }`;
@@ -1700,29 +1700,25 @@ describe("createApiApp", () => {
           counts: { green: 5, yellow: 2, red: 1 },
         }),
       ]);
+      const claim = [
+        {
+          id: "44444444-4444-4444-4444-444444444444",
+          topicTitle: "Quantum ethics",
+          counts: { green: 5, yellow: 2, red: 1 },
+        },
+      ];
 
       await withTestServer(async (baseUrl) => {
-        // Group availability is host/admin-only (2026-08-16), and a frozen
-        // claim snapshot is group availability.
+        // The LIVE wash is host/admin-only (2026-08-16), but a frozen
+        // snapshot is different in kind (Ed): no avatars, and it's the
+        // argument its author chose to publish into a booking discussion.
         mockSession("elector-1", ["elector"]);
         const elector = await gql(baseUrl, CLAIM_QUERY, { id: slot.id });
-        expect(elector.data?.slotComments).toEqual([
-          {
-            id: "44444444-4444-4444-4444-444444444444",
-            topicTitle: "Quantum ethics",
-            counts: null,
-          },
-        ]);
+        expect(elector.data?.slotComments).toEqual(claim);
 
         mockSession("host-1", ["host"]);
         const host = await gql(baseUrl, CLAIM_QUERY, { id: slot.id });
-        expect(host.data?.slotComments).toEqual([
-          {
-            id: "44444444-4444-4444-4444-444444444444",
-            topicTitle: "Quantum ethics",
-            counts: { green: 5, yellow: 2, red: 1 },
-          },
-        ]);
+        expect(host.data?.slotComments).toEqual(claim);
       });
     });
 
