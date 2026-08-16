@@ -60,7 +60,7 @@ export function BreakdownTable({
 
   return (
     <div className="table-wrap">
-      <table className="data-table sortable-table breakdown-table">
+      <table className="data-table breakdown-table">
         <thead>
           <tr>
             {header("name", electorLabel)}

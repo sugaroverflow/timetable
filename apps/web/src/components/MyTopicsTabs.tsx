@@ -10,7 +10,7 @@ import { CommentComposer } from "./CommentComposer";
 import { CommentList } from "./CommentList";
 import { CommentsOpenScope } from "./CommentsOpenScope";
 import { CommentTeaser } from "./CommentTeaser";
-import { HostOnlyThreadBody } from "./HostOnlyPanel";
+import { HostOnlyThreadBody } from "./HostOnlyThreadBody";
 import { TopicScheduleBody } from "./TopicSchedulePanel";
 import { TopicTabs, type TopicTab } from "./TopicTabs";
 

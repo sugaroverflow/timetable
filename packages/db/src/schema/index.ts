@@ -6,7 +6,6 @@ export * from "./calendar";
 export * from "./rate-limits";
 
 import { apiTokens, users } from "./auth";
-import { apiRateLimitBuckets } from "./rate-limits";
 import {
   availability,
   availabilityPatterns,
@@ -14,11 +13,7 @@ import {
   slotSessions,
   timeslots,
 } from "./calendar";
-import {
-  timetableInvites,
-  timetableMemberships,
-  timetables,
-} from "./timetables";
+import { timetableMemberships, timetables } from "./timetables";
 import { activityEvents, comments, hearts, hostHearts, topics } from "./topics";
 
 /** Convenience: inferred row types for the whole schema. */
@@ -33,9 +28,6 @@ export type NewTimetable = typeof timetables.$inferInsert;
 
 export type TimetableMembership = typeof timetableMemberships.$inferSelect;
 export type NewTimetableMembership = typeof timetableMemberships.$inferInsert;
-
-export type TimetableInvite = typeof timetableInvites.$inferSelect;
-export type NewTimetableInvite = typeof timetableInvites.$inferInsert;
 
 export type Topic = typeof topics.$inferSelect;
 export type NewTopic = typeof topics.$inferInsert;
@@ -65,11 +57,7 @@ export type Availability = typeof availability.$inferSelect;
 export type NewAvailability = typeof availability.$inferInsert;
 export type AvailabilityState = Availability["state"];
 
-export type AvailabilityPattern = typeof availabilityPatterns.$inferSelect;
 export type NewAvailabilityPattern = typeof availabilityPatterns.$inferInsert;
 
 export type SlotComment = typeof slotComments.$inferSelect;
 export type NewSlotComment = typeof slotComments.$inferInsert;
-
-export type ApiRateLimitBucket = typeof apiRateLimitBuckets.$inferSelect;
-export type NewApiRateLimitBucket = typeof apiRateLimitBuckets.$inferInsert;

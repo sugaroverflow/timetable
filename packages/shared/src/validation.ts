@@ -41,14 +41,12 @@ export const inviteSchema = z.object({
   emails: z.array(z.string().email()).min(1, "Add at least one email"),
   roles: z.array(assignableRoleEnum).min(1, "Pick at least one role"),
 });
-export type InviteInput = z.infer<typeof inviteSchema>;
 
 /** Admin email correction for a member who has never signed in
  * (2026-07-29): fixing pre-created accounts and invite typos. */
 export const updateMemberEmailSchema = z.object({
   email: z.string().email().max(320),
 });
-export type UpdateMemberEmailInput = z.infer<typeof updateMemberEmailSchema>;
 
 /** Admin "add person" (product feedback round 2): pre-create an account with
  * a real email, populate it, then send the invite email separately. */
@@ -57,12 +55,10 @@ export const addPersonSchema = z.object({
   name: z.string().min(1).max(120).optional(),
   roles: z.array(assignableRoleEnum).min(1, "Pick at least one role"),
 });
-export type AddPersonInput = z.infer<typeof addPersonSchema>;
 
 export const updateMemberRolesSchema = z.object({
   roles: z.array(roleEnum),
 });
-export type UpdateMemberRolesInput = z.infer<typeof updateMemberRolesSchema>;
 
 /** Creating a personal API token. An empty `scopes` array is valid and
  * meaningful — it makes a read-only token. */
@@ -71,14 +67,6 @@ export const createApiTokenSchema = z.object({
   scopes: z.array(tokenScopeEnum).max(API_TOKEN_SCOPES.length),
   expiresInDays: z.number().int().min(1).max(3650).nullable().optional(),
 });
-export type CreateApiTokenInput = z.infer<typeof createApiTokenSchema>;
-
-export const updateProfileSchema = z.object({
-  name: z.string().min(1).max(120).optional(),
-  bio: z.string().max(2000).optional(),
-  image: z.string().url().optional(),
-});
-export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 
 /** "HH:MM", 24-hour. */
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -121,4 +109,3 @@ export const calendarSettingsSchema = z
       .optional(),
   })
   .strict();
-export type CalendarSettingsInput = z.infer<typeof calendarSettingsSchema>;

@@ -58,7 +58,6 @@ export type FeedTopic = {
   coverImageUrl: string | null;
   status: TopicStatus;
   heartCount: number;
-  weightedScore: number | null;
   viewerHasHearted: boolean;
   /** The viewer's own 💙 (host-non-electors; false for everyone else). */
   viewerHasHostHearted: boolean;

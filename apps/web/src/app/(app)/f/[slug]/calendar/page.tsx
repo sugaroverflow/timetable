@@ -4,16 +4,11 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { auth } from "@clerk/nextjs/server";
 import {
   calendarConfirmPolicy,
-  canConfirmSession,
-  canDiscussSlots,
-  canProposeSession,
   isAdmin,
   isCalendarEnabled,
-  isElector,
   isHost,
   officeHoursLabel,
   type Role,
-  type Viewer,
 } from "@timetable/shared";
 
 import { env } from "@/env";

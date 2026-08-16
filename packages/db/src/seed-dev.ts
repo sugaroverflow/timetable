@@ -259,7 +259,7 @@ function resetDatabaseSql(): string {
   return `TRUNCATE TABLE ${tables} RESTART IDENTITY CASCADE`;
 }
 
-export function stableUuid(scope: string, key: string): string {
+function stableUuid(scope: string, key: string): string {
   const hash = createHash("sha1")
     .update(`timetable-dev-seed:${scope}:${key}`)
     .digest();

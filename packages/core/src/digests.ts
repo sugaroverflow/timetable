@@ -1697,7 +1697,7 @@ function buildCards(
 
 /** Topics whose card showed a comment/reply thread in this digest — what
  * a digest click marks seen. */
-export function digestCommentTopicIds(digest: ForumDigest): string[] {
+function digestCommentTopicIds(digest: ForumDigest): string[] {
   return digest.topics
     .filter((card) =>
       card.activities.some((a) => a.kind === "comment" || a.kind === "reply"),

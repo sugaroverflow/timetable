@@ -23,7 +23,7 @@ export type Viewer = {
 
 export const ANONYMOUS: Viewer = { userId: null, roles: [] };
 
-export function isAuthenticated(viewer: Viewer): boolean {
+function isAuthenticated(viewer: Viewer): boolean {
   return viewer.userId !== null;
 }
 

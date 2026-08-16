@@ -134,7 +134,7 @@ type PublishedHostHeart = {
  * HeartRef-shaped so the shared normalisation math applies verbatim —
  * "each host distributes one unit of interest across the topics they 💙".
  * No cutoff: 💙s are unaffected by heartsCountFrom. */
-export async function loadPublishedHostHearts(
+async function loadPublishedHostHearts(
   timetableId: string,
   opts: { userId?: string } = {},
 ): Promise<PublishedHostHeart[]> {
