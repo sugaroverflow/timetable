@@ -161,6 +161,7 @@ function ChatCount({ count }: { count: number }) {
 export function TopicScheduleBody({
   slug,
   topicId,
+  topicTitle,
   canPencil,
   viewerId = null,
   canModerate = false,
@@ -168,6 +169,9 @@ export function TopicScheduleBody({
 }: {
   slug: string;
   topicId: string;
+  /** The lens for this panel's slot chat: a comment posted here
+   * attaches THIS topic + its availability snapshot (Ed, QA 2026-08-16). */
+  topicTitle: string;
   /** False under confirmPolicy "admins" (hosts can't pencil): rows stay
    * informative, the pencil buttons hide. */
   canPencil: boolean;
@@ -232,6 +236,7 @@ export function TopicScheduleBody({
   const shared: SharedRowProps = {
     slug,
     topicId,
+    topicTitle,
     canPencil,
     viewerId,
     canModerate,
@@ -284,6 +289,7 @@ export function TopicScheduleBody({
 type SharedRowProps = {
   slug: string;
   topicId: string;
+  topicTitle: string;
   canPencil: boolean;
   viewerId: string | null;
   canModerate: boolean;
@@ -445,6 +451,7 @@ function WorkbenchRow({
   row,
   slug,
   topicId,
+  topicTitle,
   canPencil,
   weekStart,
   showYear,
@@ -512,8 +519,9 @@ function WorkbenchRow({
       </div>
       {/* The slot's own chat — the same thread the calendar page shows, so
           a timeslot has ONE conversation wherever you meet it (Ed, QA
-          2026-08-16). Plain comments, not claims: the claim chip belongs
-          to the calendar's audience lens. */}
+          2026-08-16). Posts carry this topic's claim chip: the panel IS a
+          topic lens, and the wash you're reading is the very snapshot the
+          server freezes onto the comment. */}
       {open ? (
         <div className="cal-row-detail">
           <DiscussionPanel
@@ -522,7 +530,7 @@ function WorkbenchRow({
             slug={slug}
             viewerId={viewerId}
             canModerate={canModerate}
-            lensTopic={null}
+            lensTopic={{ id: topicId, title: topicTitle }}
             comments={comments}
             roleLabels={roleLabels}
             onReload={loadComments}

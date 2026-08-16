@@ -166,6 +166,7 @@ function schedulingTab(a: TabArgs): TopicTab | null {
       <TopicScheduleBody
         slug={a.slug}
         topicId={a.topic.id}
+        topicTitle={a.topic.title}
         canPencil={a.canPencilSessions}
         viewerId={a.viewerId}
         canModerate={a.canModerate}

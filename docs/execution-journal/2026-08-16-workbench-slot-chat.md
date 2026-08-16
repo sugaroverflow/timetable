@@ -33,3 +33,24 @@ Details:
   addition, so the file now has `PinnedSessions`, `SlotList`,
   `OthersLine`, `ChatCount` and `foldHandlers` as named pieces, with a
   `SharedRowProps` bundle for what every row needs.
+
+## Round 2: the claim chip belongs here after all
+
+Ed, straight after: "I think the claim chip should be included in
+workbench comments."
+
+Right — I had reasoned that claims were the calendar's lens gesture and
+the workbench's lens was merely implicit. But it isn't implicit at all:
+the panel IS one topic's lens, and the wash the host is reading while they
+type is precisely the snapshot the server freezes onto the comment
+(`computeSlotCounts` over that topic's hearters — the same audience
+`topicSlotFit` builds the row from). Posting "could we do this one here?"
+with 🟢 5 🟡 2 attached is the whole point of arguing for a slot.
+
+So `lensTopic` is now this topic, and the composer shows the same live
+preview chip the calendar page shows under its lens. The only change
+needed was the panel's own title, threaded through as `topicTitle`.
+
+`DiscussionPanel.lensTopic` is typed structurally (`{id, title}`) rather
+than as a `TopicOption`, since the workbench has no host/heart-count
+fields to hand and never needed them.
