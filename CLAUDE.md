@@ -130,6 +130,9 @@ Stable names for feature pieces, so instructions can reference them precisely.
   scrolling. My Topics teases too (Ed, 2026-08-16) — hence
   `ManagedTopic.viewerCommentsSeenAt` and the `CommentsOpenScope` around
   its strip; only the PUBLIC thread teases, faculty/drafting open fully.
+  `CommentsOpenScope` carries TWO channels: `requestOpen` (💬 button,
+  posting — never folds) and `requestToggle` (clicking the Comments tab
+  you're already on — opens, then folds back; Ed, 2026-08-16).
 - **chain-reply digests** — `loadChainScope` in `packages/core/src/digests.ts`:
   the `replies` digest kind covers new comments in chains the recipient is
   part of, batched per chain by the email's thread merge. All comment kinds
