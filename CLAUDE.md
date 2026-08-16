@@ -151,8 +151,11 @@ Stable names for feature pieces, so instructions can reference them precisely.
   The strip never wraps (QA 2026-08-15): under 640px with ≥3 tabs the
   UNSELECTED labels are clipped to icon + count (scrolling is only a last
   resort), its bottom rule is an inset shadow (a scroll container would
-  clip a hung underline), and `.topic-tab-panel` suppresses its first
-  block's own top rule so a tab never opens on a doubled line.
+  clip a hung underline), and `.topic-tab-panel` is a 10px-gapped stack
+  (the `.thread-stack` rhythm) that suppresses nested top rules AND the
+  card-level `margin-top: -13px` pulls — those cancel the card's 14px
+  stack gap, which a tab panel doesn't have, so inside one they just
+  overlapped the ❤️ pill (QA 2026-08-16).
   **The strip sits ABOVE the action bars** (Ed, QA 2026-08-15): ❤️ leads
   the Comments tab, 💙 leads the {host}-only tab, so exactly one action
   bar is on screen and its 💬 count is unambiguously that thread's. Hence
