@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import type { WorkbenchCalendar } from "@/lib/calendarTypes";
 import type { FeedTopic } from "@/lib/feedTypes";
 import { topicPath } from "@/lib/topicPath";
 import { pluralLabel, type RoleLabels } from "@/lib/timetableSettings";
@@ -31,9 +32,6 @@ export type FeedPerms = {
   canModerate: boolean;
   /** The drafting thread's tab: the topic's own host, or any admin. */
   canSeeAdminThread: boolean;
-  /** Electors only: the sessions tab's inline 🟢🟡🔴 toggle — their
-   * existing per-slot calendar write, re-homed (2026-08-14). */
-  canSetAvailability: boolean;
 };
 
 function TopicHead({
@@ -238,6 +236,9 @@ type TabArgs = {
   adminLabel: string;
   roleLabels: RoleLabels;
   hostCommentsEnabled: boolean;
+  /** The forum's calendar context for the Sessions tab's rows, or null
+   * when the calendar is off. */
+  calendar: WorkbenchCalendar | null;
   /** The ❤️ row — null in queue mode, where the decision buttons stand
    * above the strip as the card's one call to action. */
   actionsRow: React.ReactNode;
@@ -326,9 +327,11 @@ function adminTab(a: TabArgs): TopicTab | null {
   };
 }
 
-/** sessions-tab (2026-08-14): where this topic is pencilled/confirmed on
- * future slots — for every viewer of the card (sessions are public on the
- * calendar page); the inline availability toggle is elector-only. */
+/** sessions-tab (2026-08-14; calendar rows since 2026-08-16): where this
+ * topic is pencilled/confirmed on future slots — for every viewer of the
+ * card, since sessions are public on the calendar page. The rows are
+ * calendar rows, so what each viewer gets there is what the calendar page
+ * would give them. */
 function sessionsTab(a: TabArgs): TopicTab | null {
   if (a.topic.sessionSlotCount === 0) return null;
   return {
@@ -340,7 +343,9 @@ function sessionsTab(a: TabArgs): TopicTab | null {
       <SessionsTabBody
         slug={a.slug}
         topicId={a.topic.id}
-        canSetAvailability={a.perms.canSetAvailability}
+        calendar={a.calendar}
+        adminLabel={a.adminLabel}
+        roleLabels={a.roleLabels}
       />
     ),
   };
@@ -422,6 +427,7 @@ export function TopicCard({
   viewerHeartCount = null,
   hosts = [],
   hostCommentsEnabled,
+  calendar,
   expandBody = false,
   queueControls = null,
   discussionOpen = false,
@@ -438,6 +444,9 @@ export function TopicCard({
   hosts?: { id: string; name: string | null }[];
   /** Forum option: the host-only thread (and 💙 row) — off hides both. */
   hostCommentsEnabled: boolean;
+  /** Calendar context for the Sessions tab (2026-08-16): its rows are
+   * calendar rows now. Null = the forum has no calendar, so no tab. */
+  calendar: WorkbenchCalendar | null;
   /** Full body, no collapse — the Topic Queue shows one topic at a time,
    * and deciding needs the whole thing. */
   expandBody?: boolean;
@@ -511,6 +520,7 @@ export function TopicCard({
               adminLabel,
               roleLabels,
               hostCommentsEnabled,
+              calendar,
               actionsRow: queueControls ? null : (
                 <FeedActionsRow
                   topic={topic}
