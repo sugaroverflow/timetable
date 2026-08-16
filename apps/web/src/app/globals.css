@@ -655,10 +655,44 @@ textarea {
 }
 
 /* People page: jump-to-section table of contents */
+/* people-toc (QA 2026-08-16): a real table of contents — every person,
+   grouped by role, in the order the page lists them. One column per role
+   on wide screens, stacked when there isn't room. */
 .people-toc {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
+  gap: var(--space-2) var(--space-4);
+}
+.people-toc-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 180px;
+  flex: 1 1 200px;
+}
+.people-toc-people {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.people-toc-person {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 6px;
+  margin-left: -6px;
+  border-radius: var(--radius-sm);
+  color: inherit;
+  text-decoration: none;
+  font-size: var(--text-sm);
+  /* Long names truncate rather than wrapping into a second line — the
+     contents should scan as a list of rows, one person each. */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.people-toc-person:hover {
+  background: var(--wash);
 }
 .people-toc-link {
   display: inline-flex;
@@ -676,7 +710,8 @@ textarea {
   border-color: var(--line-strong);
   background: var(--wash);
 }
-.people-section {
+.people-section,
+.people-card {
   scroll-margin-top: 80px;
 }
 
