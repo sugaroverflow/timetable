@@ -27,3 +27,22 @@ contents scan as one row per person.
 It appears once there are more than three people. Below that the page is
 its own contents, and a list of three names above three cards is just the
 page twice.
+
+## Layout, round 2 (same day)
+
+Ed had a shape in mind that my column-per-role layout didn't match:
+
+```
+Admins
+ admin1 admin2 admin3
+Hosts
+ Host1 Host2 Host3 Host4 [wraps]
+ Host5 Host6 Host7
+```
+
+So the roles stack down the page, each heading full width with its people
+flowing across and wrapping underneath it, indented. The heading is a
+small uppercase label rather than the old pill — a pill alone on a line
+read as a button you were meant to press instead of a section label — and
+it still links to its section. Each person's entry stays on one line; the
+wrap happens between people, not inside a name.
