@@ -414,7 +414,7 @@ function MySessions({
   if (slots.length === 0) return null;
   return (
     <CalendarTable
-      title="Your sessions"
+      title="Your Sessions"
       rows={slots.map((slot) => ({ slot, past: false }))}
       slug={slug}
       locations={locations}

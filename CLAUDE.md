@@ -191,10 +191,12 @@ Stable names for feature pieces, so instructions can reference them precisely.
   carries this topic's claim chip), session and admin controls in the
   fold. Two bare sections (`card={false}` — no inner cards, quiet
   `.cal-subhead` headings, no counters; Ed, QA 2026-08-16), each folding
-  by its heading (`collapsible`): **"Your sessions"** (this topic's
+  by its heading (`collapsible`): **"Your Sessions"** (this topic's
   upcoming pencils/confirmations as ordinary rows, also present in the
-  list below) and **"Calendar"**. The calendar
-  page leads with its own **"Your sessions"** card (`MySessions` in
+  list below) and **"Calendar"** — whose heading carries the
+  Date/Availability sort toggle (`headingExtra`), since that list is what
+  it sorts (Ed, QA 2026-08-16). The calendar
+  page leads with its own **"Your Sessions"** card (`MySessions` in
   `calendar/page.tsx`): the viewer's future topic sessions + office
   hours, read off the UNFILTERED calendar and repeated in the chronology
   below.
@@ -215,7 +217,11 @@ Stable names for feature pieces, so instructions can reference them precisely.
   the calendar page would give them: bookings, rooms, their own 🟢🟡🔴,
   the slot chat behind the fold; the wash stays host/admin-only because
   `counts` is gated everywhere, and charts THIS topic's hearters (the
-  workbench's audience; Ed, QA 2026-08-16). `topicSessions` builds ONLY this topic's
+  workbench's audience; Ed, QA 2026-08-16). Non-admin hosts get NO
+  pencil-in control here (`canPropose` stripped — it could only
+  cross-book their office hours into someone else's topic; booking
+  gestures live on the calendar and the workbench; Ed, QA 2026-08-16).
+  `topicSessions` builds ONLY this topic's
   slots (`listTopicSessionSlotIds` → `buildCalendar({ slotIds })`), never
   the forum's whole schedule. No lens: a comment posted from a card is a
   plain slot comment — claiming a time is the calendar's and the

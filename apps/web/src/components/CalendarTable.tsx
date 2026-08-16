@@ -361,6 +361,7 @@ function TableHeading({
   open,
   onToggle,
   pastToggle,
+  extra,
 }: {
   title: string;
   card: boolean;
@@ -369,6 +370,7 @@ function TableHeading({
   open: boolean;
   onToggle: () => void;
   pastToggle: React.ReactNode;
+  extra: React.ReactNode;
 }) {
   return (
     <h3
@@ -394,6 +396,9 @@ function TableHeading({
       )}
       {/* Ungrouped lists have no month heading to carry it. */}
       {!grouped ? pastToggle : null}
+      {/* The caller's heading-level control (the workbench's sort toggle
+          rides its Calendar heading — that list is what it sorts). */}
+      {extra ? <span className="cal-heading-extra">{extra}</span> : null}
     </h3>
   );
 }
@@ -420,9 +425,10 @@ export function CalendarTable({
   card = true,
   grouped = true,
   collapsible = false,
-  // No default (each one is a complexity point) — undefined renders as
+  // No defaults (each one is a complexity point) — undefined renders as
   // nothing, same as null.
   pastToggle,
+  headingExtra,
   rowAction,
 }: {
   rows: CalendarTableRow[];
@@ -454,6 +460,9 @@ export function CalendarTable({
    * caller owns it: a page link on the calendar, a state toggle in the
    * workbench. */
   pastToggle?: React.ReactNode;
+  /** A control riding the heading's right edge — the workbench's sort
+   * toggle on its Calendar section (Ed, QA 2026-08-16). */
+  headingExtra?: React.ReactNode;
   /** A per-row control in the right cluster — the workbench's one-click
    * pencil. */
   rowAction?: (slot: CalendarSlot) => React.ReactNode;
@@ -472,6 +481,7 @@ export function CalendarTable({
           open={open}
           onToggle={() => setOpen((o) => !o)}
           pastToggle={pastToggle}
+          extra={headingExtra}
         />
       ) : null}
       {/* Conditional render, not `hidden` — .cal-list's own display rule
