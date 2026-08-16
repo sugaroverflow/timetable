@@ -26,7 +26,10 @@ import {
 
 import { builder } from "./builder";
 import {
+  assertOptionalHostname,
+  assertOptionalHttpUrl,
   badRequest,
+  capLength,
   colour,
   forbidden,
   loadTimetableAndViewer,
@@ -79,7 +82,13 @@ builder.queryFields((t) => ({
       // otherwise), and both row-creation paths claim them — sign-in JIT
       // creation (auth/clerk.ts) and admin pre-create (createLocalUser).
       const rows = await listMembershipsForUser(ctx.user.id);
-      return rows.map((r) => ({
+      // Under a view-as preview the identity exists in ONE forum: the
+      // target's other memberships are none of the previewing admin's
+      // business (see context.ts single-forum rule).
+      const visible = ctx.impersonation
+        ? rows.filter((r) => r.timetable.id === ctx.impersonation?.timetableId)
+        : rows;
+      return visible.map((r) => ({
         id: r.membershipId,
         roles: r.roles as string[],
         timetable: { ...r.timetable, viewerRoles: r.roles as string[] },
@@ -216,6 +225,8 @@ builder.mutationFields((t) => ({
       slug: t.arg.string({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
+      capLength(args.name, 120, "Name");
+      assertOptionalHostname(args.customDomain, "Custom domain");
       const { user, readable, viewer } = await loadTimetableAndViewer(
         ctx,
         args.idOrSlug,
@@ -367,9 +378,14 @@ function themePatch(
 }
 
 /** Cover, icons, and the emoji icon (a short sequence, capped to guard
- * against arbitrary payloads). Empty strings clear. */
+ * against arbitrary payloads). Empty strings clear. URLs must be absolute
+ * http(s) — they land in `<img src>` and CSS `url()` on every page of the
+ * forum (audit 2026-08-17). */
 function brandingPatch(args: SettingsArgs): Partial<TimetableSettings> {
   const patch: Partial<TimetableSettings> = {};
+  assertOptionalHttpUrl(args.coverImageUrl, "Cover image URL");
+  assertOptionalHttpUrl(args.iconUrl, "Icon URL");
+  assertOptionalHttpUrl(args.iconDarkUrl, "Dark icon URL");
   if (args.coverImageUrl != null) {
     patch.coverImageUrl = args.coverImageUrl.trim() || null;
   }

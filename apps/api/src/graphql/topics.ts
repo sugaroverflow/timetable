@@ -60,6 +60,8 @@ import { renderMarkdown } from "../markdown";
 import { builder } from "./builder";
 import {
   assertCanOwnTopic,
+  assertOptionalHttpUrl,
+  capLength,
   forbidden,
   loadTimetableAndViewer,
   loadTopicAndViewer,
@@ -199,13 +201,16 @@ const TopicType = builder.objectRef<GqlTopic>("Topic").implement({
       nullable: true,
       resolve: (tp) => (tp.canSeeHostOnly ? tp.devotionScore : null),
     }),
-    // Per-elector breakdown — any signed-in viewer, matching the
-    // topicWeightedBreakdown query (QA 2026-07-27).
+    // Per-elector breakdown — signed-in viewers who pass the forum's
+    // comment-visibility line (member, or public forum), matching the
+    // topicWeightedBreakdown query. hosts_only forums hide the elector
+    // membership from the public, so mere sign-in is not enough
+    // (audit 2026-08-17; canSeeComments draws exactly that line).
     weightedBreakdown: t.field({
       type: [WeightedHeartType],
       nullable: true,
       resolve: async (tp, _args, ctx) => {
-        if (!ctx.user) return null;
+        if (!ctx.user || !tp.canSeeComments) return null;
         return getWeightedBreakdown(tp.timetableId, tp.id);
       },
     }),
@@ -691,6 +696,9 @@ builder.mutationFields((t) => ({
       hostId: t.arg.string({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
+      capLength(args.title, 200, "Title");
+      capLength(args.bodyMd, 100_000, "Body");
+      assertOptionalHttpUrl(args.coverImageUrl, "Cover image URL");
       const { user, readable, viewer } = await loadTimetableAndViewer(
         ctx,
         args.idOrSlug,
@@ -746,6 +754,9 @@ builder.mutationFields((t) => ({
       coverImageUrl: t.arg.string({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
+      capLength(args.title, 200, "Title");
+      capLength(args.bodyMd, 100_000, "Body");
+      assertOptionalHttpUrl(args.coverImageUrl, "Cover image URL");
       const user = await requireUser(ctx);
       const { topic, viewer } = await loadTopicAndViewer(ctx, args.topicId);
       if (!canEditTopic(viewer, topic.hostId)) forbidden();

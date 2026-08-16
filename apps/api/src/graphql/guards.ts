@@ -171,6 +171,64 @@ export const colour = (v: unknown): string | undefined =>
   typeof v === "string" && HEX_COLOUR.test(v) ? v : undefined;
 
 // ---------------------------------------------------------------------------
+// Free-string input caps (audit 2026-08-17). REST bodies go through zod;
+// these are the equivalents for raw GraphQL string args — storage/DoS
+// hygiene, not XSS (bodies are sanitised at render).
+// ---------------------------------------------------------------------------
+
+/** Throw unless the arg is at most `max` characters. */
+export function capLength(
+  value: string | null | undefined,
+  max: number,
+  label: string,
+): void {
+  if (value != null && value.length > max) {
+    throw new GraphQLError(`${label} is too long (max ${max} characters)`);
+  }
+}
+
+/** Throw unless the arg is empty/omitted (both mean "clear"/"unchanged" per
+ * the null-vs-"" mutation convention) or an absolute http(s) URL. */
+export function assertOptionalHttpUrl(
+  value: string | null | undefined,
+  label: string,
+): void {
+  const trimmed = value?.trim();
+  if (!trimmed) return;
+  capLength(trimmed, 2000, label);
+  let parsed: URL | null = null;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    parsed = null;
+  }
+  if (
+    !parsed ||
+    (parsed.protocol !== "http:" && parsed.protocol !== "https:")
+  ) {
+    throw new GraphQLError(`${label} must be an absolute http(s) URL`);
+  }
+}
+
+/** RFC-shaped hostname: dot-separated LDH labels, no scheme, no port. */
+const HOSTNAME =
+  /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/i;
+
+/** Throw unless the arg is empty (clears the domain) or a plain hostname. */
+export function assertOptionalHostname(
+  value: string | null | undefined,
+  label: string,
+): void {
+  const trimmed = value?.trim();
+  if (!trimmed) return;
+  if (trimmed.length > 253 || !HOSTNAME.test(trimmed)) {
+    throw new GraphQLError(
+      `${label} must be a hostname like forum.example.org`,
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Calendar settings validation (calendar v2)
 // ---------------------------------------------------------------------------
 

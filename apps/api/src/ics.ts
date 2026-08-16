@@ -9,11 +9,17 @@ function icsDate(d: Date): string {
 }
 
 function escapeText(s: string): string {
-  return s
-    .replace(/\\/g, "\\\\")
-    .replace(/;/g, "\\;")
-    .replace(/,/g, "\\,")
-    .replace(/\n/g, "\\n");
+  return (
+    s
+      .replace(/\\/g, "\\\\")
+      // Bare CRs would survive the \n rule and lenient clients treat them
+      // as line terminators — i.e. ICS property injection. Normalise every
+      // CR/CRLF to LF first so the \n rule catches them all.
+      .replace(/\r\n?/g, "\n")
+      .replace(/;/g, "\\;")
+      .replace(/,/g, "\\,")
+      .replace(/\n/g, "\\n")
+  );
 }
 
 /** Build an RFC 5545 VCALENDAR for a timetable's slots.

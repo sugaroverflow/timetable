@@ -7,7 +7,12 @@ import {
   type DashboardData,
   type WeightedHeartEntry,
 } from "@timetable/core";
-import { canSeeHostHeartTallies, canSeeHostOnly } from "@timetable/shared";
+import {
+  canSeeComments,
+  canSeeHostHeartTallies,
+  canSeeHostOnly,
+  type Role,
+} from "@timetable/shared";
 
 import { builder } from "./builder";
 import {
@@ -281,10 +286,12 @@ builder.queryFields((t) => ({
   }),
 
   /** Per-elector weights for one topic — fetched lazily by the ❤️-breakdown
-   * disclosures on topic cards and Analysis rows. Any signed-in reader
-   * (QA 2026-07-27; was host/admin only — who-hearts-what is already
-   * reader-visible via person pages, and the weights derive from it. The
-   * one genuinely new datum for electors is each ❤️'s date). */
+   * disclosures on topic cards and Analysis rows. Any signed-in reader on a
+   * public forum, members elsewhere (QA 2026-07-27 opened it to signed-in
+   * readers because who-hearts-what is reader-visible via person pages —
+   * but hosts_only forums deliberately hide the elector membership from
+   * the public, so the audit 2026-08-17 re-scoped it to canSeeComments,
+   * the same "member or public forum" line the rest of the matrix draws). */
   topicWeightedBreakdown: t.field({
     type: [WeightedHeartType],
     nullable: true,
@@ -296,6 +303,8 @@ builder.queryFields((t) => ({
       const readable = await readTimetable(ctx, args.idOrSlug);
       if (!readable) return null;
       if (!ctx.user) return null;
+      const viewer = { userId: ctx.user.id, roles: readable.roles as Role[] };
+      if (!canSeeComments(readable.timetable.privacy, viewer)) return null;
       return getWeightedBreakdown(readable.timetable.id, args.topicId);
     },
   }),
@@ -306,6 +315,9 @@ builder.queryFields((t) => ({
     nullable: true,
     resolve: async (_p, _a, ctx) => {
       const user = await requireUser(ctx);
+      // Never mint the target's long-lived calendar credential for a
+      // view-as preview — it would keep working after the preview ends.
+      if (ctx.impersonation) return null;
       return getOrCreateIcsToken(user.id);
     },
   }),

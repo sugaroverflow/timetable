@@ -81,6 +81,8 @@ builder.queryFields((t) => ({
     resolve: async (_p, _a, ctx) => {
       const user = await requireUser(ctx);
       refuseTokenAuth(ctx.apiToken);
+      // Account-level data — not part of any forum's view-as preview.
+      if (ctx.impersonation) return [];
       return listApiTokens(user.id);
     },
   }),

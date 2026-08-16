@@ -155,6 +155,13 @@ function baseContext(args: {
     apiToken,
     impersonation,
     async getViewer(timetableId: string): Promise<Viewer> {
+      // A preview identity exists in ONE forum: the admin's check in
+      // resolveImpersonation covered impersonation.timetableId and nothing
+      // else, so outside it the preview acts as anonymous — otherwise an
+      // admin of forum A could read forum B as any member the two share.
+      if (impersonation && timetableId !== impersonation.timetableId) {
+        return { userId: null, roles: [], sysadmin: false };
+      }
       const roles = await getViewerRoles(user?.id ?? null, timetableId);
       // The sysadmin flag unlocks READ checks only (see shared Viewer docs);
       // it never rides under an impersonation preview.
@@ -169,7 +176,16 @@ function baseContext(args: {
       if (!promise) {
         promise = getReadableTimetable(user?.id ?? null, idOrSlug, {
           sysadmin: sysadmin && !impersonation,
-        }).then((readable) => {
+        }).then(async (readable) => {
+          // Same single-forum rule as getViewer: any OTHER forum resolves
+          // as the anonymous public would see it, not as the target.
+          if (
+            impersonation &&
+            readable &&
+            readable.timetable.id !== impersonation.timetableId
+          ) {
+            return getReadableTimetable(null, idOrSlug);
+          }
           // Operator oversight is accountable: reads of forums the member
           // roles alone wouldn't unlock leave a log line (2026-07-29).
           if (

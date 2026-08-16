@@ -30,6 +30,12 @@ export const ACTION_LIMITS = {
   tokenMint: { windowMs: 60 * 60_000, max: 10 },
   /** Invite emails, counted per recipient (bulk paste of a cohort is fine). */
   invite: { windowMs: 60 * 60_000, max: 100 },
+  /** Forum creation. Each one emails the sysadmins and mints an admin
+   * surface, so this is deliberately the tightest bucket. */
+  forum: { windowMs: 24 * 60 * 60_000, max: 5 },
+  /** Signed upload URLs. Objects are public-read and never garbage
+   * collected, so cap how fast one account can mint them. */
+  upload: { windowMs: 60 * 60_000, max: 60 },
 } as const;
 
 export type LimitedAction = keyof typeof ACTION_LIMITS;
@@ -40,6 +46,8 @@ const BLOCKED_MESSAGES: Record<LimitedAction, string> = {
   topic: "You're creating topics too quickly",
   tokenMint: "You're creating API tokens too quickly",
   invite: "Too many invites sent recently",
+  forum: "You're creating forums too quickly",
+  upload: "You're uploading too quickly",
 };
 
 export type ActionDecision = { allowed: boolean; retryAfterSeconds: number };

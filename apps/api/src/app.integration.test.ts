@@ -52,6 +52,7 @@ vi.mock("@timetable/core", async (importOriginal) => {
     listSlotComments: vi.fn(),
     listTopicSessionSlotIds: vi.fn(),
     getTopicById: vi.fn(),
+    getWeightedBreakdown: vi.fn(),
     getMembership: vi.fn(),
     getMembershipById: vi.fn(),
     getPerson: vi.fn(),
@@ -412,6 +413,7 @@ afterEach(() => {
   vi.mocked(core.updateCommentBody).mockReset();
   vi.mocked(core.updateUserEmail).mockReset();
   vi.mocked(core.logActivity).mockReset();
+  vi.mocked(core.getWeightedBreakdown).mockReset();
   vi.mocked(core.updateTimetableSettings).mockReset();
   vi.mocked(core.updateTimetableProfile).mockReset();
   vi.mocked(core.updateTimetableSlug).mockReset();
@@ -619,6 +621,47 @@ describe("createApiApp", () => {
       expect(core.logActivity).toHaveBeenCalledWith(
         expect.objectContaining({ action: "member.email_change" }),
       );
+    });
+  });
+
+  it("refuses pointing a member's email at a sysadmin address", async () => {
+    // users.email is what isSysadmin() derives operator status from, so an
+    // admin-writable path re-pointing it at SYSADMIN_EMAILS would be a
+    // forum-admin → sysadmin escalation (audit 2026-08-17). The dev default
+    // sysadmin address is admin-edwin+clerk_test@example.com (env.ts).
+    mockSession("admin-1", ["admin"]);
+    vi.mocked(core.getMembershipById).mockResolvedValue(
+      membershipFixture({ userId: "member-9" }),
+    );
+
+    await withTestServer(async (baseUrl) => {
+      const res = await fetch(`${baseUrl}/api/memberships/membership-1/email`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "Admin-Edwin+clerk_test@example.com" }),
+      });
+
+      expect(res.status).toBe(403);
+      expect(clerk.replaceClerkEmail).not.toHaveBeenCalled();
+      expect(core.updateUserEmail).not.toHaveBeenCalled();
+    });
+  });
+
+  it("refuses pre-creating an account at a sysadmin address", async () => {
+    mockSession("admin-1", ["admin"]);
+
+    await withTestServer(async (baseUrl) => {
+      const res = await fetch(`${baseUrl}/api/forums/timetable-1/people`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: "admin-edwin+clerk_test@example.com",
+          roles: ["host"],
+        }),
+      });
+
+      expect(res.status).toBe(403);
+      expect(core.createLocalUser).not.toHaveBeenCalled();
     });
   });
 
@@ -1638,6 +1681,82 @@ describe("createApiApp", () => {
         expect(body.data?.calendar).toHaveLength(1);
         expect(body.data?.calendar[0]?.counts).toBeNull();
         expect(body.data?.calendar[0]?.perUser).toBeNull();
+      });
+    });
+  });
+
+  describe("topicWeightedBreakdown (member-or-public since audit 2026-08-17)", () => {
+    const QUERY = `query($s: String!, $t: String!){
+      topicWeightedBreakdown(idOrSlug: $s, topicId: $t) { electorId }
+    }`;
+
+    const breakdownRow = {
+      electorId: "elector-1",
+      electorName: "Elector One",
+      electorImage: null,
+      weight: 1,
+      heartedAt: new Date("2026-06-01T00:00:00.000Z"),
+    };
+
+    async function request(baseUrl: string) {
+      const res = await fetch(`${baseUrl}/graphql`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: QUERY,
+          variables: { s: "public-calendar", t: "topic-1" },
+        }),
+      });
+      return (await res.json()) as {
+        data?: { topicWeightedBreakdown: { electorId: string }[] | null };
+      };
+    }
+
+    function mockForum(privacy: "public" | "hosts_only", roles: string[]) {
+      vi.mocked(core.getReadableTimetable).mockResolvedValue({
+        timetable: timetableFixture({ privacy }),
+        roles: roles as never,
+      });
+      vi.mocked(core.getWeightedBreakdown).mockResolvedValue([
+        breakdownRow as never,
+      ]);
+    }
+
+    it("serves a member of a hosts_only forum", async () => {
+      mockSession("elector-1", ["elector"]);
+      mockForum("hosts_only", ["elector"]);
+
+      await withTestServer(async (baseUrl) => {
+        const body = await request(baseUrl);
+        expect(body.data?.topicWeightedBreakdown).toEqual([
+          { electorId: "elector-1" },
+        ]);
+      });
+    });
+
+    it("refuses a signed-in non-member on a hosts_only forum", async () => {
+      // hosts_only deliberately hides the elector membership from the
+      // public; the breakdown is exactly that list, so sign-in alone is
+      // not enough.
+      mockSession("stranger-1", []);
+      mockForum("hosts_only", []);
+
+      await withTestServer(async (baseUrl) => {
+        const body = await request(baseUrl);
+        expect(body.data?.topicWeightedBreakdown).toBeNull();
+        expect(core.getWeightedBreakdown).not.toHaveBeenCalled();
+      });
+    });
+
+    it("still serves a signed-in non-member on a public forum", async () => {
+      mockSession("stranger-1", []);
+      mockForum("public", []);
+
+      await withTestServer(async (baseUrl) => {
+        const body = await request(baseUrl);
+        expect(body.data?.topicWeightedBreakdown).toEqual([
+          { electorId: "elector-1" },
+        ]);
       });
     });
   });

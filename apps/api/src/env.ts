@@ -93,6 +93,13 @@ export const env = {
   rateLimitWindowMs: intEnv("RATE_LIMIT_WINDOW_MS", 60_000),
   rateLimitMax: intEnv("RATE_LIMIT_MAX", 300),
   rateLimitCleanupIntervalMs: intEnv("RATE_LIMIT_CLEANUP_INTERVAL_MS", 300_000),
+  /** Shared secret for cron-triggered jobs; required in production
+   * (checked above), optional in dev where the routes 503 without it.
+   * A getter, not a snapshot: the integration tests set and unset it per
+   * test, and re-reading costs nothing. */
+  get cronSecret(): string | null {
+    return process.env.CRON_SECRET ?? null;
+  },
   graphqlMaxDepth: intEnv("GRAPHQL_MAX_DEPTH", 12),
   graphqlMaxCost: intEnv("GRAPHQL_MAX_COST", 500),
   uploadMaxImageBytes: intEnv("UPLOAD_MAX_IMAGE_BYTES", 5 * 1024 * 1024),
