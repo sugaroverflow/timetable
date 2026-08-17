@@ -2300,6 +2300,15 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
   font-size: var(--text-sm);
   color: var(--muted);
 }
+/* The quoted snippet doubles as the deep link to its comment (Ed,
+   2026-08-17) — quiet by default, reveals itself on hover. */
+.tl-quote-link {
+  color: inherit;
+  text-decoration: none;
+}
+.tl-quote-link:hover {
+  text-decoration: underline;
+}
 .tl-note .tn-by {
   font-weight: var(--fw-semibold);
   font-size: var(--text-xs);

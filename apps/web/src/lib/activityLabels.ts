@@ -10,6 +10,7 @@ export const ACTION_LABELS: Record<string, string> = {
   "topic.reject": "rejected a topic",
   "topic.unpublish": "unpublished a topic",
   "topic.delete": "deleted a topic",
+  "topic.archive": "archived a topic",
   "topic.edit": "edited a topic",
   "topic.reassign": "handed a topic to a new owner",
   "hearts.cutoff": "moved the ❤️ counting cutoff",
