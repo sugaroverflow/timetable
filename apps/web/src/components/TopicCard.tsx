@@ -195,6 +195,8 @@ function CommentSection({
       slug={slug}
       roleLabels={roleLabels}
       topicHref={topicHref}
+      // The topic's author curates their public discussion (#258).
+      topicHostId={topic.hostId}
     />
   );
   return (

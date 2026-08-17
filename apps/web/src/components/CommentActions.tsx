@@ -19,6 +19,10 @@ const DELETE = `mutation Delete($id: String!) {
   deleteComment(commentId: $id)
 }`;
 
+const PIN = `mutation Pin($id: String!, $pinned: Boolean!) {
+  pinComment(commentId: $id, pinned: $pinned) { id }
+}`;
+
 export function CommentActions({
   commentId,
   canReply,
@@ -26,6 +30,8 @@ export function CommentActions({
   hidden,
   isOwn = false,
   onEdit,
+  canPin = false,
+  pinned = false,
 }: {
   commentId: string;
   canReply: boolean;
@@ -34,6 +40,10 @@ export function CommentActions({
   /** The viewer authored this comment: shows Edit/Delete (QA 2026-07-29). */
   isOwn?: boolean;
   onEdit?: () => void;
+  /** The viewer authored the TOPIC and this is a top-level comment:
+   * shows Pin/Unpin (#258). */
+  canPin?: boolean;
+  pinned?: boolean;
 }) {
   // ?reply= deep links focus a chain-tail composer (dialogue-first
   // threading, 2026-08-13) — this composer only opens from its button.
@@ -70,6 +80,17 @@ export function CommentActions({
     );
   }
 
+  function togglePinned() {
+    void run(
+      PIN,
+      { id: commentId, pinned: !pinned },
+      {
+        success: pinned ? "Comment unpinned" : "Comment pinned",
+        errorFallback: "Could not update comment",
+      },
+    );
+  }
+
   function remove() {
     if (!confirm("Delete this comment? This can't be undone.")) return;
     void run(
@@ -88,6 +109,11 @@ export function CommentActions({
         {canReply ? (
           <button type="button" onClick={() => setOpen((v) => !v)}>
             Reply
+          </button>
+        ) : null}
+        {canPin ? (
+          <button type="button" onClick={togglePinned} disabled={busy}>
+            {pinned ? "Unpin" : "Pin"}
           </button>
         ) : null}
         {isOwn ? (

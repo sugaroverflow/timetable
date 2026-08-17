@@ -11,6 +11,7 @@ import {
   markCommentsSeen,
   markDigestRead,
   setCommentHidden,
+  setCommentPinned,
   softDeleteComment,
   updateCommentBody,
   type CommentNode,
@@ -21,6 +22,7 @@ import {
   canModerate,
   canSeeHostOnly,
   isHostCommentsEnabled,
+  ownsTopicAsHost,
   type Viewer,
 } from "@timetable/shared";
 
@@ -101,6 +103,7 @@ async function commentNode(
     hidden: row.hiddenAt !== null,
     deleted: row.deletedAt !== null,
     editedAt: row.editedAt,
+    pinnedAt: row.pinnedAt,
     createdAt: row.createdAt,
     replies: [],
   };
@@ -222,6 +225,33 @@ builder.mutationFields((t) => ({
       // and a missing topic just blanks them instead of failing the edit.
       const topic = await getTopicById(updated.topicId);
       return commentNode(updated, topic?.timetableId ?? null);
+    },
+  }),
+
+  /** Pin/unpin a top-level comment (#258): the TOPIC's author only — their
+   * discussion, their curation. Pinned comments sort to the top of the
+   * thread client-side; replies can't be pinned (a pin that yanks a
+   * message out of its dialogue would break the chain it answers). */
+  pinComment: t.field({
+    type: CommentType,
+    args: {
+      commentId: t.arg.string({ required: true }),
+      pinned: t.arg.boolean({ required: true }),
+    },
+    resolve: async (_p, args, ctx) => {
+      const user = await requireUser(ctx);
+      const existing = await getCommentById(args.commentId);
+      if (!existing || existing.deletedAt) notFound("Comment not found");
+      if (existing.parentId) {
+        forbidden("Only top-level comments can be pinned");
+      }
+      const { topic, viewer } = await loadTopicAndViewer(ctx, existing.topicId);
+      if (!ownsTopicAsHost(viewer, topic.hostId)) {
+        forbidden("Only the topic's author can pin comments");
+      }
+      const updated = await setCommentPinned(existing.id, args.pinned, user.id);
+      if (!updated) notFound("Comment not found");
+      return commentNode(updated, topic.timetableId);
     },
   }),
 

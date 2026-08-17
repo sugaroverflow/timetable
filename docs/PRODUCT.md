@@ -185,6 +185,13 @@ tree in place. The topic's own page shows everything open.
 Comments support @mentions, which notify the mentioned member. Authors can
 edit and delete their own comments; admins can hide them.
 
+Every comment's timestamp is a permalink to that comment on the topic's
+page. The topic's author can **pin** top-level comments in their public
+discussion (Pin/Unpin under the comment, 📌 in its name row): pinned
+comments sit at the top of the thread — except a comment posted in the
+current session, which stays above them until the next page load so it
+doesn't seem to vanish from under its poster.
+
 ## Calendar
 
 The calendar helps hosts find times their people can make and see what's

@@ -91,6 +91,14 @@ function CommentBubble({
           (mixed host/elector threads read ambiguously without it). */}
       <PrimaryRolePill roles={comment.authorRoles} labels={roleLabels} />
       <CommentTime comment={comment} topicHref={topicHref} />
+      {comment.pinnedAt ? (
+        <span
+          style={{ marginLeft: 6, fontSize: 11 }}
+          title="Pinned by the topic's author"
+        >
+          📌
+        </span>
+      ) : null}
       {visibilityPill ? (
         <span
           className={visibilityPill.className}
@@ -230,6 +238,7 @@ function CommentItem({
   roleLabels,
   depth,
   topicHref,
+  canPin = false,
 }: {
   comment: FeedComment;
   canReply: boolean;
@@ -240,6 +249,9 @@ function CommentItem({
   /** 1-based nesting level, counted from the thread roots. */
   depth: number;
   topicHref?: string | null;
+  /** The viewer authored the topic: Pin/Unpin on top-level comments
+   * (#258). */
+  canPin?: boolean;
 }) {
   const replies = comment.replies ?? [];
   const [editing, setEditing] = useState(false);
@@ -280,6 +292,9 @@ function CommentItem({
             hidden={comment.hidden}
             isOwn={isOwn}
             onEdit={() => setEditing(true)}
+            // Pin = the topic author's curation gesture, roots only (#258).
+            canPin={canPin && depth === 1}
+            pinned={comment.pinnedAt != null}
           />
         )}
         <ChainBlock
@@ -302,6 +317,26 @@ function CommentItem({
  * roots newest-first to match the top-composer above the stack); feed
  * surfaces collapse the whole section behind CommentTeaser instead of
  * folding here. */
+/** Pinned-first thread order (#258). The server keeps roots newest-first
+ * (teasers and digests read "latest" off that order), so pinning is purely
+ * a render-time re-sort: pins on top (earliest pin first — the author
+ * curates by pinning sequence), then everyone else newest-first. The one
+ * exception (Ed's spec, 2026-08-17): a comment that arrived AFTER this
+ * list mounted stays ABOVE the pins until the next full page load —
+ * whoever just posted it did so at the top-composer, and watching it drop
+ * below the pins would read as the comment disappearing. */
+function orderRoots(
+  comments: FeedComment[],
+  initialIds: Set<string>,
+): FeedComment[] {
+  const pinned = comments.filter((c) => c.pinnedAt);
+  if (pinned.length === 0) return comments;
+  pinned.sort((a, b) => Date.parse(a.pinnedAt!) - Date.parse(b.pinnedAt!));
+  const fresh = comments.filter((c) => !c.pinnedAt && !initialIds.has(c.id));
+  const rest = comments.filter((c) => !c.pinnedAt && initialIds.has(c.id));
+  return [...fresh, ...pinned, ...rest];
+}
+
 export function CommentList({
   comments,
   canReply,
@@ -310,6 +345,7 @@ export function CommentList({
   slug,
   roleLabels,
   topicHref,
+  topicHostId = null,
 }: {
   comments: FeedComment[];
   canReply: boolean;
@@ -322,12 +358,18 @@ export function CommentList({
   /** The topic page's path — turns each comment's timestamp into a
    * permalink to its anchor there (#259); plain text when absent. */
   topicHref?: string | null;
+  /** The topic's owner — a viewer who matches gets Pin/Unpin on top-level
+   * comments (#258). Omit on threads where pinning shouldn't offer. */
+  topicHostId?: string | null;
 }) {
+  // Snapshot of the roots present at mount, for the fresh-above-pins rule.
+  const [initialIds] = useState(() => new Set(comments.map((c) => c.id)));
   if (!comments.length) return null;
+  const canPin = viewerId != null && viewerId === topicHostId;
 
   return (
     <div className="comments">
-      {comments.map((c) => (
+      {orderRoots(comments, initialIds).map((c) => (
         <CommentItem
           key={c.id}
           comment={c}
@@ -338,6 +380,7 @@ export function CommentList({
           roleLabels={roleLabels}
           depth={1}
           topicHref={topicHref}
+          canPin={canPin}
         />
       ))}
     </div>

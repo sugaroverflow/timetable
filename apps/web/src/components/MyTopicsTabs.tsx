@@ -28,6 +28,7 @@ function PublicCommentsPane({
   slug,
   roleLabels,
   topicHref,
+  topicHostId,
 }: {
   topicId: string;
   published: boolean;
@@ -37,6 +38,7 @@ function PublicCommentsPane({
   slug: string;
   roleLabels?: RoleLabels;
   topicHref?: string | null;
+  topicHostId?: string | null;
 }) {
   return (
     <div className="stack" style={{ gap: 10 }}>
@@ -53,6 +55,7 @@ function PublicCommentsPane({
             slug={slug}
             roleLabels={roleLabels}
             topicHref={topicHref}
+            topicHostId={topicHostId}
           />
         </CommentTeaser>
       ) : (
@@ -98,6 +101,7 @@ function commentsTab(a: TabArgs): TopicTab | null {
         slug={a.slug}
         roleLabels={a.roleLabels}
         topicHref={a.permalink}
+        topicHostId={a.topic.hostId ?? a.viewerId}
       />
     ),
   };

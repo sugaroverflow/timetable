@@ -13,13 +13,16 @@ const COMMENT_FIELDS = `
  * against GRAPHQL_MAX_COST (500) in every query that embeds the tree. */
 export const COMMENT_TREE_DEPTH = 8;
 
-/** Comment selection nested to {@link COMMENT_TREE_DEPTH} levels. */
+/** Comment selection nested to {@link COMMENT_TREE_DEPTH} levels.
+ * pinnedAt is selected on the ROOTS only: pinning is a top-level gesture
+ * (#258), and repeating it at every nested level would spend query budget
+ * on a field that's always null there. */
 export function commentTree(field = "comments"): string {
   let selection = COMMENT_FIELDS;
   for (let level = 1; level < COMMENT_TREE_DEPTH; level++) {
     selection = `${COMMENT_FIELDS} replies { ${selection} }`;
   }
-  return `${field} { ${selection} }`;
+  return `${field} { pinnedAt ${selection} }`;
 }
 
 /** Everything a calendar ROW renders (CalendarTable) — shared by the

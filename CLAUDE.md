@@ -229,6 +229,20 @@ Stable names for feature pieces, so instructions can reference them precisely.
   the forum's whole schedule. No lens: a comment posted from a card is a
   plain slot comment — claiming a time is the calendar's and the
   workbench's gesture.
+- **comment-timestamp-permalink** — `CommentTime` in `CommentList.tsx`
+  (#259): the faint relative timestamp in every comment's name row, linking
+  to `<topic permalink>#comment-<id>` (anchor + :target ring from the
+  2026-08-17 log overhaul) wherever the thread gets `topicHref`.
+- **comment-pinning** — #258 (Ed, 2026-08-17): the TOPIC's author (only —
+  not admins) gets Pin/Unpin in the comment-actions row of top-level public
+  comments; `pinComment` mutation → `comments.pinnedAt` (migration 0041),
+  📌 in the name row. The SERVER tree stays newest-first (teasers/digests
+  read "latest" off it); `orderRoots` in `CommentList.tsx` re-sorts at
+  render: pins first (earliest pin first), then newest-first — EXCEPT
+  comments that arrived after the list mounted, which stay above the pins
+  until reload (Ed: otherwise a just-posted comment looks like it
+  disappeared). `pinnedAt` is selected on thread ROOTS only (commentTree
+  budget).
 - **digest click-to-read** — `digest_sends` table + `stampDigestLinks`
   (api `email.ts`) + `DigestReadMarker` (app layout): every digest link
   carries `dg=<send id>`; one click marks that email's shown comment
