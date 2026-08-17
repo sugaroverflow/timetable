@@ -8,6 +8,7 @@ import {
 import { CreateTopicForm } from "@/components/CreateTopicForm";
 import { CreateTopicReveal } from "@/components/CreateTopicReveal";
 import { ListSortControl } from "@/components/ListSortControl";
+import { PageTopicToc } from "@/components/PageTopicToc";
 import { TopicManager } from "@/components/TopicManager";
 import { buildWorkbenchCalendar } from "@/lib/calendarPerms";
 import type { ManagedTopic } from "@/lib/feedTypes";
@@ -82,12 +83,22 @@ export default async function MyTopicsPage({
     ? data.timetableHosts.filter((h) => h.id !== data.me?.id)
     : undefined;
 
+  const sorted = sortManagedTopics(data.hostDashboard, sort);
+
   return (
     <div className="grid">
       <div className="stack">
         <div className="page-head">
           <h2 className="page-title">My Topics</h2>
         </div>
+        {/* page-topic-toc: jump links to the cards below, in list order. */}
+        <PageTopicToc
+          items={sorted.map((t) => ({
+            id: t.id,
+            title: t.title,
+            href: `#topic-${t.id}`,
+          }))}
+        />
         {/* Hidden behind the button until pressed; under the heading, same
             treatment as the calendar's propose button (QA 2026-08-03). */}
         <CreateTopicReveal>
@@ -106,7 +117,7 @@ export default async function MyTopicsPage({
           <div className="notice">No topics yet — create your first one.</div>
         ) : (
           <ul className="list">
-            {sortManagedTopics(data.hostDashboard, sort).map((topic) => (
+            {sorted.map((topic) => (
               <TopicManager
                 key={topic.id}
                 topic={topic}

@@ -1047,6 +1047,21 @@ textarea {
 .person-topics li {
   margin: 2px 0;
 }
+/* page-topic-toc (Ed, 2026-08-17): the same list, bare on the page
+   background under the My Topics / ❤️ Topics page titles. The negative
+   margin tucks it toward its title — a TOC belongs to the heading, not
+   the content flow's 14px rhythm. */
+.page-topic-toc {
+  margin-top: -6px;
+}
+.page-topic-toc ul {
+  margin-top: 0;
+}
+/* Jump-link landing spot for the anchored topic cards, clear of the
+   sticky topbar (same idea as the People page's #people-* anchors). */
+.list > .card[id^="topic-"] {
+  scroll-margin-top: calc(var(--topbar-h, 55px) + 14px);
+}
 
 /* Topic card — tier 3 of the heading hierarchy: below page titles and
    section headers on every screen size (QA 2026-07-28; 18→20 in the
@@ -1431,7 +1446,11 @@ optgroup {
   color: var(--muted);
   font-weight: var(--fw-semibold);
   font-size: var(--text-xs);
-  padding: 0;
+  /* ≥24px tap target without moving the layout: padding grows the hit
+     area, the negative margin gives the space back (audit 2026-08-17).
+     Horizontal stays inside the row's 12px gap. */
+  padding: 5px 4px;
+  margin: -5px -4px;
 }
 /* Dialogue-first threading (2026-08-13): the open discussion section
    (permalink page) — top-composer above the thread. The section carries
@@ -1478,7 +1497,10 @@ optgroup {
 .teaser-snippet {
   border: none;
   background: none;
-  padding: 0;
+  /* Same padding/negative-margin tap-target trick as .comment-actions —
+     these one-line previews are primary navigation into a thread. */
+  padding: 5px 0;
+  margin: -5px 0;
   cursor: pointer;
   max-width: 100%;
   text-align: left;
@@ -1879,6 +1901,15 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
 }
 .cal-person-link {
   display: inline-flex;
+  /* Fold avatars clamp to 15px on mobile — pad the link's hit area out
+     to ~25px tall. Horizontal stays tight (±2px): neighbouring faces sit
+     ~3px apart and must not steal each other's taps. */
+  position: relative;
+}
+.cal-person-link::after {
+  content: "";
+  position: absolute;
+  inset: -5px -2px;
 }
 /* Collapsible section heading (QA 2026-08-03, generalized from the
    schedule-setup card): a pressable section title with a chevron. */
@@ -2021,6 +2052,15 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
   padding: 3px 7px;
   font-size: var(--text-xs);
   line-height: 1;
+  /* The compact segments are ~18px tall; an invisible overlay pad brings
+     the hit area to ≥24px without growing the visible pill. Vertical
+     only — segments tile edge-to-edge horizontally. */
+  position: relative;
+}
+.avseg-compact button::after {
+  content: "";
+  position: absolute;
+  inset: -4px 0;
 }
 
 /* A past slot stays readable but visibly archived. */
@@ -2028,7 +2068,11 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
   opacity: 0.6;
 }
 /* Hidden slot comment (admins only see these) — faded like elsewhere. */
-.cal-comment-hidden .c-bubble {
+/* Admin-hidden comment, both trees (topic + slot discussions): dimmed for
+   the moderators who still see it; the "hidden" head label says why. The
+   topic tree's class went unstyled until the 2026-08-17 audit. */
+.cal-comment-hidden .c-bubble,
+.comment.hidden .c-bubble {
   opacity: 0.5;
 }
 /* Frozen availability snapshot on a session-claim comment. */

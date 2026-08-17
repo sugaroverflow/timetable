@@ -112,7 +112,7 @@
   /* --- Text --- */
   --ink: #1b2330; /* primary text (themeable) */
   --muted: #69727f; /* secondary text — AA on --card */
-  --faint: #6e7784; /* tertiary text — darkened from #9aa2af to pass WCAG AA (4.53:1) */
+  --faint: #616a77; /* tertiary text — AA on --bg (4.72:1) AND --card (5.47:1); was #6e7784, which passed only on cards (audit 2026-08-17: the log timeline sits on bare --bg) */
   --on-accent: #ffffff; /* text/icon on a saturated colored fill */
 
   /* --- Borders --- */
