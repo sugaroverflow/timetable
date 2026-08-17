@@ -2570,6 +2570,7 @@ describe("createApiApp", () => {
         hidden: false,
         deleted: false,
         editedAt: null,
+        pinnedAt: null,
         createdAt: new Date("2026-08-02T00:00:00.000Z"),
         replies: [],
       };
