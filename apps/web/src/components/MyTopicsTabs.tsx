@@ -4,6 +4,7 @@ import { countNested } from "@/lib/commentTree";
 import type { WorkbenchCalendar } from "@/lib/calendarTypes";
 import type { FeedComment, ManagedTopic } from "@/lib/feedTypes";
 import { pluralLabel, type RoleLabels } from "@/lib/timetableSettings";
+import { topicPath } from "@/lib/topicPath";
 
 import { AdminCommentsBody } from "./AdminCommentsPanel";
 import { CommentComposer } from "./CommentComposer";
@@ -26,6 +27,7 @@ function PublicCommentsPane({
   viewerId,
   slug,
   roleLabels,
+  topicHref,
 }: {
   topicId: string;
   published: boolean;
@@ -34,6 +36,7 @@ function PublicCommentsPane({
   viewerId: string | null;
   slug: string;
   roleLabels?: RoleLabels;
+  topicHref?: string | null;
 }) {
   return (
     <div className="stack" style={{ gap: 10 }}>
@@ -49,6 +52,7 @@ function PublicCommentsPane({
             viewerId={viewerId}
             slug={slug}
             roleLabels={roleLabels}
+            topicHref={topicHref}
           />
         </CommentTeaser>
       ) : (
@@ -72,6 +76,8 @@ type TabArgs = {
   hostComments: FeedComment[];
   adminComments: FeedComment[];
   published: boolean;
+  /** Topic permalink — the comment timestamps' link target (#259). */
+  permalink: string | null;
 };
 
 function commentsTab(a: TabArgs): TopicTab | null {
@@ -91,6 +97,7 @@ function commentsTab(a: TabArgs): TopicTab | null {
         viewerId={a.viewerId}
         slug={a.slug}
         roleLabels={a.roleLabels}
+        topicHref={a.permalink}
       />
     ),
   };
@@ -126,6 +133,7 @@ function hostTab(a: TabArgs): TopicTab | null {
         hostLabel={a.hostLabel}
         roleLabels={a.roleLabels}
         hostHearters={hostHearters}
+        topicHref={a.permalink}
       />
     ),
   };
@@ -148,6 +156,7 @@ function adminTab(a: TabArgs): TopicTab {
         slug={a.slug}
         adminLabel={a.adminLabel}
         roleLabels={a.roleLabels}
+        topicHref={a.permalink}
       />
     ),
   };
@@ -214,6 +223,12 @@ export function MyTopicsTabs({
     hostComments: topic.hostOnlyComments ?? [],
     adminComments: topic.adminComments ?? [],
     published: topic.status === "published",
+    permalink: topicPath(
+      slug,
+      topic.hostSlug,
+      topic.slug,
+      topic.hostId ?? viewerId,
+    ),
   };
   const tabs = [
     commentsTab(args),

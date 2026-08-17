@@ -105,6 +105,7 @@ export function HostOnlyThreadBody({
   hostHearters = null,
   canHostHeart = false,
   viewerHasHostHearted = false,
+  topicHref,
 }: {
   topicId: string;
   comments: FeedComment[];
@@ -116,6 +117,7 @@ export function HostOnlyThreadBody({
   hostHearters?: HostHearter[] | null;
   canHostHeart?: boolean;
   viewerHasHostHearted?: boolean;
+  topicHref?: string | null;
 }) {
   const count = countNested(comments);
   const threadRef = useRef<HTMLDivElement>(null);
@@ -147,6 +149,7 @@ export function HostOnlyThreadBody({
         viewerId={viewerId}
         slug={slug}
         roleLabels={roleLabels}
+        topicHref={topicHref}
       />
     </div>
   );

@@ -22,6 +22,7 @@ export function AdminCommentsBody({
   slug,
   adminLabel = "Admin",
   roleLabels,
+  topicHref,
 }: {
   topicId: string;
   comments: FeedComment[];
@@ -30,6 +31,7 @@ export function AdminCommentsBody({
   slug?: string;
   adminLabel?: string;
   roleLabels?: RoleLabels;
+  topicHref?: string | null;
 }) {
   const admins = pluralLabel(adminLabel);
   // One string for every viewer (Ed, QA 2026-08-16, extending 2026-08-11's
@@ -52,6 +54,7 @@ export function AdminCommentsBody({
         viewerId={viewerId}
         slug={slug}
         roleLabels={roleLabels}
+        topicHref={topicHref}
       />
     </div>
   );
@@ -71,6 +74,7 @@ export function AdminCommentsPanel({
   slug,
   adminLabel = "Admin",
   roleLabels,
+  topicHref,
 }: {
   topicId: string;
   comments: FeedComment[];
@@ -79,6 +83,7 @@ export function AdminCommentsPanel({
   slug?: string;
   adminLabel?: string;
   roleLabels?: RoleLabels;
+  topicHref?: string | null;
 }) {
   const count = countNested(comments);
   const [expanded, setExpanded] = useState(count > 0);
@@ -112,6 +117,7 @@ export function AdminCommentsPanel({
             slug={slug}
             adminLabel={adminLabel}
             roleLabels={roleLabels}
+            topicHref={topicHref}
           />
         )}
       </Collapsible.Panel>
