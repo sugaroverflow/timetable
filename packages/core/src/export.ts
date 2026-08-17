@@ -18,7 +18,7 @@ import {
 import {
   buildCalendar,
   getAudienceElectorIds,
-  listSlotComments,
+  listSlotCommentsForSlots,
   type CalendarSession,
   type SlotCommentView,
   type SlotCounts,
@@ -189,22 +189,12 @@ async function calendarExport(
     includePast: true,
   });
   // Slot discussions are members-only (canDiscussSlots); admins also see
-  // hidden messages, as on the calendar page.
+  // hidden messages, as on the calendar page. One batched query — a year
+  // of commented slots used to fan out one query each (audit 2026-08-17).
   const commentsBySlot = canDiscussSlots(viewer)
-    ? new Map(
-        await Promise.all(
-          slots
-            .filter((s) => s.commentCount > 0)
-            .map(
-              async (s) =>
-                [
-                  s.id,
-                  await listSlotComments(s.id, {
-                    includeHidden: canManageCalendar(viewer),
-                  }),
-                ] as const,
-            ),
-        ),
+    ? await listSlotCommentsForSlots(
+        slots.filter((s) => s.commentCount > 0).map((s) => s.id),
+        { includeHidden: canManageCalendar(viewer) },
       )
     : null;
 

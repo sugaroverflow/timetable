@@ -475,5 +475,9 @@ kept (empty) so Next.js serves any future static files from the site root.
   to render the feed page for an admin. Lazy breakdown loading, batched
   comment trees, and per-request memoisation have all since shipped.
 - Feed sorting (including seeded random) happens in the service layer after
-  loading the timetable's published topics; fine at current sizes, revisit for
-  very large timetables.
+  loading the timetable's published topics — and so do the `q` substring
+  search, filtering, and `limit`/`offset` paging, because the weighted
+  scores need global denominators. Pagination therefore gives no
+  database-side relief and search cost grows linearly with forum size;
+  fine at current sizes, revisit for very large timetables (audit
+  2026-08-17).

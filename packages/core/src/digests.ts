@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, isNull, ne, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNull, lt, ne, sql } from "drizzle-orm";
 
 import {
   effectiveDigestSettings,
@@ -182,14 +182,31 @@ export async function listDigestRecipients(): Promise<DigestRecipient[]> {
   return rows.filter((u) => u.email);
 }
 
-/** Whether a forum's digest should go out on `now`'s (UTC) day: daily
- * always; weekly only on the chosen weekday. */
+/** The digest schedule's local clock (audit 2026-08-17): the weekly
+ * weekday used to be evaluated in UTC, so a UK forum's "Monday" digest
+ * was a Sunday/Monday coin-flip across BST. Forums carry no timezone
+ * setting yet; the launch community is London-based, so this is the
+ * deployment's clock — make it per-forum if that ever changes. */
+const DIGEST_TIMEZONE = "Europe/London";
+
+const WEEKDAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function weekdayIn(timeZone: string, at: Date): number {
+  const name = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    weekday: "short",
+  }).format(at);
+  return WEEKDAY_NAMES.indexOf(name);
+}
+
+/** Whether a forum's digest should go out on `now`'s day (in
+ * DIGEST_TIMEZONE): daily always; weekly only on the chosen weekday. */
 export function isDigestDue(
   settings: EffectiveDigestSettings,
   now: Date,
 ): boolean {
   if (settings.frequency === "daily") return true;
-  return now.getUTCDay() === settings.weekday;
+  return weekdayIn(DIGEST_TIMEZONE, now) === settings.weekday;
 }
 
 /** First-digest lookback when there's no lastDigestAt watermark. */
@@ -1736,6 +1753,17 @@ export async function recordDigestSend(
     .returning({ id: digestSends.id });
   if (!row) throw new Error("Failed to record digest send");
   return row.id;
+}
+
+/** Retention for the send log (audit 2026-08-17): digest_sends grows one
+ * row per email forever, and click-to-read links older than a year are
+ * long dead — the cron prunes behind itself. Returns rows removed. */
+export async function pruneDigestSends(before: Date): Promise<number> {
+  const rows = await db
+    .delete(digestSends)
+    .where(lt(digestSends.sentAt, before))
+    .returning({ id: digestSends.id });
+  return rows.length;
 }
 
 const UUID_RE =

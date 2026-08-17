@@ -77,31 +77,37 @@ export async function createSlots(
   const plan = planSlotCreation(existing, inputs);
 
   const byId = new Map(existing.map((s) => [s.id, s]));
-  for (const { slotId, add } of plan.locationAdds) {
-    const slot = byId.get(slotId);
-    if (!slot) continue;
-    await db
-      .update(timeslots)
-      .set({ locations: [...slot.locations, ...add], updatedAt: new Date() })
-      .where(eq(timeslots.id, slotId));
-  }
+  // One transaction for the whole plan (audit 2026-08-17): a term-wide
+  // generation is dozens of writes, and a crash mid-way used to leave
+  // some slots location-augmented with the new windows never created —
+  // re-running then re-planned against the half-applied state.
+  return db.transaction(async (tx) => {
+    for (const { slotId, add } of plan.locationAdds) {
+      const slot = byId.get(slotId);
+      if (!slot) continue;
+      await tx
+        .update(timeslots)
+        .set({ locations: [...slot.locations, ...add], updatedAt: new Date() })
+        .where(eq(timeslots.id, slotId));
+    }
 
-  const created =
-    plan.toInsert.length === 0
-      ? []
-      : await db
-          .insert(timeslots)
-          .values(
-            plan.toInsert.map((s) => ({
-              timetableId,
-              startsAt: s.startsAt,
-              endsAt: s.endsAt,
-              cellKey: s.cellKey,
-              locations: s.locations,
-            })),
-          )
-          .returning();
-  return { created, augmented: plan.locationAdds.length };
+    const created =
+      plan.toInsert.length === 0
+        ? []
+        : await tx
+            .insert(timeslots)
+            .values(
+              plan.toInsert.map((s) => ({
+                timetableId,
+                startsAt: s.startsAt,
+                endsAt: s.endsAt,
+                cellKey: s.cellKey,
+                locations: s.locations,
+              })),
+            )
+            .returning();
+    return { created, augmented: plan.locationAdds.length };
+  });
 }
 
 /** A host's off-piste proposal: a session at a time the grid doesn't
@@ -118,46 +124,55 @@ export async function proposeSlot(
     sessionHostId: string;
   },
 ): Promise<{ slot: Timeslot; session: SlotSession }> {
-  const [existing] = await db
-    .select()
-    .from(timeslots)
-    .where(
-      and(
-        eq(timeslots.timetableId, timetableId),
-        eq(timeslots.startsAt, input.startsAt),
-        eq(timeslots.endsAt, input.endsAt),
-      ),
-    )
-    .limit(1);
-  let slot = existing ?? null;
-  if (slot && input.location && !slot.locations.includes(input.location)) {
-    const locations = [...slot.locations, input.location];
-    await db
-      .update(timeslots)
-      .set({ locations, updatedAt: new Date() })
-      .where(eq(timeslots.id, slot.id));
-    slot = { ...slot, locations };
-  }
-  if (!slot) {
-    const [created] = await db
-      .insert(timeslots)
-      .values({
-        timetableId,
-        startsAt: input.startsAt,
-        endsAt: input.endsAt,
+  // One transaction (audit 2026-08-17): the location union used to commit
+  // before the session insert could still fail its unique, permanently
+  // offering a location no session ever used.
+  return db.transaction(async (tx) => {
+    const [existing] = await tx
+      .select()
+      .from(timeslots)
+      .where(
+        and(
+          eq(timeslots.timetableId, timetableId),
+          eq(timeslots.startsAt, input.startsAt),
+          eq(timeslots.endsAt, input.endsAt),
+        ),
+      )
+      .limit(1);
+    let slot = existing ?? null;
+    if (slot && input.location && !slot.locations.includes(input.location)) {
+      const locations = [...slot.locations, input.location];
+      await tx
+        .update(timeslots)
+        .set({ locations, updatedAt: new Date() })
+        .where(eq(timeslots.id, slot.id));
+      slot = { ...slot, locations };
+    }
+    if (!slot) {
+      const [created] = await tx
+        .insert(timeslots)
+        .values({
+          timetableId,
+          startsAt: input.startsAt,
+          endsAt: input.endsAt,
+          createdById,
+          locations: input.location ? [input.location] : [],
+        })
+        .returning();
+      slot = created ?? null;
+    }
+    if (!slot) throw new Error("Failed to propose slot");
+    const session = await addSlotSession(
+      slot.id,
+      {
+        topicId: input.topicId,
+        sessionHostId: input.sessionHostId,
         createdById,
-        locations: input.location ? [input.location] : [],
-      })
-      .returning();
-    slot = created ?? null;
-  }
-  if (!slot) throw new Error("Failed to propose slot");
-  const session = await addSlotSession(slot.id, {
-    topicId: input.topicId,
-    sessionHostId: input.sessionHostId,
-    createdById,
+      },
+      tx,
+    );
+    return { slot, session };
   });
-  return { slot, session };
 }
 
 export async function updateSlot(
@@ -228,6 +243,12 @@ export async function slotSubjectTaken(
  * updateSlotSessionRow). Ownership (`sessionHostId`) and the admin-only
  * custom gate are the resolver's job; the per-subject unique indexes
  * backstop concurrent double-pencilling. */
+/** `db`, or the `tx` inside a db.transaction callback — lets helpers join
+ * a caller's transaction (proposeSlot) while defaulting to plain `db`. */
+type DbExecutor =
+  | typeof db
+  | Parameters<Parameters<typeof db.transaction>[0]>[0];
+
 export async function addSlotSession(
   slotId: string,
   session: {
@@ -238,8 +259,9 @@ export async function addSlotSession(
     url?: string;
     createdById?: string;
   },
+  dbc: DbExecutor = db,
 ): Promise<SlotSession> {
-  const [created] = await db
+  const [created] = await dbc
     .insert(slotSessions)
     .values({
       slotId,
@@ -551,10 +573,24 @@ export async function listSlotComments(
   slotId: string,
   opts: { includeHidden?: boolean } = {},
 ): Promise<SlotCommentView[]> {
+  const bySlot = await listSlotCommentsForSlots([slotId], opts);
+  return bySlot.get(slotId) ?? [];
+}
+
+/** Batch variant, one query for any number of slots (the export used to
+ * fire listSlotComments once per commented slot — audit 2026-08-17).
+ * Returns a map keyed by slot id; slots without comments are absent. */
+export async function listSlotCommentsForSlots(
+  slotIds: string[],
+  opts: { includeHidden?: boolean } = {},
+): Promise<Map<string, SlotCommentView[]>> {
+  const bySlot = new Map<string, SlotCommentView[]>();
+  if (slotIds.length === 0) return bySlot;
   // Author profile from their membership in the slot's timetable
   // (per-forum profiles); left join tolerates ex-members.
   const rows = await db
     .select({
+      slotId: slotComments.slotId,
       id: slotComments.id,
       authorId: slotComments.authorId,
       authorName: timetableMemberships.name,
@@ -582,28 +618,33 @@ export async function listSlotComments(
     .leftJoin(topics, eq(topics.id, slotComments.topicId))
     .where(
       and(
-        eq(slotComments.slotId, slotId),
+        inArray(slotComments.slotId, slotIds),
         opts.includeHidden ? undefined : isNull(slotComments.hiddenAt),
       ),
     )
     .orderBy(asc(slotComments.createdAt));
-  return rows.map((r) => ({
-    id: r.id,
-    authorId: r.authorId,
-    authorName: r.authorName,
-    authorImage: r.authorImage,
-    authorRoles: r.authorRoles ?? [],
-    body: r.body,
-    topicId: r.topicId,
-    topicTitle: r.topicTitle,
-    counts:
-      r.greenCount != null && r.yellowCount != null && r.redCount != null
-        ? { green: r.greenCount, yellow: r.yellowCount, red: r.redCount }
-        : null,
-    editedAt: r.editedAt,
-    hidden: r.hiddenAt != null,
-    createdAt: r.createdAt,
-  }));
+  for (const r of rows) {
+    const list = bySlot.get(r.slotId) ?? [];
+    list.push({
+      id: r.id,
+      authorId: r.authorId,
+      authorName: r.authorName,
+      authorImage: r.authorImage,
+      authorRoles: r.authorRoles ?? [],
+      body: r.body,
+      topicId: r.topicId,
+      topicTitle: r.topicTitle,
+      counts:
+        r.greenCount != null && r.yellowCount != null && r.redCount != null
+          ? { green: r.greenCount, yellow: r.yellowCount, red: r.redCount }
+          : null,
+      editedAt: r.editedAt,
+      hidden: r.hiddenAt != null,
+      createdAt: r.createdAt,
+    });
+    bySlot.set(r.slotId, list);
+  }
+  return bySlot;
 }
 
 export async function getSlotCommentById(

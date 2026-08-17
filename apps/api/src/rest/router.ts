@@ -29,6 +29,7 @@ import {
   listHostTopics,
   markForumDigestsSent,
   markInviteSent,
+  pruneDigestSends,
   recordDigestSend,
   removeMembership,
   setMemberRoles,
@@ -813,6 +814,7 @@ restRouter.post(
           );
           if (dueForumIds.length === 0) return null;
           let didSend = 0;
+          const sentForumIds = new Set<string>();
           for (const digest of digests) {
             if (!digest.email) continue;
             const { subject, html } = renderDigest(digest);
@@ -831,10 +833,20 @@ restRouter.post(
                 : stamped,
             });
             didSend += 1;
+            // Advance THIS forum's watermark the moment its email is out:
+            // with one end-of-loop mark, an early success followed by a
+            // later forum's send failure re-sent the successful email on
+            // the next run (audit 2026-08-17).
+            await markForumDigestsSent(recipient.id, [digest.forumId], now);
+            sentForumIds.add(digest.forumId);
           }
-          // Every due forum advances, sent or quiet — matching the old
-          // per-user markDigestSent semantics.
-          await markForumDigestsSent(recipient.id, dueForumIds, now);
+          // Quiet-but-due forums advance too — an empty window must never
+          // re-accumulate. Marked last: if a send above threw, the quiet
+          // forums simply recompute (still quiet) next run.
+          const quiet = dueForumIds.filter((id) => !sentForumIds.has(id));
+          if (quiet.length > 0) {
+            await markForumDigestsSent(recipient.id, quiet, now);
+          }
           return didSend;
         }),
       );
@@ -845,7 +857,13 @@ restRouter.post(
       }
     }
 
-    res.json({ processed, sent });
+    // Retention: click-to-read links older than a year are dead; the cron
+    // prunes the send log behind itself (audit 2026-08-17).
+    const pruned = await pruneDigestSends(
+      new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000),
+    );
+
+    res.json({ processed, sent, pruned });
   }),
 );
 

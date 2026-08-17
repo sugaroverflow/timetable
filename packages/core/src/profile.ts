@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import type { MembershipDigestSettings } from "@timetable/shared";
 
@@ -95,11 +95,12 @@ export async function updateUserNotificationSettings(
   userId: string,
   patch: Partial<NotificationSettings>,
 ): Promise<User | null> {
-  const current = await getUserNotificationSettings(userId);
-  const merged: NotificationSettings = { ...current, ...patch };
+  // In-database shallow merge — see updateTimetableSettings for why.
   const [user] = await db
     .update(users)
-    .set({ notificationSettings: merged })
+    .set({
+      notificationSettings: sql`coalesce(${users.notificationSettings}, '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb`,
+    })
     .where(eq(users.id, userId))
     .returning();
   return user ?? null;
@@ -131,10 +132,13 @@ export async function updateMembershipDigestSettings(
   userId: string,
   patch: MembershipDigestSettings,
 ): Promise<boolean> {
-  const current = await getMembershipDigestSettings(timetableId, userId);
+  // In-database shallow merge — see updateTimetableSettings for why.
   const [updated] = await db
     .update(timetableMemberships)
-    .set({ digestSettings: { ...current, ...patch }, updatedAt: new Date() })
+    .set({
+      digestSettings: sql`coalesce(${timetableMemberships.digestSettings}, '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb`,
+      updatedAt: new Date(),
+    })
     .where(
       and(
         eq(timetableMemberships.timetableId, timetableId),
