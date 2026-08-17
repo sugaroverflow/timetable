@@ -375,6 +375,7 @@ function CalendarBody({
         officeHoursLabel={ohLabel}
         roleLabels={roleLabels}
         pastToggle={<PastToggle showingPast={past} base={base} />}
+        anchorRows
       />
       {perms.canSeeHostOnly || perms.canSetAvailability ? <Legend /> : null}
     </div>

@@ -273,7 +273,13 @@ builder.mutationFields((t) => ({
         timetableId: readable.timetable.id,
         actorId: user.id,
         action: "member.impersonate",
-        payload: { targetUserId: target.userId, targetName: target.name },
+        payload: {
+          targetUserId: target.userId,
+          targetName: target.name,
+          // Roles at preview time — the log line reads "previewed the
+          // forum as <name> <role>" (Ed, 2026-08-17).
+          targetRoles: target.roles,
+        },
       });
       return true;
     },

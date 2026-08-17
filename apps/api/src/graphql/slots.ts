@@ -699,7 +699,11 @@ builder.mutationFields((t) => ({
       return { ...readable.timetable, viewerRoles: readable.roles as string[] };
     },
   }),
+}));
 
+// Split from the block above purely for the max-lines-per-function cap
+// (the slot.edit/slot.delete log lines tipped it over, 2026-08-17).
+builder.mutationFields((t) => ({
   /** Admin: update a timeslot's time window and/or offered locations. */
   updateTimeslot: t.field({
     type: "Boolean",
@@ -711,7 +715,7 @@ builder.mutationFields((t) => ({
       locationsJson: t.arg.string({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
-      await requireUser(ctx);
+      const user = await requireUser(ctx);
       const { slot, viewer, timetable } = await loadSlotAndViewer(
         ctx,
         args.slotId,
@@ -734,6 +738,27 @@ builder.mutationFields((t) => ({
         endsAt: args.endsAt ? new Date(args.endsAt) : undefined,
         locations,
       });
+      // Admin slot edits were the one calendar write with no log line
+      // (audit follow-up, Ed 2026-08-17).
+      const changed = [
+        args.startsAt ? "time" : null,
+        locations ? "locations" : null,
+      ].filter(Boolean);
+      await logActivity({
+        timetableId: timetable.id,
+        actorId: user.id,
+        action: "slot.edit",
+        payload: {
+          slotId: slot.id,
+          startsAt: (args.startsAt
+            ? new Date(args.startsAt)
+            : slot.startsAt
+          ).toISOString(),
+        },
+        ...(changed.length > 0
+          ? { note: `Changed ${changed.join(" and ")}` }
+          : {}),
+      });
       return true;
     },
   }),
@@ -743,7 +768,7 @@ builder.mutationFields((t) => ({
     type: "Boolean",
     args: { slotId: t.arg.string({ required: true }) },
     resolve: async (_p, args, ctx) => {
-      await requireUser(ctx);
+      const user = await requireUser(ctx);
       const { slot, viewer, timetable } = await loadSlotAndViewer(
         ctx,
         args.slotId,
@@ -751,6 +776,19 @@ builder.mutationFields((t) => ({
       requireCalendarEnabled(timetable.settings);
       if (!canManageCalendar(viewer)) forbidden("Admins only");
       await deleteSlot(slot.id);
+      await logActivity({
+        timetableId: timetable.id,
+        actorId: user.id,
+        action: "slot.delete",
+        payload: {
+          // No slotId: the row is gone, so the log line shows the time
+          // without a calendar link.
+          startsAt: slot.startsAt.toISOString(),
+          ...(slot.locations.length > 0
+            ? { location: slot.locations.join(", ") }
+            : {}),
+        },
+      });
       return true;
     },
   }),
@@ -1299,9 +1337,23 @@ builder.mutationFields((t) => ({
     },
     resolve: async (_p, args, ctx) => {
       const user = await requireUser(ctx);
-      const { comment, viewer } = await loadCommentContext(ctx, args.commentId);
+      const { comment, viewer, slot, timetable } = await loadCommentContext(
+        ctx,
+        args.commentId,
+      );
       if (!canManageCalendar(viewer)) forbidden("Admins only");
       await setSlotCommentHidden(comment.id, args.hidden, user.id);
+      // Moderation leaves a trace, like topic-comment hide/unhide does.
+      await logActivity({
+        timetableId: timetable.id,
+        actorId: user.id,
+        action: args.hidden ? "slot_comment.hide" : "slot_comment.unhide",
+        payload: {
+          slotId: slot.id,
+          startsAt: slot.startsAt.toISOString(),
+          snippet: comment.body.slice(0, 140),
+        },
+      });
       return true;
     },
   }),
