@@ -7,6 +7,7 @@ import {
 
 import { e2eTestMode, env } from "@/env";
 import { canonicalHosts, redirectTargetHost } from "@/lib/canonicalHost";
+import { buildCsp, mintNonce } from "@/lib/csp";
 
 // Next 16 renamed the "middleware" convention to "proxy". Clerk attaches auth
 // to every request; route-level access control is enforced in layouts/pages
@@ -166,7 +167,10 @@ async function staleSlugRedirect(request: NextRequest) {
   return NextResponse.redirect(url, 308);
 }
 
-async function customDomainRewrite(request: NextRequest) {
+async function customDomainRewrite(
+  request: NextRequest,
+  requestHeaders: Headers,
+) {
   const host = requestHost(request);
   const pathname = request.nextUrl.pathname;
   if (!isCustomHost(host) || !shouldRewritePath(pathname)) return undefined;
@@ -176,11 +180,32 @@ async function customDomainRewrite(request: NextRequest) {
 
   const url = request.nextUrl.clone();
   url.pathname = `/f/${slug}${pathname === "/" ? "" : pathname}`;
-  return NextResponse.rewrite(url);
+  return NextResponse.rewrite(url, { request: { headers: requestHeaders } });
 }
 
+/**
+ * Route the request AND mint its CSP (audit follow-up 2026-08-17). The
+ * nonce travels two ways: the `content-security-policy` REQUEST header is
+ * how Next learns to stamp its own framework inline scripts, and `x-nonce`
+ * is how the root layout stamps ours (the pre-paint theme script). The
+ * response then carries the policy to the browser. Redirect responses
+ * skip all of it — no document renders.
+ */
 async function routeRequest(request: NextRequest) {
-  return (await staleSlugRedirect(request)) ?? customDomainRewrite(request);
+  const redirected = await staleSlugRedirect(request);
+  if (redirected) return redirected;
+
+  const nonce = mintNonce();
+  const csp = buildCsp(nonce);
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-nonce", nonce);
+  requestHeaders.set("content-security-policy", csp);
+
+  const response =
+    (await customDomainRewrite(request, requestHeaders)) ??
+    NextResponse.next({ request: { headers: requestHeaders } });
+  response.headers.set("content-security-policy", csp);
+  return response;
 }
 
 const clerkProxy = clerkMiddleware(async (_auth, request) => {

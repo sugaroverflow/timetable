@@ -1,5 +1,6 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 
 import "./tokens.css";
 import "./globals.css";
@@ -44,18 +45,24 @@ const clerkAppearance = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   // Applies the stored light/dark choice before paint — no flash.
   const themeScript = `(function(){try{var m=localStorage.getItem("theme-mode");var d=m==="dark"||((!m||m==="system")&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.dataset.theme=d?"dark":"light";}catch(e){}})();`;
+  // The proxy's per-request CSP nonce — without it the script above is
+  // exactly what the policy exists to block (lib/csp.ts).
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
 
   const content = (
     <html lang="en-GB" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script
+          nonce={nonce}
+          dangerouslySetInnerHTML={{ __html: themeScript }}
+        />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
           rel="preconnect"
