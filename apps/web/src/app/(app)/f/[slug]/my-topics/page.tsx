@@ -137,6 +137,12 @@ export default async function MyTopicsPage({
             ))}
           </ul>
         )}
+        {/* Blank scroll room so the TOC's jump links can put even the
+            LAST card's heading at the viewport top (Ed, 2026-08-17).
+            Only when the TOC itself renders (2+ topics). */}
+        {sorted.length > 1 ? (
+          <div className="toc-jump-slack" aria-hidden />
+        ) : null}
       </div>
     </div>
   );
