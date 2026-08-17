@@ -80,5 +80,13 @@ export default async function RootLayout({
 
   if (e2eTestMode) return content;
 
-  return <ClerkProvider appearance={clerkAppearance}>{content}</ClerkProvider>;
+  // The nonce rides into Clerk's own injected <script> tags: under the
+  // CSP's strict-dynamic, host allowlisting is off, so without it Clerk's
+  // clerk.browser.js is blocked (caught live on dev, 2026-08-17 — the
+  // local probe couldn't see it because E2E mode skips Clerk entirely).
+  return (
+    <ClerkProvider appearance={clerkAppearance} nonce={nonce} dynamic>
+      {content}
+    </ClerkProvider>
+  );
 }
