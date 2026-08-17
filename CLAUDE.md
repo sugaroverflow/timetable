@@ -233,6 +233,14 @@ Stable names for feature pieces, so instructions can reference them precisely.
   (api `email.ts`) + `DigestReadMarker` (app layout): every digest link
   carries `dg=<send id>`; one click marks that email's shown comment
   threads seen up to its send time (`markDigestRead`, GREATEST semantics).
+- **page-topic-toc** — `PageTopicToc.tsx` (Ed, 2026-08-17): the little
+  table of contents under the My Topics and ❤️/💙 Topics page titles —
+  the People-page profile-card topic-list look (`person-topics` styles),
+  bare on the page background, hidden below 2 topics. My Topics links
+  jump to the anchored cards below (`#topic-<id>` on `TopicManager`'s
+  root `li`, scroll-margin clears the topbar) in the current sort order;
+  the ❤️/💙 pages link to permalinks (their feed paginates, so the card
+  may not be rendered) via the slim `HEARTED_TOC_QUERY` full list.
 
 ## Gotchas (learned the hard way)
 

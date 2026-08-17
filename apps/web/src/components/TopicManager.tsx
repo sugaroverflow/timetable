@@ -251,7 +251,9 @@ export function TopicManager({
   };
 
   return (
-    <li className="card stack">
+    // The id anchors the page-topic-toc's jump links; scroll-margin (in
+    // globals.css) keeps the landing spot clear of the sticky topbar.
+    <li className="card stack" id={`topic-${topic.id}`}>
       {/* Editing swaps the title/cover/body for the form in place
           (QA 2026-07-29) — comments, panels, and controls stay put. */}
       <TopicEditScope

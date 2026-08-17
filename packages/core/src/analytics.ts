@@ -42,7 +42,6 @@ export type DashboardData = {
   totalHearts: number;
   electorCount: number;
   hostCount: number;
-  slotCount: number;
   topicLeaderboard: {
     id: string;
     title: string;
@@ -211,14 +210,6 @@ async function loadMembers(timetableId: string): Promise<{
   const electorRows = memberRows.filter((m) => m.roles.includes("elector"));
   const hostRows = memberRows.filter((m) => m.roles.includes("host"));
   return { electorRows, hostRows };
-}
-
-async function countSlots(timetableId: string): Promise<number> {
-  const [{ n } = { n: 0 }] = await db
-    .select({ n: sql<number>`count(*)::int` })
-    .from(timeslots)
-    .where(eq(timeslots.timetableId, timetableId));
-  return n;
 }
 
 function commentScoreFields(c: TopicCommentScores | undefined) {
@@ -707,7 +698,6 @@ export async function getDashboard(
   const { electorRows, hostRows } = await loadMembers(timetableId);
   const electorCount = electorRows.length;
   const hostCount = hostRows.length;
-  const slotCount = await countSlots(timetableId);
 
   // Weighted feed gives published topics with scores + host names.
   const feed = await buildFeed(timetableId, null, {
@@ -773,7 +763,6 @@ export async function getDashboard(
     totalHearts,
     electorCount,
     hostCount,
-    slotCount,
     topicLeaderboard,
     hostActivity,
     electorActivity,

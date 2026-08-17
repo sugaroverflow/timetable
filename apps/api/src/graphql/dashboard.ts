@@ -175,7 +175,6 @@ const ElectorActivityType = builder
       electorImage: t.exposeString("electorImage", { nullable: true }),
       heartCount: t.exposeInt("heartCount"),
       commentCount: t.exposeInt("commentCount"),
-      availabilityCount: t.exposeInt("availabilityCount"),
       /** Published topics never seen nor ❤️'d — the queue coverage gap. */
       queueCount: t.exposeInt("queueCount"),
       latestActivityAt: t.string({
@@ -199,7 +198,6 @@ const DashboardType = builder.objectRef<GqlDashboard>("Dashboard").implement({
     totalHearts: t.exposeInt("totalHearts"),
     electorCount: t.exposeInt("electorCount"),
     hostCount: t.exposeInt("hostCount"),
-    slotCount: t.exposeInt("slotCount"),
     topicCounts: t.field({
       type: TopicCountsType,
       resolve: (d) => d.topicCounts,

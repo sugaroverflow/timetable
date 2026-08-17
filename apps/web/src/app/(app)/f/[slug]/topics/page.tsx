@@ -2,12 +2,15 @@ import { Heart } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { topicPath } from "@timetable/shared";
+
 import { EmptyState } from "@/components/EmptyState";
 import { FeedSearch } from "@/components/FeedSearch";
 import { FeedSortControl } from "@/components/FeedSortControl";
 import { HostFilter } from "@/components/HostFilter";
 import { InfiniteFeed } from "@/components/InfiniteFeed";
 import { MarkFeedSeen } from "@/components/MarkFeedSeen";
+import { PageTopicToc } from "@/components/PageTopicToc";
 import {
   PersonProfileCard,
   type ProfileCardPerson,
@@ -26,6 +29,49 @@ import { pluralLabel, roleLabel } from "@/lib/timetableSettings";
 import { loadMoreFeed } from "./actions";
 
 type HostCard = ProfileCardPerson | null;
+
+/** page-topic-toc data for the ❤️/💙 pages: the viewer's WHOLE hearted
+ * list (the feed below paginates at 20, so the TOC can't be read off the
+ * first page), slim fields only, linking to permalinks. */
+const HEARTED_TOC_QUERY = `
+  query HeartedToc($s: String!, $hearted: Boolean, $hostHearted: Boolean, $sort: String, $seed: String) {
+    topicFeed(idOrSlug: $s, heartedByMe: $hearted, hostHeartedByMe: $hostHearted, sort: $sort, seed: $seed, limit: 500) {
+      id title slug hostSlug hostId
+    }
+  }
+`;
+
+type HeartedTocTopic = {
+  id: string;
+  title: string;
+  slug: string | null;
+  hostSlug: string | null;
+  hostId: string;
+};
+
+/** page-topic-toc (Ed, 2026-08-17): the ❤️/💙 pages open with the whole
+ * hearted list as permalinks, in the page's own sort order. */
+async function loadHeartedToc(args: {
+  slug: string;
+  hearted: boolean;
+  hostHearted: boolean;
+  sort: string;
+  seed: string;
+  hasTopics: boolean;
+}): Promise<HeartedTocTopic[]> {
+  if (!(args.hearted || args.hostHearted) || !args.hasTopics) return [];
+  const data = await gqlFetch<{ topicFeed: HeartedTocTopic[] }>(
+    HEARTED_TOC_QUERY,
+    {
+      s: args.slug,
+      hearted: args.hearted,
+      hostHearted: args.hostHearted,
+      sort: args.sort,
+      seed: args.seed,
+    },
+  );
+  return data.topicFeed;
+}
 
 const HOST_CARD_QUERY = `
   query FeedHostCard($s: String!, $u: String!) {
@@ -193,10 +239,26 @@ export default async function FeedPage({
 
   const hostCard = await loadHostCard(slug, host);
 
+  const tocTopics = await loadHeartedToc({
+    slug,
+    hearted,
+    hostHearted,
+    sort,
+    seed,
+    hasTopics: page.topics.length > 0,
+  });
+
   return (
     <div className="stack">
       {page.isMember ? <MarkFeedSeen slug={slug} /> : null}
       <GesturePageHead hearted={hearted} hostHearted={hostHearted} />
+      <PageTopicToc
+        items={tocTopics.map((t) => ({
+          id: t.id,
+          title: t.title,
+          href: topicPath(slug, t.hostSlug, t.slug, t.hostId),
+        }))}
+      />
       <div className="toolbar feed-toolbar">
         <FeedSearch value={q} />
         {page.hosts.length > 0 ? (
