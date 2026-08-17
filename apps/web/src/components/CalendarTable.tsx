@@ -249,6 +249,7 @@ function SlotRow({
   slot,
   past,
   weekStart,
+  anchorId,
   slug,
   locations,
   perms,
@@ -264,6 +265,8 @@ function SlotRow({
   past: boolean;
   /** True when this slot starts a new (Mon-first) week — bigger gap. */
   weekStart: boolean;
+  /** Deep-link anchor (`slot-<id>`) — main calendar chronology only. */
+  anchorId?: string;
   /** Ungrouped lists carry the year (no month heading to hold it). */
   showYear: boolean;
   action: React.ReactNode;
@@ -305,6 +308,7 @@ function SlotRow({
 
   return (
     <div
+      id={anchorId}
       className={rowClasses}
       role={canExpand ? "button" : undefined}
       tabIndex={canExpand ? 0 : undefined}
@@ -425,6 +429,7 @@ export function CalendarTable({
   pastToggle,
   controls,
   rowAction,
+  anchorRows,
 }: {
   rows: CalendarTableRow[];
   slug: string;
@@ -462,6 +467,11 @@ export function CalendarTable({
   /** A per-row control in the right cluster — the workbench's one-click
    * pencil. */
   rowAction?: (slot: CalendarSlot) => React.ReactNode;
+  /** Give rows `#slot-<id>` anchors for deep links (the activity log's
+   * timeslot links, 2026-08-17). ONLY the calendar page's main chronology
+   * sets it — its Your Sessions card repeats the same slots, and duplicate
+   * ids would hijack the jump. */
+  anchorRows?: boolean;
 }) {
   const [open, setOpen] = useState(true);
   const showRows = !collapsible || open;
@@ -511,6 +521,7 @@ export function CalendarTable({
                     slot={slot}
                     past={past}
                     weekStart={weekStart}
+                    anchorId={anchorRows ? `slot-${slot.id}` : undefined}
                     slug={slug}
                     locations={locations}
                     perms={perms}

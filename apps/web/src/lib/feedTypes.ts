@@ -129,4 +129,15 @@ export type ActivityEvent = {
   commentId: string | null;
   invitedEmail: string | null;
   invitedRoles: string[];
+  /** The member the event was done TO (log overhaul, 2026-08-17). */
+  targetUserId: string | null;
+  targetName: string | null;
+  targetRoles: string[];
+  /** member.role_change: the roles the target ended up with. */
+  rolesTo: string[];
+  /** Calendar events: the timeslot involved. */
+  slotId: string | null;
+  slotStartsAt: string | null;
+  availabilityState: string | null;
+  location: string | null;
 };

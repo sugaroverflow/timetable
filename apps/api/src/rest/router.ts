@@ -423,7 +423,10 @@ restRouter.patch(
       timetableId: membership.timetableId,
       actorId: user.id,
       action: "member.email_change",
-      payload: { targetUserId: membership.userId },
+      payload: {
+        targetUserId: membership.userId,
+        targetName: membership.name ?? null,
+      },
       note: `Login email changed to ${normalizeEmail(input.email)}`,
     });
     res.json({ email: normalizeEmail(input.email) });
@@ -536,6 +539,7 @@ restRouter.patch(
         action: "member.role_change",
         payload: {
           targetUserId: membership.userId,
+          targetName: membership.name ?? null,
           from: membership.roles,
           to: roles,
         },

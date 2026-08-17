@@ -1425,6 +1425,22 @@ optgroup {
   display: flex;
   align-items: flex-start;
   gap: 10px;
+  /* Deep links (#comment-<id> from the activity log, notifications,
+     digests) land clear of the sticky topbar. */
+  scroll-margin-top: calc(var(--topbar-h, 55px) + 14px);
+}
+/* The addressed comment wears a quiet ring so the eye finds it after the
+   jump (log overhaul, 2026-08-17). Direct-child path — a descendant
+   selector would ring every reply bubble under it too. */
+.comment:target > .comment-main > .c-bubble {
+  box-shadow: 0 0 0 2px var(--primary-soft);
+}
+/* Same treatment for the calendar's #slot-<id> anchors. */
+.cal-row {
+  scroll-margin-top: calc(var(--topbar-h, 55px) + 14px);
+}
+.cal-row:target {
+  box-shadow: 0 0 0 2px var(--primary-soft);
 }
 /* Centre the avatar on the username line: with the bubble flush at the
    row top (block display), the name's tight line box spans 8→25px, so

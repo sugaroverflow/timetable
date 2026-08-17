@@ -14,6 +14,31 @@ import { loadTimetableAndViewer, readTimetable } from "./guards";
 // Types
 // ---------------------------------------------------------------------------
 
+/** First string payload value under any of `keys` (log sites named their
+ * target keys inconsistently over time — targetUserId/userId/removedUserId
+ * all mean "the member this was done to"). */
+function payloadString(
+  payload: Record<string, unknown>,
+  ...keys: string[]
+): string | null {
+  for (const key of keys) {
+    const value = payload[key];
+    if (typeof value === "string" && value) return value;
+  }
+  return null;
+}
+
+function payloadRoles(
+  payload: Record<string, unknown>,
+  ...keys: string[]
+): string[] {
+  for (const key of keys) {
+    const value = payload[key];
+    if (Array.isArray(value)) return value.filter((r) => typeof r === "string");
+  }
+  return [];
+}
+
 const ActivityType = builder
   .objectRef<ActivityEntry>("ActivityEvent")
   .implement({
@@ -53,6 +78,46 @@ const ActivityType = builder
       invitedRoles: t.stringList({
         resolve: (a) =>
           (a.payload["invitedRoles"] as string[] | undefined) ?? [],
+      }),
+      // Member-target events — bio/role/email edits, preview, removal
+      // (log overhaul, Ed 2026-08-17): who it was done TO, so the line
+      // reads "previewed the forum as <name> <role>" with a person link.
+      targetUserId: t.string({
+        nullable: true,
+        resolve: (a) =>
+          payloadString(a.payload, "targetUserId", "userId", "removedUserId"),
+      }),
+      targetName: t.string({
+        nullable: true,
+        resolve: (a) =>
+          payloadString(a.payload, "targetName", "name", "removedName"),
+      }),
+      /** The target's roles at event time (impersonate/remove). */
+      targetRoles: t.stringList({
+        resolve: (a) => payloadRoles(a.payload, "targetRoles", "roles"),
+      }),
+      /** member.role_change: the roles the target ended up with. */
+      rolesTo: t.stringList({
+        resolve: (a) => payloadRoles(a.payload, "to"),
+      }),
+      // Calendar events: which timeslot, so the line links to its row.
+      slotId: t.string({
+        nullable: true,
+        resolve: (a) => payloadString(a.payload, "slotId"),
+      }),
+      slotStartsAt: t.string({
+        nullable: true,
+        resolve: (a) => payloadString(a.payload, "startsAt"),
+      }),
+      /** availability.set: 🟢🟡🔴. */
+      availabilityState: t.string({
+        nullable: true,
+        resolve: (a) => payloadString(a.payload, "state"),
+      }),
+      /** slot.clear / slot.delete: the room involved, when one was. */
+      location: t.string({
+        nullable: true,
+        resolve: (a) => payloadString(a.payload, "location"),
       }),
     }),
   });
