@@ -174,6 +174,7 @@ function CommentSection({
   open,
   viewerId,
   roleLabels,
+  topicHref,
 }: {
   topic: FeedTopic;
   perms: FeedPerms;
@@ -182,6 +183,7 @@ function CommentSection({
   open: boolean;
   viewerId: string | null;
   roleLabels: RoleLabels;
+  topicHref?: string | null;
 }) {
   if (!perms.canComment && publicComments.length === 0) return null;
   const thread = (
@@ -192,6 +194,7 @@ function CommentSection({
       viewerId={viewerId}
       slug={slug}
       roleLabels={roleLabels}
+      topicHref={topicHref}
     />
   );
   return (
@@ -242,6 +245,8 @@ type TabArgs = {
   /** The ❤️ row — null in queue mode, where the decision buttons stand
    * above the strip as the card's one call to action. */
   actionsRow: React.ReactNode;
+  /** Topic permalink — the comment timestamps' link target (#259). */
+  permalink: string | null;
 };
 
 /** Unconditional: it carries the ❤️ row, so every card has it. */
@@ -263,6 +268,7 @@ function commentsTab(a: TabArgs): TopicTab {
           open={a.discussionOpen}
           viewerId={a.viewerId}
           roleLabels={a.roleLabels}
+          topicHref={a.permalink}
         />
       </>
     ),
@@ -293,6 +299,7 @@ function hostTab(a: TabArgs): TopicTab | null {
         hostHearters={a.topic.hostHearters}
         canHostHeart={a.perms.canHostHeart}
         viewerHasHostHearted={a.topic.viewerHasHostHearted}
+        topicHref={a.permalink}
       />
     ),
   };
@@ -321,6 +328,7 @@ function adminTab(a: TabArgs): TopicTab | null {
         slug={a.slug}
         adminLabel={a.adminLabel}
         roleLabels={a.roleLabels}
+        topicHref={a.permalink}
       />
     ),
   };
@@ -520,6 +528,7 @@ export function TopicCard({
               roleLabels,
               hostCommentsEnabled,
               calendar,
+              permalink,
               actionsRow: queueControls ? null : (
                 <FeedActionsRow
                   topic={topic}

@@ -1,9 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 import type { FeedComment } from "@/lib/feedTypes";
 import { COMMENT_TREE_DEPTH } from "@/lib/gqlFragments";
+import { relativeTime } from "@/lib/relativeTime";
 import type { RoleLabels } from "@/lib/timetableSettings";
 
 import { Avatar } from "./Avatar";
@@ -20,6 +22,42 @@ const VISIBILITY_PILLS: Record<string, { className: string; label: string }> = {
   admin_only: { className: "pill pill-admin", label: "admins" },
 };
 
+/** Faint relative timestamp on every comment — a permalink to the
+ * comment's anchor on the topic page when the thread knows its topic's URL
+ * (#259). The `#comment-<id>` anchors carry scroll-margin past the topbar
+ * and a :target highlight ring (activity-log overhaul, 2026-08-17), so the
+ * link lands the reader right on the comment. */
+function CommentTime({
+  comment,
+  topicHref,
+}: {
+  comment: FeedComment;
+  topicHref?: string | null;
+}) {
+  // Server and client render moments differ, so both the relative label
+  // and the timezone-dependent title can mismatch at hydration — harmless,
+  // suppressed.
+  const label = relativeTime(comment.createdAt);
+  const exact = new Date(comment.createdAt).toLocaleString("en-GB");
+  if (!topicHref) {
+    return (
+      <span className="c-time" title={exact} suppressHydrationWarning>
+        {label}
+      </span>
+    );
+  }
+  return (
+    <Link
+      className="c-time"
+      href={`${topicHref}#comment-${comment.id}`}
+      title={exact}
+      suppressHydrationWarning
+    >
+      {label}
+    </Link>
+  );
+}
+
 /** The name row + body for a live (non-deleted) comment; the body swaps
  * for the inline editor while editing (edit-in-place, QA 2026-07-29). */
 function CommentBubble({
@@ -28,12 +66,14 @@ function CommentBubble({
   roleLabels,
   editing,
   onEditDone,
+  topicHref,
 }: {
   comment: FeedComment;
   slug?: string;
   roleLabels?: RoleLabels;
   editing: boolean;
   onEditDone(): void;
+  topicHref?: string | null;
 }) {
   const visibilityPill = VISIBILITY_PILLS[comment.visibility];
   return (
@@ -50,6 +90,7 @@ function CommentBubble({
       {/* Who's talking, at a glance: the author's role in this forum
           (mixed host/elector threads read ambiguously without it). */}
       <PrimaryRolePill roles={comment.authorRoles} labels={roleLabels} />
+      <CommentTime comment={comment} topicHref={topicHref} />
       {visibilityPill ? (
         <span
           className={visibilityPill.className}
@@ -125,6 +166,7 @@ function ChainBlock({
   slug,
   roleLabels,
   depth,
+  topicHref,
 }: {
   comment: FeedComment;
   replies: FeedComment[];
@@ -134,6 +176,7 @@ function ChainBlock({
   slug?: string;
   roleLabels?: RoleLabels;
   depth: number;
+  topicHref?: string | null;
 }) {
   // Chain parents: every top-level comment, and any forked comment whose
   // sub-chain has started.
@@ -161,6 +204,7 @@ function ChainBlock({
           slug={slug}
           roleLabels={roleLabels}
           depth={depth + 1}
+          topicHref={topicHref}
         />
       ))}
       {showTail ? (
@@ -185,6 +229,7 @@ function CommentItem({
   slug,
   roleLabels,
   depth,
+  topicHref,
 }: {
   comment: FeedComment;
   canReply: boolean;
@@ -194,6 +239,7 @@ function CommentItem({
   roleLabels?: RoleLabels;
   /** 1-based nesting level, counted from the thread roots. */
   depth: number;
+  topicHref?: string | null;
 }) {
   const replies = comment.replies ?? [];
   const [editing, setEditing] = useState(false);
@@ -221,6 +267,7 @@ function CommentItem({
             roleLabels={roleLabels}
             editing={editing}
             onEditDone={() => setEditing(false)}
+            topicHref={topicHref}
           />
         )}
         {comment.deleted ? null : (
@@ -244,6 +291,7 @@ function CommentItem({
           slug={slug}
           roleLabels={roleLabels}
           depth={depth}
+          topicHref={topicHref}
         />
       </div>
     </div>
@@ -261,6 +309,7 @@ export function CommentList({
   viewerId = null,
   slug,
   roleLabels,
+  topicHref,
 }: {
   comments: FeedComment[];
   canReply: boolean;
@@ -270,6 +319,9 @@ export function CommentList({
   slug?: string;
   /** The forum's role labels, for the author role pills. */
   roleLabels?: RoleLabels;
+  /** The topic page's path — turns each comment's timestamp into a
+   * permalink to its anchor there (#259); plain text when absent. */
+  topicHref?: string | null;
 }) {
   if (!comments.length) return null;
 
@@ -285,6 +337,7 @@ export function CommentList({
           slug={slug}
           roleLabels={roleLabels}
           depth={1}
+          topicHref={topicHref}
         />
       ))}
     </div>

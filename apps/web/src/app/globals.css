@@ -2222,6 +2222,17 @@ html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
   font-size: var(--text-sm);
   line-height: var(--lh-tight);
 }
+/* Relative timestamp in the name row — doubles as the comment's permalink
+   (#259), so the link stays quiet until hovered, like .tl-quote-link. */
+.c-time {
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--faint);
+  text-decoration: none;
+}
+a.c-time:hover {
+  text-decoration: underline;
+}
 .c-text {
   font-size: var(--text-base);
   margin-top: 2px;

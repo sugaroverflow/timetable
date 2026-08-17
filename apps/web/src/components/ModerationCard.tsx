@@ -138,6 +138,7 @@ export function ModerationCard({
           slug={slug}
           adminLabel={adminLabel}
           roleLabels={roleLabels}
+          topicHref={permalink}
         />
         <AdminTopicActions
           topic={{
