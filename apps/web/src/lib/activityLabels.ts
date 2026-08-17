@@ -16,6 +16,9 @@ export const ACTION_LABELS: Record<string, string> = {
   "hearts.cutoff": "moved the ❤️ counting cutoff",
   "comment.hide": "hid a comment",
   "comment.unhide": "un-hid a comment",
+  // Pinning by the topic's author (#258, 2026-08-17).
+  "comment.pin": "pinned a comment",
+  "comment.unpin": "unpinned a comment",
   "member.bio_edit": "edited a member's bio",
   "member.profile_edit": "updated their own profile",
   "heart.add": "❤️'d a topic",

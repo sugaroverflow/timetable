@@ -1,0 +1,1 @@
+ALTER TABLE "comments" ADD COLUMN "pinned_at" timestamp with time zone;

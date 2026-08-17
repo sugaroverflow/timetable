@@ -120,6 +120,12 @@ CommentType.implement({
       nullable: true,
       resolve: (c) => c.editedAt?.toISOString() ?? null,
     }),
+    /** Pinned by the topic's author (#258) — set on top-level comments
+     * only; ordering is the client's job (the tree stays newest-first). */
+    pinnedAt: t.string({
+      nullable: true,
+      resolve: (c) => c.pinnedAt?.toISOString() ?? null,
+    }),
     createdAt: t.string({ resolve: (c) => c.createdAt.toISOString() }),
     replies: t.field({ type: [CommentType], resolve: (c) => c.replies }),
   }),

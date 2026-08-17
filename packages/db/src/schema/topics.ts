@@ -191,6 +191,10 @@ export const comments = pgTable(
     /** Set on author edits only — updatedAt also moves on hide/unhide, so
      * it can't drive the "(edited)" marker. */
     editedAt: timestamp({ withTimezone: true }),
+    /** Pinned by the topic's author (#258, 2026-08-17): top-level comments
+     * only, sorted to the top of the thread — earliest pin first, so the
+     * author curates the order by pinning sequence. */
+    pinnedAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },

@@ -19,6 +19,9 @@ export type FeedComment = {
   /** Author-deleted tombstone: body/author arrive blanked from the API. */
   deleted: boolean;
   editedAt: string | null;
+  /** Pinned by the topic's author (#258) — selected on thread roots only,
+   * so absent on replies. */
+  pinnedAt?: string | null;
   createdAt: string;
   replies: FeedComment[];
 };

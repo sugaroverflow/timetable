@@ -214,6 +214,45 @@ export async function setCommentHidden(
   return updated;
 }
 
+/** Pin/unpin by the topic's author (#258, 2026-08-17). Caller enforces the
+ * gate (author + top-level); this just stamps and logs. Logged with the
+ * same topic + snippet payload shape as comment.hide so the activity
+ * timeline links it to the comment. */
+export async function setCommentPinned(
+  commentId: string,
+  pinned: boolean,
+  byUserId: string,
+): Promise<Comment | null> {
+  const [updated] = await db
+    .update(comments)
+    .set({
+      pinnedAt: pinned ? new Date() : null,
+      updatedAt: new Date(),
+    })
+    .where(eq(comments.id, commentId))
+    .returning();
+  if (!updated) return null;
+  const [topic] = await db
+    .select({ title: topics.title, timetableId: topics.timetableId })
+    .from(topics)
+    .where(eq(topics.id, updated.topicId))
+    .limit(1);
+  if (topic) {
+    await logActivity({
+      timetableId: topic.timetableId,
+      actorId: byUserId,
+      action: pinned ? "comment.pin" : "comment.unpin",
+      payload: {
+        topicId: updated.topicId,
+        title: topic.title,
+        snippet: updated.body.slice(0, 140),
+        commentId: updated.id,
+      },
+    });
+  }
+  return updated;
+}
+
 export type CommentNode = {
   id: string;
   parentId: string | null;
@@ -230,6 +269,10 @@ export type CommentNode = {
    * survives in the tree at all when replies hang off it. */
   deleted: boolean;
   editedAt: Date | null;
+  /** Pinned by the topic's author (#258) — top-level comments only. The
+   * tree stays newest-first regardless (teasers and digests read "latest"
+   * off it); pinned-first ordering is the thread renderer's job. */
+  pinnedAt: Date | null;
   createdAt: Date;
   replies: CommentNode[];
 };
@@ -253,6 +296,7 @@ type CommentTreeRow = {
   hiddenAt: Date | null;
   deletedAt: Date | null;
   editedAt: Date | null;
+  pinnedAt: Date | null;
   createdAt: Date;
 };
 
@@ -288,6 +332,7 @@ async function fetchCommentRows(
       hiddenAt: comments.hiddenAt,
       deletedAt: comments.deletedAt,
       editedAt: comments.editedAt,
+      pinnedAt: comments.pinnedAt,
       createdAt: comments.createdAt,
     })
     .from(comments)
@@ -319,6 +364,7 @@ function buildCommentTree(rows: CommentTreeRow[]): CommentNode[] {
       hidden: r.hiddenAt !== null,
       deleted: r.deletedAt !== null,
       editedAt: r.editedAt,
+      pinnedAt: r.pinnedAt,
       createdAt: r.createdAt,
       replies: [],
     });

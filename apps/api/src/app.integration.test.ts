@@ -53,6 +53,9 @@ vi.mock("@timetable/core", async (importOriginal) => {
     listTopicSessionSlotIds: vi.fn(),
     getTopicById: vi.fn(),
     getWeightedBreakdown: vi.fn(),
+    // Default: no roles — commentNode's author-pill lookup must not reach
+    // the real DB. Tests that care set their own resolved value.
+    getViewerRoles: vi.fn(async () => []),
     getMembership: vi.fn(),
     getMembershipById: vi.fn(),
     getPerson: vi.fn(),
@@ -67,6 +70,7 @@ vi.mock("@timetable/core", async (importOriginal) => {
     listHostTopics: vi.fn(),
     markInviteSent: vi.fn(),
     logActivity: vi.fn(),
+    setCommentPinned: vi.fn(),
     setMemberRoles: vi.fn(),
     setTopicReady: vi.fn(),
     softDeleteComment: vi.fn(),
@@ -2902,6 +2906,7 @@ describe("createApiApp", () => {
       hiddenByUserId: null,
       deletedAt: null,
       editedAt: null,
+      pinnedAt: null,
       createdAt: new Date("2026-01-01T00:00:00.000Z"),
       updatedAt: new Date("2026-01-01T00:00:00.000Z"),
     };
@@ -2964,6 +2969,80 @@ describe("createApiApp", () => {
       };
       expect(deleted.data.deleteComment).toBe(true);
       expect(core.softDeleteComment).toHaveBeenCalledWith("comment-1");
+    });
+  });
+
+  it("only lets the topic's author pin top-level comments", async () => {
+    const commentRow = {
+      id: "comment-1",
+      topicId: "22222222-2222-2222-2222-222222222222",
+      parentId: null,
+      authorId: "elector-1",
+      body: "worth keeping on top",
+      visibility: "public" as const,
+      hiddenAt: null,
+      hiddenByUserId: null,
+      deletedAt: null,
+      editedAt: null,
+      pinnedAt: null,
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    };
+    const gql = (baseUrl: string, query: string) =>
+      fetch(`${baseUrl}/graphql`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query }),
+      });
+    const pinMutation = `mutation {
+      pinComment(commentId: "comment-1", pinned: true) { id pinnedAt }
+    }`;
+
+    await withTestServer(async (baseUrl) => {
+      vi.mocked(core.getCommentById).mockResolvedValue(commentRow);
+      vi.mocked(core.getTopicById).mockResolvedValue(
+        topicFixture({ status: "published" }), // hostId: "host-1"
+      );
+
+      // An admin who isn't the author: refused — pinning is the author's
+      // curation gesture, not moderation.
+      mockSession("admin-1", ["admin"]);
+      const denied = (await (await gql(baseUrl, pinMutation)).json()) as {
+        errors?: unknown[];
+        data?: { pinComment: unknown };
+      };
+      expect(denied.errors?.length).toBeGreaterThan(0);
+      expect(denied.data?.pinComment ?? null).toBeNull();
+      expect(core.setCommentPinned).not.toHaveBeenCalled();
+
+      // The topic's author: pin lands and returns the stamp.
+      mockSession("host-1", ["host"]);
+      const pinnedAt = new Date("2026-08-17T12:00:00.000Z");
+      vi.mocked(core.setCommentPinned).mockResolvedValue({
+        ...commentRow,
+        pinnedAt,
+      });
+      const pinned = (await (await gql(baseUrl, pinMutation)).json()) as {
+        data: { pinComment: { pinnedAt: string | null } };
+      };
+      expect(pinned.data.pinComment.pinnedAt).toBe(pinnedAt.toISOString());
+      expect(core.setCommentPinned).toHaveBeenCalledWith(
+        "comment-1",
+        true,
+        "host-1",
+      );
+
+      // A reply can't be pinned, even by the author.
+      vi.mocked(core.setCommentPinned).mockClear();
+      vi.mocked(core.getCommentById).mockResolvedValue({
+        ...commentRow,
+        parentId: "comment-0",
+      });
+      const replyDenied = (await (await gql(baseUrl, pinMutation)).json()) as {
+        errors?: unknown[];
+      };
+      expect(replyDenied.errors?.length).toBeGreaterThan(0);
+      expect(core.setCommentPinned).not.toHaveBeenCalled();
     });
   });
 
