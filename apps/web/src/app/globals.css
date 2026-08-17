@@ -1062,6 +1062,13 @@ textarea {
 .list > .card[id^="topic-"] {
   scroll-margin-top: calc(var(--topbar-h, 55px) + 14px);
 }
+/* Jump slack (Ed, 2026-08-17): a page can't scroll past its own end, so
+   without spare room below the list the LAST card's anchor jump stops
+   short of putting its heading at the top. Sized so a shortest-realistic
+   (~160px) final card still makes it; taller ones just leave less blank. */
+.toc-jump-slack {
+  height: calc(100vh - var(--topbar-h, 55px) - 174px);
+}
 
 /* Topic card — tier 3 of the heading hierarchy: below page titles and
    section headers on every screen size (QA 2026-07-28; 18→20 in the

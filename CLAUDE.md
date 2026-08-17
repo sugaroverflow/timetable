@@ -238,7 +238,9 @@ Stable names for feature pieces, so instructions can reference them precisely.
   the People-page profile-card topic-list look (`person-topics` styles),
   bare on the page background, hidden below 2 topics. My Topics links
   jump to the anchored cards below (`#topic-<id>` on `TopicManager`'s
-  root `li`, scroll-margin clears the topbar) in the current sort order;
+  root `li`, scroll-margin clears the topbar) in the current sort order,
+  with a `.toc-jump-slack` spacer after the list so even the LAST card's
+  jump can land its heading at the viewport top (Ed, 2026-08-17);
   the ❤️/💙 pages link to permalinks (their feed paginates, so the card
   may not be rendered) via the slim `HEARTED_TOC_QUERY` full list.
 
