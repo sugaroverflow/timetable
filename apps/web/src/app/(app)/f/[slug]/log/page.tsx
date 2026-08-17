@@ -228,11 +228,17 @@ function SlotSuffix({ event, slug }: { event: ActivityEvent; slug: string }) {
   );
 }
 
+/** Deep link for the event's topic — anchored to the comment when the
+ * event names one. Shared by the topic-title link and the snippet quote
+ * (Ed, 2026-08-17: the quote is the natural click target). */
+function topicOrCommentHref(event: ActivityEvent, slug: string) {
+  const href = topicPath(slug, event.topicHostSlug, event.topicSlug);
+  return href && event.commentId ? `${href}#comment-${event.commentId}` : href;
+}
+
 function TopicSuffix({ event, slug }: { event: ActivityEvent; slug: string }) {
   if (!event.topicTitle) return null;
-  const href = topicPath(slug, event.topicHostSlug, event.topicSlug);
-  const commentHref =
-    href && event.commentId ? `${href}#comment-${event.commentId}` : href;
+  const commentHref = topicOrCommentHref(event, slug);
   return (
     <>
       {" — "}
@@ -245,6 +251,20 @@ function TopicSuffix({ event, slug }: { event: ActivityEvent; slug: string }) {
         <span className="faint"> ({event.topicHostName})</span>
       ) : null}
     </>
+  );
+}
+
+/** The quoted comment/body text, linked to the comment itself when the
+ * event carries one (unstyled-link class keeps the quiet quote look). */
+function SnippetQuote({ event, slug }: { event: ActivityEvent; slug: string }) {
+  const href = topicOrCommentHref(event, slug);
+  const quote = <>&ldquo;{event.snippet}&rdquo;</>;
+  return href ? (
+    <Link className="tl-quote-link" href={href}>
+      {quote}
+    </Link>
+  ) : (
+    quote
   );
 }
 
@@ -286,7 +306,11 @@ function TimelineItem({
         </span>
       </div>
       {event.snippet ? (
-        <div className="tl-note">&ldquo;{event.snippet}&rdquo;</div>
+        <div className="tl-note">
+          {/* The quote links where the title does — straight to the
+              comment when the event names one. */}
+          <SnippetQuote event={event} slug={slug} />
+        </div>
       ) : null}
       {event.note ? (
         <div className="tl-note">
