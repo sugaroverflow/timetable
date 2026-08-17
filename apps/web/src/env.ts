@@ -22,4 +22,7 @@ export const env = {
   webOrigin: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000",
   // Extra self-hosts (CSV) beyond the built-in list in lib/canonicalHost.
   canonicalHostsCsv: process.env.NEXT_PUBLIC_CANONICAL_HOSTS ?? "",
+  // The CSP builder decodes the Clerk frontend-API origin out of this
+  // (lib/csp.ts); the Clerk SDK reads the variable itself directly.
+  clerkPublishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "",
 };
