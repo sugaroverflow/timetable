@@ -76,7 +76,9 @@ export function ImageUploadField({
 
       // Direct browser→bucket PUT. A TypeError here is almost always the
       // bucket rejecting the origin (CORS not configured for this site) —
-      // surface that instead of a bare "Failed to fetch".
+      // surface that instead of a bare "Failed to fetch". NB a CSP
+      // connect-src miss throws identically (prod outage 2026-08-18) —
+      // keep csp.ts's storage source in step with the bucket host.
       let uploadRes: Response;
       try {
         uploadRes = await fetch(signed.uploadUrl, {

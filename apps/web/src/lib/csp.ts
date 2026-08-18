@@ -54,6 +54,12 @@ export function buildCsp(nonce: string): string {
     clerk,
     // Clerk's usage telemetry endpoint.
     "https://clerk-telemetry.com",
+    // Image uploads PUT straight from the browser to the presigned Spaces
+    // URL (ImageUploadField) — the wildcard covers path-style, bucket-
+    // subdomain, and CDN hosts in every region/environment. Broke on prod
+    // the day CSP shipped (Ed, 2026-08-18): a blocked PUT surfaces as the
+    // misleading "bucket CORS" upload error.
+    "https://*.digitaloceanspaces.com",
     // Next dev overlay / fast-refresh websocket.
     dev ? "ws:" : null,
   ].filter(Boolean);
