@@ -44,6 +44,15 @@ describe("buildCsp", () => {
     fakeEnv.apiUrl = "https://topic.forum";
     expect(buildCsp("n")).toContain("connect-src 'self' https://topic.forum");
   });
+
+  it("allows the direct-to-Spaces upload PUT in connect-src", () => {
+    // ImageUploadField PUTs presigned Spaces URLs from the browser — a
+    // connect-src miss blocks every image upload (prod, 2026-08-18).
+    const connect = buildCsp("n")
+      .split("; ")
+      .find((d) => d.startsWith("connect-src"));
+    expect(connect).toContain("https://*.digitaloceanspaces.com");
+  });
 });
 
 describe("mintNonce", () => {
