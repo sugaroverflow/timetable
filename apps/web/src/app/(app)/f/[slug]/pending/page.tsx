@@ -13,7 +13,11 @@ import {
   sortManagedTopics,
 } from "@/lib/managedTopicSort";
 import { displayRolesFromCookies } from "@/lib/previewRoles.server";
-import { parseTimetableSettings, roleLabel } from "@/lib/timetableSettings";
+import {
+  parseTimetableSettings,
+  pluralLabel,
+  roleLabel,
+} from "@/lib/timetableSettings";
 
 type Data = {
   timetable: { viewerRoles: string[]; settings: string } | null;
@@ -101,7 +105,7 @@ export default async function ModerationPage({
   const hostLabel = roleLabel(settings.roleLabels, "host");
 
   if (!isAdmin(roles)) {
-    return <div className="notice">{adminLabel}s only.</div>;
+    return <div className="notice">{pluralLabel(adminLabel)} only.</div>;
   }
 
   const queue = data.moderationQueue;

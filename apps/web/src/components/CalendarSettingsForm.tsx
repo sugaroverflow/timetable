@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { CalendarSettings, ConfirmPolicy } from "@timetable/shared";
 
 import { Switch } from "@/components/Switch";
+import { pluralLabel } from "@/lib/timetableSettings";
 import { useGqlAction } from "@/lib/useGqlAction";
 
 const SAVE = `mutation($s: String!, $cal: String!, $direct: Boolean!) {
@@ -43,8 +44,8 @@ export function CalendarSettingsForm({
   );
   const [direct, setDirect] = useState(hostsPublishDirectly);
 
-  const hosts = `${hostLabel}s`;
-  const admins = `${adminLabel}s`;
+  const hosts = pluralLabel(hostLabel);
+  const admins = pluralLabel(adminLabel);
 
   function save() {
     const confirmPolicy: ConfirmPolicy = hostsConfirm

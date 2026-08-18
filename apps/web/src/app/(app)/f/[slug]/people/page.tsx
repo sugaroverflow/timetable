@@ -88,7 +88,6 @@ function PeopleContents({ sections }: { sections: Section[] }) {
         <div key={section.role} className="people-toc-group">
           <a className="people-toc-heading" href={`#people-${section.role}`}>
             {section.heading}
-            <span className="faint">{section.people.length}</span>
           </a>
           <div className="people-toc-people">
             {section.people.map((person) => (
@@ -261,17 +260,22 @@ export default async function PeoplePage({
     membersByUser = new Map(members.timetableMembers.map((m) => [m.userId, m]));
   }
 
-  const sections = (["admin", "host", "elector"] as const).map((role) => ({
-    role,
-    heading: pluralLabel(roleLabel(settings.roleLabels, role)),
-    people: data.timetablePeople
+  const sections = (["admin", "host", "elector"] as const).map((role) => {
+    const people = data.timetablePeople
       .filter((p) => primaryRole(p.roles as Role[]) === role)
       .sort((a, b) =>
         (a.name ?? "Member").localeCompare(b.name ?? "Member", undefined, {
           sensitivity: "base",
         }),
-      ),
-  }));
+      );
+    const label = roleLabel(settings.roleLabels, role);
+    // A section of one wears the singular (Ed, 2026-08-18).
+    return {
+      role,
+      heading: people.length === 1 ? label : pluralLabel(label),
+      people,
+    };
+  });
   const visibleSections = sections.filter((s) => s.people.length > 0);
 
   return (

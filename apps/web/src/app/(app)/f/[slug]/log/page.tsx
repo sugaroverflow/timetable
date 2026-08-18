@@ -22,6 +22,7 @@ import { gqlFetch } from "@/lib/graphql";
 import { displayRolesFromCookies } from "@/lib/previewRoles.server";
 import {
   parseTimetableSettings,
+  pluralLabel,
   roleLabel,
   type RoleLabels,
 } from "@/lib/timetableSettings";
@@ -385,7 +386,7 @@ export default async function ActivityPage({
   const adminLabel = roleLabel(settings.roleLabels, "admin");
 
   if (!isAdmin(roles)) {
-    return <div className="notice">{adminLabel}s only.</div>;
+    return <div className="notice">{pluralLabel(adminLabel)} only.</div>;
   }
 
   const visibleEvents = data.activityTimeline.filter(
