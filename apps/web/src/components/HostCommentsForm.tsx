@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { Switch } from "@/components/Switch";
+import { pluralLabel } from "@/lib/timetableSettings";
 import { useGqlAction } from "@/lib/useGqlAction";
 
 const MUTATION = `mutation HostComments($s: String!, $e: Boolean!) {
@@ -49,27 +50,29 @@ export function HostCommentsForm({
     );
   }
 
-  const hosts = hostLabel.toLowerCase();
-  const electors = electorLabel.toLowerCase();
-  const admins = adminLabel.toLowerCase();
+  const host = hostLabel.toLowerCase();
+  const elector = electorLabel.toLowerCase();
+  const hosts = pluralLabel(host);
+  const electors = pluralLabel(elector);
+  const admins = pluralLabel(adminLabel.toLowerCase());
 
   return (
     <form onSubmit={submit} className="stack" style={{ gap: 12 }}>
       <div>
         <h3 className="settings-subtitle">{hostLabel}-only comments</h3>
         <p className="hint" style={{ margin: "2px 0 0" }}>
-          A comment thread on each topic that only {hosts}s and {admins}s see,
-          with a 💙 row where {hosts}s show interest in each other&rsquo;s
-          topics. 💙s never affect the {electors}s&rsquo; vote. In a forum where
-          every {hosts} is also an {electors} this backchannel adds little —
-          switch it off and 💙s become private bookmarks only {admins}s see in
+          A comment thread on each topic that only {hosts} and {admins} see,
+          with a 💙 row where {hosts} show interest in each other&rsquo;s
+          topics. 💙s never affect the {electors}&rsquo; vote. In a forum where
+          every {host} is also an {elector} this backchannel adds little —
+          switch it off and 💙s become private bookmarks only {admins} see in
           Analysis. Nothing is deleted either way.
         </p>
       </div>
       <Switch
         checked={enabled}
         onChange={setEnabled}
-        label={`Show the ${hosts}-only thread and 💙 row`}
+        label={`Show the ${host}-only thread and 💙 row`}
       />
       <div className="row wrap">
         <button className="btn btn-primary" type="submit" disabled={busy}>
