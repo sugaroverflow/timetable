@@ -86,6 +86,26 @@ export const env = {
    * Never set this in the production app spec.
    */
   devSeedUserMapping: process.env.DEV_SEED_USER_MAPPING === "true" || !isProd,
+  /**
+   * How many proxy hops in front of Express to trust. Express counts from the
+   * RIGHT of X-Forwarded-For, so this must match the real chain exactly.
+   *
+   * MEASURED on hosted dev, 2026-08-21 (docs/OPERATIONS.md R1):
+   *   X-Forwarded-For: <real client>, 172.70.46.137
+   * DigitalOcean App Platform is itself fronted by Cloudflare — every
+   * *.ondigitalocean.app response carries a CF-RAY header — so the chain is
+   * client → Cloudflare → DigitalOcean → here. At hops=1 Express resolved
+   * req.ip to the CLOUDFLARE EDGE address, which rotates per request across
+   * Cloudflare's fleet; the rate limiter therefore scattered every caller
+   * across a pool of buckets and limited nobody. The hosted specs set 2.
+   *
+   * Counting from the right is also what makes this spoof-resistant: a client
+   * who injects their own X-Forwarded-For only pushes entries LEFT, while
+   * Cloudflare appends the true client IP to the right of them.
+   *
+   * The default stays 1 (correct for a plain single-proxy deployment); the
+   * app specs override it for the measured DigitalOcean topology.
+   */
   trustProxyHops: intEnv("TRUST_PROXY_HOPS", 1),
   /**
    * How long /health waits on its `select 1` before calling the database

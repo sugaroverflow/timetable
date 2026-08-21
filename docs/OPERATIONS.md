@@ -31,7 +31,7 @@ an account, or credentials only Ed can supply) · **LATER**
 
 ## Risk register
 
-### R1 — The hosted rate limiter is misconfigured and effectively inert · **IN PROGRESS**
+### R1 — The hosted rate limiter is misconfigured and effectively inert · **DONE**
 
 **Measured, not inferred** (2026-08-21, against `dev.timetable.love`).
 Eight identical `POST /graphql` requests from one client, forced onto IPv4,
@@ -62,11 +62,48 @@ would collapse into a single shared bucket. It does not — SSR traffic scatters
 across the same pool. The failure mode is inversion (no limiting), not
 concentration.
 
-**Fix, in two steps.** The correct `TRUST_PROXY_HOPS` for DO App Platform
-cannot be guessed from here — it depends on how many entries DigitalOcean puts
-in `X-Forwarded-For`. So: (a) ship a forwarding diagnostic that reports the
-chain the API actually receives, enabled on dev only; (b) read it, set the hop
-count correctly in both specs, add a regression test.
+**Cause, measured.** A forwarding diagnostic was shipped to hosted dev
+(`DEBUG_FORWARDING=true`, dev spec only) and reported:
+
+```json
+{
+  "ip": "172.70.46.137",
+  "ips": ["172.70.46.137"],
+  "xForwardedFor": "2a01:4b00:b608:3100:19bf:a36f:866:b3e3,172.70.46.137",
+  "trustProxyHops": 1
+}
+```
+
+`172.70.46.137` is **Cloudflare**. DigitalOcean App Platform is itself fronted
+by Cloudflare — every `*.ondigitalocean.app` response carries a `CF-RAY` header
+and `Server: cloudflare`, on `topic.forum` as well as dev. So the real chain is
+**client → Cloudflare → DigitalOcean → Express**, and the header carries
+`<real client>, <cloudflare edge>`.
+
+Express counts trusted hops from the **right**, so at `TRUST_PROXY_HOPS=1` it
+resolved `req.ip` to the Cloudflare edge address — which rotates per request
+across Cloudflare's fleet. Hence the scatter.
+
+**Fixed:** both app specs now set `TRUST_PROXY_HOPS=2`, which resolves `req.ip`
+to the real client. Counting from the right is also what keeps this
+spoof-resistant: a client injecting their own `X-Forwarded-For` only pushes
+entries further left, while Cloudflare appends the true client IP to the right
+of them.
+
+**The consequence of fixing it — read this before touching the limit.** Making
+per-IP limiting real re-arms the concentration risk: server-side rendering
+fetches the API over the public URL (`transport.ts` → `NEXT_PUBLIC_GRAPHQL_URL`
+→ `${APP_URL}/graphql`), so **every server-rendered page view in the entire
+forum arrives from one address** — the web container's egress. At the old
+300/min that would have 429'd everyone simultaneously at the busiest moment,
+which is the failure the original code reading predicted.
+
+`RATE_LIMIT_MAX` is therefore raised to 6000/min in both specs. That still
+bounds a scraper, and per-user write budgets (`http/action-limits.ts`, keyed by
+user id) remain the real abuse protection. The number is a judgement call
+rather than a measurement, and the way to remove the guesswork entirely is the
+structural fix — SSR talking to the API internally instead of round-tripping
+through the public hostname (task 13).
 
 ### R2 — The rate limiter fails closed · **DONE**
 
@@ -251,7 +288,15 @@ Ordered by (likelihood × blast radius) ÷ effort. Everything here needs Ed.
 11. **Give the digest cron a second trigger, or a weekly "did it run?" check
     (R12).**
 12. **Run a real load test before trusting the numbers (R18).**
-13. **Pre-build the production web image the way dev does (R9)**, so the
+13. **Make SSR talk to the API internally rather than over the public hostname
+    (R1).** Today every server-rendered page view round-trips out through
+    Cloudflare and back, and arrives at the API from a single address, so the
+    rate limit has to be set generously enough to absorb the whole forum's
+    SSR traffic in one bucket. Routing SSR internally would let the per-IP
+    limit go back to a tight, meaningful number and would cut a network hop
+    off every page render. Needs a decision because it touches
+    `lib/transport.ts`, which is load-bearing.
+14. **Pre-build the production web image the way dev does (R9)**, so the
     deployed artefact is the tested artefact.
 
 ---

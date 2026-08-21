@@ -9,6 +9,13 @@
 name: topic-prod
 region: lon
 
+# Ops alerting (docs/OPERATIONS.md R6). DigitalOcean emails the app owner, so
+# there is no account to create and no dependency to add. Verified on the dev
+# app first (deploy 2026-08-21) before being mirrored here.
+alerts:
+  - rule: DEPLOYMENT_FAILED
+  - rule: DOMAIN_FAILED
+
 # topic.forum is PRIMARY (APP_URL and all NEXT_PUBLIC_* URLs follow it);
 # timetable.love stays as an alias through the transition.
 domains:
@@ -45,16 +52,46 @@ services:
     http_port: 4000
     instance_count: 1
     instance_size_slug: apps-s-1vcpu-0.5gb
+    # /health pings Postgres now (R3), so it can fail. Thresholds are
+    # deliberately slack: at instance_count 1 a restart IS downtime, so a
+    # brief database blip must not cause one. 5 × 10s ≈ 50s of sustained
+    # failure before DigitalOcean recycles the container.
     health_check:
       http_path: /health
+      period_seconds: 10
+      timeout_seconds: 5
+      failure_threshold: 5
+      success_threshold: 1
+    alerts:
+      - rule: RESTART_COUNT
+        operator: GREATER_THAN
+        value: 3
+        window: FIVE_MINUTES
     envs:
       - { key: API_PORT, value: "4000", scope: RUN_TIME }
       - { key: DATABASE_URL, value: "${timetable-db.DATABASE_URL}", scope: RUN_TIME }
       - { key: DATABASE_SSL, value: "require", scope: RUN_TIME }
       - { key: WEB_ORIGIN, value: "${APP_URL}", scope: RUN_TIME }
-      - { key: TRUST_PROXY_HOPS, value: "1", scope: RUN_TIME }
+      # 2, not 1 — measured on hosted dev 2026-08-21 (docs/OPERATIONS.md R1).
+      # App Platform is itself behind Cloudflare, so the chain is
+      # client -> Cloudflare -> DigitalOcean -> Express and the header reads
+      # "<real client>, <cloudflare edge>". At 1, Express resolved req.ip to
+      # the Cloudflare edge address, which rotates per request — so the rate
+      # limiter scattered every caller across a pool of buckets and limited
+      # nobody, while still being able to 429 innocent users off those shared
+      # proxy buckets.
+      - { key: TRUST_PROXY_HOPS, value: "2", scope: RUN_TIME }
       - { key: RATE_LIMIT_BACKEND, value: "database", scope: RUN_TIME }
       - { key: RATE_LIMIT_KEY_PREFIX, value: "timetable:production:api", scope: RUN_TIME }
+      # Raised from the code default of 300 because fixing the hop count above
+      # makes per-IP limiting REAL, and server-side rendering all arrives from
+      # one address: the web container's egress. Every server-rendered page
+      # view in the whole forum would otherwise share a single 300/min bucket
+      # and 429 everyone at once at the busiest moment. 6000/min still bounds
+      # a scraper, and per-user write budgets (http/action-limits.ts) are the
+      # real abuse protection. Removing the guesswork needs the structural fix
+      # — SSR talking to the API internally (OPERATIONS.md task 13).
+      - { key: RATE_LIMIT_MAX, value: "6000", scope: RUN_TIME }
       - { key: GRAPHQL_MAX_COST, value: "500", scope: RUN_TIME }
       - { key: CLERK_SECRET_KEY, value: "${CLERK_SECRET_KEY}", scope: RUN_TIME, type: SECRET }
       - { key: CRON_SECRET, value: "${CRON_SECRET}", scope: RUN_TIME, type: SECRET }
