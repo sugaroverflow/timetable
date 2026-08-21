@@ -369,7 +369,8 @@ function buildTopicTabs(args: TabArgs): TopicTab[] {
   ].filter((s): s is TopicTab => s !== null);
 }
 
-/** Collapsed by default; the Topic Queue shows the whole body. */
+/** Collapsed by default; the Topic Queue and a topic's own permalink page
+ * show the whole body — you're there to read one topic, not skim a list. */
 function TopicBody({ html, expand }: { html: string; expand: boolean }) {
   if (expand) {
     return (
