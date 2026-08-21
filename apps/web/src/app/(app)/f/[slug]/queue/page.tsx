@@ -1,3 +1,5 @@
+import { ArrowLeft } from "lucide-react";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { EmptyState } from "@/components/EmptyState";
@@ -26,6 +28,55 @@ function endOfRoundHint(args: {
   return `You've seen all ${args.roundSize}.`;
 }
 
+/** Where you are under the card. The round counter would be a lie beneath
+ * an older topic — it counts where the QUEUE is, not what you're reading,
+ * and going back never moves it (Ed, 2026-08-21) — so while looking back
+ * it says how far back instead. */
+function QueueProgress({
+  back,
+  position,
+  roundSize,
+}: {
+  back: number;
+  position: number;
+  roundSize: number;
+}) {
+  return (
+    <p className="faint queue-progress">
+      {back > 0
+        ? `Looking back · ${back} topic${back === 1 ? "" : "s"} ago`
+        : `${position} of ${roundSize} this round`}
+    </p>
+  );
+}
+
+/** The explicit "you've seen everything" screen. queue-back rides it too
+ * (Ed, 2026-08-21): the end of a round is exactly where "wait, go back"
+ * happens, so the last topic is one step away from here. */
+function QueueDone({
+  slug,
+  roundSize,
+  historyCount,
+  hint,
+}: {
+  slug: string;
+  roundSize: number;
+  historyCount: number;
+  hint: string;
+}) {
+  return (
+    <div className="stack queue-done">
+      <EmptyState icon="✓" title="That's every topic" hint={hint} />
+      <QueueRestartButton slug={slug} roundSize={roundSize} />
+      {historyCount > 0 ? (
+        <Link className="btn btn-ghost" href={`/f/${slug}/queue?back=1`}>
+          <ArrowLeft size={16} aria-hidden /> Look back at the last topic
+        </Link>
+      ) : null}
+    </div>
+  );
+}
+
 /** The Topic Queue (its own sidebar page since QA 2026-07-28; v2
  * 2026-07-29): one published topic at a time in a per-user stable
  * shuffle. Electors get a big ❤️ switcher + Next; host-non-electors get
@@ -35,11 +86,18 @@ function endOfRoundHint(args: {
  * review for a fresh-eyes pass. */
 export default async function QueuePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  /** queue-back: `?back=n` shows the topic n steps behind the live one
+   * (Ed, 2026-08-21). Read-only — it reviews nothing, so the round
+   * counter and `remaining` are untouched. */
+  searchParams: Promise<{ back?: string }>;
 }) {
   const { slug } = await params;
-  const { page, queue } = await fetchQueuePage(slug);
+  const { back: backParam } = await searchParams;
+  const back = Math.max(0, Math.trunc(Number(backParam)) || 0);
+  const { page, queue } = await fetchQueuePage(slug, back);
   // Guests and non-members have no queue — the nav doesn't link here.
   if (!queue) redirect(`/f/${slug}/topics`);
 
@@ -84,28 +142,30 @@ export default async function QueuePage({
                 }
                 canHeart={viewerCanHeart || viewerCanHostHeart}
                 hostMode={viewerCanHostHeart}
+                slug={slug}
+                back={back}
+                historyCount={queue.historyCount}
               />
             }
           />
-          <p className="faint queue-progress">
-            {queue.roundSize - queue.remaining + 1} of {queue.roundSize} this
-            round
-          </p>
+          <QueueProgress
+            back={back}
+            position={queue.roundSize - queue.remaining + 1}
+            roundSize={queue.roundSize}
+          />
         </>
       ) : (
-        <div className="stack queue-done">
-          <EmptyState
-            icon="✓"
-            title="That's every topic"
-            hint={endOfRoundHint({
-              viewerCanHeart,
-              viewerCanHostHeart,
-              roundSize: queue.roundSize,
-              heartedCount,
-            })}
-          />
-          <QueueRestartButton slug={slug} roundSize={queue.roundSize} />
-        </div>
+        <QueueDone
+          slug={slug}
+          roundSize={queue.roundSize}
+          historyCount={queue.historyCount}
+          hint={endOfRoundHint({
+            viewerCanHeart,
+            viewerCanHostHeart,
+            roundSize: queue.roundSize,
+            heartedCount,
+          })}
+        />
       )}
     </div>
   );

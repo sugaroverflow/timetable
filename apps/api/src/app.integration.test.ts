@@ -1227,6 +1227,7 @@ describe("createApiApp", () => {
       remainingNew: 0,
       roundSize: 4,
       neverSeenCount: 2,
+      historyIds: [],
     });
 
     const query = `query($s: String!) {

@@ -1,6 +1,7 @@
 "use client";
 
-import { ArrowRight, RotateCcw } from "lucide-react";
+import { ArrowLeft, ArrowRight, RotateCcw } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -24,6 +25,85 @@ function switchLabel(hearted: boolean, hostMode: boolean): string {
   return hearted ? `${glyph}'d — click to remove` : `${glyph} this topic`;
 }
 
+/** queue-back's left arrow: a link, because the step lives in the URL.
+ * Disabled rather than absent on the first card of a round, so the ❤️
+ * switch doesn't shift sideways when history appears. */
+function BackStep({ href }: { href: string | null }) {
+  if (!href) {
+    return (
+      <button
+        type="button"
+        className="queue-btn queue-btn-back"
+        aria-label="Previous topic"
+        title="Nothing to go back to yet"
+        disabled
+      >
+        <ArrowLeft size={24} aria-hidden />
+      </button>
+    );
+  }
+  return (
+    <Link
+      className="queue-btn queue-btn-back"
+      href={href}
+      aria-label="Previous topic"
+      title="Previous topic"
+    >
+      <ArrowLeft size={24} aria-hidden />
+    </Link>
+  );
+}
+
+/** The right arrow while looking back: one step forward, landing on the
+ * live topic at step 0. Marks nothing seen — this topic already is. */
+function ForwardStep({ href, label }: { href: string; label: string }) {
+  return (
+    <Link
+      className="queue-btn queue-btn-next"
+      href={href}
+      aria-label={label}
+      title={label}
+    >
+      <ArrowRight size={30} aria-hidden />
+    </Link>
+  );
+}
+
+/** A real switch (QA 2026-07-29: the 🤍/❤️ glyph swap read as ambiguous):
+ * heart + track/thumb toggle inside one pill. */
+function HeartSwitch({
+  hearted,
+  hostMode,
+  busy,
+  onToggle,
+}: {
+  hearted: boolean;
+  hostMode: boolean;
+  busy: boolean;
+  onToggle: () => void;
+}) {
+  const label = switchLabel(hearted, hostMode);
+  return (
+    <button
+      type="button"
+      className={`queue-switch${hearted ? " on" : ""}`}
+      role="switch"
+      aria-checked={hearted}
+      aria-label={label}
+      title={label}
+      disabled={busy}
+      onClick={onToggle}
+    >
+      <span className="queue-switch-heart" aria-hidden>
+        {hearted ? (hostMode ? "💙" : "❤️") : "🤍"}
+      </span>
+      <span className="queue-switch-track" aria-hidden>
+        <span className="queue-switch-thumb" />
+      </span>
+    </button>
+  );
+}
+
 /**
  * The Topic Queue's decision controls (v2 2026-07-29): a ❤️ on/off
  * SWITCHER and a Next button — the member decides whether the topic is
@@ -39,6 +119,9 @@ export function QueueControls({
   hearted: initialHearted,
   canHeart,
   hostMode = false,
+  slug,
+  back = 0,
+  historyCount = 0,
 }: {
   topicId: string;
   hearted: boolean;
@@ -46,6 +129,11 @@ export function QueueControls({
   /** Bind the switch to 💙 instead of ❤️ (the viewer's roles decide —
    * one person, one gesture). */
   hostMode?: boolean;
+  slug: string;
+  /** queue-back: how many topics behind the live one this card is. */
+  back?: number;
+  /** How many reviewed topics are available to step back through. */
+  historyCount?: number;
 }) {
   const router = useRouter();
   const { toastError } = useToast();
@@ -94,39 +182,41 @@ export function QueueControls({
     }
   }
 
+  // queue-back (Ed, 2026-08-21): the step lives in the URL, so going back
+  // is ordinary navigation — the browser's own Back works too, and none
+  // of it writes anything (re-showing a topic never un-reviews it).
+  const stepHref = (n: number) =>
+    n <= 0 ? `/f/${slug}/queue` : `/f/${slug}/queue?back=${n}`;
+  const canGoBack = back < historyCount;
+
   return (
     <div className="queue-bar">
+      <BackStep href={canGoBack ? stepHref(back + 1) : null} />
       {canHeart ? (
-        // A real switch (QA 2026-07-29: the 🤍/❤️ glyph swap read as
-        // ambiguous): heart + track/thumb toggle inside one pill.
+        <HeartSwitch
+          hearted={hearted}
+          hostMode={hostMode}
+          busy={busy}
+          onToggle={toggleHeart}
+        />
+      ) : null}
+      {back > 0 ? (
+        <ForwardStep
+          href={stepHref(back - 1)}
+          label={back === 1 ? "Back to where you were" : "Forward"}
+        />
+      ) : (
         <button
           type="button"
-          className={`queue-switch${hearted ? " on" : ""}`}
-          role="switch"
-          aria-checked={hearted}
-          aria-label={switchLabel(hearted, hostMode)}
-          title={switchLabel(hearted, hostMode)}
+          className="queue-btn queue-btn-next"
+          aria-label="Next topic"
+          title="Next topic"
           disabled={busy}
-          onClick={toggleHeart}
+          onClick={next}
         >
-          <span className="queue-switch-heart" aria-hidden>
-            {hearted ? (hostMode ? "💙" : "❤️") : "🤍"}
-          </span>
-          <span className="queue-switch-track" aria-hidden>
-            <span className="queue-switch-thumb" />
-          </span>
+          <ArrowRight size={30} aria-hidden />
         </button>
-      ) : null}
-      <button
-        type="button"
-        className="queue-btn queue-btn-next"
-        aria-label="Next topic"
-        title="Next topic"
-        disabled={busy}
-        onClick={next}
-      >
-        <ArrowRight size={30} aria-hidden />
-      </button>
+      )}
     </div>
   );
 }

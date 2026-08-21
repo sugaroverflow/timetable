@@ -148,17 +148,19 @@ export type QueueState = {
   remaining: number;
   remainingNew: number;
   roundSize: number;
+  /** queue-back: how many reviewed topics can be stepped back through. */
+  historyCount: number;
   current: FeedTopic | null;
 };
 
 const QUEUE_QUERY = `
-  query QueuePage($s: String!) {
+  query QueuePage($s: String!, $back: Int) {
     timetable: forum(idOrSlug: $s) { viewerRoles settings viewerHeartedPublishedCount }
     me { id }
     myFeedLastSeenAt(idOrSlug: $s)
     timetableHosts: forumHosts(idOrSlug: $s) { id name }
-    topicQueue(idOrSlug: $s) {
-      remaining remainingNew roundSize
+    topicQueue(idOrSlug: $s, back: $back) {
+      remaining remainingNew roundSize historyCount
       current {
         ${TOPIC_FEED_FIELDS}
         contentUpdatedAt
@@ -172,10 +174,13 @@ const QUEUE_QUERY = `
  * the regular feed. */
 export async function fetchQueuePage(
   slug: string,
+  /** queue-back: 0 is the live topic, 1 the one just passed (Ed,
+   * 2026-08-21). Read-only — stepping back reviews nothing. */
+  back = 0,
 ): Promise<{ page: FeedPage; queue: QueueState | null }> {
   const data = await gqlFetch<
     Omit<Data, "topicFeed"> & { topicQueue: QueueState | null }
-  >(QUEUE_QUERY, { s: slug });
+  >(QUEUE_QUERY, { s: slug, back });
   const roles = await displayRolesFromCookies(
     (data.timetable?.viewerRoles ?? []) as Role[],
   );

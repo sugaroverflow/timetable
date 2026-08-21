@@ -261,6 +261,20 @@ Stable names for feature pieces, so instructions can reference them precisely.
   (api `email.ts`) + `DigestReadMarker` (app layout): every digest link
   carries `dg=<send id>`; one click marks that email's shown comment
   threads seen up to its send time (`markDigestRead`, GREATEST semantics).
+- **queue-back** — the Topic Queue's left arrow (Ed, 2026-08-21):
+  `?back=n` on `/queue` shows the topic n steps behind the live one, so
+  the step is a URL, ordinary navigation, and the browser's own Back
+  works. **Going back never makes anything unseen** (Ed's rule): it is a
+  pure read, `remaining` and the "n of N this round" counter don't move,
+  and the ❤️ switch still saves — you revisit a decision rather than
+  rewinding the queue. The history is `historyIds` from `getTopicQueue`:
+  this round's reviewed topics sorted by the SAME comparator as
+  `remaining`, which is what makes it the order they were shown —
+  ordering by `seenAt` would reshuffle the history the moment you re-❤️ an
+  older topic, since hearting bumps the seen mark. The right arrow mirrors
+  it (one step forward, landing on the live topic at step 0), where at
+  step 0 it stays the Next that marks seen and advances. The done screen
+  carries the same step as "Look back at the last topic".
 - **page-topic-toc** — `PageTopicToc.tsx` (Ed, 2026-08-17): the little
   table of contents under the My Topics and ❤️/💙 Topics page titles —
   the People-page profile-card topic-list look (`person-topics` styles),
