@@ -17,6 +17,7 @@ import { useToast } from "@/components/Toast";
 import { clientApi } from "@/lib/clientApi";
 import type { DigestSettings, RoleLabels } from "@/lib/timetableSettings";
 import { useGqlAction } from "@/lib/useGqlAction";
+import { useSavedSnapshot } from "@/lib/useSavedSnapshot";
 
 const MUTATION = `mutation DigestDefaults($s: String!, $e: Boolean, $k: String!) {
   updateTimetableSettings: updateForumSettings(
@@ -61,19 +62,18 @@ export function EmailDigestForm({
         ]),
       ) as Record<DigestKind, boolean>,
   );
-  const [saved, setSaved] = useState(false);
+  const { saved, markSaved } = useSavedSnapshot([enabled, kinds]);
   const [sendingTest, setSendingTest] = useState(false);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    setSaved(false);
     void run(
       MUTATION,
       { s: slug, e: enabled, k: JSON.stringify(kinds) },
       {
         success: "Digest defaults saved",
         errorFallback: "Could not save digest defaults",
-        onSuccess: () => setSaved(true),
+        onSuccess: markSaved,
       },
     );
   }

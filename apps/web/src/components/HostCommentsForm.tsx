@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Switch } from "@/components/Switch";
 import { pluralLabel } from "@/lib/timetableSettings";
 import { useGqlAction } from "@/lib/useGqlAction";
+import { useSavedSnapshot } from "@/lib/useSavedSnapshot";
 
 const MUTATION = `mutation HostComments($s: String!, $e: Boolean!) {
   updateTimetableSettings: updateForumSettings(
@@ -34,18 +35,17 @@ export function HostCommentsForm({
 }) {
   const { run, busy } = useGqlAction();
   const [enabled, setEnabled] = useState(initialEnabled);
-  const [saved, setSaved] = useState(false);
+  const { saved, markSaved } = useSavedSnapshot([enabled]);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    setSaved(false);
     void run(
       MUTATION,
       { s: slug, e: enabled },
       {
         success: "Settings saved",
         errorFallback: "Could not save settings",
-        onSuccess: () => setSaved(true),
+        onSuccess: markSaved,
       },
     );
   }

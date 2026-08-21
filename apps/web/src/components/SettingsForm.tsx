@@ -17,6 +17,7 @@ import {
   type ThemeSettings,
 } from "@/lib/timetableSettings";
 import { useGqlAction } from "@/lib/useGqlAction";
+import { useSavedSnapshot } from "@/lib/useSavedSnapshot";
 
 const MUTATION = `mutation Theme($s: String!, $theme: String, $cover: String, $icon: String, $iconDark: String, $emoji: String) {
   updateTimetableSettings: updateForumSettings(
@@ -380,9 +381,9 @@ export function SettingsForm({
   current: SettingsValues;
 }) {
   const { run, busy } = useGqlAction();
-  const [saved, setSaved] = useState(false);
   const initial = initialState(current);
   const [state, setState] = useState<ThemeState>(initial);
+  const { saved, markSaved } = useSavedSnapshot(state);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [uploadingIcon, setUploadingIcon] = useState(false);
 
@@ -471,12 +472,10 @@ export function SettingsForm({
     // Reset: drop the inline overrides so the page falls back to the saved
     // theme rendered by the SSR <style> tag.
     clearPreview();
-    setSaved(false);
   }
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    setSaved(false);
     void run(
       MUTATION,
       {
@@ -492,7 +491,7 @@ export function SettingsForm({
       {
         success: "Theme saved",
         errorFallback: "Could not save theme",
-        onSuccess: () => setSaved(true),
+        onSuccess: markSaved,
       },
     );
   }

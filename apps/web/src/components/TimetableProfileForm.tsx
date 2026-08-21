@@ -6,6 +6,7 @@ import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { clientGql } from "@/lib/clientGraphql";
 import type { RoleLabels } from "@/lib/timetableSettings";
 import { useGqlAction } from "@/lib/useGqlAction";
+import { useSavedSnapshot } from "@/lib/useSavedSnapshot";
 
 const MUTATION = `mutation($s: String!, $name: String, $privacy: String, $cd: String, $slug: String) {
   updateTimetableProfile: updateForumProfile(idOrSlug: $s, name: $name, privacy: $privacy, customDomain: $cd, slug: $slug) { id slug }
@@ -187,11 +188,10 @@ export function TimetableProfileForm({
   const [labels, setLabels] = useState<LabelsState>(() =>
     initialLabels(roleLabels),
   );
-  const [saved, setSaved] = useState(false);
+  const { saved, markSaved } = useSavedSnapshot([identity, labels]);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    setSaved(false);
     const newSlug = identity.slug.trim();
     void run(
       MUTATION,
@@ -217,7 +217,7 @@ export function TimetableProfileForm({
             rh: labels.host,
             re: labels.elector,
           });
-          setSaved(true);
+          markSaved();
           // A slug change moves the page itself: hard-navigate to the new
           // settings URL so the router, layout, and sidebar all re-resolve.
           if (newSlug && newSlug !== slug) {

@@ -5,6 +5,7 @@ import { useState } from "react";
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { RichTextEditor } from "@/components/RichTextEditor";
 import { useGqlAction } from "@/lib/useGqlAction";
+import { useSavedSnapshot } from "@/lib/useSavedSnapshot";
 
 const MUTATION = `mutation($s: String!, $name: String, $bio: String, $image: String) {
   updateMyProfile(idOrSlug: $s, name: $name, bio: $bio, image: $image) { userId }
@@ -27,17 +28,10 @@ export function ProfileForm({
   const [bio, setBio] = useState(initialBio ?? "");
   const [image, setImage] = useState(initialImage ?? "");
   const [uploadingImage, setUploadingImage] = useState(false);
-  // "Saved" describes the CURRENT field values, not a one-way latch: we
-  // remember what was last saved, so the first further edit puts "Save
-  // profile" back and a second round of edits is savable (Ed, 2026-08-21).
-  const [savedValues, setSavedValues] = useState<string | null>(null);
-  const values = JSON.stringify([name, bio, image.trim()]);
-  const saved = savedValues === values;
+  const { saved, markSaved } = useSavedSnapshot([name, bio, image.trim()]);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    // Snapshot what we're sending — the fields may move on while it's away.
-    const sent = values;
     void run(
       MUTATION,
       // Empty string, not null: the API treats null as "leave unchanged",
@@ -47,7 +41,7 @@ export function ProfileForm({
         success: "Profile saved",
         errorFallback: "Could not save profile",
         onSuccess: () => {
-          setSavedValues(sent);
+          markSaved();
           // The topbar AccountMenu caches this forum's avatar for the life
           // of the app layout — tell it the profile changed (QA 2026-07-28:
           // a new photo didn't show top right until a hard reload).
