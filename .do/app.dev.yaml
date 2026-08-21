@@ -59,9 +59,25 @@ services:
       - { key: DATABASE_URL, value: "${timetable-db.DATABASE_URL}", scope: RUN_TIME }
       - { key: DATABASE_SSL, value: "require", scope: RUN_TIME }
       - { key: WEB_ORIGIN, value: "${APP_URL}", scope: RUN_TIME }
-      - { key: TRUST_PROXY_HOPS, value: "1", scope: RUN_TIME }
+      # 2, not 1 — measured 2026-08-21 (docs/OPERATIONS.md R1). App Platform
+      # is itself behind Cloudflare, so the chain is
+      # client -> Cloudflare -> DigitalOcean -> Express and the header reads
+      # "<real client>, <cloudflare edge>". At 1, Express resolved req.ip to
+      # the Cloudflare edge address, which rotates per request — so the rate
+      # limiter scattered every caller across a pool of buckets and limited
+      # nobody.
+      - { key: TRUST_PROXY_HOPS, value: "2", scope: RUN_TIME }
       - { key: RATE_LIMIT_BACKEND, value: "database", scope: RUN_TIME }
       - { key: RATE_LIMIT_KEY_PREFIX, value: "timetable:dev:api", scope: RUN_TIME }
+      # Raised from the code default of 300 because fixing the hop count above
+      # makes per-IP limiting REAL, and server-side rendering all arrives from
+      # one address: the web container's egress. Every server-rendered page
+      # view in the whole forum would otherwise share a single 300/min bucket
+      # and 429 everyone at once at the busiest moment. 6000/min still bounds
+      # a scraper, and per-user write budgets (http/action-limits.ts) are the
+      # real abuse protection. Removing the guesswork needs the structural fix
+      # — SSR talking to the API internally (OPERATIONS.md task 13).
+      - { key: RATE_LIMIT_MAX, value: "6000", scope: RUN_TIME }
       - { key: GRAPHQL_MAX_COST, value: "500", scope: RUN_TIME }
       - { key: CLERK_SECRET_KEY, value: "${CLERK_SECRET_KEY}", scope: RUN_TIME, type: SECRET }
       # Dev-only: map Clerk test users (externalId=dev_sample_*) to the seeded
