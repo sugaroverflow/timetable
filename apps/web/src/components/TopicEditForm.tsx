@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 
+import { DraftRestoredNotice } from "@/components/DraftRestoredNotice";
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { RichTextEditor } from "@/components/RichTextEditor";
 import type { ManagedTopic } from "@/lib/feedTypes";
+import { useStoredDraft } from "@/lib/formDrafts";
 import { useGqlAction } from "@/lib/useGqlAction";
 
 const UPDATE_MUTATION = `mutation Update($id: String!, $title: String!, $body: String!, $cover: String) {
@@ -23,10 +25,25 @@ export function TopicEditForm({
   onDone: () => void;
 }) {
   const { run, busy } = useGqlAction();
-  const [title, setTitle] = useState(topic.title);
-  const [body, setBody] = useState(topic.bodyMd);
-  const [cover, setCover] = useState(topic.coverImageUrl ?? "");
+  // Unsaved EDITS are recoverable the same way a new topic's text is
+  // (topic-draft-recovery, Ed 2026-08-21) — the baseline is the saved
+  // content, so an untouched editor stores nothing.
+  const { values, patch, restored, discard } = useStoredDraft(
+    `topic:${topic.id}`,
+    {
+      title: topic.title,
+      body: topic.bodyMd,
+      cover: topic.coverImageUrl ?? "",
+    },
+  );
+  const { title, body, cover } = values;
   const [uploadingCover, setUploadingCover] = useState(false);
+
+  /** Saved or cancelled: either way these edits are no longer pending. */
+  function done() {
+    discard();
+    onDone();
+  }
 
   function saveEdit(e: React.FormEvent) {
     e.preventDefault();
@@ -42,33 +59,38 @@ export function TopicEditForm({
       {
         success: "Topic updated",
         errorFallback: "Could not save changes",
-        onSuccess: onDone,
+        onSuccess: done,
       },
     );
   }
 
   return (
     <form className="stack" onSubmit={saveEdit}>
+      {restored ? <DraftRestoredNotice onDiscard={discard} /> : null}
       <div className="field">
         <label htmlFor={`topic-edit-title-${topic.id}`}>Title</label>
         <input
           id={`topic-edit-title-${topic.id}`}
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          onChange={(e) => patch({ title: e.target.value })}
         />
       </div>
       <ImageUploadField
         id={`topic-edit-cover-${topic.id}`}
         label="Cover image"
         value={cover}
-        onChange={setCover}
+        onChange={(next) => patch({ cover: next })}
         purpose="topic-cover"
         timetableIdOrSlug={slug}
         onUploadingChange={setUploadingCover}
       />
       <div className="field">
         <label htmlFor={`topic-edit-body-${topic.id}`}>Description</label>
-        <RichTextEditor value={body} onChange={setBody} minHeight={280} />
+        <RichTextEditor
+          value={body}
+          onChange={(next) => patch({ body: next })}
+          minHeight={280}
+        />
       </div>
       <div className="row">
         <button
@@ -78,7 +100,7 @@ export function TopicEditForm({
         >
           {uploadingCover ? "Uploading…" : busy ? "Saving…" : "Save changes"}
         </button>
-        <button className="btn btn-ghost" type="button" onClick={onDone}>
+        <button className="btn btn-ghost" type="button" onClick={done}>
           Cancel
         </button>
       </div>
