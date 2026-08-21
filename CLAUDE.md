@@ -157,7 +157,15 @@ Stable names for feature pieces, so instructions can reference them precisely.
   `stripWhenSingle` so even a drafting-only card wears the strip (Ed,
   2026-08-16). Ed's vocabulary (2026-08-15): the strip
   is "topic-tabs", a pane is "the sessions tab", "the comments tab", …
-  Inactive panels unmount, so lazy fetches stay lazy; on feed cards the
+  Panes mount LAZILY on first activation and then STAY mounted — measured
+  on dev 2026-08-21: a fresh card has exactly one panel in the DOM (the
+  selected one), visiting a tab adds its panel, and leaving never removes
+  it (Base UI unmounts only when a close transition completes, and these
+  panels have none). So each pane's fetch still doesn't fire until you
+  open its tab, but nothing is torn down when you leave — and a deep link
+  must NAME its tab (`?tab=`, see comment-draft-store and the notification
+  links), because an unvisited pane is not in the page at all. The older
+  note here said inactive panels unmount; they don't. On feed cards the
   💬 button / top-composer snap the strip back to Comments through
   CommentsOpenScope. The collapsible `HostOnlyPanel` wrapper is gone
   (2026-08-14); `AdminCommentsPanel`'s survives on permalink + moderation.
@@ -267,9 +275,13 @@ Stable names for feature pieces, so instructions can reference them precisely.
 - **comment-draft-store** — `useDraft`/`draftKey`/`hasDraft`/`clearDraft`
   in `apps/web/src/lib/commentDrafts.ts` (Ed, 2026-08-21): half-written
   comments live in a module-level map keyed by what's being written, not
-  in component state, because topic-tabs UNMOUNTS the inactive panel (the
-  thing that keeps each tab's fetches lazy) and a tab switch would
-  otherwise bin the text. Every composer uses it — top-composer,
+  in component state, so nothing that destroys a composer can take the
+  text with it. VERIFIED on dev 2026-08-21 to survive a route change (type
+  a comment, go to Calendar, come back). NOT the mechanism originally
+  written here: topic-tabs does not unmount panes on switching — see the
+  topic-tabs entry — so plain tab switching is not what loses a draft; the
+  live candidates are route changes, the comment-teaser folding a tree,
+  and any card remount. Every composer uses it — top-composer,
   chain-tail-composer, the Reply box, both inline editors, and the slot
   chat. Composers that open from a button (Reply, Edit) reopen themselves
   when `hasDraft` says text is waiting, since the draft outlives the
