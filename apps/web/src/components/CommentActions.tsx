@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { ComposerRow } from "@/components/ComposerRow";
 import { GrowingTextarea } from "@/components/GrowingTextarea";
+import { draftKey, hasDraft, useDraft } from "@/lib/commentDrafts";
 import { useGqlAction } from "@/lib/useGqlAction";
 
 const REPLY = `mutation Reply($id: String!, $body: String!) {
@@ -48,8 +49,19 @@ export function CommentActions({
   // ?reply= deep links focus a chain-tail composer (dialogue-first
   // threading, 2026-08-13) — this composer only opens from its button.
   const { run, busy } = useGqlAction();
-  const [open, setOpen] = useState(false);
-  const [body, setBody] = useState("");
+  // The box only exists while it is open, so an unsent draft has to be
+  // able to reopen it — otherwise the text survives the tab switch but
+  // stays out of reach (comment-draft-store, 2026-08-21).
+  const key = draftKey.reply(commentId);
+  const [open, setOpen] = useState(() => hasDraft(key));
+  const [body, setBody, clearBody] = useDraft(key);
+
+  /** Collapsing the box is a discard: it drops the draft, so "a draft
+   * exists" always means live unsent text. */
+  function toggleReply() {
+    if (open) clearBody();
+    setOpen((v) => !v);
+  }
 
   function reply(e: React.FormEvent) {
     e.preventDefault();
@@ -62,7 +74,7 @@ export function CommentActions({
         success: "Reply posted",
         errorFallback: "Could not reply",
         onSuccess: () => {
-          setBody("");
+          clearBody();
           setOpen(false);
         },
       },
@@ -107,7 +119,7 @@ export function CommentActions({
     <>
       <div className="comment-actions">
         {canReply ? (
-          <button type="button" onClick={() => setOpen((v) => !v)}>
+          <button type="button" onClick={toggleReply}>
             Reply
           </button>
         ) : null}

@@ -264,6 +264,19 @@ Stable names for feature pieces, so instructions can reference them precisely.
   the ❤️/💙 pages link to permalinks (their feed paginates, so the card
   may not be rendered) via the slim `HEARTED_TOC_QUERY` full list.
 
+- **comment-draft-store** — `useDraft`/`draftKey`/`hasDraft`/`clearDraft`
+  in `apps/web/src/lib/commentDrafts.ts` (Ed, 2026-08-21): half-written
+  comments live in a module-level map keyed by what's being written, not
+  in component state, because topic-tabs UNMOUNTS the inactive panel (the
+  thing that keeps each tab's fetches lazy) and a tab switch would
+  otherwise bin the text. Every composer uses it — top-composer,
+  chain-tail-composer, the Reply box, both inline editors, and the slot
+  chat. Composers that open from a button (Reply, Edit) reopen themselves
+  when `hasDraft` says text is waiting, since the draft outlives the
+  unmount but the open/closed state doesn't; posting, saving, or
+  explicitly collapsing clears the draft, and a page reload is a clean
+  slate. Any new composer should use it rather than `useState("")`.
+
 ## Gotchas (learned the hard way)
 
 - Postgres `ALTER TYPE … ADD VALUE` can't run inside a transaction — Drizzle

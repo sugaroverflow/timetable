@@ -1,11 +1,12 @@
 "use client";
 
 import { Send } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { ComposerRow } from "@/components/ComposerRow";
 import { GrowingTextarea } from "@/components/GrowingTextarea";
+import { draftKey, useDraft } from "@/lib/commentDrafts";
 import { useGqlAction } from "@/lib/useGqlAction";
 
 const REPLY = `mutation ContinueThread($id: String!, $body: String!) {
@@ -36,7 +37,7 @@ export function ChainTailComposer({
   const searchParams = useSearchParams();
   const replyTarget = searchParams.get("reply");
   const deepLinked = replyTarget != null && focusIds.includes(replyTarget);
-  const [body, setBody] = useState("");
+  const [body, setBody, clearBody] = useDraft(draftKey.chain(parentId));
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -55,7 +56,7 @@ export function ChainTailComposer({
       {
         success: "Reply posted",
         errorFallback: "Could not reply",
-        onSuccess: () => setBody(""),
+        onSuccess: clearBody,
       },
     );
   }
