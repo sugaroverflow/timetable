@@ -136,6 +136,10 @@ export default async function TopicPermalinkPage({
         viewerHeartCount={data.timetable?.viewerHeartedPublishedCount ?? null}
         hosts={data.timetableHosts}
         discussionOpen
+        // The whole description, no "Show more" (Ed, 2026-08-21): someone
+        // on a topic's own page came to read it. Folding is for lists you
+        // skim — the feed, My Topics, the Pending queue.
+        expandBody
         hostCommentsEnabled={isHostCommentsEnabled(settings)}
         calendar={buildWorkbenchCalendar(settings, roles, viewerId)}
       />
