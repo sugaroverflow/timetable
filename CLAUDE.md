@@ -286,6 +286,21 @@ Stable names for feature pieces, so instructions can reference them precisely.
   the OG routes' separate compilation can't resolve them (typecheck passes;
   the dev server then fails at request time and e2e times out). Keep those
   modules dependency-free; duplicate small constants locally with a comment.
+- **DigitalOcean App Platform sits behind Cloudflare** — every
+  `*.ondigitalocean.app` response carries `CF-RAY`/`Server: cloudflare`, on
+  `topic.forum` too. So `X-Forwarded-For` reads `<real client>, <cloudflare
+  edge>` and Express (which counts trusted hops from the RIGHT) needs
+  `TRUST_PROXY_HOPS=2`. At 1 it resolved `req.ip` to the Cloudflare edge,
+  which rotates per request — the rate limiter scattered every caller across
+  a pool of buckets and limited nobody, while still able to 429 innocent
+  users off those shared buckets. Anything keyed by client IP must assume
+  this topology (measured 2026-08-21, `docs/OPERATIONS.md` R1).
+- **SSR arrives from ONE address.** The web app fetches the API over the
+  public URL (`NEXT_PUBLIC_GRAPHQL_URL` = `${APP_URL}/graphql`), so every
+  server-rendered page view reaches the API from the web container's egress
+  IP and shares a single rate-limit bucket. Hence `RATE_LIMIT_MAX=6000` in
+  the hosted specs; per-user write budgets (`http/action-limits.ts`) are the
+  real abuse protection.
 - Drizzle raw `sql` templates with Date params (`` sql`${col} >= ${now}` ``)
   bypass the column's Date mapping and THROW at runtime on hosted Postgres
   while passing every local check — always use `gte`/`lte`/`eq` operators
