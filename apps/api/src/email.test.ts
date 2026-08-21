@@ -102,7 +102,14 @@ describe("renderDigest (v3, topic cards)", () => {
 
   it("builds Reply deep-links; commenters plain, byline still linked", () => {
     const { html } = renderDigest(SAMPLE);
-    expect(html).toContain("?reply=garden-robin#comment-garden-robin");
+    expect(html).toContain(
+      "?tab=comments&amp;topic=sample-garden&amp;reply=garden-robin#comment-garden-robin",
+    );
+    // A {host}-only comment aims at the {host}-only tab: topic-tabs
+    // unmounts the others, so the composer isn't on the page otherwise.
+    expect(html).toContain(
+      "?tab=host&amp;topic=sample-mine&amp;reply=assembly-eli#comment-assembly-eli",
+    );
     expect(html).toContain("Reply →");
     // Commenter names are plain bold text, not profile links…
     expect(html).toContain("<strong>Robin Vale</strong>");
