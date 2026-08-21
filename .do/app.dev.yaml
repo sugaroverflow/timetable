@@ -7,6 +7,14 @@
 name: topic-dev
 region: lon
 
+# Ops alerting (R6). Zero-dependency: DigitalOcean emails the app owner, so
+# there is no account to create and no code to ship. Combined with the real
+# /health check (R3), a flapping API now announces itself instead of waiting
+# to be noticed.
+alerts:
+  - rule: DEPLOYMENT_FAILED
+  - rule: DOMAIN_FAILED
+
 domains:
   - domain: dev.timetable.love
     type: PRIMARY
@@ -31,8 +39,21 @@ services:
     http_port: 4000
     instance_count: 1
     instance_size_slug: apps-s-1vcpu-0.5gb
+    # /health now actually pings Postgres (R3), so it can fail. Thresholds are
+    # deliberately slack: at instance_count 1 a restart IS downtime, so a brief
+    # database blip must not trigger one. 5 consecutive failures × 10s ≈ 50s of
+    # sustained failure before DigitalOcean recycles the container.
     health_check:
       http_path: /health
+      period_seconds: 10
+      timeout_seconds: 5
+      failure_threshold: 5
+      success_threshold: 1
+    alerts:
+      - rule: RESTART_COUNT
+        operator: GREATER_THAN
+        value: 3
+        window: FIVE_MINUTES
     envs:
       - { key: API_PORT, value: "4000", scope: RUN_TIME }
       - { key: DATABASE_URL, value: "${timetable-db.DATABASE_URL}", scope: RUN_TIME }
@@ -46,6 +67,13 @@ services:
       # Dev-only: map Clerk test users (externalId=dev_sample_*) to the seeded
       # fixture users even though this is a production build. Never in app.yaml.
       - { key: DEV_SEED_USER_MAPPING, value: "true", scope: RUN_TIME }
+      # Dev-only: /health reports the X-Forwarded-For chain the API actually
+      # receives, so TRUST_PROXY_HOPS can be set from measurement instead of
+      # guesswork (R1 — today it resolves to a rotating DigitalOcean edge
+      # address, scattering every caller across a pool of rate-limit buckets
+      # and leaving the API effectively unlimited). Never in app.yaml: it
+      # exposes internal proxy topology.
+      - { key: DEBUG_FORWARDING, value: "true", scope: RUN_TIME }
       - { key: CRON_SECRET, value: "${CRON_SECRET}", scope: RUN_TIME, type: SECRET }
       - { key: RESEND_API_KEY, value: "${RESEND_API_KEY}", scope: RUN_TIME, type: SECRET }
       - { key: EMAIL_FROM, value: "${EMAIL_FROM}", scope: RUN_TIME }

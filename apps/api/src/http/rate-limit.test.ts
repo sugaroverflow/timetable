@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   createDatabaseRateLimitStore,
   createMemoryRateLimitStore,
+  rateLimit,
   rateLimitDecision,
   type RateLimitDbModule,
 } from "./rate-limit";
@@ -187,5 +188,76 @@ describe("rateLimitDecision", () => {
         retryAfterSeconds: 10,
       },
     );
+  });
+});
+
+describe("rateLimit middleware", () => {
+  function fakeRes() {
+    const res = {
+      statusCode: 200,
+      body: undefined as unknown,
+      headers: {} as Record<string, string>,
+      setHeader(name: string, value: string) {
+        res.headers[name] = value;
+      },
+      status(code: number) {
+        res.statusCode = code;
+        return res;
+      },
+      json(payload: unknown) {
+        res.body = payload;
+        return res;
+      },
+    };
+    return res;
+  }
+
+  const fakeReq = () =>
+    ({
+      method: "POST",
+      originalUrl: "/graphql",
+      ip: "203.0.113.9",
+      socket: { remoteAddress: "203.0.113.9" },
+    }) as never;
+
+  it("blocks once the bucket is exhausted", async () => {
+    const middleware = rateLimit({
+      windowMs: 60_000,
+      max: 1,
+      store: createMemoryRateLimitStore(60_000),
+    });
+    const next = vi.fn();
+
+    await middleware(fakeReq(), fakeRes() as never, next);
+    expect(next).toHaveBeenCalledTimes(1);
+
+    const blocked = fakeRes();
+    await middleware(fakeReq(), blocked as never, next);
+
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(blocked.statusCode).toBe(429);
+  });
+
+  it("FAILS OPEN when the store throws (ops R2)", async () => {
+    // The limiter fronts /graphql and /api, so a 503 here turned a database
+    // blip into a total outage. Losing limiting for the blip is the cheaper
+    // failure — this test exists to stop anyone reverting that trade.
+    const middleware = rateLimit({
+      windowMs: 60_000,
+      max: 100,
+      store: {
+        hit() {
+          throw new Error("bucket store unavailable");
+        },
+      },
+    });
+    const res = fakeRes();
+    const next = vi.fn();
+
+    await middleware(fakeReq(), res as never, next);
+
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toBeUndefined();
   });
 });

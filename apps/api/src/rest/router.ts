@@ -801,60 +801,86 @@ restRouter.post(
     const recipients = await listDigestRecipients();
     let sent = 0;
     let processed = 0;
+    let failed = 0;
 
-    // Recipients are independent, so process them in concurrent chunks of
-    // 10. Failure semantics match the old sequential loop as closely as
-    // chunking allows: one recipient's compute/send throwing still aborts
-    // the whole run (previously everything after it; now its chunk).
+    // Recipients are independent, so process them in concurrent chunks of 10.
+    //
+    // Each recipient is ISOLATED (ops R4): a compute or send failure is
+    // logged, counted and stepped over. It used to abort the entire run —
+    // and the likeliest trigger was never a bad address but Resend's 2/sec
+    // rate limit against ten concurrent unthrottled sends, so the first run
+    // against a real cohort would have taken everyone's digest down with it.
+    // Sends are paced in email.ts now; this is the second line of defence.
+    //
+    // A skipped recipient loses nothing: per-forum watermarks only advance
+    // once an email is actually out, so the next run recomputes their window
+    // and picks up exactly where this one gave up.
+    /** Returns emails sent, or null when this recipient had nothing due. */
+    const sendRecipientDigests = async (
+      recipient: (typeof recipients)[number],
+    ): Promise<number | null> => {
+      // One email per forum with news.
+      const { digests, dueForumIds } = await computeUserForumDigests(
+        recipient,
+        now,
+      );
+      if (dueForumIds.length === 0) return null;
+      let didSend = 0;
+      const sentForumIds = new Set<string>();
+      for (const digest of digests) {
+        if (!digest.email) continue;
+        const { subject, html } = renderDigest(digest);
+        // Read tracking (2026-08-13): every link carries the send row's
+        // id — one click marks the digest's shown threads seen.
+        const sendId = await recordDigestSend(digest, now);
+        const stamped = stampDigestLinks(html, sendId);
+        // One single-use ticket per email; null (Clerk hiccup) degrades
+        // to plain links, never blocks the send.
+        const ticket = await createSignInTicket(digest.userId);
+        await sendEmail({
+          to: digest.email,
+          subject,
+          html: ticket ? wrapLinksWithSignInTicket(stamped, ticket) : stamped,
+        });
+        didSend += 1;
+        // Advance THIS forum's watermark the moment its email is out:
+        // with one end-of-loop mark, an early success followed by a
+        // later forum's send failure re-sent the successful email on
+        // the next run (audit 2026-08-17).
+        await markForumDigestsSent(recipient.id, [digest.forumId], now);
+        sentForumIds.add(digest.forumId);
+      }
+      // Quiet-but-due forums advance too — an empty window must never
+      // re-accumulate. Marked last: if a send above threw, the quiet
+      // forums simply recompute (still quiet) next run.
+      const quiet = dueForumIds.filter((id) => !sentForumIds.has(id));
+      if (quiet.length > 0) {
+        await markForumDigestsSent(recipient.id, quiet, now);
+      }
+      return didSend;
+    };
+
     const chunkSize = 10;
     for (let i = 0; i < recipients.length; i += chunkSize) {
       const chunk = recipients.slice(i, i + chunkSize);
       const results = await Promise.all(
         chunk.map(async (recipient) => {
-          // One email per forum with news.
-          const { digests, dueForumIds } = await computeUserForumDigests(
-            recipient,
-            now,
-          );
-          if (dueForumIds.length === 0) return null;
-          let didSend = 0;
-          const sentForumIds = new Set<string>();
-          for (const digest of digests) {
-            if (!digest.email) continue;
-            const { subject, html } = renderDigest(digest);
-            // Read tracking (2026-08-13): every link carries the send row's
-            // id — one click marks the digest's shown threads seen.
-            const sendId = await recordDigestSend(digest, now);
-            const stamped = stampDigestLinks(html, sendId);
-            // One single-use ticket per email; null (Clerk hiccup) degrades
-            // to plain links, never blocks the send.
-            const ticket = await createSignInTicket(digest.userId);
-            await sendEmail({
-              to: digest.email,
-              subject,
-              html: ticket
-                ? wrapLinksWithSignInTicket(stamped, ticket)
-                : stamped,
+          try {
+            return await sendRecipientDigests(recipient);
+          } catch (err) {
+            logRequestError(req, err, {
+              component: "digests",
+              recipientId: recipient.id,
             });
-            didSend += 1;
-            // Advance THIS forum's watermark the moment its email is out:
-            // with one end-of-loop mark, an early success followed by a
-            // later forum's send failure re-sent the successful email on
-            // the next run (audit 2026-08-17).
-            await markForumDigestsSent(recipient.id, [digest.forumId], now);
-            sentForumIds.add(digest.forumId);
+            return "failed" as const;
           }
-          // Quiet-but-due forums advance too — an empty window must never
-          // re-accumulate. Marked last: if a send above threw, the quiet
-          // forums simply recompute (still quiet) next run.
-          const quiet = dueForumIds.filter((id) => !sentForumIds.has(id));
-          if (quiet.length > 0) {
-            await markForumDigestsSent(recipient.id, quiet, now);
-          }
-          return didSend;
         }),
       );
       for (const result of results) {
+        if (result === "failed") {
+          failed += 1;
+          continue;
+        }
         if (result === null) continue;
         processed += 1;
         sent += result;
@@ -867,7 +893,9 @@ restRouter.post(
       new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000),
     );
 
-    res.json({ processed, sent, pruned });
+    // `failed` is the signal the cron caller checks (ops R4): the run always
+    // completes now, so a silent 200 would hide a cohort-wide send failure.
+    res.json({ processed, sent, failed, pruned });
   }),
 );
 

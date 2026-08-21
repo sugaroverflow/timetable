@@ -84,6 +84,17 @@ vi.mock("@timetable/core", async (importOriginal) => {
   };
 });
 
+// /health pings the database now (ops R3). The suite runs with no Postgres,
+// so stub the one query it makes; the real timeout/failure behaviour is
+// covered by the injectable seam in http/health.test.ts.
+vi.mock("@timetable/db", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@timetable/db")>();
+  return {
+    ...actual,
+    db: { execute: vi.fn(async () => []) },
+  };
+});
+
 vi.mock("./auth/clerk", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./auth/clerk")>();
   return {
@@ -433,7 +444,7 @@ describe("createApiApp", () => {
       const res = await fetch(`${baseUrl}/health`);
 
       expect(res.status).toBe(200);
-      await expect(res.json()).resolves.toEqual({ ok: true });
+      await expect(res.json()).resolves.toEqual({ ok: true, db: "up" });
     });
   });
 

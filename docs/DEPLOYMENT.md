@@ -3,6 +3,10 @@
 Topic is deployed to DigitalOcean App Platform with two app services, one
 migration job, and managed PostgreSQL. Clerk handles authentication.
 
+This document covers how deploys work. For what to do when something is
+**broken** — the risk register, the incident runbook, backups and alerting —
+see `docs/OPERATIONS.md`.
+
 ## Environments
 
 | | Local | Dev | Production |
@@ -345,8 +349,10 @@ Without the required `SPACES_*` variables, `POST /api/uploads` returns `503`.
 
 After deploy:
 
-1. Open `/health`; it should return JSON with `ok: true`. Note that `/health`
-   passing does not guarantee GraphQL works — always follow up with step 2.
+1. Open `/health`; it should return `{"ok":true,"db":"up"}`. Since 2026-08-21
+   this pings Postgres and returns 503 with `"db":"down"` when it cannot
+   (`docs/OPERATIONS.md` R3), so it is now a real readiness signal — but it
+   still exercises none of the GraphQL path, so always follow up with step 2.
 2. Send `POST /graphql` with `query { __typename }`; it should return `200`
    with a GraphQL `data` payload.
 3. Sign in through Clerk.

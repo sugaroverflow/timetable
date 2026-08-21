@@ -89,6 +89,12 @@ Lint covers everything: `apps/web` has its own Next config; the root
   production deploys are human-triggered only.** Same for repo settings,
   rulesets, and DO infrastructure (`doctl`).
 - Never commit secrets. Env shape lives in `.env.example`.
+- **Term-time migration policy (2026-08-21):** while a real programme is
+  running, migrations are **additive only** — add columns and tables; never
+  drop, rename, or narrow one. Migrations run PRE_DEPLOY and a code rollback
+  does NOT roll back the schema, so an additive-only rule is what makes every
+  deploy safely reversible. Clean up dropped columns in the holidays.
+  See `docs/OPERATIONS.md` R11.
 
 ## Conventions
 
