@@ -247,7 +247,7 @@ export function MyTopicsTabs({
   // every card on the page carries the same furniture (Ed, 2026-08-16).
   return (
     <CommentsOpenScope>
-      <TopicTabs tabs={tabs} stripWhenSingle />
+      <TopicTabs tabs={tabs} topicId={topic.id} stripWhenSingle />
     </CommentsOpenScope>
   );
 }

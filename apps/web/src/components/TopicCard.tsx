@@ -517,6 +517,7 @@ export function TopicCard({
           {queueControls}
 
           <TopicTabs
+            topicId={topic.id}
             followCommentsOpen
             tabs={buildTopicTabs({
               topic,

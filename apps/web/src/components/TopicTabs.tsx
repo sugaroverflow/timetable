@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Tabs } from "@base-ui/react/tabs";
 import { CalendarDays, Library, MessageCircle, Shield } from "lucide-react";
 
@@ -30,6 +31,28 @@ const ICONS = {
 } as const;
 
 /**
+ * Which tab a deep link asks for, or null.
+ *
+ * A comment lives in ONE thread, so a link to a {host}-only or drafting
+ * comment has to say which tab holds it — the panes are unmounted, so the
+ * `?reply=` composer and the `#comment-` anchor simply aren't there until
+ * the right tab is selected (Ed, 2026-08-21: Notifications' Reply). `topic`
+ * aims the request at one card, since My Topics and Pending render a strip
+ * per topic and would otherwise all swing to the named tab.
+ */
+function deepLinkedTab(
+  params: URLSearchParams,
+  tabs: TopicTab[],
+  topicId?: string,
+): string | null {
+  const want = params.get("tab");
+  if (!want || !tabs.some((t) => t.value === want)) return null;
+  const forTopic = params.get("topic");
+  if (forTopic && forTopic !== topicId) return null;
+  return want;
+}
+
+/**
  * topic-tabs (2026-08-14, generalised from My Topics; named 2026-08-15):
  * two or more tabs render as the horizontal strip, a single one renders
  * bare — exactly what the card showed before tabs existed. When
@@ -40,10 +63,14 @@ const ICONS = {
  */
 export function TopicTabs({
   tabs,
+  topicId,
   followCommentsOpen = false,
   stripWhenSingle = false,
 }: {
   tabs: TopicTab[];
+  /** This card's topic, so a `?tab=` deep link can be aimed at ONE card —
+   * a list page renders many strips (Ed, 2026-08-21). */
+  topicId?: string;
   followCommentsOpen?: boolean;
   /** Render the strip even for one tab. My Topics sets this so a fresh
    * submitted topic (drafting thread only) wears the same furniture as
@@ -51,7 +78,13 @@ export function TopicTabs({
   stripWhenSingle?: boolean;
 }) {
   const { requestId, requestToggle } = useCommentsOpen();
-  const [tab, setTab] = useState(tabs[0]?.value ?? "comments");
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState(
+    () =>
+      deepLinkedTab(searchParams, tabs, topicId) ??
+      tabs[0]?.value ??
+      "comments",
+  );
   // Render-phase adjustment (the React "information from previous renders"
   // pattern): every open-the-comments request snaps the strip back to the
   // Comments tab.
