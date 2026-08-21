@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
+import { draftKey, hasDraft } from "@/lib/commentDrafts";
 import type { FeedComment } from "@/lib/feedTypes";
 import { COMMENT_TREE_DEPTH } from "@/lib/gqlFragments";
 import { relativeTime } from "@/lib/relativeTime";
@@ -254,7 +255,11 @@ function CommentItem({
   canPin?: boolean;
 }) {
   const replies = comment.replies ?? [];
-  const [editing, setEditing] = useState(false);
+  // Reopen the inline editor for an edit interrupted by a tab switch —
+  // the draft outlives the unmount, the open/closed state doesn't.
+  const [editing, setEditing] = useState(() =>
+    hasDraft(draftKey.edit(comment.id)),
+  );
   const isOwn = viewerId != null && viewerId === comment.authorId;
 
   return (

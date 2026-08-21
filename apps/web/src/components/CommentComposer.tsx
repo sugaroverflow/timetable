@@ -10,6 +10,7 @@ import {
   type MentionCandidate,
 } from "@/components/MentionTextarea";
 import { clientGql } from "@/lib/clientGraphql";
+import { draftKey, useDraft } from "@/lib/commentDrafts";
 import { useGqlAction } from "@/lib/useGqlAction";
 
 import { useCommentsOpen } from "./CommentsOpenScope";
@@ -66,7 +67,9 @@ export function CommentComposer({
   // Posting unfolds the card's comment-teaser so the new comment is
   // visible in its thread (QA 2026-08-13); no-op without a teaser.
   const { requestOpen } = useCommentsOpen();
-  const [body, setBody] = useState("");
+  const [body, setBody, clearBody] = useDraft(
+    draftKey.comment(topicId, visibility),
+  );
   const mentionsEnabled = visibility === "public" && Boolean(mentionSlug);
   const [candidates, setCandidates] = useState<MentionCandidate[]>([]);
   const [loadedCandidates, setLoadedCandidates] = useState(false);
@@ -103,7 +106,7 @@ export function CommentComposer({
         success: copy.success,
         errorFallback: "Could not post comment",
         onSuccess: () => {
-          setBody("");
+          clearBody();
           requestOpen();
         },
       },

@@ -1,9 +1,10 @@
 "use client";
 
 import { Send } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
 import { GrowingTextarea } from "@/components/GrowingTextarea";
+import { draftKey, useDraft } from "@/lib/commentDrafts";
 import { useGqlAction } from "@/lib/useGqlAction";
 
 const EDIT = `mutation Edit($id: String!, $body: String!) {
@@ -23,8 +24,20 @@ export function CommentEditForm({
   onDone(): void;
 }) {
   const { run, busy } = useGqlAction();
-  const [body, setBody] = useState(initialBody);
+  // An interrupted edit keeps its text (comment-draft-store, 2026-08-21);
+  // typing back to the original body drops the draft, so an untouched
+  // editor never counts as one.
+  const [body, setBody, clearBody] = useDraft(
+    draftKey.edit(commentId),
+    initialBody,
+  );
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  /** Saved or cancelled — either way the edit is over. */
+  function done() {
+    clearBody();
+    onDone();
+  }
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -44,7 +57,7 @@ export function CommentEditForm({
       {
         success: "Comment updated",
         errorFallback: "Could not update comment",
-        onSuccess: onDone,
+        onSuccess: done,
       },
     );
   }
@@ -69,7 +82,7 @@ export function CommentEditForm({
       <button
         type="button"
         className="btn btn-ghost btn-sm"
-        onClick={onDone}
+        onClick={done}
         disabled={busy}
       >
         Cancel

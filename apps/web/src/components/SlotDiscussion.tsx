@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Send } from "lucide-react";
 
 import { clientGql } from "@/lib/clientGraphql";
+import { clearDraft, draftKey, hasDraft, useDraft } from "@/lib/commentDrafts";
 import type { RoleLabels } from "@/lib/timetableSettings";
 import { useGqlAction } from "@/lib/useGqlAction";
 
@@ -133,7 +134,10 @@ function SlotCommentEditor({
   onDone: () => Promise<void>;
 }) {
   const { run, busy } = useGqlAction();
-  const [body, setBody] = useState(comment.body);
+  const [body, setBody, clearBody] = useDraft(
+    draftKey.edit(comment.id),
+    comment.body,
+  );
 
   function save(e: React.FormEvent) {
     e.preventDefault();
@@ -145,7 +149,10 @@ function SlotCommentEditor({
       {
         success: "Comment updated",
         errorFallback: "Could not update comment",
-        onSuccess: onDone,
+        onSuccess: async () => {
+          clearBody();
+          await onDone();
+        },
       },
     );
   }
@@ -211,8 +218,16 @@ function CommentRow({
   roleLabels?: RoleLabels;
   onChanged: () => Promise<void>;
 }) {
-  const [editing, setEditing] = useState(false);
+  // Reopen an edit interrupted by a tab switch; toggling Edit shut is a
+  // discard, so it drops the draft (comment-draft-store, 2026-08-21).
+  const editKey = draftKey.edit(comment.id);
+  const [editing, setEditing] = useState(() => hasDraft(editKey));
   const isOwn = viewerId !== null && comment.authorId === viewerId;
+
+  function toggleEdit() {
+    if (editing) clearDraft(editKey);
+    setEditing(!editing);
+  }
 
   return (
     <div className={`comment${comment.hidden ? " cal-comment-hidden" : ""}`}>
@@ -263,7 +278,7 @@ function CommentRow({
           comment={comment}
           isOwn={isOwn}
           canModerate={canModerate}
-          onEdit={() => setEditing(!editing)}
+          onEdit={toggleEdit}
           onChanged={onChanged}
         />
       </div>
@@ -304,7 +319,9 @@ export function DiscussionPanel({
   onReload: () => Promise<void>;
 }) {
   const { run, busy } = useGqlAction();
-  const [body, setBody] = useState("");
+  const [body, setBody, clearBody] = useDraft(
+    draftKey.slot(slotId, lensTopic?.id ?? null),
+  );
 
   function post(e: React.FormEvent) {
     e.preventDefault();
@@ -316,7 +333,7 @@ export function DiscussionPanel({
       {
         errorFallback: "Could not post",
         onSuccess: async () => {
-          setBody("");
+          clearBody();
           await onReload();
         },
       },
