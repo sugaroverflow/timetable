@@ -90,7 +90,11 @@ export function CollapsibleTopicBody({ html }: { html: string }) {
     <>
       <div
         ref={ref}
-        className={`topic-body${hydrated ? "" : " topic-body-collapsed"}`}
+        className={`topic-body${hydrated ? "" : " topic-body-collapsed"}${
+          // Fade the tail into the Show more pill — but only when text is
+          // genuinely hidden below it (Ed, 2026-08-21).
+          collapsible && !expanded ? " topic-body-fade" : ""
+        }`}
         dangerouslySetInnerHTML={{ __html: html }}
       />
       {collapsible ? (
