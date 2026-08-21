@@ -34,6 +34,7 @@ type Notification = {
   body: string;
   visibility: string;
   createdAt: string;
+  topicId: string;
   topicTitle: string;
   topicSlug: string | null;
   topicHostSlug: string | null;
@@ -55,7 +56,7 @@ const QUERY = `
     me { notificationSettings }
     notifications(idOrSlug: $s) {
       commentId kind authorId authorName authorImage authorRoles body
-      visibility createdAt topicTitle topicSlug topicHostSlug
+      visibility createdAt topicId topicTitle topicSlug topicHostSlug
     }
   }
 `;
@@ -68,6 +69,14 @@ const KIND_VERBS: Record<Notification["kind"], string> = {
   session_pencilled: "pencilled in a session for",
   session_confirmed: "confirmed a session for",
   session_cleared: "cleared a pencilled session for",
+};
+
+/** A comment's visibility IS its tab in topic-tabs — the values are
+ * `TopicTab.value` in `TopicCard.tsx` / `MyTopicsTabs.tsx`. */
+const TAB_FOR_VISIBILITY: Record<string, string> = {
+  public: "comments",
+  host_only: "host",
+  admin_only: "admin",
 };
 
 function isSessionKind(kind: Notification["kind"]): boolean {
@@ -109,9 +118,13 @@ function cardLinks(
       ? `/f/${slug}/${viewerIsAdmin ? "pending" : "my-topics"}`
       : null);
   if (!base) return { href: null, replyHref: null };
+  // Name the tab that holds the comment and the topic it belongs to: the
+  // other panes are unmounted, so without this the reply composer and the
+  // #comment- anchor aren't on the page at all (Ed, 2026-08-21).
+  const aim = `tab=${TAB_FOR_VISIBILITY[n.visibility] ?? "comments"}&topic=${n.topicId}`;
   return {
-    href: `${base}#comment-${n.commentId}`,
-    replyHref: `${base}?reply=${n.commentId}#comment-${n.commentId}`,
+    href: `${base}?${aim}#comment-${n.commentId}`,
+    replyHref: `${base}?${aim}&reply=${n.commentId}#comment-${n.commentId}`,
   };
 }
 
