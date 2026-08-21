@@ -322,6 +322,7 @@ function threadLine(
   depth: number,
   path: string | null,
   accent: string,
+  aim: string,
 ): string {
   const name = personName(node.comment.author);
   const color = node.isNew ? accent : E.muted;
@@ -329,7 +330,7 @@ function threadLine(
   const line = `<div style="padding-left:${depth * INDENT}px;margin:3px 0;white-space:pre-wrap;">${name}<span class="em-muted" style="color:${E.muted};">: </span><span${bodyCls} style="color:${color};">${esc(node.comment.body)}</span></div>`;
   if (!node.isNew || !path) return line;
   const id = node.comment.id;
-  const href = `${linkBase}${path}?reply=${encodeURIComponent(id)}#comment-${encodeURIComponent(id)}`;
+  const href = `${linkBase}${path}?${aim}&reply=${encodeURIComponent(id)}#comment-${encodeURIComponent(id)}`;
   const reply = `<div style="padding-left:${(depth + 1) * INDENT}px;margin:2px 0 0;"><a href="${esc(href)}" style="color:${accent};font-weight:600;text-decoration:none;">Reply →</a></div>`;
   return line + reply;
 }
@@ -341,6 +342,7 @@ function renderThreadTree(
   card: DigestTopicCard,
   acts: Extract<DigestActivity, { kind: "comment" | "reply" }>[],
   accent: string,
+  aim: string,
 ): string {
   const nodes = new Map<string, ThreadNode>();
   for (const a of acts) {
@@ -363,7 +365,7 @@ function renderThreadTree(
   const walk = (id: string, depth: number): void => {
     const node = nodes.get(id);
     if (!node) return;
-    lines.push(threadLine(node, depth, card.path, accent));
+    lines.push(threadLine(node, depth, card.path, accent, aim));
     for (const child of children.get(id) ?? []) walk(child, depth + 1);
   };
   for (const root of roots) walk(root, 0);
@@ -465,6 +467,27 @@ function threadLabel(
 
 type Discussion = Extract<DigestActivity, { kind: "comment" | "reply" }>;
 
+/** Aims a reply link at the tab that actually holds the comment.
+ *
+ * The web app's topic-tabs unmounts its inactive panes, so a link to a
+ * {host}-only or drafting comment lands on a card with neither the reply
+ * composer nor the `#comment-` anchor on the page (Ed, 2026-08-21). The
+ * values are `TopicTab.value`; `topic` aims the request at ONE card, since
+ * the fallback pages render a strip per topic. Mirrors
+ * `TAB_FOR_VISIBILITY` in the web app's notifications page. */
+function replyAim(
+  visibility: "public" | "host_only" | "admin_only",
+  topicId: string,
+): string {
+  const tab =
+    visibility === "host_only"
+      ? "host"
+      : visibility === "admin_only"
+        ? "admin"
+        : "comments";
+  return `tab=${tab}&topic=${encodeURIComponent(topicId)}`;
+}
+
 /** Discussion split into its three threads (regular / host-only /
  * you-and-admin), each rendered as one merged tree under its label. */
 function renderDiscussion(
@@ -481,7 +504,7 @@ function renderDiscussion(
       if (acts.length === 0) return "";
       return (
         threadLabel(vis, hostLabel, adminLabel) +
-        renderThreadTree(card, acts, accent)
+        renderThreadTree(card, acts, accent, replyAim(vis, card.topicId))
       );
     })
     .filter(Boolean);
