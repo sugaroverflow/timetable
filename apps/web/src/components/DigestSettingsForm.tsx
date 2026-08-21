@@ -21,6 +21,7 @@ import {
   type RoleLabels,
 } from "@/lib/timetableSettings";
 import { useGqlAction } from "@/lib/useGqlAction";
+import { useSavedSnapshot } from "@/lib/useSavedSnapshot";
 
 // Fully per-forum (2026-08-11): on/off, cadence, and the kind switches
 // all live on this forum's membership.
@@ -134,11 +135,10 @@ export function DigestSettingsForm({
         ]),
       ) as Record<DigestKind, boolean>,
   );
-  const [saved, setSaved] = useState(false);
+  const { saved, markSaved } = useSavedSnapshot([cadence, weekday, kinds]);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    setSaved(false);
     const enabled = cadence !== "never";
     // Only the switches the viewer can actually use are saved — greyed
     // (admin-view) and hidden ones keep falling through to the defaults.
@@ -161,7 +161,7 @@ export function DigestSettingsForm({
       {
         success: "Digest settings saved",
         errorFallback: "Could not save settings",
-        onSuccess: () => setSaved(true),
+        onSuccess: markSaved,
       },
     );
   }

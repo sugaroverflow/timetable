@@ -17,6 +17,7 @@ import { clientApi } from "@/lib/clientApi";
 import { clientGql } from "@/lib/clientGraphql";
 import { roleLabel } from "@/lib/timetableSettings";
 import { useGqlAction } from "@/lib/useGqlAction";
+import { useSavedSnapshot } from "@/lib/useSavedSnapshot";
 
 const PERSON_BIO = `query($s: String!, $u: String!) { person(idOrSlug: $s, userId: $u) { bio image } }`;
 const UPDATE_BIO = `mutation($s: String!, $u: String!, $bio: String!, $image: String!) {
@@ -145,10 +146,9 @@ export function MemberRolesEditor({
   const isOwner = hasOwnerRole(initialRoles as Role[]);
   const [roles, setRoles] = useState<string[]>(initialRoles);
   const [busy, setBusy] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const { saved, markSaved } = useSavedSnapshot(roles);
 
   function toggleRole(role: string) {
-    setSaved(false);
     setRoles((prev) =>
       prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role],
     );
@@ -156,7 +156,6 @@ export function MemberRolesEditor({
 
   async function save() {
     setBusy(true);
-    setSaved(false);
     const res = await clientApi(`/api/memberships/${membershipId}/roles`, {
       method: "PATCH",
       body: JSON.stringify({
@@ -165,7 +164,7 @@ export function MemberRolesEditor({
     });
     setBusy(false);
     if (res.ok) {
-      setSaved(true);
+      markSaved();
       toast("Roles updated");
       router.refresh();
     } else {
