@@ -261,6 +261,21 @@ Stable names for feature pieces, so instructions can reference them precisely.
   (api `email.ts`) + `DigestReadMarker` (app layout): every digest link
   carries `dg=<send id>`; one click marks that email's shown comment
   threads seen up to its send time (`markDigestRead`, GREATEST semantics).
+- **topic-draft-recovery** — `useStoredDraft` in
+  `apps/web/src/lib/formDrafts.ts` + `DraftRestoredNotice` (Ed,
+  2026-08-21, after losing a long topic draft to an accidental navigation
+  + browser Back): the topic composers keep their fields in
+  **sessionStorage**, so the writing survives leaving the page, Back, and
+  a reload — and is dropped when the tab closes, so nothing lingers for
+  the next person on that machine. Distinct from
+  [[comment-draft-store]], which is a module-level map: that dies with
+  the JS context, which is fine for a one-line comment and not for a
+  topic. `initial` is the baseline (empty for a new topic, the saved
+  content when editing), so an untouched form stores nothing and typing
+  back to the original clears it; restore happens in an effect AFTER
+  mount (restoring during render would be a hydration mismatch) and only
+  while the form is still untouched. Keys: `new-topic:<slug>` (one draft
+  per forum) and `topic:<id>`. Create/save/Cancel all discard.
 - **queue-back** — the Topic Queue's left arrow (Ed, 2026-08-21):
   `?back=n` on `/queue` shows the topic n steps behind the live one, so
   the step is a URL, ordinary navigation, and the browser's own Back

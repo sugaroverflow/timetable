@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 
+import { DraftRestoredNotice } from "@/components/DraftRestoredNotice";
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { RichTextEditor } from "@/components/RichTextEditor";
+import { useStoredDraft } from "@/lib/formDrafts";
 import { useGqlAction } from "@/lib/useGqlAction";
 
 const MUTATION = `mutation Create($s: String!, $title: String!, $body: String, $cover: String, $host: String) {
@@ -21,10 +23,14 @@ export function CreateTopicForm({
   hostLabel?: string;
 }) {
   const { run, busy } = useGqlAction();
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
-  const [cover, setCover] = useState("");
-  const [host, setHost] = useState("");
+  // A topic is long-form writing: keep it recoverable if the page goes
+  // away under it (topic-draft-recovery, Ed 2026-08-21). One draft per
+  // forum, so two forums' new topics don't overwrite each other.
+  const { values, patch, restored, discard } = useStoredDraft(
+    `new-topic:${slug}`,
+    { title: "", body: "", cover: "", host: "" },
+  );
+  const { title, body, cover, host } = values;
   const [uploadingCover, setUploadingCover] = useState(false);
 
   function submit(e: React.FormEvent) {
@@ -43,12 +49,8 @@ export function CreateTopicForm({
       {
         success: owner ? `Topic created for ${owner}` : "Topic created",
         errorFallback: "Could not create topic",
-        onSuccess: () => {
-          setTitle("");
-          setBody("");
-          setCover("");
-          setHost("");
-        },
+        // The topic exists now — the draft has done its job.
+        onSuccess: discard,
       },
     );
   }
@@ -58,12 +60,13 @@ export function CreateTopicForm({
       <h2 className="section-title" style={{ marginBottom: 10 }}>
         New topic
       </h2>
+      {restored ? <DraftRestoredNotice onDiscard={discard} /> : null}
       <div className="field">
         <label htmlFor="topic-title">Title</label>
         <input
           id="topic-title"
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          onChange={(e) => patch({ title: e.target.value })}
           placeholder="Cryptocurrencies"
         />
       </div>
@@ -71,7 +74,7 @@ export function CreateTopicForm({
         id="topic-cover"
         label="Cover image"
         value={cover}
-        onChange={setCover}
+        onChange={(next) => patch({ cover: next })}
         purpose="topic-cover"
         timetableIdOrSlug={slug}
         onUploadingChange={setUploadingCover}
@@ -80,7 +83,7 @@ export function CreateTopicForm({
         <label htmlFor="topic-body">Description</label>
         <RichTextEditor
           value={body}
-          onChange={setBody}
+          onChange={(next) => patch({ body: next })}
           placeholder="What is this session about?"
         />
       </div>
@@ -90,7 +93,7 @@ export function CreateTopicForm({
           <select
             id="topic-host"
             value={host}
-            onChange={(e) => setHost(e.target.value)}
+            onChange={(e) => patch({ host: e.target.value })}
           >
             <option value="">Me</option>
             {hosts.map((h) => (
