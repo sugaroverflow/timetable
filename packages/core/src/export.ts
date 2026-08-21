@@ -123,7 +123,7 @@ export type DataExport = {
   people: ExportPerson[];
   /** Hosts/admins: the viewer's own topics across all statuses. */
   myTopics?: ExportManagedTopic[];
-  /** Admins: submitted topics awaiting review. */
+  /** Admins: draft topics awaiting publication. */
   pendingTopics?: ExportManagedTopic[];
   /** Admins: the append-only ❤️/💙 ledger, oldest first. Unlike `hearts`
    * on each topic (current, post-cutoff state), this history survives
@@ -143,7 +143,7 @@ const README = [
   "public, host_only, or admin_only). `people` — members' public profiles",
   "and their published topics. `myTopics` — present for hosts/admins: the",
   "exporting user's own topics in every status, with their comment threads.",
-  "`pendingTopics` — present for admins: submitted topics awaiting review.",
+  "`pendingTopics` — present for admins: draft topics awaiting publication.",
   "`heartEvents` — present for admins: the append-only ledger of every ❤️",
   "(kind `heart`) and 💙 (kind `host_heart`) add/remove, oldest first;",
   "unlike per-topic `hearts` it is unaffected by the hearts cutoff, so",

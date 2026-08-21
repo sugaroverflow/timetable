@@ -41,12 +41,12 @@ export default async function ApiPage({
           topics with their body markdown, comments, heart counts, weighted
           scores, and the user ids currently hearting each topic; and member
           profiles. Hosts additionally receive their own topics in every status
-          with comment threads. Admins additionally receive the pending
-          (submitted) queue. When the forum&rsquo;s calendar is on, the export
-          also carries every timeslot with its sessions; members additionally
-          get each slot&rsquo;s discussion and their own availability answer,
-          and hosts and admins the elector availability tallies. The
-          file&rsquo;s <code>readme</code> field describes its structure.
+          with comment threads. Admins additionally receive the pending (draft)
+          queue. When the forum&rsquo;s calendar is on, the export also carries
+          every timeslot with its sessions; members additionally get each
+          slot&rsquo;s discussion and their own availability answer, and hosts
+          and admins the elector availability tallies. The file&rsquo;s{" "}
+          <code>readme</code> field describes its structure.
         </p>
         <ExportDownloadButton slug={slug} />
       </section>

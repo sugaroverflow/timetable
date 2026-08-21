@@ -3,7 +3,9 @@
  * the copy convention, calendar actions spelled out. */
 export const ACTION_LABELS: Record<string, string> = {
   "topic.create": "created a topic",
-  "topic.submit": "submitted a topic for review",
+  // The `submitted` status is called "draft" in the UI (2026-08-21) — this
+  // event is an unpublished topic going back into it, not a submission.
+  "topic.submit": "returned a topic to draft",
   "topic.ready": "marked a topic ready to publish",
   "topic.unready": "moved a topic back to drafting",
   "topic.publish": "published a topic",

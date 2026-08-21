@@ -281,9 +281,19 @@ Stable names for feature pieces, so instructions can reference them precisely.
 
 - Postgres `ALTER TYPE … ADD VALUE` can't run inside a transaction — Drizzle
   migrations must **recreate the enum** instead (see migrations 0013/0014).
-- "Draft" means two things historically: the draft **topic status is removed**
-  (dead references may lurk), but the "**drafting thread**" — `admin_only`
-  comment visibility — is a live feature. Never blanket-delete "draft" matches.
+- "Draft" means THREE things — never blanket-delete or rename "draft"
+  matches. (1) The old draft **topic status is removed** from the enum (dead
+  references may lurk). (2) The "**drafting thread**" — `admin_only` comment
+  visibility — is a live feature. (3) Since 2026-08-21 **"draft" is the
+  user-facing label for the stored `submitted` status** (Ed: nothing is
+  submitted and nothing is reviewed — a topic is created straight into it
+  and sits there while its host writes; the real "ready" signal is the
+  separate `readyAt` switch, which is why the Pending queue always said
+  "still drafting"). The label lives in
+  `apps/web/src/lib/topicStatusLabels.ts`; the stored value stays
+  `submitted` everywhere — DB enum, GraphQL, identifiers, CSS
+  `.status-submitted` — because renaming a live enum value is a
+  non-additive migration (R11) and copy-only follows the rebrand pattern.
 - `apps/web/.next/` build output pollutes searches — scope greps to `src/`.
 - Seed fixture bodies in `dev-sample-data.md` must not contain `^## ` lines
   (breaks the section parser); `###` is safe.
