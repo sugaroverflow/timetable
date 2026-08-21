@@ -27,11 +27,17 @@ export function ProfileForm({
   const [bio, setBio] = useState(initialBio ?? "");
   const [image, setImage] = useState(initialImage ?? "");
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [saved, setSaved] = useState(false);
+  // "Saved" describes the CURRENT field values, not a one-way latch: we
+  // remember what was last saved, so the first further edit puts "Save
+  // profile" back and a second round of edits is savable (Ed, 2026-08-21).
+  const [savedValues, setSavedValues] = useState<string | null>(null);
+  const values = JSON.stringify([name, bio, image.trim()]);
+  const saved = savedValues === values;
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    setSaved(false);
+    // Snapshot what we're sending — the fields may move on while it's away.
+    const sent = values;
     void run(
       MUTATION,
       // Empty string, not null: the API treats null as "leave unchanged",
@@ -41,7 +47,7 @@ export function ProfileForm({
         success: "Profile saved",
         errorFallback: "Could not save profile",
         onSuccess: () => {
-          setSaved(true);
+          setSavedValues(sent);
           // The topbar AccountMenu caches this forum's avatar for the life
           // of the app layout — tell it the profile changed (QA 2026-07-28:
           // a new photo didn't show top right until a hard reload).
