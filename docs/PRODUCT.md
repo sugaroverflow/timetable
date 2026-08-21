@@ -61,7 +61,10 @@ removed).
 
 Hosts (and admins) write topics in a rich-text editor; markdown is the stored
 format. A new topic is created as `submitted` and is immediately publishable
-by an admin — there is no separate draft status. Pre-publish feedback happens
+by an admin — there is no separate draft status. **The UI calls that state
+"draft"** (2026-08-21): nothing has been submitted and nothing is reviewed,
+the topic simply sits there while its host writes it. `submitted` remains
+the stored value; only the label changed. Pre-publish feedback happens
 in the topic's **drafting thread**: admin-only comments that the topic's
 owner can also see and reply to, never rendered in the feed. Pending Topics
 shows the submitted queue.

@@ -11,6 +11,7 @@ import { MyTopicsTabs } from "@/components/MyTopicsTabs";
 import type { WorkbenchCalendar } from "@/lib/calendarTypes";
 import type { ManagedTopic } from "@/lib/feedTypes";
 import { topicPath } from "@/lib/topicPath";
+import { topicStatusLabel } from "@/lib/topicStatusLabels";
 import { useGqlAction } from "@/lib/useGqlAction";
 
 const SUBMIT = `mutation($id: String!){ submitTopic(topicId: $id){ id } }`;
@@ -145,7 +146,7 @@ function ManageControls({
 }
 
 /** The one status-changing action a host sees: Publish (when the forum lets
- * hosts publish directly — calendar-v2 PR), Submit for review, Unpublish, or
+ * hosts publish directly — calendar-v2 PR), Return to draft, Unpublish, or
  * the pending note. */
 function StatusAction({
   topic,
@@ -189,13 +190,13 @@ function StatusAction({
         className="btn btn-primary"
         type="button"
         disabled={busy}
-        onClick={() => run(SUBMIT, { id: topic.id }, "Submitted for review")}
+        onClick={() => run(SUBMIT, { id: topic.id }, "Back in draft")}
       >
-        Submit for review
+        Return to draft
       </button>
     );
   }
-  // Submitted: the host's readiness switch — flips the signal the admin
+  // Draft: the host's readiness switch — flips the signal the admin
   // Pending queue filters on (2026-08-06). Stays visible while editing,
   // since TopicEditScope keeps this row mounted under the form.
   return <ReadySwitch topicId={topic.id} ready={Boolean(topic.readyAt)} />;
@@ -280,7 +281,7 @@ export function TopicManager({
                 )}
               </h3>
               <span className={`status-badge status-${topic.status}`}>
-                {topic.status}
+                {topicStatusLabel(topic.status)}
               </span>
             </div>
 

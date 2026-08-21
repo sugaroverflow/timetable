@@ -15,6 +15,7 @@ import { gqlFetch } from "@/lib/graphql";
 import { displayRolesFromCookies } from "@/lib/previewRoles.server";
 import { parseTimetableSettings, roleLabel } from "@/lib/timetableSettings";
 import { topicPath } from "@/lib/topicPath";
+import { topicStatusLabel } from "@/lib/topicStatusLabels";
 
 type Data = {
   timetable: {
@@ -81,14 +82,16 @@ function redirectIfStaleHost(slug: string, hostSlug: string, topic: FeedTopic) {
   }
 }
 
-/** Unpublished/submitted topics get a status bar; published ones render
+/** Unpublished/draft topics get a status bar; published ones render
  * nothing — including the bar itself (QA 2026-07-29: the empty toolbar
  * showed as a bare stripe above every published topic). */
 function StatusBar({ status }: { status: string }) {
   if (status === "published") return null;
   return (
     <div className="toolbar">
-      <span className={`status-badge status-${status}`}>{status}</span>
+      <span className={`status-badge status-${status}`}>
+        {topicStatusLabel(status)}
+      </span>
     </div>
   );
 }
