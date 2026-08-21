@@ -105,6 +105,13 @@ rather than a measurement, and the way to remove the guesswork entirely is the
 structural fix — SSR talking to the API internally instead of round-tripping
 through the public hostname (task 13).
 
+**Verified on hosted dev after deploy** (2026-08-21). `req.ip` now resolves to
+the real client, and eight rapid requests decrement a single bucket
+monotonically — 5999, 5998, 5997, 5996, 5995, 5994, 5993, 5992 — against one
+stable window, where before they scattered across four. The Cloudflare edge
+address also visibly moved between probes (`…137` → `…136`), which is the
+rotation that caused the original bug.
+
 ### R2 — The rate limiter fails closed · **DONE**
 
 `rate-limit.ts` returned 503 to _every_ request when the bucket store threw.
@@ -245,10 +252,20 @@ rather than waiting to be checked. Design for the week he has flu.
 Recorded because it is the classic first-load killer and Topic does not have
 it. Revisit before scaling past two API instances.
 
-### R18 — Never load-tested · **LATER** (task 12)
+### R18 — Barely load-tested · **PARTLY DONE** (task 12)
 
-Nothing has ever put concurrent load on the app. The rate-limit probe above is
-the only real measurement taken to date.
+First concurrency measurement, hosted dev, 2026-08-21: **30 simultaneous
+homepage loads** (the full server-rendering path) all returned 200, in 3s wall
+clock, with the slowest single response at **2.0s**.
+
+So the app does not fall over at that level — but 2.0s under only 30-way
+concurrency, on `apps-s-1vcpu-0.5gb` instances, is not much headroom. Treat 30
+concurrent as "works", not as "comfortable", and re-measure before assuming a
+larger cohort is fine.
+
+The probe also confirmed the SSR concentration described in R1: those 30 page
+loads did not touch the probing client's own rate-limit bucket at all, because
+their GraphQL calls arrive from the web container's address.
 
 ---
 
