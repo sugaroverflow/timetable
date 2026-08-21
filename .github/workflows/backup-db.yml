@@ -1,0 +1,85 @@
+name: Backup Database
+
+# Off-site logical backup (docs/OPERATIONS.md R8). DigitalOcean's managed
+# daily backups cover hardware loss; this covers the slow-motion failure they
+# do not — a destructive migration noticed weeks later, after every managed
+# snapshot has rolled past the good state.
+#
+# INERT until the secrets below exist in the `production` GitHub Environment:
+#   DATABASE_URL_BACKUP    connection string for the prod cluster
+#   BACKUP_SPACES_BUCKET   a PRIVATE bucket, separate from the uploads bucket
+#   BACKUP_SPACES_KEY      Spaces access key with write access to it
+#   BACKUP_SPACES_SECRET
+#
+# The bucket must be private and must not be the uploads bucket: the dump
+# contains every user's email address and every comment. It also cannot be a
+# GitHub Actions artifact — this repository is public, so artifacts are
+# publicly downloadable.
+
+on:
+  schedule:
+    # Weekly, Sunday 03:41 UTC. Off-peak, and deliberately not on the hour.
+    - cron: "41 3 * * 0"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: GitHub Environment holding the backup secrets
+        type: choice
+        options:
+          - production
+          - timetable-dev
+        default: production
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check configuration
+        id: check
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_BACKUP }}
+          BACKUP_SPACES_BUCKET: ${{ secrets.BACKUP_SPACES_BUCKET }}
+          BACKUP_SPACES_KEY: ${{ secrets.BACKUP_SPACES_KEY }}
+          BACKUP_SPACES_SECRET: ${{ secrets.BACKUP_SPACES_SECRET }}
+        run: |
+          if [ -z "$DATABASE_URL" ] || [ -z "$BACKUP_SPACES_BUCKET" ] \
+            || [ -z "$BACKUP_SPACES_KEY" ] || [ -z "$BACKUP_SPACES_SECRET" ]; then
+            echo "::warning::Backups are NOT running — the backup secrets are not configured. See docs/OPERATIONS.md task 9."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Pin the client to the server's major version: pg_dump refuses to dump
+      # from a newer server than itself, and the runner's default can lag.
+      - name: Install postgresql-client-16 and s3cmd
+        if: steps.check.outputs.configured == 'true'
+        run: |
+          set -euo pipefail
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-16 s3cmd
+          pg_dump --version
+
+      - name: Run backup
+        if: steps.check.outputs.configured == 'true'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_BACKUP }}
+          BACKUP_SPACES_BUCKET: ${{ secrets.BACKUP_SPACES_BUCKET }}
+          BACKUP_SPACES_KEY: ${{ secrets.BACKUP_SPACES_KEY }}
+          BACKUP_SPACES_SECRET: ${{ secrets.BACKUP_SPACES_SECRET }}
+          BACKUP_SPACES_REGION: ${{ vars.BACKUP_SPACES_REGION || 'lon1' }}
+          BACKUP_RETENTION_DAYS: ${{ vars.BACKUP_RETENTION_DAYS || '90' }}
+        run: |
+          chmod +x scripts/backup-db.sh
+          scripts/backup-db.sh

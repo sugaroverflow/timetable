@@ -13,6 +13,7 @@ import {
   useApiTokenScopes,
   useApiTokenWriteLimits,
 } from "./graphql/token-scopes";
+import { createHealthHandler } from "./http/health";
 import { createDatabaseRateLimitStore, rateLimit } from "./http/rate-limit";
 import { requestLog, structuredLogger } from "./http/request-log";
 import { restRouter } from "./rest/router";
@@ -101,9 +102,16 @@ export function createApiApp() {
 
   app.use("/api", limiter, express.json(), restRouter);
 
-  app.get("/health", (_req, res) => {
-    res.json({ ok: true });
-  });
+  // Outside the limiter on purpose: a health probe that can be throttled is
+  // not a health probe.
+  app.get(
+    "/health",
+    createHealthHandler({
+      timeoutMs: env.healthDbTimeoutMs,
+      debugForwarding: env.debugForwarding,
+      trustProxyHops: env.trustProxyHops,
+    }),
+  );
 
   return app;
 }

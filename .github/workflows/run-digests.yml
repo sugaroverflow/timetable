@@ -31,8 +31,22 @@ jobs:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           DIGEST_JOB_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.digest_job_url || 'https://timetable.love/api/jobs/digests' }}
         run: |
+          set -euo pipefail
           test -n "$CRON_SECRET"
           test -n "$DIGEST_JOB_URL"
-          curl --fail --show-error --silent \
+
+          response=$(curl --fail --show-error --silent \
             --request POST "$DIGEST_JOB_URL" \
-            --header "x-cron-secret: $CRON_SECRET"
+            --header "x-cron-secret: $CRON_SECRET")
+
+          echo "$response"
+          echo "digest run: $response" >> "$GITHUB_STEP_SUMMARY"
+
+          # Recipients are isolated now (ops R4), so the job returns 200 even
+          # when individual sends failed. Without this check a cohort-wide
+          # delivery failure would show as a green workflow run.
+          failed=$(echo "$response" | jq -r '.failed // 0')
+          if [ "$failed" -gt 0 ]; then
+            echo "::error::$failed recipient(s) failed — check the API logs (component=digests), then re-dispatch. Already-sent forums will not re-send."
+            exit 1
+          fi

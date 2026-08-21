@@ -11,9 +11,58 @@ import { avatarSlot, initials } from "@timetable/shared";
 
 const EMAIL_FROM = process.env.EMAIL_FROM ?? "Topic <no-reply@example.com>";
 
+const sleep = (ms: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/** Reads at call time so tests (and the app spec) can vary them. */
+const maxRps = () => Number(process.env.RESEND_MAX_RPS ?? 2) || 2;
+const maxAttempts = () => Number(process.env.EMAIL_MAX_ATTEMPTS ?? 4) || 4;
+
+/**
+ * Global send pacing (ops R4). Resend's default limit is 2 requests/second,
+ * and the digest job fires a chunk of recipients concurrently — unthrottled,
+ * the first run against a real cohort hits 429 immediately. Every send in the
+ * process queues through one chain so the API-wide rate never exceeds
+ * RESEND_MAX_RPS, no matter how many callers are in flight.
+ */
+let sendChain: Promise<unknown> = Promise.resolve();
+let lastSendStartedAt = 0;
+
+function schedule<T>(task: () => Promise<T>): Promise<T> {
+  const result = sendChain.then(async () => {
+    const gap = 1000 / maxRps();
+    const wait = lastSendStartedAt + gap - Date.now();
+    if (wait > 0) await sleep(wait);
+    lastSendStartedAt = Date.now();
+    return task();
+  });
+  // Keep the chain alive whatever this task did, or one rejection would
+  // poison every subsequent send.
+  sendChain = result.then(
+    () => {},
+    () => {},
+  );
+  return result;
+}
+
+/** 429 and 5xx are worth another go; 4xx (bad address, bad key) never is. */
+const isRetryable = (status: number) => status === 429 || status >= 500;
+
+function retryDelayMs(res: Response, attempt: number): number {
+  const header = res.headers.get("retry-after");
+  const seconds = header ? Number(header) : NaN;
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000;
+  // Exponential backoff, capped so a wedged provider can't stall the run.
+  return Math.min(500 * 2 ** (attempt - 1), 8_000);
+}
+
 /**
  * Send an email via Resend. With no RESEND_API_KEY (local dev), the message is
  * logged to the console instead.
+ *
+ * Paced (see `schedule`) and retried on 429/5xx and network errors. It still
+ * throws once attempts are exhausted — but the digest job now isolates each
+ * recipient, so a throw no longer takes the whole run down with it.
  */
 export async function sendEmail(args: {
   to: string;
@@ -28,22 +77,45 @@ export async function sendEmail(args: {
     return;
   }
 
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: EMAIL_FROM,
-      to: args.to,
-      subject: args.subject,
-      html: args.html,
-    }),
-  });
-  if (!res.ok) {
-    throw new Error(`Resend error ${res.status}: ${await res.text()}`);
+  const attempts = maxAttempts();
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    let res: Response;
+    try {
+      res = await schedule(() =>
+        fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${key}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            from: EMAIL_FROM,
+            to: args.to,
+            subject: args.subject,
+            html: args.html,
+          }),
+        }),
+      );
+    } catch (err) {
+      // Network-level failure (DNS, socket, timeout) — always worth a retry.
+      lastError = err;
+      if (attempt === attempts) break;
+      await sleep(Math.min(500 * 2 ** (attempt - 1), 8_000));
+      continue;
+    }
+
+    if (res.ok) return;
+
+    lastError = new Error(`Resend error ${res.status}: ${await res.text()}`);
+    if (!isRetryable(res.status) || attempt === attempts) break;
+    await sleep(retryDelayMs(res, attempt));
   }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error(`Resend send failed: ${String(lastError)}`);
 }
 
 const esc = (s: string) =>
