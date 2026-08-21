@@ -954,6 +954,9 @@ const TopicQueueType = builder
       roundSize: t.exposeInt("roundSize"),
       /** Published topics never seen nor ❤️'d (the sidebar badge). */
       neverSeenCount: t.exposeInt("neverSeenCount"),
+      /** queue-back: how many already-reviewed topics the viewer can step
+       * back through this round. */
+      historyCount: t.int({ resolve: (q) => q.historyIds.length }),
       current: t.field({
         type: TopicType,
         nullable: true,
@@ -969,7 +972,14 @@ builder.queryFields((t) => ({
   topicQueue: t.field({
     type: TopicQueueType,
     nullable: true,
-    args: { idOrSlug: t.arg.string({ required: true }) },
+    args: {
+      idOrSlug: t.arg.string({ required: true }),
+      /** queue-back (Ed, 2026-08-21): serve the topic `back` steps behind
+       * the live one instead — 1 is the topic just passed. Read-only: a
+       * step back never un-reviews anything, so `remaining` and the round
+       * counter don't move. Out-of-range values clamp to the live topic. */
+      back: t.arg.int({ required: false }),
+    },
     resolve: async (_p, args, ctx) => {
       if (!ctx.user) return null;
       const readable = await readTimetable(ctx, args.idOrSlug);
@@ -982,10 +992,18 @@ builder.queryFields((t) => ({
         ctx.user.id,
         readable.timetable.heartsCountFrom,
       );
+      const back = Math.max(
+        0,
+        Math.min(args.back ?? 0, state.historyIds.length),
+      );
+      const showId =
+        back > 0
+          ? state.historyIds[state.historyIds.length - back]!
+          : state.currentTopicId;
       let current: GqlTopic | null = null;
-      if (state.currentTopicId) {
+      if (showId) {
         const [topic] = await buildFeed(readable.timetable.id, ctx.user.id, {
-          topicId: state.currentTopicId,
+          topicId: showId,
         });
         if (topic) {
           const flags = topicViewFlags(readable.timetable, viewer);

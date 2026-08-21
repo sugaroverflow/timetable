@@ -2449,6 +2449,19 @@ a.c-time:hover {
 .queue-btn-next {
   color: var(--ink);
 }
+/* queue-back (Ed, 2026-08-21): a smaller, quieter twin of Next on the
+   left — revisiting a topic is a secondary move next to deciding on this
+   one, and it must not read as the primary action. Rendered as a link
+   (the step lives in the URL), so it needs the button's own centring. */
+.queue-btn-back {
+  width: 48px;
+  height: 48px;
+  color: var(--muted);
+  text-decoration: none;
+}
+a.queue-btn-back:hover {
+  color: var(--ink);
+}
 .queue-progress {
   text-align: center;
   font-size: var(--text-sm);
