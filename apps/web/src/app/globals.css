@@ -420,6 +420,20 @@ textarea {
 .topic-body-collapsed > *:not(:first-child) {
   display: none;
 }
+/* The last couple of lines fade out while collapsed (Ed, 2026-08-21): a
+   soft edge reads as "there is more below" before you notice the pill,
+   where a hard cut can look like the end of the text. A mask, not a
+   colour overlay — it only touches alpha, so it works over any card
+   background in both themes. Applied only once hydration has confirmed
+   something IS hidden, so a short body never flashes faded. */
+.topic-body-fade {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    black calc(100% - 2.5em),
+    transparent
+  );
+  mask-image: linear-gradient(to bottom, black calc(100% - 2.5em), transparent);
+}
 /* Show more/less: a small pill in the accent colour — easy to miss as
    bare muted text, and readers skipped past without realising text was
    hidden (QA 2026-07-29). Pulled up against the stack gap so it hugs the
