@@ -38,7 +38,7 @@ import {
 
 /** Max bio length, shared by the self-edit and admin-edit mutations so the two
  * can't drift apart. Storage hygiene only — the column is unbounded `text`. */
-const BIO_MAX_LENGTH = 4000;
+const BIO_MAX_LENGTH = 8000;
 
 // ---------------------------------------------------------------------------
 // Types
