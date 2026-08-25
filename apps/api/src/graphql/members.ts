@@ -36,6 +36,10 @@ import {
   requireUser,
 } from "./guards";
 
+/** Max bio length, shared by the self-edit and admin-edit mutations so the two
+ * can't drift apart. Storage hygiene only — the column is unbounded `text`. */
+const BIO_MAX_LENGTH = 4000;
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -313,7 +317,7 @@ builder.mutationFields((t) => ({
     },
     resolve: async (_p, args, ctx) => {
       capLength(args.name, 120, "Name");
-      capLength(args.bio, 3000, "Bio");
+      capLength(args.bio, BIO_MAX_LENGTH, "Bio");
       assertOptionalHttpUrl(args.image, "Image URL");
       const { user, readable } = await loadTimetableAndViewer(
         ctx,
@@ -424,7 +428,7 @@ builder.mutationFields((t) => ({
       image: t.arg.string({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
-      capLength(args.bio, 3000, "Bio");
+      capLength(args.bio, BIO_MAX_LENGTH, "Bio");
       assertOptionalHttpUrl(args.image, "Image URL");
       const { user, readable } = await requireAdminTimetable(
         ctx,
