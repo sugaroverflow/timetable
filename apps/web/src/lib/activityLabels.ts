@@ -21,7 +21,9 @@ export const ACTION_LABELS: Record<string, string> = {
   // Pinning by the topic's author (#258, 2026-08-17).
   "comment.pin": "pinned a comment",
   "comment.unpin": "unpinned a comment",
-  "member.bio_edit": "edited a member's bio",
+  // Covers name, photo and bio since 2026-08-27 (the stored action keeps
+  // its `bio_edit` name — historical rows read fine under the new wording).
+  "member.bio_edit": "edited a member's profile",
   "member.profile_edit": "updated their own profile",
   "heart.add": "❤️'d a topic",
   "heart.remove": "took back their ❤️ from a topic",
@@ -64,7 +66,7 @@ export const ACTION_LABELS: Record<string, string> = {
  * remain the filter's wording and the fallback. */
 export const TARGETED_LABELS: Record<string, string> = {
   "member.impersonate": "previewed the forum as",
-  "member.bio_edit": "edited the bio of",
+  "member.bio_edit": "edited the profile of",
   "member.email_change": "changed the login email of",
   "member.role_change": "changed the roles of",
   "member.remove": "removed",

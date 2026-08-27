@@ -414,9 +414,11 @@ builder.mutationFields((t) => ({
     },
   }),
 
-  /** Admin: edit any member's bio (QA #42 — bios are editable from the
-   * Members section in Settings) and profile image (production QA).
-   * Logged to the activity feed. */
+  /** Admin: edit any member's per-forum profile — bio (QA #42 — bios are
+   * editable from the Members section in Settings), profile image
+   * (production QA) and name (2026-08-27). Same fields the member's own
+   * updateMyProfile edits. Logged to the activity feed.
+   * (Mutation name kept for compatibility.) */
   updateMemberBio: t.field({
     type: PersonType,
     nullable: true,
@@ -426,9 +428,13 @@ builder.mutationFields((t) => ({
       bio: t.arg.string({ required: true }),
       /** Omit to leave unchanged; empty string clears. */
       image: t.arg.string({ required: false }),
+      /** Omit (or blank) to leave unchanged — a member can be renamed, but
+       * not renamed to nothing. Renaming re-derives their member slug. */
+      name: t.arg.string({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
       capLength(args.bio, BIO_MAX_LENGTH, "Bio");
+      capLength(args.name, 120, "Name");
       assertOptionalHttpUrl(args.image, "Image URL");
       const { user, readable } = await requireAdminTimetable(
         ctx,
@@ -436,15 +442,19 @@ builder.mutationFields((t) => ({
       );
       const target = await getPerson(readable.timetable.id, args.userId);
       if (!target) notFound("Member not found");
+      const name = args.name?.trim() || undefined;
       await updateMemberProfile(readable.timetable.id, args.userId, {
         bio: args.bio.trim() || null,
         ...(args.image != null ? { image: args.image.trim() || null } : {}),
+        ...(name != null ? { name } : {}),
       });
       await logActivity({
         timetableId: readable.timetable.id,
         actorId: user.id,
         action: "member.bio_edit",
-        payload: { userId: args.userId, name: target.name },
+        // The name AFTER the edit — the timeline chip should read as the
+        // person you'd look for today, not their old name.
+        payload: { userId: args.userId, name: name ?? target.name },
       });
       return getPerson(readable.timetable.id, args.userId);
     },

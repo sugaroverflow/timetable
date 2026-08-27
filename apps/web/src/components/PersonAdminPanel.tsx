@@ -74,8 +74,11 @@ function ChangeEmailField({
 }
 
 /** Admin "Edit" control on a People card (QA #59 — member editing moved
- * here from the Settings dropdown). Expands into the roles + bio editor,
- * with removal from the timetable (round 3). Owners can't be removed. */
+ * here from the Settings dropdown). Expands into the roles editor plus the
+ * member's name/bio/photo fields (open immediately — Ed, 2026-08-27: one
+ * click, not two), the login email, and removal from the timetable
+ * (round 3). "Close editor" discards anything unsaved. Owners can't be
+ * removed. */
 export function PersonAdminPanel({
   membershipId,
   userId,
