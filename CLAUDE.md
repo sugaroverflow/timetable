@@ -318,7 +318,34 @@ Stable names for feature pieces, so instructions can reference them precisely.
   explicitly collapsing clears the draft, and a page reload is a clean
   slate. Any new composer should use it rather than `useState("")`.
 
+- **feed-position-store** — `lib/feedPosition.ts` (Ed's "going back feels
+  fragile", 2026-08-28): remembers, per feed view, how many pages the
+  infinite feed had appended and the scroll offset, so Back replays them
+  instead of dropping you at the top. `InfiniteFeed` refetches that many
+  pages on mount and scrolls in an effect that waits for the commit —
+  before the cards are in the DOM there is nothing to scroll to. Keyed by
+  the element `key`'s view identity (sort, host, ❤️/💙 filter, seed,
+  search) PLUS the forum slug, since the person page's key lacks it.
+  Module-level like [[comment-draft-store]], deliberately: a within-visit
+  convenience that dies with the JS context. **Only a history traversal
+  restores** — popstate arms it, any click disarms it (a click-initiated
+  navigation is not a traversal), so clicking through to a feed you were
+  once deep in still starts at the top. The browser's own clamped restore
+  still runs first, so a deep restore briefly shows the top and then
+  jumps; fixing that would mean owning `scrollRestoration` app-wide.
+
 ## Gotchas (learned the hard way)
+
+- **In-page jump links must be `next/link`, never a bare `<a href="#…">`**
+  (2026-08-28). A fragment link is navigated by the BROWSER, so its history
+  entry carries `history.state === null`, and Next's popstate handler opens
+  with `if (!event.state) return` — it ignores entries it did not create.
+  Pressing Back onto one is a NO-OP: the URL changes and the previous page
+  stays rendered, and the next Back skips past it. The bug is silent, shows
+  up one navigation later, and the two spellings look identical in review.
+  `Link` has an `onlyHashChange` path that scrolls to the fragment and
+  pushes a router-owned entry. Verified on dev; cost the People page's
+  table of contents (`#person-…`, `#people-<role>`).
 
 - Postgres `ALTER TYPE … ADD VALUE` can't run inside a transaction — Drizzle
   migrations must **recreate the enum** instead (see migrations 0013/0014).

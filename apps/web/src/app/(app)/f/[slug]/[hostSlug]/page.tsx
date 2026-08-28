@@ -83,6 +83,7 @@ function TopicSection({
       ) : (
         <InfiniteFeed
           key={`${host}|${heartedBy}`}
+          positionKey={`${page.slug}|person|${host}|${heartedBy}`}
           query={{ slug: page.slug, sort: "recent", host, heartedBy }}
           refreshToken={refreshToken}
           pageSize={FEED_PAGE_SIZE}

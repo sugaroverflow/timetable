@@ -80,25 +80,35 @@ type Section = { role: Role; heading: string; people: Person[] };
  * flowing across and wrapping underneath (Ed's layout, 2026-08-16). The
  * heading still jumps to its section; each name jumps to that person's
  * card. Avatars ride along because a face is faster to find than a name.
+ *
+ * These are `Link`s, not bare `<a href="#…">`, and that is load-bearing
+ * (2026-08-28): a raw fragment link makes the BROWSER push the history
+ * entry, and such an entry carries `history.state === null`. Next's
+ * popstate handler ignores any entry it did not create, so pressing Back
+ * onto one is a no-op — you would return to this page's URL with the
+ * previous page still rendered, and a second Back would then land on the
+ * un-anchored entry, i.e. the top of People. `Link` routes the jump
+ * through the router (its `onlyHashChange` path scrolls to the fragment),
+ * so the entry is the router's and Back comes home to the person.
  */
 function PeopleContents({ sections }: { sections: Section[] }) {
   return (
     <nav className="people-toc card" aria-label="People on this page">
       {sections.map((section) => (
         <div key={section.role} className="people-toc-group">
-          <a className="people-toc-heading" href={`#people-${section.role}`}>
+          <Link className="people-toc-heading" href={`#people-${section.role}`}>
             {section.heading}
-          </a>
+          </Link>
           <div className="people-toc-people">
             {section.people.map((person) => (
-              <a
+              <Link
                 key={person.userId}
                 className="people-toc-person"
                 href={`#${personAnchor(person.userId)}`}
               >
                 <Avatar name={person.name} image={person.image} small />
                 {person.name ?? "Member"}
-              </a>
+              </Link>
             ))}
           </div>
         </div>

@@ -3,6 +3,7 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 
 import type { FeedQuery } from "@/lib/feedPage";
+import { takeFeedPosition, useFeedPositionMemory } from "@/lib/feedPosition";
 
 type LoadMore = (
   query: FeedQuery,
@@ -50,6 +51,7 @@ function FeedTail({
  */
 export function InfiniteFeed({
   query,
+  positionKey,
   refreshToken = "",
   pageSize,
   initialHasNext,
@@ -58,6 +60,10 @@ export function InfiniteFeed({
 }: {
   /** The feed request all appended pages repeat (offset varies per page). */
   query: Omit<FeedQuery, "offset">;
+  /** Identifies this feed view for the feed-position-store — pass the same
+   * string used as the element `key`, so a different sort/filter/seed is a
+   * different view and never restores another view's position. */
+  positionKey: string;
   /** Server-render marker: pass a fresh value on every server render so
    * appended pages can re-sync after a router.refresh() (see below). */
   refreshToken?: string;
@@ -73,6 +79,25 @@ export function InfiniteFeed({
   const offsetRef = useRef(pageSize);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const tokenRef = useRef(refreshToken);
+  /** Offset to scroll to once the restored cards are committed. */
+  const pendingScrollRef = useRef<number | null>(null);
+
+  /** Fetch pages 1..count in order and return them; shared by the restore
+   * and refresh paths, which both replay pages the user already had. */
+  const fetchPages = useCallback(
+    async (count: number, cancelled: () => boolean) => {
+      const cards: React.ReactNode[] = [];
+      let next = true;
+      for (let i = 0; i < count; i += 1) {
+        const res = await loadMore({ ...query, offset: (i + 1) * pageSize });
+        if (cancelled()) return null;
+        cards.push(res.cards);
+        next = res.hasNext;
+      }
+      return { cards, next };
+    },
+    [loadMore, query, pageSize],
+  );
 
   const loadNext = useCallback(async () => {
     if (loadingRef.current) return;
@@ -104,16 +129,11 @@ export function InfiniteFeed({
     void (async () => {
       loadingRef.current = true;
       try {
-        const fresh: React.ReactNode[] = [];
-        let next = true;
-        for (let off = pageSize; off < offsetRef.current; off += pageSize) {
-          const res = await loadMore({ ...query, offset: off });
-          if (cancelled) return;
-          fresh.push(res.cards);
-          next = res.hasNext;
-        }
-        setPages(fresh);
-        setHasNext(next);
+        const loaded = offsetRef.current / pageSize - 1;
+        const fresh = await fetchPages(loaded, () => cancelled);
+        if (!fresh) return;
+        setPages(fresh.cards);
+        setHasNext(fresh.next);
       } catch {
         // Keep the stale pages — the next scroll or refresh retries.
       } finally {
@@ -123,7 +143,43 @@ export function InfiniteFeed({
     return () => {
       cancelled = true;
     };
-  }, [refreshToken, loadMore, query, pageSize]);
+  }, [refreshToken, fetchPages, pageSize]);
+
+  /* Back to the feed (2026-08-28): the pages this view had loaded are gone
+   * with the unmounted subtree, so replay them, then put the viewport back.
+   * Mount-only, and a no-op unless the arrival was a history traversal that
+   * left a position behind — see feed-position-store. */
+  useEffect(() => {
+    const saved = takeFeedPosition(positionKey);
+    if (!saved) return;
+    // Hold the sentinel off: on a one-page document it is already in view,
+    // so without this it would race us loading page two.
+    loadingRef.current = true;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const restored = await fetchPages(saved.pages, () => cancelled);
+        if (!restored) return;
+        offsetRef.current = (saved.pages + 1) * pageSize;
+        pendingScrollRef.current = saved.scrollY;
+        setPages(restored.cards);
+        setHasNext(restored.next);
+      } catch {
+        // Restoring is a convenience; a failure just leaves you on page one.
+      } finally {
+        loadingRef.current = false;
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Mount-only: the saved position is consumed by the first run.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* Records the position as you scroll, and performs the pending scroll
+   * once the restored pages are committed. */
+  useFeedPositionMemory(positionKey, pages.length, pendingScrollRef);
 
   useEffect(() => {
     const el = sentinelRef.current;

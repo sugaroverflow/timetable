@@ -299,6 +299,7 @@ export default async function FeedPage({
         <SearchHighlight q={q}>
           <InfiniteFeed
             key={`${sort}|${host}|${hearted}|${hostHearted}|${seed}|${q}`}
+            positionKey={`${slug}|topics|${sort}|${host}|${hearted}|${hostHearted}|${seed}|${q}`}
             query={{ slug, sort, host, hearted, hostHearted, q, seed }}
             // eslint-disable-next-line react-hooks/purity -- server-only render marker
             refreshToken={Math.random().toString(36).slice(2, 10)}
