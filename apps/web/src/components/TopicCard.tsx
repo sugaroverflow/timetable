@@ -104,6 +104,9 @@ function TopicTail({
   const editable = {
     id: topic.id,
     title: topic.title,
+    // The current permalink slug — a rename from the permalink page
+    // navigates to the new one (TopicEditForm).
+    slug: topic.slug,
     bodyMd: topic.bodyMd,
     coverImageUrl: topic.coverImageUrl,
     status: topic.status,

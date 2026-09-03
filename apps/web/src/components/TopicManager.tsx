@@ -261,6 +261,7 @@ export function TopicManager({
         topic={{
           id: topic.id,
           title: topic.title,
+          slug: topic.slug,
           bodyMd: topic.bodyMd,
           coverImageUrl: topic.coverImageUrl,
         }}

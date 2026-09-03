@@ -16,8 +16,11 @@ export type GqlActionOptions<T> = {
    * flags, follow-up requests). Runs inside the try, before the success
    * toast — a throw here lands in the same error toast as the mutation. */
   onSuccess?: (data: T) => void | Promise<void>;
-  /** Set false for flows that don't re-render server data. Default true. */
-  refresh?: boolean;
+  /** Set false for flows that don't re-render server data, or decide from
+   * the mutation result — a save that MOVED the page (topic rename → new
+   * permalink) navigates instead, and a refresh of the old URL would 404.
+   * Default true. */
+  refresh?: boolean | ((data: T) => boolean);
 };
 
 /**
@@ -54,7 +57,11 @@ export function useGqlAction() {
             : opts.success,
         );
       }
-      if (opts.refresh !== false) {
+      const refresh =
+        typeof opts.refresh === "function"
+          ? opts.refresh(data)
+          : opts.refresh !== false;
+      if (refresh) {
         startTransition(() => router.refresh());
       }
     } catch (err) {

@@ -8,7 +8,7 @@ import { TopicEditForm } from "./TopicEditForm";
 
 type EditableTopic = Pick<
   ManagedTopic,
-  "id" | "title" | "bodyMd" | "coverImageUrl"
+  "id" | "title" | "bodyMd" | "coverImageUrl" | "slug"
 >;
 
 const Ctx = createContext<{

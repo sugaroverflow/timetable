@@ -347,6 +347,15 @@ Stable names for feature pieces, so instructions can reference them precisely.
   pushes a router-owned entry. Verified on dev; cost the People page's
   table of contents (`#person-…`, `#people-<role>`).
 
+- **`router.refresh()` is bound to the URL, not the entity** (2026-09-03).
+  `useGqlAction` ends every mutation with a refresh of the CURRENT route.
+  A draft topic's slug follows its title until publish, so a rename from
+  the topic's own permalink moves the page underfoot and the refresh
+  404s. `TopicEditForm` compares old and new `topicPath` and
+  `router.replace`s instead when they differ and you're standing on the
+  old one; `refresh` accepts a function of the result for exactly this.
+  Any future mutation that can change the current page's address needs
+  the same treatment.
 - Postgres `ALTER TYPE … ADD VALUE` can't run inside a transaction — Drizzle
   migrations must **recreate the enum** instead (see migrations 0013/0014).
 - "Draft" means THREE things — never blanket-delete or rename "draft"
