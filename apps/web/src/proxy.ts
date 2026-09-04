@@ -5,6 +5,8 @@ import {
   type NextRequest,
 } from "next/server";
 
+import { matchVanityRoute, type VanityRoute } from "@timetable/shared";
+
 import { e2eTestMode, env } from "@/env";
 import { canonicalHosts, redirectTargetHost } from "@/lib/canonicalHost";
 import { buildCsp, mintNonce } from "@/lib/csp";
@@ -12,18 +14,23 @@ import { buildCsp, mintNonce } from "@/lib/csp";
 // Next 16 renamed the "middleware" convention to "proxy". Clerk attaches auth
 // to every request; route-level access control is enforced in layouts/pages
 // (public timetables stay readable while anonymous).
-type RouteLookup = {
-  data?: { timetableRouteByDomain?: { slug: string } | null };
+type RoutesLookup = {
+  data?: { forumRoutesByHost?: VanityRoute[] };
   errors?: { message?: string }[];
 };
 
-const ROUTE_QUERY = `
-  query DomainRoute($host: String!) {
-    timetableRouteByDomain: forumRouteByDomain(host: $host) { slug }
+const ROUTES_QUERY = `
+  query VanityRoutes($host: String!) {
+    forumRoutesByHost(host: $host) { slug pathPrefix }
   }
 `;
 
-const routeCache = new Map<string, { slug: string; expiresAt: number }>();
+// vanity-address: every route on a host, cached per host — an empty list
+// too, so a stray host pointed at us doesn't re-query on every hit.
+const routeCache = new Map<
+  string,
+  { routes: VanityRoute[]; expiresAt: number }
+>();
 
 type SlugLookup = {
   data?: { forumCanonicalSlug?: string | null };
@@ -64,44 +71,35 @@ function isCustomHost(host: string): boolean {
   return true;
 }
 
-function shouldRewritePath(pathname: string): boolean {
-  if (pathname.startsWith("/f/")) return false;
-  if (pathname.startsWith("/api/")) return false;
-  if (pathname === "/graphql" || pathname.startsWith("/graphql/")) return false;
-  if (pathname.startsWith("/sign-in") || pathname.startsWith("/sign-up")) {
-    return false;
-  }
-  return true;
-}
-
-/** One GraphQL round-trip: host → timetable slug (null when unrouted).
- * Network and GraphQL failures are logged by name and resolve to null. */
-async function fetchDomainSlug(
+/** One GraphQL round-trip: host → its vanity routes (empty when none).
+ * Network and GraphQL failures are logged by name and resolve to null so
+ * the caller can decline to cache them. */
+async function fetchHostRoutes(
   host: string,
   graphqlUrl: string,
-): Promise<string | null> {
+): Promise<VanityRoute[] | null> {
   const res = await fetch(graphqlUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query: ROUTE_QUERY, variables: { host } }),
+    body: JSON.stringify({ query: ROUTES_QUERY, variables: { host } }),
   });
   if (!res.ok) {
     console.warn(
-      `[web] custom domain lookup failed for ${host}: GraphQL returned ${res.status}`,
+      `[web] vanity address lookup failed for ${host}: GraphQL returned ${res.status}`,
     );
     return null;
   }
-  const json = (await res.json()) as RouteLookup;
+  const json = (await res.json()) as RoutesLookup;
   if (json.errors?.length) {
     console.warn(
-      `[web] custom domain lookup failed for ${host}: ${json.errors
+      `[web] vanity address lookup failed for ${host}: ${json.errors
         .map((error) => error.message)
         .filter(Boolean)
         .join("; ")}`,
     );
     return null;
   }
-  return json.data?.timetableRouteByDomain?.slug ?? null;
+  return json.data?.forumRoutesByHost ?? [];
 }
 
 function routeGraphqlUrl(): string {
@@ -112,18 +110,18 @@ function routeGraphqlUrl(): string {
   );
 }
 
-async function lookupDomainSlug(host: string): Promise<string | null> {
+async function lookupHostRoutes(host: string): Promise<VanityRoute[]> {
   const now = Date.now();
   const cached = routeCache.get(host);
-  if (cached && cached.expiresAt > now) return cached.slug;
+  if (cached && cached.expiresAt > now) return cached.routes;
 
   try {
-    const slug = await fetchDomainSlug(host, routeGraphqlUrl());
-    if (slug) routeCache.set(host, { slug, expiresAt: now + 60_000 });
-    return slug;
+    const routes = await fetchHostRoutes(host, routeGraphqlUrl());
+    if (routes) routeCache.set(host, { routes, expiresAt: now + 60_000 });
+    return routes ?? [];
   } catch (error) {
-    console.warn(`[web] custom domain lookup failed for ${host}`, error);
-    return null;
+    console.warn(`[web] vanity address lookup failed for ${host}`, error);
+    return [];
   }
 }
 
@@ -167,20 +165,28 @@ async function staleSlugRedirect(request: NextRequest) {
   return NextResponse.redirect(url, 308);
 }
 
-async function customDomainRewrite(
-  request: NextRequest,
-  requestHeaders: Headers,
-) {
+/**
+ * vanity-address (Ed, 2026-09-04): a request on any host that isn't ours
+ * is REDIRECTED to the deployment's own origin — into the forum whose
+ * address (host + longest path prefix) it matches, carrying the rest of
+ * the path and the query along, or to the home page when nothing on that
+ * host matches. Never served in place: sessions are per host, links are
+ * absolute `/f/<slug>/…` paths, and emails link home regardless — and a
+ * stray host pointed at us must not render the app under its name. 307,
+ * not 308: admins edit these addresses, and browsers cache 308 for good.
+ */
+async function vanityRedirect(request: NextRequest) {
   const host = requestHost(request);
-  const pathname = request.nextUrl.pathname;
-  if (!isCustomHost(host) || !shouldRewritePath(pathname)) return undefined;
+  if (!isCustomHost(host)) return undefined;
 
-  const slug = await lookupDomainSlug(host);
-  if (!slug) return undefined;
-
-  const url = request.nextUrl.clone();
-  url.pathname = `/f/${slug}${pathname === "/" ? "" : pathname}`;
-  return NextResponse.rewrite(url, { request: { headers: requestHeaders } });
+  const routes = await lookupHostRoutes(host);
+  const match = matchVanityRoute(routes, request.nextUrl.pathname);
+  const url = new URL(env.webOrigin);
+  if (match) {
+    url.pathname = `/f/${match.slug}${match.rest}`;
+    url.search = request.nextUrl.search;
+  }
+  return NextResponse.redirect(url, 307);
 }
 
 /**
@@ -201,9 +207,7 @@ async function routeRequest(request: NextRequest) {
   requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("content-security-policy", csp);
 
-  const response =
-    (await customDomainRewrite(request, requestHeaders)) ??
-    NextResponse.next({ request: { headers: requestHeaders } });
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("content-security-policy", csp);
   return response;
 }
@@ -212,7 +216,10 @@ const clerkProxy = clerkMiddleware(async (_auth, request) => {
   return routeRequest(request);
 });
 
-export default function proxy(request: NextRequest, event: NextFetchEvent) {
+export default async function proxy(
+  request: NextRequest,
+  event: NextFetchEvent,
+) {
   // Clerk sessions exist per host, so our www/legacy aliases redirect to the
   // deployment's own origin before anything else runs (issue #230). 308
   // preserves method and query, and calendar/feed clients follow it.
@@ -224,6 +231,11 @@ export default function proxy(request: NextRequest, event: NextFetchEvent) {
     url.port = "";
     return NextResponse.redirect(url, 308);
   }
+
+  // Any other host is a vanity address (or a stray) — redirected home too,
+  // before Clerk sees a host it was never configured for.
+  const vanity = await vanityRedirect(request);
+  if (vanity) return vanity;
 
   // Playwright smoke tests render anonymous shell routes without Clerk's
   // development-browser handshake or real Clerk credentials.

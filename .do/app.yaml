@@ -27,6 +27,10 @@ domains:
     type: ALIAS
   - domain: www.timetable.love
     type: ALIAS
+  # vanity-address hosts (see docs/DEPLOYMENT.md): DNS CNAMEs at the app,
+  # the web proxy redirects each path into its forum. One line per host.
+  - domain: topic.newspeak.house
+    type: ALIAS
 
 # HTTP routing on one domain. API owns /api, /graphql, /health; web owns the rest.
 # preserve_path_prefix keeps the prefix so Express (mounted at /api, /graphql,

@@ -2,7 +2,6 @@ import {
   getDashboard,
   getHostHeartBreakdown,
   getOrCreateIcsToken,
-  getTimetableByDomain,
   getWeightedBreakdown,
   type DashboardData,
   type WeightedHeartEntry,
@@ -20,7 +19,7 @@ import {
   readTimetable,
   requireUser,
 } from "./guards";
-import { TimetableType, WeightedHeartType } from "./types";
+import { WeightedHeartType } from "./types";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -317,20 +316,6 @@ builder.queryFields((t) => ({
       // view-as preview — it would keep working after the preview ends.
       if (ctx.impersonation) return null;
       return getOrCreateIcsToken(user.id);
-    },
-  }),
-
-  /** Resolve a timetable by custom domain (for hostname routing). */
-  forumByDomain: t.field({
-    type: TimetableType,
-    nullable: true,
-    args: { host: t.arg.string({ required: true }) },
-    resolve: async (_p, args, ctx) => {
-      const timetable = await getTimetableByDomain(args.host);
-      if (!timetable) return null;
-      const readable = await readTimetable(ctx, timetable.id);
-      if (!readable) return null;
-      return { ...readable.timetable, viewerRoles: readable.roles as string[] };
     },
   }),
 }));

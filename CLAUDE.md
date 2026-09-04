@@ -318,6 +318,21 @@ Stable names for feature pieces, so instructions can reference them precisely.
   explicitly collapsing clears the draft, and a page reload is a clean
   slate. Any new composer should use it rather than `useState("")`.
 
+- **vanity-address** — `packages/shared/src/vanityAddress.ts` +
+  `vanityRedirect` in `apps/web/src/proxy.ts` + `forumRoutesByHost` (Ed,
+  2026-09-04): a forum's short public address — `topic.newspeak.house/2026`
+  — stored in `timetables.customDomain` as `host` or `host/prefix`.
+  Requests on ANY host that isn't ours are REDIRECTED (307) to the origin:
+  into the forum whose host + longest path prefix matches, rest of the path
+  and query carried along, or to the home page when nothing matches. Never
+  served in place (sessions are per host, links are absolute `/f/<slug>/…`,
+  emails link home) — Ed chose the redirect over white-labelling. Several
+  forums share a host by prefix (one per year). Runs FIRST in `proxy()`,
+  before Clerk. Each hostname needs the DO app spec line + a CNAME once
+  (`docs/DEPLOYMENT.md`); paths need nothing. The settings field is
+  "Vanity address"; the column and GraphQL arg keep the `customDomain`
+  name.
+
 - **feed-position-store** — `lib/feedPosition.ts` (Ed's "going back feels
   fragile", 2026-08-28): remembers, per feed view, how many pages the
   infinite feed had appended and the scroll offset, so Back replays them

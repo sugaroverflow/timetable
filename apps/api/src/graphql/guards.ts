@@ -210,24 +210,6 @@ export function assertOptionalHttpUrl(
   }
 }
 
-/** RFC-shaped hostname: dot-separated LDH labels, no scheme, no port. */
-const HOSTNAME =
-  /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/i;
-
-/** Throw unless the arg is empty (clears the domain) or a plain hostname. */
-export function assertOptionalHostname(
-  value: string | null | undefined,
-  label: string,
-): void {
-  const trimmed = value?.trim();
-  if (!trimmed) return;
-  if (trimmed.length > 253 || !HOSTNAME.test(trimmed)) {
-    throw new GraphQLError(
-      `${label} must be a hostname like forum.example.org`,
-    );
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Calendar settings validation (calendar v2)
 // ---------------------------------------------------------------------------

@@ -103,15 +103,17 @@ function IdentityFields({
         </select>
       </div>
       <div className="field">
-        <label htmlFor="tt-domain">Custom domain (coming soon)</label>
+        <label htmlFor="tt-domain">Vanity address</label>
         <input
           id="tt-domain"
           value={value.customDomain}
           onChange={(e) => onChange({ customDomain: e.target.value })}
-          placeholder="forum.2026.newspeak.house"
+          placeholder="topic.newspeak.house/2026"
         />
         <p className="hint" style={{ margin: "4px 0 0" }}>
-          Saved for later — custom-domain routing isn&rsquo;t wired up yet.
+          A short address for posters and emails — a hostname, or a hostname and
+          path. Visitors there are sent to this forum. The hostname has to be
+          pointed at Topic first; ask your sysadmin.
         </p>
       </div>
     </>

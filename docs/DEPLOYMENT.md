@@ -217,6 +217,31 @@ For production on a custom domain, create a Clerk production instance, configure
 domains and DNS in Clerk, then update the GitHub `production` environment
 secrets to live keys.
 
+## Vanity addresses (per-forum short URLs)
+
+A forum admin can set a **vanity address** in Forum Settings — a hostname
+(`forum.example.org`) or hostname and path (`topic.newspeak.house/2026`).
+Requests arriving there are 307-redirected by the web proxy to the forum on
+the app's own origin; the forum is never served under the other name (Clerk
+sessions are per host). Several forums may share one hostname with different
+path prefixes.
+
+The proxy only sees the request once TLS terminates, so each HOSTNAME needs
+ops work once (the paths need none):
+
+1. Add the hostname to the app's `domains:` list in `.do/app.yaml` as
+   `type: ALIAS` (applied on the next production deploy), or add it in the
+   DigitalOcean control panel under the app's Settings → Domains.
+2. At the domain's DNS, add a CNAME for that hostname pointing at the app's
+   `*.ondigitalocean.app` hostname. DigitalOcean issues the certificate once
+   it sees the record (minutes).
+3. The admin then types the address into Forum Settings. Until step 2
+   resolves, the browser can't reach us at all — the proxy has nothing to do
+   with that failure.
+
+An unknown host that reaches the app (a stray CNAME) is redirected to the
+origin's home page rather than served.
+
 ## Digest Cron
 
 The digest job is exposed as:

@@ -5,7 +5,7 @@ import {
   getFeedLastSeen,
   getLastVisitedTimetableSlug,
   getReadableTimetable,
-  getTimetableByDomain,
+  listTimetableRoutesByHost,
   getViewerRoles,
   listMembershipsForUser,
   logActivity,
@@ -19,14 +19,15 @@ import type { Timetable, TimetableSettings } from "@timetable/db";
 import {
   canEditSettings,
   canModerate,
+  formatVanityAddress,
   forumSlugSchema,
+  parseVanityAddress,
   PRIVACY_LEVELS,
   type Privacy,
 } from "@timetable/shared";
 
 import { builder } from "./builder";
 import {
-  assertOptionalHostname,
   assertOptionalHttpUrl,
   badRequest,
   capLength,
@@ -45,16 +46,48 @@ import { TimetableType, type GqlTimetable } from "./types";
 // Types
 // ---------------------------------------------------------------------------
 
-type GqlTimetableRoute = Pick<Timetable, "id" | "slug" | "privacy">;
+/** One vanity-address route on a host: the forum and the path prefix it
+ * claims there ("" for the bare hostname). */
+type GqlTimetableRoute = { slug: string; pathPrefix: string };
+
+/** vanity-address arg → what to store: undefined leaves it alone, "" clears
+ * it, otherwise the CANONICAL form (lowercase, no scheme, no trailing
+ * slash — the proxy matches it byte-for-byte against request hosts), after
+ * checking no other forum already holds that exact address (the column is
+ * unique; this turns the constraint error into a sentence). */
+async function resolveVanityAddress(
+  arg: string | null | undefined,
+  ownSlug: string,
+): Promise<string | undefined> {
+  if (arg == null) return undefined;
+  const trimmed = arg.trim();
+  if (!trimmed) return "";
+  const parsed = parseVanityAddress(trimmed);
+  if (!parsed) {
+    throw new GraphQLError(
+      "Vanity address must look like forum.example.org or topic.example.org/2026",
+    );
+  }
+  const address = formatVanityAddress(parsed);
+  const taken = (await listTimetableRoutesByHost(parsed.host)).find(
+    (route) => route.pathPrefix === parsed.pathPrefix && route.slug !== ownSlug,
+  );
+  if (taken) {
+    throw new GraphQLError(
+      `${address} is already the address of another forum`,
+    );
+  }
+  return address;
+}
+
 type GqlMembership = { id: string; roles: string[]; timetable: GqlTimetable };
 
 const TimetableRouteType = builder
   .objectRef<GqlTimetableRoute>("ForumRoute")
   .implement({
     fields: (t) => ({
-      id: t.exposeID("id"),
       slug: t.exposeString("slug"),
-      privacy: t.exposeString("privacy"),
+      pathPrefix: t.exposeString("pathPrefix"),
     }),
   });
 
@@ -136,26 +169,21 @@ builder.queryFields((t) => ({
     },
   }),
 
-  /** Public hostname routing lookup. Returns only route-safe fields. */
-  forumRouteByDomain: t.field({
-    type: TimetableRouteType,
-    nullable: true,
+  /** vanity-address routing lookup for the web proxy: every forum with an
+   * address on this host, with the path prefix each claims. Anonymous by
+   * design (only slugs and prefixes are exposed); the proxy caches per
+   * host and matches paths itself. */
+  forumRoutesByHost: t.field({
+    type: [TimetableRouteType],
     args: { host: t.arg.string({ required: true }) },
-    resolve: async (_p, args) => {
-      const timetable = await getTimetableByDomain(args.host);
-      if (!timetable) return null;
-      return {
-        id: timetable.id,
-        slug: timetable.slug,
-        privacy: timetable.privacy,
-      };
-    },
+    resolve: (_p, args) =>
+      listTimetableRoutesByHost(args.host.trim().toLowerCase()),
   }),
 
   /** A current-or-historical slug → the forum's canonical slug (editable
    * slugs, 2026-08-10). Anonymous by design — the web proxy's stale-slug
    * 308 must fire for signed-out hits on private forums too. Only the slug
-   * mapping is exposed (same trade as forumRouteByDomain). */
+   * mapping is exposed (same trade as forumRoutesByHost). */
   forumCanonicalSlug: t.string({
     nullable: true,
     args: { slug: t.arg.string({ required: true }) },
@@ -226,12 +254,15 @@ builder.mutationFields((t) => ({
     },
     resolve: async (_p, args, ctx) => {
       capLength(args.name, 120, "Name");
-      assertOptionalHostname(args.customDomain, "Custom domain");
       const { user, readable, viewer } = await loadTimetableAndViewer(
         ctx,
         args.idOrSlug,
       );
       if (!canEditSettings(viewer)) forbidden("Admins only");
+      const vanity = await resolveVanityAddress(
+        args.customDomain,
+        readable.timetable.slug,
+      );
 
       let privacy: Privacy | undefined;
       if (args.privacy != null) {
@@ -244,8 +275,7 @@ builder.mutationFields((t) => ({
       let updated = await updateTimetableProfile(readable.timetable.id, {
         name: args.name ?? undefined,
         privacy,
-        customDomain:
-          args.customDomain != null ? args.customDomain.trim() : undefined,
+        customDomain: vanity,
       });
       if (!updated) notFound("Forum not found");
 

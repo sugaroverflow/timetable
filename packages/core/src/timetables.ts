@@ -1,4 +1,4 @@
-import { and, eq, getTableColumns } from "drizzle-orm";
+import { and, eq, getTableColumns, like, or } from "drizzle-orm";
 
 import {
   db,
@@ -183,16 +183,26 @@ export async function getCanonicalTimetableSlug(
   return historical?.slug ?? null;
 }
 
-/** Resolve a timetable by its custom domain (for hostname-based routing). */
-export async function getTimetableByDomain(
+/** Every vanity-address route on a host (see shared `vanityAddress.ts`):
+ * the forum claiming the bare hostname, plus those claiming
+ * `host/<prefix>`. The web proxy fetches this once per host and matches
+ * paths itself, so one lookup serves a year's worth of forums. */
+export async function listTimetableRoutesByHost(
   host: string,
-): Promise<Timetable | null> {
-  const [timetable] = await db
-    .select()
+): Promise<{ slug: string; pathPrefix: string }[]> {
+  const rows = await db
+    .select({ slug: timetables.slug, customDomain: timetables.customDomain })
     .from(timetables)
-    .where(eq(timetables.customDomain, host))
-    .limit(1);
-  return timetable ?? null;
+    .where(
+      or(
+        eq(timetables.customDomain, host),
+        like(timetables.customDomain, `${host}/%`),
+      ),
+    );
+  return rows.map((row) => ({
+    slug: row.slug,
+    pathPrefix: (row.customDomain ?? "").slice(host.length),
+  }));
 }
 
 export type MembershipWithTimetable = {

@@ -318,8 +318,10 @@ Admin surfaces:
   preview sentence, digest defaults, the calendar policies (enable, confirm
   rules, locations — the schedule itself is built on the Calendar page),
   the topics policy (hosts publish directly), the host-thread option, the
-  ❤️ cutoff, and the custom domain field (marked "coming soon" — routing is
-  not wired up yet)
+  ❤️ cutoff, and the vanity address — a hostname or hostname/path such as
+  `topic.newspeak.house/2026` that redirects to the forum (2026-09-04; the
+  hostname must first be added to the app and pointed at it, see
+  `docs/DEPLOYMENT.md`)
 - **Theme** — primary/secondary/background/topbar/text colours with live
   preview, curated font pairings, a dark-mode palette, cover image, and icon
 
