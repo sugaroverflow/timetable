@@ -45,6 +45,7 @@ vi.mock("@timetable/core", async (importOriginal) => {
     createApiToken: vi.fn(),
     createLocalUser: vi.fn(),
     deleteTopic: vi.fn(),
+    updateTopic: vi.fn(),
     getAudienceElectorIds: vi.fn(),
     getCommentById: vi.fn(),
     getSlotById: vi.fn(),
@@ -404,6 +405,7 @@ afterEach(() => {
   vi.mocked(core.countViewerPublishedHearts).mockReset();
   vi.mocked(core.createLocalUser).mockReset();
   vi.mocked(core.deleteTopic).mockReset();
+  vi.mocked(core.updateTopic).mockReset();
   vi.mocked(core.getTopicById).mockReset();
   vi.mocked(core.getMembership).mockReset();
   vi.mocked(core.getMembershipById).mockReset();
@@ -1477,6 +1479,66 @@ describe("createApiApp", () => {
         const body = await requestDelete(baseUrl, topic.id);
         expect(body.errors?.length).toBeGreaterThan(0);
         expect(core.deleteTopic).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("updateTopic cover image", () => {
+    const UPDATE = `mutation($id: String!, $cover: String){ updateTopic(topicId: $id, coverImageUrl: $cover){ id } }`;
+
+    async function requestUpdate(
+      baseUrl: string,
+      variables: { id: string; cover?: string | null },
+    ) {
+      const res = await fetch(`${baseUrl}/graphql`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: UPDATE, variables }),
+      });
+      return (await res.json()) as {
+        data: { updateTopic: { id: string } | null } | null;
+        errors?: unknown[];
+      };
+    }
+
+    // The three-state convention every form has to honour: "" clears,
+    // null/absent leaves the field alone (the web edit form once sent
+    // null for a removed cover, so Remove image never stuck — 2026-09-08).
+    it("clears the cover when the URL is an empty string", async () => {
+      const topic = topicFixture({ coverImageUrl: "https://img.example/a" });
+      mockSession("host-1", ["host"]);
+      vi.mocked(core.getTopicById).mockResolvedValue(topic);
+      vi.mocked(core.updateTopic).mockResolvedValue({
+        ...topic,
+        coverImageUrl: null,
+      });
+
+      await withTestServer(async (baseUrl) => {
+        const body = await requestUpdate(baseUrl, { id: topic.id, cover: "" });
+        expect(body.errors).toBeUndefined();
+        expect(core.updateTopic).toHaveBeenCalledWith(
+          topic.id,
+          expect.objectContaining({ coverImageUrl: null }),
+        );
+      });
+    });
+
+    it("leaves the cover alone when the URL is null", async () => {
+      const topic = topicFixture({ coverImageUrl: "https://img.example/a" });
+      mockSession("host-1", ["host"]);
+      vi.mocked(core.getTopicById).mockResolvedValue(topic);
+      vi.mocked(core.updateTopic).mockResolvedValue(topic);
+
+      await withTestServer(async (baseUrl) => {
+        const body = await requestUpdate(baseUrl, {
+          id: topic.id,
+          cover: null,
+        });
+        expect(body.errors).toBeUndefined();
+        expect(core.updateTopic).toHaveBeenCalledWith(
+          topic.id,
+          expect.objectContaining({ coverImageUrl: undefined }),
+        );
       });
     });
   });

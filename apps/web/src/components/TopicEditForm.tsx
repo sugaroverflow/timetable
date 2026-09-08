@@ -79,7 +79,9 @@ export function TopicEditForm({
         id: topic.id,
         title: title.trim(),
         body,
-        cover: cover.trim() || null,
+        // "" clears the cover; null would mean "unchanged" to the API, so
+        // Remove image + Save used to leave the old picture in place.
+        cover: cover.trim(),
       },
       {
         success: "Topic updated",

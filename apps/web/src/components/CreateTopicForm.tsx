@@ -43,7 +43,7 @@ export function CreateTopicForm({
         s: slug,
         title: title.trim(),
         body,
-        cover: cover.trim() || null,
+        cover: cover.trim(),
         host: host || null,
       },
       {
