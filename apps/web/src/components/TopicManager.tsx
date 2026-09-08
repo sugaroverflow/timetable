@@ -110,6 +110,7 @@ function ManageControls({
           bodyMd: topic.bodyMd,
           coverImageUrl: topic.coverImageUrl,
           status: topic.status,
+          readyAt: topic.readyAt,
         }}
         slug={slug}
         label={adminLabel}
