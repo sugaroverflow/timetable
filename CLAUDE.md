@@ -333,6 +333,19 @@ Stable names for feature pieces, so instructions can reference them precisely.
   "Vanity address"; the column and GraphQL arg keep the `customDomain`
   name.
 
+- **sent-back-notice** — how a host hears that an admin pressed
+  `BackToDraftingButton` (`AdminTopicActions.tsx`, #344) on their ready
+  draft (Ed, 2026-09-08). Both channels read the `topic.unready` activity
+  event the mutation already logged, excluding the host's own flips
+  (their ReadySwitch writes the same event): `listSentBackNotifications`
+  in `packages/core/src/notifications.ts` puts a "moved your topic back to
+  drafting" line in the notifications pane (and the unread badge), linking
+  to the My Topics card with the drafting tab open; `unreadyActivities`
+  in `digests.ts` rides the digest as the `unready` activity kind — a
+  switch-less admin override like `assignment`, "Sent back to drafting"
+  pill, counts as news, skipped once the topic is no longer a draft. No
+  reason travels with it: the drafting thread is the channel for that.
+
 - **feed-position-store** — `lib/feedPosition.ts` (Ed's "going back feels
   fragile", 2026-08-28): remembers, per feed view, how many pages the
   infinite feed had appended and the scroll offset, so Back replays them

@@ -387,18 +387,18 @@ function renderHostHearts(hearters: DigestPerson[]): string {
     .join("");
 }
 
-const STATUS_PILLS: Record<
-  "new" | "pending" | "assignment" | "draft",
-  [string, string, string]
-> = {
+type StatusKind = "new" | "pending" | "assignment" | "unready" | "draft";
+
+const STATUS_PILLS: Record<StatusKind, [string, string, string]> = {
   // [label, background, text]
   new: ["New", "#e8f6ec", "#207a32"],
   pending: ["Ready to review", "#fdf1e3", "#b25e09"],
   assignment: ["Assigned to you", "#eaeefe", "#2f54eb"],
+  unready: ["Sent back to drafting", "#fdeeee", "#a83a3a"],
   draft: ["Unpublished draft", "#eef0f5", "#7d8694"],
 };
 
-function statusPill(kind: "new" | "pending" | "assignment" | "draft"): string {
+function statusPill(kind: StatusKind): string {
   const [label, bg, fg] = STATUS_PILLS[kind];
   return `<span style="display:inline-block;background:${bg};color:${fg};font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;margin-left:6px;white-space:nowrap;vertical-align:middle;">${label}</span>`;
 }
@@ -521,15 +521,11 @@ function renderCard(
   adminLabel: string,
 ): string {
   const statuses = card.activities.filter(
-    (
-      a,
-    ): a is Extract<
-      DigestActivity,
-      { kind: "new" | "pending" | "assignment" | "draft" }
-    > =>
+    (a): a is Extract<DigestActivity, { kind: StatusKind }> =>
       a.kind === "new" ||
       a.kind === "pending" ||
       a.kind === "assignment" ||
+      a.kind === "unready" ||
       a.kind === "draft",
   );
   const discussion = card.activities.filter(
@@ -659,6 +655,7 @@ function digestSummary(digest: ForumDigest): string {
     new: 0,
     pending: 0,
     assignment: 0,
+    unready: 0,
   };
   let confirmedNew = 0;
   for (const card of digest.topics) {
@@ -680,6 +677,11 @@ function digestSummary(digest: ForumDigest): string {
   n(counts.new, "new topic", "new topics");
   n(counts.pending, "topic to review", "topics to review");
   n(counts.assignment, "topic assigned to you", "topics assigned to you");
+  n(
+    counts.unready,
+    "topic sent back to drafting",
+    "topics sent back to drafting",
+  );
   n(confirmedNew, "session confirmed", "sessions confirmed");
   const asksNew = digest.availabilityAsks.filter((s) => s.isNew).length;
   n(

@@ -447,6 +447,18 @@ function sampleStatusActivities(
       kind: null,
       activity: { kind: "assignment", at: sAt("2026-07-29T18:20:00Z") },
     },
+    // Sent back to drafting by an admin — the other admin override.
+    {
+      meta: card(
+        "sample-sent-back",
+        "Field trip to the archives",
+        me,
+        "A morning at the borough archives with the head archivist: what they hold, how to request material, and a look at the maps. Needs a date, a headcount cap and someone to sort the travel.",
+        p("you", "field-trip-archives"),
+      ),
+      kind: null,
+      activity: { kind: "unready", at: sAt("2026-07-29T19:05:00Z") },
+    },
     // Newly published topics (elector and host flavours share the look).
     {
       meta: card(

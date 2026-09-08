@@ -26,7 +26,8 @@ type Notification = {
     | "mention"
     | "session_pencilled"
     | "session_confirmed"
-    | "session_cleared";
+    | "session_cleared"
+    | "sent_back_to_drafting";
   authorId: string;
   authorName: string | null;
   authorImage: string | null;
@@ -69,6 +70,8 @@ const KIND_VERBS: Record<Notification["kind"], string> = {
   session_pencilled: "pencilled in a session for",
   session_confirmed: "confirmed a session for",
   session_cleared: "cleared a pencilled session for",
+  // An admin cleared your "Ready to publish" mark (Ed, 2026-09-08).
+  sent_back_to_drafting: "moved your topic back to drafting:",
 };
 
 /** A comment's visibility IS its tab in topic-tabs — the values are
@@ -112,6 +115,15 @@ function cardLinks(
   if (isSessionKind(n.kind)) {
     return { href: `/f/${slug}/calendar`, replyHref: null };
   }
+  if (n.kind === "sent_back_to_drafting") {
+    // Your card on My Topics, drafting tab open — where the admin's
+    // reason lives and where your Ready switch is. The tab must be
+    // named: an unvisited pane isn't in the page (topic-tabs).
+    return {
+      href: `/f/${slug}/my-topics?tab=admin&topic=${n.topicId}#topic-${n.topicId}`,
+      replyHref: null,
+    };
+  }
   const base =
     topicPath(slug, n.topicHostSlug, n.topicSlug) ??
     (n.visibility === "admin_only"
@@ -140,7 +152,9 @@ function NotificationCard({
   const { href, replyHref } = cardLinks(n, slug, viewerIsAdmin);
   const detail = isSessionKind(n.kind)
     ? sessionWhen(n.body)
-    : `“${n.body.slice(0, 160)}”`;
+    : n.body
+      ? `“${n.body.slice(0, 160)}”`
+      : null;
   return (
     <li className="card">
       <div className="row" style={{ alignItems: "flex-start" }}>

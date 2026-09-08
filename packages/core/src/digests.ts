@@ -104,6 +104,10 @@ export type DigestActivity =
   | { kind: "pending"; at: Date; isNew: boolean }
   /** A topic an admin (re)assigned to the recipient. */
   | { kind: "assignment"; at: Date }
+  /** The recipient's draft, marked ready, that an admin sent back to
+   * drafting (Ed, 2026-09-08). An admin override like `assignment`: no
+   * switch, always news. */
+  | { kind: "unready"; at: Date }
   /** The recipient's own still-unpublished draft — a standing reminder. */
   | { kind: "draft"; at: Date };
 
@@ -1439,6 +1443,46 @@ async function assignmentActivities(
     }));
 }
 
+/** The recipient's drafts an admin sent back from "ready to publish"
+ * (Ed, 2026-09-08). The host's own flip writes the same event, so the
+ * actor is excluded; a topic published or unpublished since is stale
+ * news and skipped. */
+async function unreadyActivities(
+  ctx: DigestContext,
+  since: Date,
+): Promise<RawActivity[]> {
+  if (ctx.forumIds.length === 0) return [];
+  const rows = await db
+    .select({
+      topicId: topics.id,
+      timetableId: activityEvents.timetableId,
+      createdAt: activityEvents.createdAt,
+    })
+    .from(activityEvents)
+    // payload.topicId is text; topics.id is uuid — compare as text.
+    .innerJoin(
+      topics,
+      sql`${topics.id}::text = ${activityEvents.payload}->>'topicId'`,
+    )
+    .where(
+      and(
+        inArray(activityEvents.timetableId, ctx.forumIds),
+        eq(activityEvents.action, "topic.unready"),
+        gt(activityEvents.createdAt, since),
+        eq(topics.hostId, ctx.recipient.id),
+        eq(topics.status, "submitted"),
+        ne(activityEvents.actorId, ctx.recipient.id),
+      ),
+    );
+  return rows
+    .filter((r) => r.createdAt > sinceFor(ctx, r.timetableId))
+    .map((r) => ({
+      topicId: r.topicId,
+      timetableId: r.timetableId,
+      activity: { kind: "unready" as const, at: r.createdAt },
+    }));
+}
+
 /** Which per-forum switch governs each activity kind. */
 /** The fallback switch per activity kind for activities without an
  * explicit `switch` tag. PARTIAL (round 2): sessions and assignments are
@@ -1464,6 +1508,7 @@ const CARD_TIER: Record<DigestActivity["kind"], number> = {
   heart: 0,
   hostHeart: 0,
   assignment: 1,
+  unready: 1,
   pending: 1,
   new: 2,
   draft: 3,
@@ -1475,9 +1520,10 @@ const ACTIVITY_RANK: Record<DigestActivity["kind"], number> = {
   heart: 3,
   hostHeart: 4,
   assignment: 5,
-  pending: 6,
-  new: 7,
-  draft: 8,
+  unready: 6,
+  pending: 7,
+  new: 8,
+  draft: 9,
 };
 
 function cardTier(card: DigestTopicCard): number {
@@ -1530,8 +1576,10 @@ async function collectActivities(
       ? newTopicActivities(ctx, since)
       : none,
     pendingReviewActivities(ctx),
-    // Assignments are an admin override — never switchable, always sent.
+    // Assignments and send-backs are admin overrides — never switchable,
+    // always sent.
     assignmentActivities(ctx, since),
+    unreadyActivities(ctx, since),
   ]);
   return collected.flat();
 }

@@ -38,6 +38,7 @@ describe("renderDigest (v3, topic cards)", () => {
   it("shows status as a pill and the topic body (truncated) on status cards", () => {
     const { html } = renderDigest(SAMPLE);
     expect(html).toContain("Assigned to you");
+    expect(html).toContain("Sent back to drafting");
     expect(html).toContain("Unpublished draft");
     expect(html).toContain("New</span>");
     // Long new-topic body is truncated with a Show more link.

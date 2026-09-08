@@ -24,10 +24,12 @@ import {
 
 /** One entry in the notifications pane (QA #59): a comment on one of the
  * viewer's topics, a reply to one of the viewer's comments, a comment that
- * @mentions the viewer, or — calendar v2 (QA 2026-08-03) — a session
- * pencilled/confirmed/cleared for a topic the viewer ❤️'d. For session
- * kinds, `commentId` is the activity-event id and `body` carries the slot's
- * startsAt ISO for the pane to format. */
+ * @mentions the viewer, — calendar v2 (QA 2026-08-03) — a session
+ * pencilled/confirmed/cleared for a topic the viewer ❤️'d, or (Ed,
+ * 2026-09-08) an admin sending the viewer's ready draft back to drafting.
+ * For the activity-log kinds, `commentId` is the activity-event id; for
+ * sessions `body` carries the slot's startsAt ISO for the pane to
+ * format, for send-backs it is empty. */
 export type NotificationItem = {
   commentId: string;
   kind:
@@ -36,7 +38,8 @@ export type NotificationItem = {
     | "mention"
     | "session_pencilled"
     | "session_confirmed"
-    | "session_cleared";
+    | "session_cleared"
+    | "sent_back_to_drafting";
   authorId: string;
   authorName: string | null;
   authorImage: string | null;
@@ -139,10 +142,86 @@ async function listSessionNotifications(
   }));
 }
 
+/** An admin sent one of the viewer's ready drafts back to drafting (Ed,
+ * 2026-09-08) — the `topic.unready` event the admin bar's Back to
+ * drafting writes. The host's own switch writes the same event, hence
+ * the actor exclusion. */
+async function listSentBackNotifications(
+  timetableId: string,
+  userId: string,
+  limit: number,
+): Promise<NotificationItem[]> {
+  const actorMembers = alias(timetableMemberships, "actor_memberships");
+  const hostMembers = alias(timetableMemberships, "host_memberships");
+
+  const rows = await db
+    .select({
+      id: activityEvents.id,
+      actorId: activityEvents.actorId,
+      authorName: actorMembers.name,
+      authorRoles: actorMembers.roles,
+      authorImage: actorMembers.image,
+      createdAt: activityEvents.createdAt,
+      topicId: topics.id,
+      topicTitle: topics.title,
+      topicSlug: topics.slug,
+      topicHostSlug: hostMembers.slug,
+    })
+    .from(activityEvents)
+    .innerJoin(
+      topics,
+      sql`${topics.id}::text = ${activityEvents.payload}->>'topicId'`,
+    )
+    .leftJoin(
+      actorMembers,
+      and(
+        eq(actorMembers.userId, activityEvents.actorId),
+        eq(actorMembers.timetableId, timetableId),
+      ),
+    )
+    .leftJoin(
+      hostMembers,
+      and(
+        eq(hostMembers.userId, topics.hostId),
+        eq(hostMembers.timetableId, timetableId),
+      ),
+    )
+    .where(and(...sentBackConditions(timetableId, userId)))
+    .orderBy(desc(activityEvents.createdAt))
+    .limit(limit);
+
+  return rows.map((r) => ({
+    commentId: r.id,
+    kind: "sent_back_to_drafting" as const,
+    authorId: r.actorId ?? "",
+    authorName: r.authorName,
+    authorRoles: (r.authorRoles ?? []) as string[],
+    authorImage: r.authorImage,
+    body: "",
+    visibility: "admin_only",
+    createdAt: r.createdAt,
+    topicId: r.topicId,
+    topicTitle: r.topicTitle,
+    topicSlug: r.topicSlug,
+    topicHostSlug: r.topicHostSlug,
+  }));
+}
+
+/** Shared by the list and the unread count (the query joins `topics`). */
+function sentBackConditions(timetableId: string, userId: string) {
+  return [
+    eq(activityEvents.timetableId, timetableId),
+    eq(activityEvents.action, "topic.unready"),
+    eq(topics.hostId, userId),
+    ne(activityEvents.actorId, userId),
+  ];
+}
+
 /**
  * Comments on the viewer's topics + replies to the viewer's comments +
- * session events on ❤️'d topics, newest first. The viewer authored none of
- * them; hidden comments excluded.
+ * session events on ❤️'d topics + send-backs of the viewer's drafts,
+ * newest first. The viewer authored none of them; hidden comments
+ * excluded.
  */
 export async function listNotifications(
   timetableId: string,
@@ -150,12 +229,13 @@ export async function listNotifications(
   limit = 50,
 ): Promise<NotificationItem[]> {
   const sessions = await listSessionNotifications(timetableId, userId, limit);
+  const sentBack = await listSentBackNotifications(timetableId, userId, limit);
   const commentItems = await listCommentNotifications(
     timetableId,
     userId,
     limit,
   );
-  return [...commentItems, ...sessions]
+  return [...commentItems, ...sessions, ...sentBack]
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
     .slice(0, limit);
 }
@@ -314,7 +394,21 @@ export async function countUnreadNotifications(
     )
     .where(and(...sessionConds));
 
-  return (row?.n ?? 0) + (sessionRow?.n ?? 0);
+  // Send-backs of the viewer's drafts count too (Ed, 2026-09-08).
+  const sentBackConds = sentBackConditions(timetableId, userId);
+  if (membership.seenAt) {
+    sentBackConds.push(gt(activityEvents.createdAt, membership.seenAt));
+  }
+  const [sentBackRow] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(activityEvents)
+    .innerJoin(
+      topics,
+      sql`${topics.id}::text = ${activityEvents.payload}->>'topicId'`,
+    )
+    .where(and(...sentBackConds));
+
+  return (row?.n ?? 0) + (sessionRow?.n ?? 0) + (sentBackRow?.n ?? 0);
 }
 
 /** Reset the unread badge — called when the member opens Notifications. */
