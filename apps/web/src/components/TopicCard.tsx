@@ -213,7 +213,9 @@ function CommentSection({
           mentionSlug={slug}
           submitOnEnter={submitOnEnter}
           placeholder={
-            submitOnEnter ? "Add a comment… (Enter posts)" : undefined
+            submitOnEnter
+              ? "Add a comment… (Enter posts, @ to mention)"
+              : undefined
           }
         />
       ) : null}

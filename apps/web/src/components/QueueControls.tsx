@@ -7,13 +7,11 @@ import { useEffect, useRef, useState, useTransition } from "react";
 
 import { useToast } from "@/components/Toast";
 import { clientGql } from "@/lib/clientGraphql";
-import { draftKey, getDraft, setDraft } from "@/lib/commentDrafts";
 import {
   isTypingTarget,
   queueKeyAction,
   type QueueKeyAction,
 } from "@/lib/queueKeys";
-import { composeLibraryComment } from "@timetable/shared";
 
 import { useCommentsOpen } from "./CommentsOpenScope";
 
@@ -27,10 +25,6 @@ const HOST_HEART = `mutation QueueHostHeart($id: String!) {
 
 const NEXT = `mutation QueueNext($id: String!) {
   queueMarkSeen(topicId: $id)
-}`;
-
-const LIBRARY = `query LibraryMatches($s: String!, $id: String!) {
-  libraryMatches(idOrSlug: $s, topicId: $id) { name url }
 }`;
 
 function switchLabel(hearted: boolean, hostMode: boolean): string {
@@ -53,35 +47,6 @@ function focusComposer(topicId: string, attempt = 0) {
   }
   if (attempt < 3) {
     requestAnimationFrame(() => focusComposer(topicId, attempt + 1));
-  }
-}
-
-/**
- * in-the-library (2026-09-07): ↓ also asks the Civic Tech Field Guide's
- * matcher what this topic is about, and pre-composes the answer as a
- * comment for the box it just opened — heading, one line of lead, then up
- * to three library entries with their links, ranked by the matcher.
- *
- * A pre-filled box is a destructive thing to hand someone, so this only
- * ever writes into an EMPTY draft: empty when ↓ was pressed, and still
- * empty when the matcher answers a second or two later (by which point you
- * may have started typing your own comment, and that wins). A miss, a
- * failure, or an unconfigured matcher leaves the box as it was, which is
- * how ↓ behaves for everyone who is just there to comment.
- */
-async function suggestLibraryComment(slug: string, topicId: string) {
-  const key = draftKey.comment(topicId, "public");
-  if (getDraft(key)) return;
-  try {
-    const data = await clientGql<{
-      libraryMatches: { name: string; url: string }[] | null;
-    }>(LIBRARY, { s: slug, id: topicId });
-    const body = composeLibraryComment(data.libraryMatches ?? []);
-    if (!body || getDraft(key)) return;
-    setDraft(key, body);
-  } catch {
-    // The library is a nicety on top of commenting; an empty box is the
-    // fallback, and a toast here would interrupt the round.
   }
 }
 
@@ -292,13 +257,6 @@ export function QueueControls({
   function openComposer() {
     requestOpen();
     focusComposer(topicId);
-    // in-the-library: one lookup per topic, however many times ↓ is
-    // pressed. The ref survives router.refresh() reconciling this
-    // component in place, so it is keyed by topic rather than a boolean.
-    if (suggestedFor.current !== topicId) {
-      suggestedFor.current = topicId;
-      void suggestLibraryComment(slug, topicId);
-    }
   }
 
   // queue-keys (2026-09-07): a round is worked through from the keyboard —
@@ -307,9 +265,6 @@ export function QueueControls({
   // topic: router.refresh() reconciles this component in place (see the
   // note above), so a listener that closed over `topicId` would keep
   // hearting the topic you had two cards ago.
-  /** in-the-library: the topic whose library lookup has already been made
-   * this mount. */
-  const suggestedFor = useRef<string | null>(null);
   const runAction = useRef<(action: QueueKeyAction) => void>(() => {});
   useEffect(() => {
     runAction.current = (action) => {

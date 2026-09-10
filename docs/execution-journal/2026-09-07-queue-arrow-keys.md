@@ -96,3 +96,16 @@ Still unverified by eye: the legend's spacing under the bar, and whether ↓
 reaches the composer when the strip has to switch back from another tab
 (the retry across animation frames is a belt-and-braces guess at a real
 render timing).
+
+## Adopted (2026-09-10)
+
+Matt's PR (#346) was taken as-is with two changes before merging. The
+commit carried a stray `suggestLibraryComment` block — a "Civic Tech Field
+Guide" lookup that pre-composed a comment on ↓ — importing
+`composeLibraryComment`, `getDraft` and `setDraft` from modules this repo
+doesn't have (they live on another branch of his), which is why CI's
+`next build` failed. That block is removed; the arrow keys are unchanged.
+And once Enter has posted, the composer now blurs itself in
+`submitOnEnter` mode, so the round continues with → rather than needing an
+Escape first — the placeholder keeps the @-mention hint alongside "Enter
+posts".

@@ -134,6 +134,12 @@ export function CommentComposer({
         onSuccess: () => {
           clearBody();
           requestOpen();
+          // queue-keys: once Enter has posted, the box gives the arrows
+          // back by itself — the round continues with → rather than an
+          // Escape first (adopted from #346, 2026-09-10).
+          if (submitOnEnter && document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+          }
         },
       },
     );

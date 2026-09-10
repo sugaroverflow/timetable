@@ -311,7 +311,9 @@ Stable names for feature pieces, so instructions can reference them precisely.
   still be switching the strip back to Comments); in the box **Enter
   posts**, Shift+Enter starts a line, Escape blurs and the arrows come
   back — `CommentComposer`'s `submitOnEnter`, which the queue is the only
-  surface to pass. Arrows are ignored with any modifier and while the
+  surface to pass; a successful Enter-post blurs the box too, so ↓ type
+  Enter → is one uninterrupted gesture (adopted from Matt's #346,
+  2026-09-10). Arrows are ignored with any modifier and while the
   target is an input/textarea/contenteditable; ↑/↓ `preventDefault` so the
   page doesn't scroll under the card, which is the one thing this costs.
   Covered by `QueueControls.test.tsx` — the web workspace's first jsdom
