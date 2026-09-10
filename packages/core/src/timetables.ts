@@ -1,4 +1,4 @@
-import { and, eq, getTableColumns, like, or } from "drizzle-orm";
+import { and, eq, getTableColumns, isNull, like, or } from "drizzle-orm";
 
 import {
   db,
@@ -222,7 +222,14 @@ export async function listMembershipsForUser(
     })
     .from(timetableMemberships)
     .innerJoin(timetables, eq(timetables.id, timetableMemberships.timetableId))
-    .where(eq(timetableMemberships.userId, userId));
+    .where(
+      and(
+        eq(timetableMemberships.userId, userId),
+        // A deactivated membership leaves the forum switcher
+        // (member-deactivation, 2026-09-10).
+        isNull(timetableMemberships.deactivatedAt),
+      ),
+    );
 
   return rows.map((r) => ({
     membershipId: r.membershipId,
@@ -246,7 +253,12 @@ export async function getLastVisitedTimetableSlug(
     })
     .from(timetableMemberships)
     .innerJoin(timetables, eq(timetables.id, timetableMemberships.timetableId))
-    .where(eq(timetableMemberships.userId, userId));
+    .where(
+      and(
+        eq(timetableMemberships.userId, userId),
+        isNull(timetableMemberships.deactivatedAt),
+      ),
+    );
   if (rows.length === 0) return null;
   rows.sort(
     (a, b) =>
@@ -262,7 +274,10 @@ export async function getViewerRoles(
 ): Promise<Role[]> {
   if (!userId) return [];
   const [membership] = await db
-    .select({ roles: timetableMemberships.roles })
+    .select({
+      roles: timetableMemberships.roles,
+      deactivatedAt: timetableMemberships.deactivatedAt,
+    })
     .from(timetableMemberships)
     .where(
       and(
@@ -271,7 +286,14 @@ export async function getViewerRoles(
       ),
     )
     .limit(1);
-  return membership?.roles ?? [];
+  // Deactivation is a suspension (Ed, 2026-09-10): the stored roles stay
+  // on the row (reactivation restores them untouched) but resolve as
+  // none, so every permission check — reading a private forum included —
+  // treats the person as a non-member. This is the ONE place roles are
+  // resolved for a viewer; the row's `roles` column is never read for
+  // authorisation anywhere else.
+  if (!membership || membership.deactivatedAt) return [];
+  return membership.roles;
 }
 
 export type ReadableTimetable = {

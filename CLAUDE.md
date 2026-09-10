@@ -327,6 +327,29 @@ Stable names for feature pieces, so instructions can reference them precisely.
   the ❤️/💙 pages link to permalinks (their feed paginates, so the card
   may not be rendered) via the slim `HEARTED_TOC_QUERY` full list.
 
+- **member-deactivation** — `deactivateMembership` / `reactivateMembership`
+  in `packages/core/src/members.ts` + `timetableMemberships.deactivatedAt`
+  (migration 0042) + `POST /api/memberships/:id/{deactivate,reactivate}`
+  + the Deactivate/Reactivate controls in `PersonAdminPanel` (Ed,
+  2026-09-10): the reversible alternative to "Remove from forum" for
+  someone who has left. The membership ROW STAYS — it is what gives their
+  comments a byline and their topics a host profile, which is exactly what
+  removal destroys. While the stamp is set: `getViewerRoles` resolves the
+  roles as NONE (a suspension — non-member for every permission check,
+  private forums unreadable, the forum gone from their switcher; the
+  stored `roles` are untouched so reactivation restores them), the person
+  is off the People page and the host picker (admins see them in a dimmed
+  **"Deactivated"** section at the foot of People, with Reactivate; their
+  person page is admin-only), their live topics were unpublished through
+  the ordinary `unpublishTopic` path (one `topic.unpublish` log line each,
+  under the admin, plus a `member.deactivate` line carrying the count),
+  and `membershipIsEmailable` says no so their email digests pause (in-app
+  notifications untouched — Ed narrowed it to email). Reactivation
+  republishes NOTHING (editorial call; Publish exists) and stamps
+  `lastDigestAt` to now so the first digest back doesn't replay the
+  absence. Owner and self can't be deactivated. Not to be confused with
+  the FORUM privacy value `deactivated` (whole-forum, admins only).
+
 - **comment-draft-store** — `useDraft`/`draftKey`/`hasDraft`/`clearDraft`
   in `apps/web/src/lib/commentDrafts.ts` (Ed, 2026-08-21): half-written
   comments live in a module-level map keyed by what's being written, not

@@ -73,6 +73,8 @@ vi.mock("@timetable/core", async (importOriginal) => {
     logActivity: vi.fn(),
     setCommentPinned: vi.fn(),
     setMemberRoles: vi.fn(),
+    deactivateMembership: vi.fn(),
+    reactivateMembership: vi.fn(),
     setTopicReady: vi.fn(),
     softDeleteComment: vi.fn(),
     toggleHeart: vi.fn(),
@@ -249,6 +251,7 @@ function membershipFixture(
     queueRoundStartedAt: null,
     digestSettings: {},
     lastDigestAt: null,
+    deactivatedAt: null,
     createdAt: new Date("2026-01-01T00:00:00.000Z"),
     updatedAt: new Date("2026-01-01T00:00:00.000Z"),
     ...patch,
@@ -386,6 +389,8 @@ afterEach(() => {
   restoreCronSecret();
   restoreStorageEnv();
   vi.mocked(context.buildContext).mockReset();
+  vi.mocked(core.deactivateMembership).mockReset();
+  vi.mocked(core.reactivateMembership).mockReset();
   vi.mocked(core.addSlotComment).mockReset();
   vi.mocked(core.addSlotSession).mockReset();
   vi.mocked(core.buildCalendar).mockReset();
@@ -869,6 +874,110 @@ describe("createApiApp", () => {
       expect(core.setMemberRoles).toHaveBeenCalledWith("membership-1", [
         "admin",
       ]);
+    });
+  });
+
+  // member-deactivation (Ed, 2026-09-10).
+  it("lets admins deactivate a member and reports the topics taken down", async () => {
+    mockSession("admin-1", ["admin"]);
+    const membership = membershipFixture({ roles: ["host"] });
+    vi.mocked(core.getMembershipById).mockResolvedValue(membership);
+    vi.mocked(core.getTimetableById).mockResolvedValue(
+      timetableFixture({ ownerId: "owner-1" }),
+    );
+    vi.mocked(core.deactivateMembership).mockResolvedValue({
+      unpublishedCount: 2,
+    });
+
+    await withTestServer(async (baseUrl) => {
+      const res = await fetch(
+        `${baseUrl}/api/memberships/membership-1/deactivate`,
+        { method: "POST" },
+      );
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toEqual({
+        deactivated: true,
+        unpublishedCount: 2,
+      });
+      expect(core.deactivateMembership).toHaveBeenCalledWith(
+        membership,
+        "admin-1",
+      );
+    });
+  });
+
+  it("refuses to deactivate the owner or the acting admin", async () => {
+    mockSession("admin-1", ["admin"]);
+    vi.mocked(core.getTimetableById).mockResolvedValue(
+      timetableFixture({ ownerId: "owner-1" }),
+    );
+
+    await withTestServer(async (baseUrl) => {
+      vi.mocked(core.getMembershipById).mockResolvedValue(
+        membershipFixture({ userId: "owner-1", roles: ["owner", "admin"] }),
+      );
+      const owner = await fetch(
+        `${baseUrl}/api/memberships/membership-1/deactivate`,
+        { method: "POST" },
+      );
+      expect(owner.status).toBe(400);
+      await expect(owner.json()).resolves.toMatchObject({
+        error: "The owner can't be deactivated",
+      });
+
+      vi.mocked(core.getMembershipById).mockResolvedValue(
+        membershipFixture({ userId: "admin-1", roles: ["admin"] }),
+      );
+      const self = await fetch(
+        `${baseUrl}/api/memberships/membership-1/deactivate`,
+        { method: "POST" },
+      );
+      expect(self.status).toBe(400);
+      await expect(self.json()).resolves.toMatchObject({
+        error: "You can't deactivate yourself",
+      });
+
+      expect(core.deactivateMembership).not.toHaveBeenCalled();
+    });
+  });
+
+  it("refuses deactivation and reactivation from non-admins", async () => {
+    mockSession("host-1", ["host"]);
+    vi.mocked(core.getMembershipById).mockResolvedValue(membershipFixture());
+
+    await withTestServer(async (baseUrl) => {
+      for (const verb of ["deactivate", "reactivate"]) {
+        const res = await fetch(
+          `${baseUrl}/api/memberships/membership-1/${verb}`,
+          { method: "POST" },
+        );
+        expect(res.status).toBe(403);
+      }
+      expect(core.deactivateMembership).not.toHaveBeenCalled();
+      expect(core.reactivateMembership).not.toHaveBeenCalled();
+    });
+  });
+
+  it("lets admins reactivate a deactivated member", async () => {
+    mockSession("admin-1", ["admin"]);
+    const membership = membershipFixture({
+      deactivatedAt: new Date("2026-09-01T00:00:00.000Z"),
+    });
+    vi.mocked(core.getMembershipById).mockResolvedValue(membership);
+
+    await withTestServer(async (baseUrl) => {
+      const res = await fetch(
+        `${baseUrl}/api/memberships/membership-1/reactivate`,
+        { method: "POST" },
+      );
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toEqual({ reactivated: true });
+      expect(core.reactivateMembership).toHaveBeenCalledWith(
+        membership,
+        "admin-1",
+      );
     });
   });
 

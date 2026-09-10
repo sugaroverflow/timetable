@@ -105,6 +105,14 @@ export const timetableMemberships = pgTable(
      * runs on its own cadence. Null falls back to users.lastDigestAt so
      * the rollout doesn't resend old windows. */
     lastDigestAt: timestamp({ withTimezone: true }),
+    /** Member deactivation (Ed, 2026-09-10): set when an admin deactivates
+     * the member, null while active. The row STAYS — it is what gives
+     * their comments a byline and their topics a host profile, which is
+     * why this is a column and not a delete. While set: roles resolve as
+     * empty (a non-member for every permission check), the member is off
+     * the People page, their digests don't send, and the forum leaves
+     * their switcher. Reactivation clears it. */
+    deactivatedAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },

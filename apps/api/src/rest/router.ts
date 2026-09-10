@@ -17,6 +17,7 @@ import {
   getMembership,
   getUsersByEmails,
   logActivity,
+  deactivateMembership,
   getMembershipById,
   getPerson,
   getReadableTimetable,
@@ -30,6 +31,7 @@ import {
   markForumDigestsSent,
   markInviteSent,
   pruneDigestSends,
+  reactivateMembership,
   recordDigestSend,
   removeMembership,
   setMemberRoles,
@@ -578,6 +580,72 @@ restRouter.delete(
 
     await removeMembership(membership, user.id);
     res.json({ removed: true });
+  }),
+);
+
+/**
+ * POST /api/memberships/:id/deactivate
+ * Admin-only member deactivation (member-deactivation — Ed, 2026-09-10):
+ * the reversible alternative to removal. Roles are suspended, the member
+ * leaves the People page, their live topics are unpublished and their
+ * digests pause; their comments stay. The owner can't be deactivated, and
+ * neither can the acting admin — suspending your own roles would lock
+ * you out of undoing it.
+ */
+restRouter.post(
+  "/memberships/:id/deactivate",
+  h(async (req, res) => {
+    const ctx = await contextFromRequest(req);
+    const user = requireUserCtx(ctx, res);
+    if (!user) return;
+
+    const admin = await requireAdminMembership(
+      ctx,
+      req.params.id as string,
+      res,
+    );
+    if (!admin) return;
+    const { membership } = admin;
+
+    const timetable = await getTimetableById(membership.timetableId);
+    if (timetable && membership.userId === timetable.ownerId) {
+      res.status(400).json({ error: "The owner can't be deactivated" });
+      return;
+    }
+    if (membership.userId === user.id) {
+      res.status(400).json({ error: "You can't deactivate yourself" });
+      return;
+    }
+
+    const { unpublishedCount } = await deactivateMembership(
+      membership,
+      user.id,
+    );
+    res.json({ deactivated: true, unpublishedCount });
+  }),
+);
+
+/**
+ * POST /api/memberships/:id/reactivate
+ * Undoes deactivation: roles come back into force, the member returns to
+ * the People page and their digests resume. Nothing is republished.
+ */
+restRouter.post(
+  "/memberships/:id/reactivate",
+  h(async (req, res) => {
+    const ctx = await contextFromRequest(req);
+    const user = requireUserCtx(ctx, res);
+    if (!user) return;
+
+    const admin = await requireAdminMembership(
+      ctx,
+      req.params.id as string,
+      res,
+    );
+    if (!admin) return;
+
+    await reactivateMembership(admin.membership, user.id);
+    res.json({ reactivated: true });
   }),
 );
 

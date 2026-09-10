@@ -12,6 +12,7 @@ import { PersonAdminPanel } from "@/components/PersonAdminPanel";
 import { PersonChip } from "@/components/PersonChip";
 import { RolePills } from "@/components/RolePills";
 import { UserPreviewStart } from "@/components/UserPreview";
+import { formatShortDate } from "@/lib/dates";
 import { gqlFetch } from "@/lib/graphql";
 import { displayRolesFromCookies } from "@/lib/previewRoles.server";
 import {
@@ -29,6 +30,9 @@ type Person = {
   slug: string | null;
   roles: string[];
   bioHtml: string | null;
+  /** Set while deactivated (member-deactivation, 2026-09-10) — only admin
+   * viewers ever receive such a person; they're listed apart below. */
+  deactivatedAt: string | null;
   publishedTopics: { id: string; title: string; slug: string | null }[];
 };
 
@@ -43,7 +47,7 @@ const QUERY = `
     timetable: forum(idOrSlug: $s) { id settings viewerRoles }
     me { id }
     timetablePeople: forumPeople(idOrSlug: $s) {
-      userId name image slug roles bioHtml
+      userId name image slug roles bioHtml deactivatedAt
       publishedTopics { id title slug }
     }
   }
@@ -56,12 +60,13 @@ type Member = {
   name: string | null;
   email: string | null;
   inviteSentAt: string | null;
+  deactivatedAt: string | null;
 };
 
 const MEMBERS_QUERY = `
   query Members($timetableId: String!) {
     timetableMembers: forumMembers(forumId: $timetableId) {
-      membershipId userId roles name email inviteSentAt
+      membershipId userId roles name email inviteSentAt deactivatedAt
     }
   }
 `;
@@ -163,7 +168,8 @@ function PersonCardActions({
           name={person.name}
         />
       ) : null}
-      {canManage && person.userId !== meId ? (
+      {/* No invites to a deactivated member — reactivate first. */}
+      {canManage && person.userId !== meId && !person.deactivatedAt ? (
         <InviteSendButton
           membershipId={member!.membershipId}
           email={member!.email}
@@ -179,6 +185,9 @@ function PersonCardActions({
           email={member!.email}
           roles={member!.roles}
           roleLabels={roleLabels}
+          deactivatedAt={person.deactivatedAt}
+          publishedTopicCount={person.publishedTopics.length}
+          isSelf={person.userId === meId}
         />
       ) : null}
     </div>
@@ -204,7 +213,17 @@ function PersonCard({
   const canManage = canEdit && member != null;
   return (
     // The anchor every table-of-contents entry points at.
-    <li className="card stack people-card" id={personAnchor(person.userId)}>
+    <li
+      className={`card stack people-card${person.deactivatedAt ? " people-card-deactivated" : ""}`}
+      id={personAnchor(person.userId)}
+    >
+      {person.deactivatedAt ? (
+        <div className="hint">
+          Deactivated {formatShortDate(person.deactivatedAt)} — hidden from
+          everyone but admins; their topics are unpublished and their digests
+          paused.
+        </div>
+      ) : null}
       <div className="person-head">
         {/* Photo and name both click through to the person's page (links
             pass 2026-08-03 — the name used to go to their filtered feed,
@@ -270,8 +289,21 @@ export default async function PeoplePage({
     membersByUser = new Map(members.timetableMembers.map((m) => [m.userId, m]));
   }
 
+  // Deactivated members (admin viewers only — the API drops them for
+  // everyone else) sit in their own section at the foot of the page, out
+  // of the role sections and the contents, so the active roster reads as
+  // it always did.
+  const activePeople = data.timetablePeople.filter((p) => !p.deactivatedAt);
+  const deactivatedPeople = data.timetablePeople
+    .filter((p) => p.deactivatedAt)
+    .sort((a, b) =>
+      (a.name ?? "Member").localeCompare(b.name ?? "Member", undefined, {
+        sensitivity: "base",
+      }),
+    );
+
   const sections = (["admin", "host", "elector"] as const).map((role) => {
-    const people = data.timetablePeople
+    const people = activePeople
       .filter((p) => primaryRole(p.roles as Role[]) === role)
       .sort((a, b) =>
         (a.name ?? "Member").localeCompare(b.name ?? "Member", undefined, {
@@ -299,7 +331,7 @@ export default async function PeoplePage({
           roleLabels={settings.roleLabels}
         />
       ) : null}
-      {data.timetablePeople.length === 0 ? (
+      {activePeople.length === 0 ? (
         <EmptyState
           icon="◎"
           title="No members yet"
@@ -308,7 +340,7 @@ export default async function PeoplePage({
       ) : (
         <>
           {/* Below four people the page is its own contents. */}
-          {data.timetablePeople.length > 3 ? (
+          {activePeople.length > 3 ? (
             <PeopleContents sections={visibleSections} />
           ) : null}
           {visibleSections.map((section) => (
@@ -335,6 +367,28 @@ export default async function PeoplePage({
           ))}
         </>
       )}
+      {deactivatedPeople.length > 0 ? (
+        <section
+          id="people-deactivated"
+          className="stack people-section"
+          aria-label="Deactivated members"
+        >
+          <h3 className="section-title">Deactivated</h3>
+          <ul className="list">
+            {deactivatedPeople.map((person) => (
+              <PersonCard
+                key={person.userId}
+                slug={slug}
+                person={person}
+                member={membersByUser.get(person.userId)}
+                meId={data.me?.id}
+                canEdit={canEdit}
+                roleLabels={settings.roleLabels}
+              />
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </div>
   );
 }

@@ -67,6 +67,8 @@ export type ExportPerson = {
   slug: string | null;
   bio: string | null;
   roles: Role[];
+  /** ISO timestamp while deactivated (admin exports only), else null. */
+  deactivatedAt: string | null;
   publishedTopics: { id: string; title: string; slug: string | null }[];
 };
 
@@ -279,6 +281,8 @@ export async function buildDataExport(
 
   const people: ExportPerson[] = (await listPeople(timetable.id))
     .filter((p) => canSeePersonProfile(timetable.privacy, viewer, p.roles))
+    // Deactivated members are admin-eyes-only, same as the People page.
+    .filter((p) => moderate || !p.deactivatedAt)
     .map((p) => ({
       userId: p.userId,
       name: p.name,
@@ -286,6 +290,7 @@ export async function buildDataExport(
       bio: p.bio,
       // Owner stays admin-eyes-only, same as the People page.
       roles: moderate ? p.roles : p.roles.filter((r) => r !== "owner"),
+      deactivatedAt: p.deactivatedAt?.toISOString() ?? null,
       publishedTopics: p.publishedTopics ?? [],
     }));
 

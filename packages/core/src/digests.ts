@@ -294,12 +294,20 @@ function sinceFor(ctx: DigestContext, timetableId: string): Date {
  * member opens the forum themselves (either seen-watermark), digest emails
  * would be the forum's surprise first contact. Organic members (creators,
  * invite-link claimants) always pass: visiting the app sets a watermark.
+ *
+ * A deactivated member (member-deactivation, 2026-09-10) is never
+ * emailable: their digests pause for as long as the admin's switch is
+ * set. A filtered-out membership's send watermark does NOT advance, so
+ * reactivation stamps `lastDigestAt` to that instant — the first digest
+ * back covers what happened since they returned, not the whole absence.
  */
 function membershipIsEmailable(m: {
   inviteSentAt: Date | null;
   lastSeenFeedAt: Date | null;
   lastSeenNotificationsAt: Date | null;
+  deactivatedAt: Date | null;
 }): boolean {
+  if (m.deactivatedAt) return false;
   return Boolean(
     m.inviteSentAt ?? m.lastSeenFeedAt ?? m.lastSeenNotificationsAt,
   );
@@ -318,6 +326,7 @@ async function loadDigestContext(
       lastSeenNotificationsAt: timetableMemberships.lastSeenNotificationsAt,
       digestSettings: timetableMemberships.digestSettings,
       lastDigestAt: timetableMemberships.lastDigestAt,
+      deactivatedAt: timetableMemberships.deactivatedAt,
       name: timetables.name,
       slug: timetables.slug,
       settings: timetables.settings,

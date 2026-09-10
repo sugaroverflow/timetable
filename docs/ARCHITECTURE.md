@@ -197,6 +197,8 @@ REST routes currently include:
 | `PATCH /api/memberships/:id/roles` | Change member roles |
 | `PATCH /api/memberships/:id/email` | Admin fixes a never-signed-in member's address (409 once they have signed in) |
 | `DELETE /api/memberships/:id` | Remove a member (the owner can never be removed) |
+| `POST /api/memberships/:id/deactivate` | Deactivate a member (member-deactivation, 2026-09-10): roles suspended, off the People page, live topics unpublished, digests paused; comments and profile kept. Owner and self refused |
+| `POST /api/memberships/:id/reactivate` | Undo deactivation (nothing republished) |
 | `POST /api/jobs/digests` | Cron-protected digest job |
 | `POST /api/forums/:idOrSlug/digest-test` | Admin-only: send the requesting admin a test digest built from sample data |
 | `GET /api/forums/:idOrSlug/calendar.ics` | Calendar feed |
@@ -257,7 +259,9 @@ The `dashboard` query accepts optional host and elector-activity filters for
 host/admin planning views.
 
 `Member` exposes `inviteSentAt` so the People page can show per-member invite
-state.
+state, and `deactivatedAt` (as does `Person`) so admins see deactivated
+members apart; non-admin viewers never receive a deactivated person from
+`forumPeople` or `person`.
 
 Main mutations cover:
 
