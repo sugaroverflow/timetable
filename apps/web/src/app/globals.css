@@ -1053,6 +1053,14 @@ textarea {
   padding-top: 12px;
 }
 
+/* A deactivated member's card (member-deactivation, 2026-09-10 — admin
+   viewers only): dimmed as a whole so the "Deactivated" section reads as
+   a shelf, not a roster; the actions row stays full-strength so
+   Reactivate is obviously live. */
+.people-card-deactivated > :not(.people-card-actions) {
+  opacity: 0.6;
+}
+
 .person-topics ul {
   margin: 6px 0 0;
   padding-left: 18px;

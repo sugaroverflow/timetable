@@ -48,6 +48,7 @@ type GqlMember = {
   membershipId: string;
   roles: string[];
   inviteSentAt: Date | null;
+  deactivatedAt: Date | null;
   user: {
     id: string;
     name: string | null;
@@ -79,6 +80,11 @@ const MemberType = builder.objectRef<GqlMember>("Member").implement({
       nullable: true,
       resolve: (m) => m.inviteSentAt?.toISOString() ?? null,
     }),
+    /** Set while deactivated (member-deactivation, 2026-09-10). */
+    deactivatedAt: t.string({
+      nullable: true,
+      resolve: (m) => m.deactivatedAt?.toISOString() ?? null,
+    }),
     userId: t.id({ resolve: (m) => m.user.id }),
     name: t.string({ nullable: true, resolve: (m) => m.user.name }),
     email: t.string({ nullable: true, resolve: (m) => m.user.email }),
@@ -109,6 +115,13 @@ const PersonType = builder.objectRef<Person>("Person").implement({
       resolve: (p) => (p.bio ? renderMarkdown(p.bio) : null),
     }),
     bio: t.exposeString("bio", { nullable: true }),
+    /** Set while deactivated (member-deactivation, 2026-09-10). Only
+     * admin viewers ever receive a deactivated person, so exposing the
+     * stamp adds nothing for the public. */
+    deactivatedAt: t.string({
+      nullable: true,
+      resolve: (p) => p.deactivatedAt?.toISOString() ?? null,
+    }),
     /** Published topics this person hosts (QA #59 — People page cards). */
     publishedTopics: t.field({
       type: [PersonTopicType],
@@ -127,6 +140,23 @@ function withPublicRoles(person: Person, viewer: Viewer): Person {
     ...person,
     roles: person.roles.filter((r) => r !== "owner"),
   };
+}
+
+/** A person as this viewer may see them, or null if not at all: the
+ * privacy-level profile rule, then member-deactivation (2026-09-10) —
+ * deactivated members are admin-eyes-only, listed apart on the People
+ * page for admins and simply gone for everyone else — then the owner
+ * strip. The one gate for both `forumPeople` and `person`. */
+function personForViewer(
+  person: Person,
+  privacy: Privacy,
+  viewer: Viewer,
+): Person | null {
+  if (!canSeePersonProfile(privacy, viewer, person.roles as SharedRole[])) {
+    return null;
+  }
+  if (person.deactivatedAt && !canModerate(viewer)) return null;
+  return withPublicRoles(person, viewer);
 }
 
 // ---------------------------------------------------------------------------
@@ -150,15 +180,8 @@ builder.queryFields((t) => ({
       if (!readable) return [];
       const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
       const people = await listPeople(readable.timetable.id);
-      return people
-        .filter((p) =>
-          canSeePersonProfile(
-            readable.timetable.privacy as Privacy,
-            viewer,
-            p.roles as SharedRole[],
-          ),
-        )
-        .map((p) => withPublicRoles(p, viewer));
+      const privacy = readable.timetable.privacy as Privacy;
+      return people.flatMap((p) => personForViewer(p, privacy, viewer) ?? []);
     },
   }),
 
@@ -183,17 +206,12 @@ builder.queryFields((t) => ({
         : args.userSlug
           ? await getPersonBySlug(readable.timetable.id, args.userSlug)
           : null;
-      if (
-        person &&
-        !canSeePersonProfile(
-          readable.timetable.privacy as Privacy,
-          viewer,
-          person.roles as SharedRole[],
-        )
-      ) {
-        return null;
-      }
-      return person ? withPublicRoles(person, viewer) : null;
+      if (!person) return null;
+      return personForViewer(
+        person,
+        readable.timetable.privacy as Privacy,
+        viewer,
+      );
     },
   }),
 
@@ -208,6 +226,7 @@ builder.queryFields((t) => ({
         membershipId: m.membershipId,
         roles: m.roles as string[],
         inviteSentAt: m.inviteSentAt,
+        deactivatedAt: m.deactivatedAt,
         user: m.user,
       }));
     },

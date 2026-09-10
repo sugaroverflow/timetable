@@ -1,6 +1,7 @@
 import { Pencil } from "lucide-react";
 import Link from "next/link";
 
+import { formatShortDate } from "@/lib/dates";
 import { personPath } from "@/lib/personPath";
 import type { RoleLabels } from "@/lib/timetableSettings";
 
@@ -14,6 +15,10 @@ export type ProfileCardPerson = {
   slug: string | null;
   roles: string[];
   bioHtml: string | null;
+  /** Set while deactivated (member-deactivation, 2026-09-10). Only admin
+   * viewers ever receive such a person, so the note this renders is for
+   * them: "why am I seeing this page when they're gone?" */
+  deactivatedAt?: string | null;
 };
 
 /** Profile header shared by the host-filtered feed and the person pages
@@ -47,6 +52,12 @@ export function PersonProfileCard({
   );
   return (
     <div className="card stack">
+      {person.deactivatedAt ? (
+        <div className="hint">
+          Deactivated {formatShortDate(person.deactivatedAt)} — only admins can
+          see this page.
+        </div>
+      ) : null}
       {/* Portrait with the name and role pills beneath (QA 2026-07-28).
        * The name is the page's top heading — tier 1 of the hierarchy. */}
       <div className="profile-head">

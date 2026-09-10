@@ -25,7 +25,7 @@ import { loadMoreFeed } from "../topics/actions";
 const PERSON_QUERY = `
   query PersonPage($s: String!, $userSlug: String!) {
     person(idOrSlug: $s, userSlug: $userSlug) {
-      userId name image slug roles bioHtml
+      userId name image slug roles bioHtml deactivatedAt
     }
   }
 `;
@@ -33,7 +33,7 @@ const PERSON_QUERY = `
 const PERSON_BY_ID_QUERY = `
   query PersonPageById($s: String!, $userId: String!) {
     person(idOrSlug: $s, userId: $userId) {
-      userId name image slug roles bioHtml
+      userId name image slug roles bioHtml deactivatedAt
     }
   }
 `;

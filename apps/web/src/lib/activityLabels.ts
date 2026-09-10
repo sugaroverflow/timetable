@@ -38,6 +38,9 @@ export const ACTION_LABELS: Record<string, string> = {
   "member.invite": "invited someone",
   "member.first_login": "signed in for the first time",
   "member.remove": "removed a member from the forum",
+  // member-deactivation (Ed, 2026-09-10).
+  "member.deactivate": "deactivated a member",
+  "member.reactivate": "reactivated a member",
   "member.impersonate": "previewed the forum as a member",
   // Retained for historical rows; the preview-end event is no longer logged.
   "member.impersonate_end": "ended a member preview",
@@ -70,6 +73,8 @@ export const TARGETED_LABELS: Record<string, string> = {
   "member.email_change": "changed the login email of",
   "member.role_change": "changed the roles of",
   "member.remove": "removed",
+  "member.deactivate": "deactivated",
+  "member.reactivate": "reactivated",
 };
 
 /** availability.set states → the emoji the calendar uses. */
