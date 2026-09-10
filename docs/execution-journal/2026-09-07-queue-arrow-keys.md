@@ -109,3 +109,11 @@ And once Enter has posted, the composer now blurs itself in
 `submitOnEnter` mode, so the round continues with → rather than needing an
 Escape first — the placeholder keeps the @-mention hint alongside "Enter
 posts".
+
+CI then failed twice more on the new component test, both times in the
+test's own plumbing rather than the arrows: jsdom 30 needs Node ≥ 22.22
+(its undici calls `worker_threads.markAsUncloneable`, absent on the Node
+20 CI and prod images), so jsdom is pinned to ^29; and npm left even that
+nested under `apps/web/node_modules`, where vitest at the root can't
+resolve an environment from, so jsdom is declared at the root as well.
+The suite was run under a Node 20 binary locally before pushing.

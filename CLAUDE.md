@@ -81,7 +81,13 @@ Web COMPONENT tests (jsdom + `@testing-library/react`, since queue-keys
 `@/lib/clientGraphql` and `@/components/Toast` through `vi.hoisted`).
 `vitest.config.ts` sets `oxc: { jsx: { runtime: "automatic" } }` because
 Vite 8 transforms with Oxc and tsconfig's `jsx: preserve` (which Next
-needs) would otherwise leave JSX untransformed.
+needs) would otherwise leave JSX untransformed. **jsdom is pinned to ^29
+and declared at the ROOT** (2026-09-10): jsdom 30 needs Node ≥ 22.22 (its
+undici 8 calls `worker_threads.markAsUncloneable`), and CI + the prod
+image run Node 20; and vitest resolves the environment package from the
+root `node_modules`, where npm would not reliably hoist a workspace-only
+devDependency (CI failed with "Cannot find package 'jsdom'" until the
+root declaration). Verified under a Node 20 binary locally.
 Lint covers everything: `apps/web` has its own Next config; the root
 `eslint.config.mjs` lints `apps/api`, `packages/*`, `tests/`, `scripts/`.
 
