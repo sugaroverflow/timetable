@@ -30,6 +30,8 @@ import {
   type Timeslot,
 } from "@timetable/db";
 
+import { givenByActiveMember } from "./activeMember";
+
 // --------------------------------------------------------------------------
 // Slot CRUD
 // --------------------------------------------------------------------------
@@ -754,6 +756,7 @@ export async function getAudienceElectorIds(
         and(
           eq(hearts.topicId, audience.topicId),
           eq(topics.timetableId, timetableId),
+          givenByActiveMember(hearts.userId, topics.timetableId),
         ),
       );
     return Array.from(new Set(rows.map((r) => r.userId)));
@@ -769,6 +772,7 @@ export async function getAudienceElectorIds(
         eq(topics.timetableId, timetableId),
         eq(topics.hostId, audience.hostId),
         eq(topics.status, "published"),
+        givenByActiveMember(hearts.userId, topics.timetableId),
       ),
     );
   return Array.from(new Set(rows.map((r) => r.userId)));

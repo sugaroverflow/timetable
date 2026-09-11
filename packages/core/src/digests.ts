@@ -899,7 +899,12 @@ async function heartActivities(
       ),
     )
     .where(
-      and(inArray(hearts.topicId, myTopicIds), gt(hearts.createdAt, since)),
+      and(
+        inArray(hearts.topicId, myTopicIds),
+        gt(hearts.createdAt, since),
+        // A since-deactivated hearter's ❤️ is hidden (active-member-filter).
+        isNull(timetableMemberships.deactivatedAt),
+      ),
     );
 
   const byTopic = new Map<
@@ -966,6 +971,7 @@ async function hostHeartActivities(
       and(
         inArray(hostHearts.topicId, myTopicIds),
         gt(hostHearts.createdAt, since),
+        isNull(timetableMemberships.deactivatedAt),
       ),
     );
 

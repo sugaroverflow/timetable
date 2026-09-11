@@ -20,6 +20,7 @@ import {
   type TopicNormScores,
 } from "@timetable/shared";
 
+import { givenByActiveMember } from "./activeMember";
 import { coerceDate } from "./dates";
 import { computeHostHeartScores } from "./hostHearts";
 import { loadQueueCoverage } from "./queue";
@@ -187,7 +188,10 @@ async function countTopicsByStatus(
   return topicCounts;
 }
 
-/** Members with their roles; electors keep their name for the activity list. */
+/** Members with their roles; electors keep their name for the activity list.
+ * Deactivated members are left out (Ed, 2026-09-11): they are off People and
+ * the host picker, so they are off the Analysis tables and the elector/host
+ * counts too — their past ❤️s still count towards topic totals. */
 async function loadMembers(timetableId: string): Promise<{
   electorRows: { userId: string; name: string | null; image: string | null }[];
   hostRows: {
@@ -206,7 +210,12 @@ async function loadMembers(timetableId: string): Promise<{
       slug: timetableMemberships.slug,
     })
     .from(timetableMemberships)
-    .where(eq(timetableMemberships.timetableId, timetableId));
+    .where(
+      and(
+        eq(timetableMemberships.timetableId, timetableId),
+        isNull(timetableMemberships.deactivatedAt),
+      ),
+    );
   const electorRows = memberRows.filter((m) => m.roles.includes("elector"));
   const hostRows = memberRows.filter((m) => m.roles.includes("host"));
   return { electorRows, hostRows };
@@ -438,6 +447,8 @@ async function loadHostHeartActivity(
       and(
         eq(topics.timetableId, timetableId),
         eq(topics.status, "published" as const),
+        // The join above is the TOPIC's host; this checks the GIVER.
+        givenByActiveMember(hostHearts.userId, topics.timetableId),
       ),
     );
 }
@@ -567,6 +578,7 @@ async function loadCommentTallies(
         isNull(comments.hiddenAt),
         isNull(comments.deletedAt),
         sql`'elector' = ANY(${timetableMemberships.roles})`,
+        isNull(timetableMemberships.deactivatedAt),
         ne(comments.authorId, topics.hostId),
         ...(activitySince ? [gte(comments.createdAt, activitySince)] : []),
       ),

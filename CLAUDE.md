@@ -357,6 +357,25 @@ Stable names for feature pieces, so instructions can reference them precisely.
   `lastDigestAt` to now so the first digest back doesn't replay the
   absence. Owner and self can't be deactivated. Not to be confused with
   the FORUM privacy value `deactivated` (whole-forum, admins only).
+  **Their ❤️s and 💙s stop counting anywhere while deactivated** (Ed,
+  2026-09-11): they are off the Analysis tables and header counts
+  (`loadMembers`), out of the Analysis 💬 metrics, and their hearts are
+  hidden through [[active-member-filter]] — rankings, card counts,
+  breakdowns, export, calendar hearted audiences, host-digest ❤️ news.
+  Comments stay visible in threads with their byline, and the card's 💬
+  count still counts them.
+
+- **active-member-filter** — `givenByActiveMember(userIdCol,
+  timetableIdCol)` in `packages/core/src/activeMember.ts` (Ed,
+  2026-09-11): the WHERE condition every ❤️/💙 reader carries so a
+  deactivated member's hearts are hidden at read time (nothing is
+  written, so reactivation restores them). A correlated `NOT EXISTS`
+  against a membership with `deactivatedAt` set — NOT a join, so a heart
+  from someone REMOVED from the forum (no row) keeps counting as it
+  always has. Readers that already left-join the GIVER's membership use
+  `isNull(timetableMemberships.deactivatedAt)` directly (`digests.ts`,
+  `listTopicHostHearters`). Any new query that counts or lists hearts
+  must carry one or the other.
 
 - **comment-draft-store** — `useDraft`/`draftKey`/`hasDraft`/`clearDraft`
   in `apps/web/src/lib/commentDrafts.ts` (Ed, 2026-08-21): half-written

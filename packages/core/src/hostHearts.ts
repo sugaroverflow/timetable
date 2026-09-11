@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 
 import { db, hostHearts, timetableMemberships, topics } from "@timetable/db";
 
@@ -10,6 +10,7 @@ import {
 } from "@timetable/shared";
 
 import { logActivity } from "./activity";
+import { givenByActiveMember } from "./activeMember";
 import { recordHeartEvent } from "./heartEvents";
 import { markTopicSeen } from "./queue";
 import type { WeightedHeartEntry } from "./topics";
@@ -112,7 +113,14 @@ export async function listTopicHostHearters(
         eq(timetableMemberships.timetableId, timetableId),
       ),
     )
-    .where(eq(hostHearts.topicId, topicId));
+    // The giver's membership is left-joined above; a deactivated giver's 💙
+    // is hidden (active-member-filter), a removed one's still shows.
+    .where(
+      and(
+        eq(hostHearts.topicId, topicId),
+        isNull(timetableMemberships.deactivatedAt),
+      ),
+    );
   return rows
     .map((r) => ({
       userId: r.userId,
@@ -141,6 +149,7 @@ async function loadPublishedHostHearts(
   const conds = [
     eq(topics.timetableId, timetableId),
     eq(topics.status, "published" as const),
+    givenByActiveMember(hostHearts.userId, topics.timetableId),
   ];
   if (opts.userId) conds.push(eq(hostHearts.userId, opts.userId));
   return db

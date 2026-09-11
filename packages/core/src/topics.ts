@@ -20,6 +20,7 @@ import {
 } from "@timetable/shared";
 
 import { logActivity } from "./activity";
+import { givenByActiveMember } from "./activeMember";
 import { coerceDate } from "./dates";
 import { ensureTopicSlug } from "./slugs";
 
@@ -356,6 +357,8 @@ export async function loadPublishedHearts(
   const conds = [
     eq(topics.timetableId, timetableId),
     eq(topics.status, "published"),
+    // A deactivated member's ❤️s are hidden forum-wide (active-member-filter).
+    givenByActiveMember(hearts.userId, topics.timetableId),
   ];
   if (opts.userId) conds.push(eq(hearts.userId, opts.userId));
   if (cutoff) conds.push(gte(hearts.createdAt, cutoff));
