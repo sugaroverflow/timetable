@@ -23,6 +23,7 @@ import {
 import { givenByActiveMember } from "./activeMember";
 import { coerceDate } from "./dates";
 import { computeHostHeartScores } from "./hostHearts";
+import { loadLastActivitySignals } from "./lastActivity";
 import { loadQueueCoverage } from "./queue";
 import { getHeartsCountFrom } from "./topics";
 import { buildFeed, type FeedTopic } from "./topics";
@@ -83,8 +84,9 @@ export type DashboardData = {
     topicCount: number;
     commentCount: number;
     /** 💙s this host has given (host hearts, 2026-08-04). Admin eyes only —
-     * nulled by the API for non-admin viewers; deliberately NOT folded into
-     * latestActivityAt so nothing about 💙 timing leaks to hosts. */
+     * nulled by the API for non-admin viewers. Their TIMING does reach
+     * latestActivityAt since last-activity-signals (Ed, 2026-09-25: "any
+     * sign we have", shown to everyone who sees the table). */
     hostHeartCount: number;
     /** The topics this host 💙'd (the row's fold-open sub-table, mirroring
      * the elector rows' heartedTopics). Admin eyes only, same as the count.
@@ -305,6 +307,8 @@ function buildHostActivity(args: {
   commentsByAuthor: Map<string, Stat>;
   hostHeartRows: HeartActivityRow[];
   commentsByAuthorTopic: Map<string, number>;
+  /** last-activity-signals — every trace, unwindowed. */
+  lastSignals: Map<string, Date>;
 }): DashboardData["hostActivity"] {
   const givenByHost = heartStatsByElector(args.hostHeartRows);
   const heartedByHost = heartedTopicsByElector(
@@ -327,6 +331,7 @@ function buildHostActivity(args: {
         latestActivityAt: latestDate(
           topicStat?.latestAt,
           commentStat?.latestAt,
+          args.lastSignals.get(h.userId),
         ),
       };
     })
@@ -632,6 +637,8 @@ function buildElectorActivity(args: {
   availabilityByElector: Map<string, Stat>;
   queueCoverage: { publishedCount: number; coveredByUser: Map<string, number> };
   filter: ElectorActivityFilter;
+  /** last-activity-signals — every trace, unwindowed. */
+  lastSignals: Map<string, Date>;
 }): DashboardData["electorActivity"] {
   const heartsByElector = heartStatsByElector(args.heartActivityRows);
   const heartedByElector = heartedTopicsByElector(
@@ -658,6 +665,7 @@ function buildElectorActivity(args: {
           heartStat?.latestAt,
           commentStat?.latestAt,
           availabilityStat?.latestAt,
+          args.lastSignals.get(elector.userId),
         ),
         heartedTopics: heartedByElector.get(elector.userId) ?? [],
       };
@@ -747,7 +755,10 @@ export async function getDashboard(
     activitySince,
   );
 
+  const lastSignals = await loadLastActivitySignals(timetableId);
+
   const electorActivity = buildElectorActivity({
+    lastSignals,
     electorRows,
     heartActivityRows,
     commentsByElector: commentActivity.byElector,
@@ -761,6 +772,7 @@ export async function getDashboard(
   });
 
   const hostActivity = buildHostActivity({
+    lastSignals,
     hostRows,
     topicStats: await loadHostTopicStats(timetableId),
     commentsByAuthor: hostCommentActivity.byElector,

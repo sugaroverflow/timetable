@@ -438,6 +438,21 @@ Stable names for feature pieces, so instructions can reference them precisely.
   [[active-member-filter]]) minus the published-only condition, so a
   live topic matches the feed and a retired one shows its dormant ❤️s.
 
+- **last-activity-signals** — `loadLastActivitySignals` in
+  `packages/core/src/lastActivity.ts` (Ed, 2026-09-25: "any sign we have
+  that they're active"): the "Last activity" date in BOTH Analysis
+  activity tables (Faculty + Elector) is the newest trace of any kind —
+  activity log (as actor), the ❤️/💙 LEDGER `heart_events` (never the
+  `hearts` table, whose `createdAt` a cutoff revival bumps), comments and
+  slot chat in any thread (posted/edited), availability + patterns,
+  pencils they created, and READING (queue `topic_seen`, `comment_seen`,
+  All Topics + notifications visits). Unwindowed by the hearts cutoff (the
+  count columns and Active/Quiet filter keep the window). Shown to hosts
+  too, so it reveals colleagues' 💙 and "last seen" timing — Ed's
+  informed call after learning hosts can see the tables. View-as can't
+  pollute it (all reading marks are mutations, refused while previewing);
+  keep any NEW reading mark a mutation for that reason.
+
 - **feed-position-store** — `lib/feedPosition.ts` (Ed's "going back feels
   fragile", 2026-08-28): remembers, per feed view, how many pages the
   infinite feed had appended and the scroll offset, so Back replays them
