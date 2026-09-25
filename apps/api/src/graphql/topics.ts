@@ -17,6 +17,7 @@ import {
   listSubmittedTopics,
   listTimetableHosts,
   loadCommentsSeen,
+  loadTopicHeartSummaries,
   logActivity,
   markTopicSeen,
   moderateTopic,
@@ -108,7 +109,24 @@ type GqlManagedTopic = Topic & {
   prefetchedComments?: CommentNode[];
   prefetchedHostOnlyComments?: CommentNode[];
   prefetchedAdminComments?: CommentNode[];
+  /** managed-heart-fields, batched by hostDashboard. */
+  prefetchedHearts?: { heartCount: number; viewerHasHearted: boolean };
 };
+
+/** The ❤️ summary for one managed topic — the batch when the list
+ * resolver attached one, else a single-topic lookup. */
+async function managedHearts(
+  tp: GqlManagedTopic,
+  viewerUserId: string | null,
+): Promise<{ heartCount: number; viewerHasHearted: boolean }> {
+  if (tp.prefetchedHearts) return tp.prefetchedHearts;
+  const summaries = await loadTopicHeartSummaries(
+    tp.timetableId,
+    [tp.id],
+    viewerUserId,
+  );
+  return summaries.get(tp.id) ?? { heartCount: 0, viewerHasHearted: false };
+}
 
 const HostOptionType = builder
   .objectRef<{ id: string; name: string | null }>("HostOption")
@@ -326,6 +344,19 @@ const ManagedTopicType = builder
       viewerCommentsSeenAt: t.string({
         nullable: true,
         resolve: (tp) => tp.viewerCommentsSeenAt?.toISOString() ?? null,
+      }),
+      /** managed-heart-fields (my-topics-heart-row, 2026-09-25). On a
+       * published topic, the feed's own count; on an unpublished or
+       * archived one, its DORMANT ❤️s — counted nowhere until it is
+       * republished. ManagedTopic is served only to the owning host and
+       * admins, who are the people entitled to see that. */
+      heartCount: t.int({
+        resolve: async (tp, _a, ctx) =>
+          (await managedHearts(tp, ctx.user?.id ?? null)).heartCount,
+      }),
+      viewerHasHearted: t.boolean({
+        resolve: async (tp, _a, ctx) =>
+          (await managedHearts(tp, ctx.user?.id ?? null)).viewerHasHearted,
       }),
       /** Public comment thread — lets My Topics render feed-identical cards
        * (QA #59). */
@@ -612,7 +643,18 @@ builder.queryFields((t) => ({
       const readable = await readTimetable(ctx, args.idOrSlug);
       if (!readable) return [];
       const rows = await listHostTopics(readable.timetable.id, ctx.user.id);
-      return attachManagedCommentTrees(rows, ctx.user.id);
+      const [managed, hearts] = await Promise.all([
+        attachManagedCommentTrees(rows, ctx.user.id),
+        loadTopicHeartSummaries(
+          readable.timetable.id,
+          rows.map((tp) => tp.id),
+          ctx.user.id,
+        ),
+      ]);
+      return managed.map((tp) => ({
+        ...tp,
+        prefetchedHearts: hearts.get(tp.id),
+      }));
     },
   }),
 

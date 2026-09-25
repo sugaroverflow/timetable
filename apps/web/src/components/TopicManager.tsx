@@ -228,6 +228,8 @@ export function TopicManager({
   canPublishDirectly = false,
   calendar,
   hostCommentsEnabled,
+  canHeart = false,
+  viewerHeartCount = null,
 }: {
   topic: ManagedTopic;
   slug: string;
@@ -235,6 +237,10 @@ export function TopicManager({
   hostLabel: string;
   adminLabel: string;
   electorLabel?: string;
+  /** my-topics-heart-row: whether the viewer may ❤️ (an elector), and
+   * their ❤️ total for the "your vote" chip. */
+  canHeart?: boolean;
+  viewerHeartCount?: number | null;
   isAdmin: boolean;
   hosts: { id: string; name: string | null }[];
   canPublishDirectly?: boolean;
@@ -310,6 +316,9 @@ export function TopicManager({
           roleLabels={roleLabels}
           calendar={calendar}
           hostCommentsEnabled={hostCommentsEnabled}
+          electorLabel={electorLabel}
+          canHeart={canHeart}
+          viewerHeartCount={viewerHeartCount}
         />
 
         <ManageControls

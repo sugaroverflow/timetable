@@ -385,6 +385,98 @@ export async function countViewerPublishedHearts(
   return viewerHearts.length;
 }
 
+/** Post-cutoff ❤️s from active members on the given topics, WHATEVER
+ * their status. For a published topic this is exactly the feed's
+ * `heartCount` (same cutoff, same active-member-filter); for an
+ * unpublished or archived one it is the DORMANT ❤️s — kept on the row but
+ * counted nowhere (not in weights, not in Analysis) until republication
+ * brings them back. Only the topic's host and admins may see those. */
+async function loadTopicHeartRows(
+  timetableId: string,
+  topicIds: string[],
+): Promise<{ topicId: string; electorId: string; createdAt: Date }[]> {
+  if (topicIds.length === 0) return [];
+  const cutoff = await getHeartsCountFrom(timetableId);
+  const conds = [
+    eq(topics.timetableId, timetableId),
+    inArray(hearts.topicId, topicIds),
+    givenByActiveMember(hearts.userId, topics.timetableId),
+  ];
+  if (cutoff) conds.push(gte(hearts.createdAt, cutoff));
+  return db
+    .select({
+      topicId: hearts.topicId,
+      electorId: hearts.userId,
+      createdAt: hearts.createdAt,
+    })
+    .from(hearts)
+    .innerJoin(topics, eq(topics.id, hearts.topicId))
+    .where(and(...conds));
+}
+
+/** my-topics-heart-row: each topic's ❤️ count and whether the viewer ❤️s
+ * it, batched for the My Topics page (managed-heart-fields). */
+export async function loadTopicHeartSummaries(
+  timetableId: string,
+  topicIds: string[],
+  viewerUserId: string | null,
+): Promise<Map<string, { heartCount: number; viewerHasHearted: boolean }>> {
+  const rows = await loadTopicHeartRows(timetableId, topicIds);
+  const summaries = new Map(
+    topicIds.map((id) => [id, { heartCount: 0, viewerHasHearted: false }]),
+  );
+  for (const row of rows) {
+    const s = summaries.get(row.topicId);
+    if (!s) continue;
+    s.heartCount += 1;
+    if (row.electorId === viewerUserId) s.viewerHasHearted = true;
+  }
+  return summaries;
+}
+
+/** Who ❤️'d a retired topic — its dormant ❤️s, by name and date. No
+ * weights: those exist only among published topics. Caller gates this to
+ * the topic's host and admins. */
+export async function listDormantHearters(
+  timetableId: string,
+  topicId: string,
+): Promise<
+  {
+    electorId: string;
+    electorName: string | null;
+    electorImage: string | null;
+    heartedAt: Date;
+  }[]
+> {
+  const rows = await loadTopicHeartRows(timetableId, [topicId]);
+  if (rows.length === 0) return [];
+  const members = await db
+    .select({
+      id: timetableMemberships.userId,
+      name: timetableMemberships.name,
+      image: timetableMemberships.image,
+    })
+    .from(timetableMemberships)
+    .where(
+      and(
+        eq(timetableMemberships.timetableId, timetableId),
+        inArray(
+          timetableMemberships.userId,
+          rows.map((r) => r.electorId),
+        ),
+      ),
+    );
+  const byId = new Map(members.map((m) => [m.id, m]));
+  return rows
+    .map((r) => ({
+      electorId: r.electorId,
+      electorName: byId.get(r.electorId)?.name ?? null,
+      electorImage: byId.get(r.electorId)?.image ?? null,
+      heartedAt: r.createdAt,
+    }))
+    .sort((a, b) => a.heartedAt.getTime() - b.heartedAt.getTime());
+}
+
 /**
  * Feed ranking. The four normalisations (raw/l2/l1/devotion) mirror the
  * dashboard "Analysis" switcher; "hearts" is kept as a backward-compatible

@@ -113,6 +113,10 @@ export type ManagedTopic = {
   hostHearters?: HostHearter[] | null;
   /** Drafting thread — admins + topic owner only (QA #59 round 3). */
   adminComments?: FeedComment[];
+  /** managed-heart-fields (My Topics only): the feed's count on a
+   * published topic, the dormant ❤️s on an unpublished/archived one. */
+  heartCount?: number;
+  viewerHasHearted?: boolean;
 };
 
 export type ActivityEvent = {

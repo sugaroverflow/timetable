@@ -2,11 +2,14 @@ import {
   getDashboard,
   getHostHeartBreakdown,
   getOrCreateIcsToken,
+  getTopicById,
   getWeightedBreakdown,
+  listDormantHearters,
   type DashboardData,
   type WeightedHeartEntry,
 } from "@timetable/core";
 import {
+  canEditTopic,
   canSeeComments,
   canSeeHostHeartTallies,
   canSeeHostOnly,
@@ -24,6 +27,20 @@ import { WeightedHeartType } from "./types";
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+
+/** One dormant ❤️ on a retired topic — names and dates, no weights. */
+const DormantHeartType = builder
+  .objectRef<
+    Awaited<ReturnType<typeof listDormantHearters>>[number]
+  >("DormantHeart")
+  .implement({
+    fields: (t) => ({
+      electorId: t.exposeID("electorId"),
+      electorName: t.exposeString("electorName", { nullable: true }),
+      electorImage: t.exposeString("electorImage", { nullable: true }),
+      heartedAt: t.string({ resolve: (h) => h.heartedAt.toISOString() }),
+    }),
+  });
 
 const TopicCountsType = builder
   .objectRef<DashboardData["topicCounts"]>("TopicCounts")
@@ -303,6 +320,31 @@ builder.queryFields((t) => ({
       const viewer = { userId: ctx.user.id, roles: readable.roles as Role[] };
       if (!canSeeComments(readable.timetable.privacy, viewer)) return null;
       return getWeightedBreakdown(readable.timetable.id, args.topicId);
+    },
+  }),
+
+  /** Who ❤️'d an unpublished or archived topic — its dormant ❤️s, which
+   * count nowhere until republication (my-topics-heart-row, 2026-09-25).
+   * Owner + admins only: unlike a live topic's breakdown, this is not
+   * public knowledge. Null when unauthorized or the topic is live (a live
+   * topic's ❤️s are `topicWeightedBreakdown`'s). */
+  topicDormantHearters: t.field({
+    type: [DormantHeartType],
+    nullable: true,
+    args: {
+      idOrSlug: t.arg.string({ required: true }),
+      topicId: t.arg.string({ required: true }),
+    },
+    resolve: async (_p, args, ctx) => {
+      if (!ctx.user) return null;
+      const readable = await readTimetable(ctx, args.idOrSlug);
+      if (!readable) return null;
+      const topic = await getTopicById(args.topicId);
+      if (!topic || topic.timetableId !== readable.timetable.id) return null;
+      if (topic.status === "published") return null;
+      const viewer = { userId: ctx.user.id, roles: readable.roles as Role[] };
+      if (!canEditTopic(viewer, topic.hostId)) return null;
+      return listDormantHearters(readable.timetable.id, topic.id);
     },
   }),
 

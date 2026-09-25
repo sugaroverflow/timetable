@@ -38,14 +38,19 @@ export function BreakdownTable({
   slug,
   rows,
   electorLabel = "Elector",
+  weights = true,
 }: {
   slug: string;
   rows: WeightedHeart[];
   /** The forum's custom role label (QA 2026-07-28). */
   electorLabel?: string;
+  /** False for a retired topic's dormant ❤️s (my-topics-heart-row):
+   * weights exist only among published topics, so only names and dates
+   * show. */
+  weights?: boolean;
 }) {
   const { sortRows, headerProps } = useTableSort<SortKey, WeightedHeart>({
-    initial: "l1",
+    initial: weights ? "l1" : "heartedAt",
     ascendingKeys: ["name"],
     compare: compareRows,
   });
@@ -64,9 +69,13 @@ export function BreakdownTable({
         <thead>
           <tr>
             {header("name", electorLabel)}
-            {header("l1", "L1")}
-            {header("l2", "L2")}
-            {header("devotion", "Devotion")}
+            {weights ? (
+              <>
+                {header("l1", "L1")}
+                {header("l2", "L2")}
+                {header("devotion", "Devotion")}
+              </>
+            ) : null}
             {header("heartedAt", "Hearted")}
           </tr>
         </thead>
@@ -84,9 +93,13 @@ export function BreakdownTable({
                   </span>
                 </PersonChip>
               </td>
-              <td className="mono">{fmt(w.weight)}</td>
-              <td className="mono">{fmt(w.l2Weight)}</td>
-              <td className="mono">{fmt(w.devotionWeight)}</td>
+              {weights ? (
+                <>
+                  <td className="mono">{fmt(w.weight)}</td>
+                  <td className="mono">{fmt(w.l2Weight)}</td>
+                  <td className="mono">{fmt(w.devotionWeight)}</td>
+                </>
+              ) : null}
               <td className="mono">
                 {formatShortDate(w.heartedAt, { year: true })}
               </td>
@@ -96,9 +109,13 @@ export function BreakdownTable({
         <tfoot>
           <tr className="breakdown-sums">
             <td>Σ · {rows.length} ❤️</td>
-            <td className="mono">{fmt(sum((w) => w.weight))}</td>
-            <td className="mono">{fmt(sum((w) => w.l2Weight))}</td>
-            <td className="mono">{fmt(sum((w) => w.devotionWeight))}</td>
+            {weights ? (
+              <>
+                <td className="mono">{fmt(sum((w) => w.weight))}</td>
+                <td className="mono">{fmt(sum((w) => w.l2Weight))}</td>
+                <td className="mono">{fmt(sum((w) => w.devotionWeight))}</td>
+              </>
+            ) : null}
             <td />
           </tr>
         </tfoot>

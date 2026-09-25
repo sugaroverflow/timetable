@@ -1,5 +1,6 @@
 import {
   isAdmin,
+  isElector,
   isHost,
   isHostCommentsEnabled,
   type Role,
@@ -23,7 +24,11 @@ import { displayRolesFromCookies } from "@/lib/previewRoles.server";
 import { parseTimetableSettings, roleLabel } from "@/lib/timetableSettings";
 
 type Data = {
-  timetable: { viewerRoles: string[]; settings: string } | null;
+  timetable: {
+    viewerRoles: string[];
+    settings: string;
+    viewerHeartedPublishedCount: number | null;
+  } | null;
   me: { id: string } | null;
   timetableHosts: { id: string; name: string | null }[];
   hostDashboard: ManagedTopic[];
@@ -31,12 +36,16 @@ type Data = {
 
 const QUERY = `
   query HostDashboard($s: String!) {
-    timetable: forum(idOrSlug: $s) { viewerRoles settings }
+    timetable: forum(idOrSlug: $s) {
+      viewerRoles settings viewerHeartedPublishedCount
+    }
     me { id }
     timetableHosts: forumHosts(idOrSlug: $s) { id name }
     hostDashboard(idOrSlug: $s) {
       ${MANAGED_TOPIC_FIELDS}
       viewerCommentsSeenAt
+      heartCount
+      viewerHasHearted
       hostHearters { userId name image slug }
       ${commentTree()}
       ${commentTree("hostOnlyComments")}
@@ -133,6 +142,10 @@ export default async function MyTopicsPage({
                 )}
                 calendar={workbenchCalendar}
                 hostCommentsEnabled={isHostCommentsEnabled(settings)}
+                canHeart={isElector(roles)}
+                viewerHeartCount={
+                  data.timetable?.viewerHeartedPublishedCount ?? null
+                }
               />
             ))}
           </ul>

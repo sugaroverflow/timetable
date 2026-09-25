@@ -422,6 +422,22 @@ Stable names for feature pieces, so instructions can reference them precisely.
   pill, counts as news, skipped once the topic is no longer a draft. No
   reason travels with it: the drafting thread is the channel for that.
 
+- **my-topics-heart-row** — `TopicActionsRow` leading the My Topics
+  Comments tab (`heartRow` in `MyTopicsTabs.tsx`; Ed, 2026-09-25), where
+  ❤️ leads the feed card's. Published topics get the full feed row.
+  Unpublished/archived get its `dormant` mode — count only, "paused while
+  …", no 💬, names-only `DormantBreakdownBody` — and their Comments tab
+  always shows to carry it. Drafts get none. **Dormant ❤️s**: unpublishing
+  keeps the heart rows but every weight/count reader counts published
+  topics only, so a retired topic's ❤️s count nowhere until republished;
+  only its host and admins may see them (`topicDormantHearters`, gated by
+  `canEditTopic` — never widen the public `topicWeightedBreakdown`).
+- **managed-heart-fields** — `ManagedTopic.heartCount` /
+  `viewerHasHearted`, batched in `hostDashboard` via
+  `loadTopicHeartSummaries` (core `topics.ts`): the feed's rows (cutoff +
+  [[active-member-filter]]) minus the published-only condition, so a
+  live topic matches the feed and a retired one shows its dormant ❤️s.
+
 - **feed-position-store** — `lib/feedPosition.ts` (Ed's "going back feels
   fragile", 2026-08-28): remembers, per feed view, how many pages the
   infinite feed had appended and the scroll offset, so Back replays them

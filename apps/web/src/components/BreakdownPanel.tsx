@@ -57,6 +57,75 @@ export function BreakdownPanelBody({
   return <BreakdownTable slug={slug} rows={rows} electorLabel={electorLabel} />;
 }
 
+const DORMANT_QUERY = `query DormantHearters($s: String!, $t: String!) {
+  topicDormantHearters(idOrSlug: $s, topicId: $t) {
+    electorId electorName electorImage heartedAt
+  }
+}`;
+
+/** A retired topic's dormant ❤️s (my-topics-heart-row, 2026-09-25): who
+ * ❤️'d it and when, no weights — those exist only among published topics.
+ * Owner + admins only (the query answers null to anyone else). */
+export function DormantBreakdownBody({
+  slug,
+  topicId,
+  electorLabel = "Elector",
+}: {
+  slug: string;
+  topicId: string;
+  electorLabel?: string;
+}) {
+  const [rows, setRows] = useState<WeightedHeart[] | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    clientGql<{
+      topicDormantHearters:
+        | Pick<
+            WeightedHeart,
+            "electorId" | "electorName" | "electorImage" | "heartedAt"
+          >[]
+        | null;
+    }>(DORMANT_QUERY, { s: slug, t: topicId })
+      .then((data) => {
+        if (cancelled) return;
+        setRows(
+          (data.topicDormantHearters ?? []).map((h) => ({
+            ...h,
+            weight: 0,
+            l2Weight: 0,
+            devotionWeight: 0,
+          })),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [slug, topicId]);
+
+  if (failed) {
+    return <div className="hint">Couldn&rsquo;t load the breakdown.</div>;
+  }
+  if (rows === null) {
+    return <div className="hint">Loading…</div>;
+  }
+  if (rows.length === 0) {
+    return <div className="hint">No ❤️ yet.</div>;
+  }
+  return (
+    <BreakdownTable
+      slug={slug}
+      rows={rows}
+      electorLabel={electorLabel}
+      weights={false}
+    />
+  );
+}
+
 const HOST_HEART_QUERY = `query HostHeartBreakdown($s: String!, $t: String!) {
   topicHostHeartBreakdown(idOrSlug: $s, topicId: $t) {
     hostId hostName hostImage weight l2Weight devotionWeight heartedAt

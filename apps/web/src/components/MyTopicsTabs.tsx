@@ -1,10 +1,13 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 import { countNested } from "@/lib/commentTree";
 import type { WorkbenchCalendar } from "@/lib/calendarTypes";
 import type { FeedComment, ManagedTopic } from "@/lib/feedTypes";
 import { pluralLabel, type RoleLabels } from "@/lib/timetableSettings";
 import { topicPath } from "@/lib/topicPath";
+import { topicStatusLabel } from "@/lib/topicStatusLabels";
 
 import { AdminCommentsBody } from "./AdminCommentsPanel";
 import { CommentComposer } from "./CommentComposer";
@@ -12,6 +15,7 @@ import { CommentList } from "./CommentList";
 import { CommentsOpenScope } from "./CommentsOpenScope";
 import { CommentTeaser } from "./CommentTeaser";
 import { HostOnlyThreadBody } from "./HostOnlyThreadBody";
+import { TopicActionsRow } from "./TopicActionsRow";
 import { TopicScheduleBody } from "./TopicSchedulePanel";
 import { TopicTabs, type TopicTab } from "./TopicTabs";
 
@@ -29,6 +33,7 @@ function PublicCommentsPane({
   roleLabels,
   topicHref,
   topicHostId,
+  heartRow,
 }: {
   topicId: string;
   published: boolean;
@@ -39,9 +44,12 @@ function PublicCommentsPane({
   roleLabels?: RoleLabels;
   topicHref?: string | null;
   topicHostId?: string | null;
+  /** my-topics-heart-row — leads the tab, as ❤️ leads the feed card's. */
+  heartRow?: ReactNode;
 }) {
   return (
     <div className="stack" style={{ gap: 10 }}>
+      {heartRow}
       {published ? (
         <CommentComposer topicId={topicId} mentionSlug={slug} />
       ) : null}
@@ -81,11 +89,40 @@ type TabArgs = {
   published: boolean;
   /** Topic permalink — the comment timestamps' link target (#259). */
   permalink: string | null;
+  electorLabel?: string;
+  canHeart: boolean;
+  viewerHeartCount: number | null;
 };
+
+/** my-topics-heart-row (Ed, 2026-09-25): the feed's ❤️ row on a
+ * published topic; on an unpublished or archived one, the same row in
+ * its dormant mode (count + "paused while …", names-only breakdown).
+ * Drafts get none — they have never been live, so they have no ❤️s. */
+function heartRow(a: TabArgs, commentCount: number): ReactNode {
+  const dormant =
+    a.topic.status === "unpublished" || a.topic.status === "archived";
+  if (!a.published && !dormant) return null;
+  return (
+    <TopicActionsRow
+      topicId={a.topic.id}
+      slug={a.slug}
+      heartCount={a.topic.heartCount ?? 0}
+      viewerHasHearted={a.topic.viewerHasHearted ?? false}
+      commentCount={commentCount}
+      canHeart={a.canHeart}
+      signedIn={a.viewerId != null}
+      viewerHeartCount={a.viewerHeartCount}
+      electorLabel={a.electorLabel}
+      dormant={dormant ? topicStatusLabel(a.topic.status) : null}
+    />
+  );
+}
 
 function commentsTab(a: TabArgs): TopicTab | null {
   const count = countNested(a.publicComments);
-  if (!a.published && count === 0) return null;
+  const row = heartRow(a, count);
+  // A retired topic always gets the tab now: it carries the dormant ❤️s.
+  if (!a.published && count === 0 && !row) return null;
   return {
     value: "comments",
     icon: "comments",
@@ -102,6 +139,7 @@ function commentsTab(a: TabArgs): TopicTab | null {
         roleLabels={a.roleLabels}
         topicHref={a.permalink}
         topicHostId={a.topic.hostId ?? a.viewerId}
+        heartRow={row}
       />
     ),
   };
@@ -204,6 +242,9 @@ export function MyTopicsTabs({
   roleLabels,
   calendar,
   hostCommentsEnabled,
+  electorLabel,
+  canHeart,
+  viewerHeartCount,
 }: {
   topic: ManagedTopic;
   slug: string;
@@ -213,6 +254,9 @@ export function MyTopicsTabs({
   roleLabels?: RoleLabels;
   calendar: WorkbenchCalendar | null;
   hostCommentsEnabled: boolean;
+  electorLabel?: string;
+  canHeart: boolean;
+  viewerHeartCount: number | null;
 }) {
   const args: TabArgs = {
     topic,
@@ -223,6 +267,9 @@ export function MyTopicsTabs({
     roleLabels,
     calendar,
     hostCommentsEnabled,
+    electorLabel,
+    canHeart,
+    viewerHeartCount,
     publicComments: topic.comments ?? [],
     hostComments: topic.hostOnlyComments ?? [],
     adminComments: topic.adminComments ?? [],
