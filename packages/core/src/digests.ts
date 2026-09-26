@@ -1,4 +1,15 @@
-import { and, asc, eq, gt, inArray, isNull, lt, ne, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  eq,
+  gt,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  ne,
+  sql,
+} from "drizzle-orm";
 
 import {
   effectiveDigestSettings,
@@ -1217,10 +1228,14 @@ function eligibleForums(
 
 /** The recipient's ENTIRE review queue (round 2, admin switch, Ed:
  * admins toggle a standing "for review" listing): every topic currently
- * awaiting review in their admin forums, never their own. `updatedAt`
- * approximates the submission time (status transitions bump it; a later
- * edit re-flagging a queued topic as news is a feature) — only
- * since-window items count as send-triggering news. */
+ * awaiting review in their admin forums, never their own. "Awaiting
+ * review" is a draft (`submitted`) whose host has flipped the Ready
+ * switch (`readyAt`) — the same test as the Pending page's "ready" filter
+ * and the nav badge; a draft without it is still being written and the
+ * app says so (Ed, 2026-09-26: the digest was listing every draft as
+ * "Ready to review"). `updatedAt` approximates the ready time (flipping
+ * the switch bumps it; a later edit re-flagging a queued topic as news is
+ * a feature) — only since-window items count as send-triggering news. */
 async function pendingReviewActivities(
   ctx: DigestContext,
 ): Promise<RawActivity[]> {
@@ -1237,6 +1252,7 @@ async function pendingReviewActivities(
       and(
         inArray(topics.timetableId, eligible),
         eq(topics.status, "submitted"),
+        isNotNull(topics.readyAt),
         ne(topics.hostId, ctx.recipient.id),
       ),
     );
