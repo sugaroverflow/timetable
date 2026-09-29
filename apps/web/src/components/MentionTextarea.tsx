@@ -3,8 +3,13 @@
 import { useRef, useState } from "react";
 
 import { GrowingTextarea } from "@/components/GrowingTextarea";
+import { clientGql } from "@/lib/clientGraphql";
 
 export type MentionCandidate = { name: string | null; slug: string | null };
+
+const PEOPLE_QUERY = `query MentionPeople($s: String!) {
+  timetablePeople: forumPeople(idOrSlug: $s) { name slug }
+}`;
 
 // The in-progress "@handle" immediately before the caret, if any.
 const ACTIVE_MENTION_RE = /(?:^|[^A-Za-z0-9_@])@([a-z0-9-]*)$/i;
@@ -23,6 +28,7 @@ export function MentionTextarea({
   ariaLabel,
   dataTopicComposer,
   onUnhandledKeyDown,
+  textareaRef,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -34,8 +40,10 @@ export function MentionTextarea({
    * box (queue-keys: Enter posts, Escape leaves). While the picker is
    * open it keeps Enter/Tab/Escape and the ↑/↓ that walk it. */
   onUnhandledKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  textareaRef?: React.RefObject<HTMLTextAreaElement | null>;
 }) {
-  const ref = useRef<HTMLTextAreaElement>(null);
+  const ownRef = useRef<HTMLTextAreaElement>(null);
+  const ref = textareaRef ?? ownRef;
   const [query, setQuery] = useState<string | null>(null);
   const [active, setActive] = useState(0);
 
@@ -141,6 +149,38 @@ export function MentionTextarea({
           ))}
         </ul>
       ) : null}
+    </div>
+  );
+}
+
+/** Mention textarea backed by the timetable's visible member list. Candidates
+ * load on first focus so closed reply composers do not add feed-page queries. */
+export function ForumMentionTextarea({
+  mentionSlug,
+  ...props
+}: Omit<React.ComponentProps<typeof MentionTextarea>, "candidates"> & {
+  mentionSlug: string;
+}) {
+  const [candidates, setCandidates] = useState<MentionCandidate[]>([]);
+  const [loadedCandidates, setLoadedCandidates] = useState(false);
+
+  async function loadCandidates() {
+    if (loadedCandidates) return;
+    setLoadedCandidates(true);
+    try {
+      const data = await clientGql<{ timetablePeople: MentionCandidate[] }>(
+        PEOPLE_QUERY,
+        { s: mentionSlug },
+      );
+      setCandidates(data.timetablePeople ?? []);
+    } catch {
+      // Autocomplete is a convenience; a hand-typed @slug still resolves.
+    }
+  }
+
+  return (
+    <div style={{ flex: 1 }} onFocus={loadCandidates}>
+      <MentionTextarea {...props} candidates={candidates} />
     </div>
   );
 }

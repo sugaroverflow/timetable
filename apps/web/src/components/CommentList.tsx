@@ -217,7 +217,11 @@ function ChainBlock({
         />
       ))}
       {showTail ? (
-        <ChainTailComposer parentId={comment.id} focusIds={tailFocusIds} />
+        <ChainTailComposer
+          parentId={comment.id}
+          focusIds={tailFocusIds}
+          mentionSlug={comment.visibility === "public" ? slug : undefined}
+        />
       ) : null}
     </div>
   );
@@ -300,6 +304,7 @@ function CommentItem({
             // Pin = the topic author's curation gesture, roots only (#258).
             canPin={canPin && depth === 1}
             pinned={comment.pinnedAt != null}
+            mentionSlug={comment.visibility === "public" ? slug : undefined}
           />
         )}
         <ChainBlock
