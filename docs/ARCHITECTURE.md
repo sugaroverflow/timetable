@@ -426,7 +426,7 @@ Core tables:
   (Markdown body) whose `last_activity_at` every reply bumps; replies
   carry `root_id`. Reactions are one row per post+person+emoji. Read
   mark: `timetable_memberships.lounge_seen_at`; digest click-to-read:
-  `digest_sends.lounge_shown`)
+  `digest_sends.lounge_shown_until` — up to the newest post the card showed)
 
 Notable columns: `timetables.settings` is a JSON blob holding role labels,
 theme (colours, fonts, dark palette), icon/cover URLs, digest defaults, the

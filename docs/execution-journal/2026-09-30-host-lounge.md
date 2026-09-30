@@ -45,7 +45,8 @@ Recorded in full in `docs/host-lounge-plan.md`:
 - **Migration 0044** (additive): `lounge_comments` (root/parent/`root_id`,
   `last_activity_at` for bump order, hide/delete/edit/pin),
   `lounge_mentions`, `lounge_reactions`,
-  `timetable_memberships.lounge_seen_at`, `digest_sends.lounge_shown`.
+  `timetable_memberships.lounge_seen_at`, `digest_sends.lounge_shown_until` (a digest click marks the Lounge read
+  up to the newest post the card showed, never the send time).
 - **Shared:** `isLoungeEnabled`, `canUseLounge`, the `lounge` digest kind
   (audience host), `normalizeReaction` (one emoji grapheme, ❤️/💙
   refused). Tests.
@@ -68,3 +69,19 @@ Recorded in full in `docs/host-lounge-plan.md`:
   Lounge kinds in Notifications. The thread components now take their
   mutations from `commentThreadAdapter` (topic comments by default) — one
   thread implementation for both surfaces.
+
+## Review pass (same day)
+
+An independent review found no privacy leak to electors or outsiders, and
+seven correctness issues, all fixed before merge: replies were refused
+under a deleted post (a dead-end composer); hidden conversations could
+still be written to from a stale tab and their replies still notified;
+a digest click marked unshown posts read; concurrent replies could move
+a bump backwards; the "Show older" cursor could skip a sub-millisecond
+bump time; a reload could drop the conversation the reader had just
+acted on; and a `?c=` link on the same route didn't bring its
+conversation in.
+
+Accepted as is: whether a forum has the Lounge switched on is visible in
+the forum's public settings JSON, as the calendar and host-thread
+switches already are — never any content.
