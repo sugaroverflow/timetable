@@ -34,8 +34,8 @@ const PILL_CLASS: Record<AssignableRole, string> = {
 
 /** Admins can edit any member's per-forum Contact Details (2026-09-30),
  * name (2026-08-27), bio (markdown, QA #42) and profile picture
- * (production QA) — the same fields the member's own profile page edits,
- * Contact Details first as there.
+ * (production QA) — the same fields, in the same order (Name, Contact
+ * Details, About), as the member's own profile page.
  *
  * Fetched on mount rather than behind a second "Edit bio & photo" click
  * (Ed, 2026-08-27: the People card's Edit should BE the profile editor).
@@ -110,6 +110,18 @@ function MemberProfileFields({
 
   return (
     <div className="stack" style={{ marginTop: 12, gap: 8 }}>
+      <h3 className="section-title">Profile</h3>
+      <div className="field" style={{ marginBottom: 0 }}>
+        <label htmlFor={`member-name-${userId}`}>Name</label>
+        <input
+          id={`member-name-${userId}`}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          // Renaming re-derives their member slug, so their profile URL
+          // follows — old links to it stop resolving.
+          placeholder="Their name in this forum"
+        />
+      </div>
       <div className="field" style={{ marginBottom: 0 }}>
         <label>Contact Details</label>
         <p className="hint profile-audience">
@@ -127,27 +139,19 @@ function MemberProfileFields({
         )}
       </div>
       <div className="field" style={{ marginBottom: 0 }}>
-        <label htmlFor={`member-name-${userId}`}>Name</label>
-        <input
-          id={`member-name-${userId}`}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          // Renaming re-derives their member slug, so their profile URL
-          // follows — old links to it stop resolving.
-          placeholder="Their name in this forum"
-        />
+        <label>About</label>
+        {bio === null ? (
+          <div className="rte" style={{ minHeight: 420 }} aria-busy="true" />
+        ) : (
+          // Same editor as the topic composers and the profile About
+          // field (launch QA 2026-07-27); markdown stays underneath.
+          <RichTextEditor
+            value={bio}
+            onChange={setBio}
+            placeholder="Member bio"
+          />
+        )}
       </div>
-      {bio === null ? (
-        <div className="rte" style={{ minHeight: 420 }} aria-busy="true" />
-      ) : (
-        // Same editor as the topic composers and the profile About
-        // field (launch QA 2026-07-27); markdown stays underneath.
-        <RichTextEditor
-          value={bio}
-          onChange={setBio}
-          placeholder="Member bio"
-        />
-      )}
       <ImageUploadField
         id={`member-image-${userId}`}
         label="Profile image"

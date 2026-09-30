@@ -5,16 +5,9 @@ import { isProfilePublic, type Privacy, type Role } from "@timetable/shared";
 export const CONTACT_DETAILS_AUDIENCE =
   "Only members of this forum can see these.";
 
-/** "Public Profile" only when the internet really can read it; plain
- * "Profile" on private forums and for electors on hosts-only ones (Ed,
- * 2026-09-30 — the label must never claim a reach it doesn't have). */
-export function profileHeading(privacy: string, roles: string[]): string {
-  return isProfilePublic(privacy as Privacy, roles as Role[])
-    ? "Public Profile"
-    : "Profile";
-}
-
-/** The line under the profile heading: who actually sees it here. */
+/** The line under the About field: who actually reads the bio here —
+ * the internet only where `isProfilePublic` says so (public/no_comments;
+ * hosts and admins on hosts_only), forum members otherwise. */
 export function profileAudience(privacy: string, roles: string[]): string {
   return isProfilePublic(privacy as Privacy, roles as Role[])
     ? "Anyone can see this, including search engines."

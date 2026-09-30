@@ -52,3 +52,15 @@ number meant only for fellow members.
   someone who joins in order to read it; and removal doesn't un-see what
   was read. The editor copy says "Only members of this forum can see
   these" and nothing stronger.
+
+## Second pass (same day, after Ed saw it on dev)
+
+Ed: in both editors, Contact Details go **under Name and above About**,
+with **"Profile" as the one top-level title** and the fields the level
+below. So the separate "Public Profile"/"Profile" section heading is
+gone — a public-sounding title over a box that now contains members-only
+content would contradict itself. Its job moved to the line under the
+About label ("Anyone can see this, including search engines." or "Only
+members of this forum can see this."). The admin Edit panel on People
+cards gained a "Profile" heading and an "About" label (its bio editor
+had none). Readers' pages are unchanged: Contact Details above the bio.

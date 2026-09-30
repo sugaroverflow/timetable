@@ -5,11 +5,7 @@ import { useState } from "react";
 
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { RichTextEditor } from "@/components/RichTextEditor";
-import {
-  CONTACT_DETAILS_AUDIENCE,
-  profileAudience,
-  profileHeading,
-} from "@/lib/profileLabels";
+import { CONTACT_DETAILS_AUDIENCE, profileAudience } from "@/lib/profileLabels";
 import { useGqlAction } from "@/lib/useGqlAction";
 import { useSavedSnapshot } from "@/lib/useSavedSnapshot";
 
@@ -17,9 +13,9 @@ const MUTATION = `mutation($s: String!, $name: String, $bio: String, $contactDet
   updateMyProfile(idOrSlug: $s, name: $name, bio: $bio, contactDetails: $contactDetails, image: $image) { userId }
 }`;
 
-/** Edits the viewer's profile in ONE forum (per-forum profiles). Contact
- * Details lead (Ed, 2026-09-30): the members-only box, above the profile
- * whose heading and audience line say who can actually read it here. */
+/** Edits the viewer's profile in ONE forum (per-forum profiles). One
+ * "Profile" (the page title) over Name, Contact Details, About (Ed,
+ * 2026-09-30); Contact Details and About each say who can read them. */
 export function ProfileForm({
   slug,
   name: initialName,
@@ -76,21 +72,7 @@ export function ProfileForm({
   }
 
   return (
-    <form onSubmit={submit} className="card profile-form">
-      <h2 className="section-title">Contact Details</h2>
-      <p className="hint profile-audience">
-        <Lock size={12} aria-hidden /> {CONTACT_DETAILS_AUDIENCE}
-      </p>
-      <div className="field">
-        <RichTextEditor
-          value={contactDetails}
-          onChange={setContactDetails}
-          minHeight={140}
-          placeholder="Email, phone, Signal — however members can reach you."
-        />
-      </div>
-      <h2 className="section-title">{profileHeading(privacy, roles)}</h2>
-      <p className="hint profile-audience">{profileAudience(privacy, roles)}</p>
+    <form onSubmit={submit} className="card">
       <div className="field">
         <label htmlFor="name">Name</label>
         <input
@@ -100,7 +82,22 @@ export function ProfileForm({
         />
       </div>
       <div className="field">
+        <label>Contact Details</label>
+        <p className="hint profile-audience">
+          <Lock size={12} aria-hidden /> {CONTACT_DETAILS_AUDIENCE}
+        </p>
+        <RichTextEditor
+          value={contactDetails}
+          onChange={setContactDetails}
+          minHeight={140}
+          placeholder="Email, phone, Signal — however members can reach you."
+        />
+      </div>
+      <div className="field">
         <label htmlFor="bio">About</label>
+        <p className="hint profile-audience">
+          {profileAudience(privacy, roles)}
+        </p>
         {/* Same editor and size as the topic composers — one consistent
          * writing surface everywhere (launch QA 2026-07-27). Markdown
          * stays the stored format underneath. */}

@@ -1,23 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { profileAudience, profileHeading } from "./profileLabels";
-
-describe("profileHeading", () => {
-  it("says Public Profile only where the public can read it", () => {
-    expect(profileHeading("public", ["elector"])).toBe("Public Profile");
-    expect(profileHeading("no_comments", ["elector"])).toBe("Public Profile");
-    expect(profileHeading("hosts_only", ["host"])).toBe("Public Profile");
-  });
-
-  it("says Profile where only members can", () => {
-    expect(profileHeading("private", ["host"])).toBe("Profile");
-    expect(profileHeading("hosts_only", ["elector"])).toBe("Profile");
-  });
-});
+import { profileAudience } from "./profileLabels";
 
 describe("profileAudience", () => {
-  it("matches the heading", () => {
+  it("names the internet only where the public can read the bio", () => {
     expect(profileAudience("public", ["elector"])).toMatch(/search engines/);
+    expect(profileAudience("no_comments", ["elector"])).toMatch(/search/);
+    expect(profileAudience("hosts_only", ["host"])).toMatch(/search/);
+  });
+
+  it("says members only everywhere else", () => {
     expect(profileAudience("private", ["admin"])).toMatch(/Only members/);
+    expect(profileAudience("hosts_only", ["elector"])).toMatch(/Only members/);
   });
 });

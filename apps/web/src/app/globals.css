@@ -2971,11 +2971,8 @@ a.queue-btn-back:hover {
   gap: 3px;
 }
 
-/* The profile editor's two sections — Contact Details, then the
-   (Public) Profile — each a heading with a who-can-see-this line. */
-.profile-form .section-title:not(:first-child) {
-  margin-top: 18px;
-}
+/* The who-can-read-this line under a profile field's label (Contact
+   Details, About). */
 .profile-audience {
   display: flex;
   align-items: center;

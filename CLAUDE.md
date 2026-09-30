@@ -462,13 +462,17 @@ Stable names for feature pieces, so instructions can reference them precisely.
   Stripped in `personForViewer` (members.ts), the one gate every
   profile read passes; the export builds its people field by field and
   deliberately omits it (Ed: nobody collects everyone's contact details
-  in one download). It sits ABOVE the profile everywhere (editor, person
-  page, host header on /topics, People cards). Named "Contact Details",
+  in one download). Readers see it ABOVE the bio (person page, host header on
+  /topics, People cards); both editors (own profile page, admin Edit on
+  People cards) are one "Profile" over Name → Contact Details → About
+  (Ed, 2026-09-30, second pass — the first pass's separate "Public
+  Profile" heading is gone: a public-sounding title over a members-only
+  box contradicted itself). Named "Contact Details",
   not "Private Profile", so people don't write a second whole profile.
-  The profile's heading is **"Public Profile"** only when
-  `isProfilePublic` says the internet can read it (public/no_comments;
-  hosts and admins on hosts_only) and plain **"Profile"** otherwise, each
-  with a who-can-see-this line (`lib/profileLabels.ts`); readers see a
+  Contact Details and About each carry a who-can-read-this line
+  (`lib/profileLabels.ts`; About names the internet only where
+  `isProfilePublic` — public/no_comments; hosts and admins on
+  hosts_only); readers see a
   🔒 "Members only" note on Contact Details only where the profile around
   them is public.
 

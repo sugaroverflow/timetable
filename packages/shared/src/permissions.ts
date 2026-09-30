@@ -85,8 +85,9 @@ export function canSeeContactDetails(viewer: Viewer): boolean {
   return isMember(viewer.roles);
 }
 
-/** Whether this person's profile is open to the internet — what earns it
- * the "Public Profile" label (plain "Profile" otherwise, 2026-09-30). */
+/** Whether this person's profile is open to the internet (2026-09-30) —
+ * decides the editor's who-reads-your-About line and the readers'
+ * "Members only" note on Contact Details. */
 export function isProfilePublic(
   privacy: Privacy,
   personRoles: readonly Role[],
