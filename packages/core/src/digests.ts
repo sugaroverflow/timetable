@@ -1875,7 +1875,7 @@ export async function recordDigestSend(
       userId: digest.userId,
       timetableId: digest.forumId,
       commentTopicIds: digestCommentTopicIds(digest),
-      loungeShown: digest.lounge !== null,
+      loungeShownUntil: digest.lounge?.shownUntil ?? null,
       sentAt,
     })
     .returning({ id: digestSends.id });
@@ -1912,9 +1912,10 @@ export async function markDigestRead(
     .where(and(eq(digestSends.id, sendId), eq(digestSends.userId, userId)))
     .limit(1);
   if (!send) return false;
-  // The email showed the Lounge card: the room is read up to the send.
-  if (send.loungeShown) {
-    await markLoungeSeen(send.timetableId, userId, send.sentAt);
+  // The email showed the Lounge card: the room is read up to the newest
+  // post it showed (never the send time — the card leaves posts out).
+  if (send.loungeShownUntil) {
+    await markLoungeSeen(send.timetableId, userId, send.loungeShownUntil);
   }
   if (send.commentTopicIds.length === 0) return true;
   // ISO string + explicit cast, NEVER a raw Date param in a sql template

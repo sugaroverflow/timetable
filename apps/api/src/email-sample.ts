@@ -666,6 +666,7 @@ function sampleLounge(me: DigestPerson, forumSlug: string): DigestLoungeCard {
   const tom = sWho("Tom Reyes", "sample-tom");
   return {
     path: `/f/${forumSlug}/lounge`,
+    shownUntil: new Date("2026-07-30T12:00:00Z"),
     conversations: [
       {
         rootId: "sample-lounge-1",

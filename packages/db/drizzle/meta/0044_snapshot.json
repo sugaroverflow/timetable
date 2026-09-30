@@ -1,5 +1,5 @@
 {
-  "id": "038f3ef7-9693-4b5e-a8a8-73e6293d54b5",
+  "id": "f5f76ee0-1dff-430b-b9bb-7b1bd191ba02",
   "prevId": "e03ece2f-28ed-4246-88e8-159c7a451bed",
   "version": "7",
   "dialect": "postgresql",
@@ -232,12 +232,11 @@
           "notNull": true,
           "default": "'[]'::jsonb"
         },
-        "lounge_shown": {
-          "name": "lounge_shown",
-          "type": "boolean",
+        "lounge_shown_until": {
+          "name": "lounge_shown_until",
+          "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": true,
-          "default": false
+          "notNull": false
         },
         "sent_at": {
           "name": "sent_at",

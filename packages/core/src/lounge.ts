@@ -14,6 +14,8 @@ import {
   sql,
 } from "drizzle-orm";
 
+import { alias } from "drizzle-orm/pg-core";
+
 import { parseMentionHandles, type Role } from "@timetable/shared";
 
 import {
@@ -101,9 +103,13 @@ export async function startLoungeConversation(
   authorId: string,
   body: string,
 ): Promise<LoungeComment> {
+  // lastActivityAt set here, in milliseconds, rather than by the column's
+  // now() default (microseconds): the "Show older" cursor is a JS Date, and
+  // a sub-millisecond bump time could fall between two cursor values and
+  // be skipped. Every bump time is millisecond-precise this way.
   const [row] = await db
     .insert(loungeComments)
-    .values({ timetableId, authorId, body })
+    .values({ timetableId, authorId, body, lastActivityAt: new Date() })
     .returning();
   if (!row) throw new Error("Failed to start conversation");
   await logLounge(row, authorId, "lounge.post", true);
@@ -130,9 +136,14 @@ export async function replyInLounge(
       })
       .returning();
     if (!row) throw new Error("Failed to reply");
+    // GREATEST: a concurrent reply that commits later with an earlier
+    // timestamp must not move the bump backwards. ISO string + cast, never
+    // a raw Date in a sql template (the Drizzle gotcha in CLAUDE.md).
     await tx
       .update(loungeComments)
-      .set({ lastActivityAt: row.createdAt })
+      .set({
+        lastActivityAt: sql`GREATEST(${loungeComments.lastActivityAt}, ${row.createdAt.toISOString()}::timestamptz)`,
+      })
       .where(eq(loungeComments.id, rootId));
     return row;
   });
@@ -141,6 +152,8 @@ export async function replyInLounge(
   return reply;
 }
 
+/** Edits re-read mentions: a newly added @handle notifies (one already
+ * recorded is ignored by the unique index). */
 export async function editLoungeComment(
   id: string,
   body: string,
@@ -151,7 +164,19 @@ export async function editLoungeComment(
     .set({ body, editedAt: now, updatedAt: now })
     .where(eq(loungeComments.id, id))
     .returning();
+  if (row) await recordLoungeMentions(row);
   return row ?? null;
+}
+
+/** The conversation's opening post is hidden — everything in it is out of
+ * sight for non-admins (the page, the dot, notifications). */
+export async function isLoungeConversationHidden(
+  post: LoungeComment,
+): Promise<boolean> {
+  if (post.hiddenAt) return true;
+  if (!post.rootId) return false;
+  const root = await getLoungeComment(post.rootId);
+  return root?.hiddenAt != null;
 }
 
 export async function softDeleteLoungeComment(id: string): Promise<void> {
@@ -579,11 +604,14 @@ export async function hasUnreadLounge(
     )
     .limit(1);
   if (!membership) return false;
+  const roots = alias(loungeComments, "lounge_roots");
   const conds = [
     eq(loungeComments.timetableId, timetableId),
     ne(loungeComments.authorId, userId),
     isNull(loungeComments.hiddenAt),
     isNull(loungeComments.deletedAt),
+    // Nothing inside a hidden conversation lights the dot.
+    isNull(roots.hiddenAt),
   ];
   if (membership.seenAt) {
     conds.push(gt(loungeComments.createdAt, membership.seenAt));
@@ -591,6 +619,7 @@ export async function hasUnreadLounge(
   const [row] = await db
     .select({ id: loungeComments.id })
     .from(loungeComments)
+    .leftJoin(roots, eq(roots.id, loungeComments.rootId))
     .where(and(...conds))
     .limit(1);
   return row !== undefined;

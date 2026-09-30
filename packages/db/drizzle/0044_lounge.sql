@@ -30,7 +30,7 @@ CREATE TABLE "lounge_reactions" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "digest_sends" ADD COLUMN "lounge_shown" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "digest_sends" ADD COLUMN "lounge_shown_until" timestamp with time zone;--> statement-breakpoint
 ALTER TABLE "timetable_memberships" ADD COLUMN "lounge_seen_at" timestamp with time zone;--> statement-breakpoint
 ALTER TABLE "lounge_comments" ADD CONSTRAINT "lounge_comments_timetable_id_timetables_id_fk" FOREIGN KEY ("timetable_id") REFERENCES "public"."timetables"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "lounge_comments" ADD CONSTRAINT "lounge_comments_parent_id_lounge_comments_id_fk" FOREIGN KEY ("parent_id") REFERENCES "public"."lounge_comments"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint

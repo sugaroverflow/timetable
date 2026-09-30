@@ -53,7 +53,11 @@ export default async function LoungePage({
   return (
     <>
       <MarkLoungeSeen slug={slug} />
+      {/* Keyed by the linked conversation: a timestamp or notification
+          link to another `?c=` is a same-route navigation, and the room
+          must start over to bring that conversation in. */}
       <LoungeRoom
+        key={focusId ?? "room"}
         slug={slug}
         initial={room.lounge}
         focusId={focusId}

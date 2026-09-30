@@ -38,6 +38,10 @@ export type DigestLoungeCard = {
   /** The Lounge page, e.g. `/f/<slug>/lounge`. */
   path: string;
   conversations: DigestLoungeConversation[];
+  /** The newest post the card shows as new — a digest click marks the
+   * Lounge read up to here, not to the send time (the card leaves
+   * colleague-to-colleague replies out, and caps its conversations). */
+  shownUntil: Date;
 };
 
 /** At most this many conversations; the card always ends with a link to
@@ -203,6 +207,21 @@ function buildConversation(
   return posts.some((p) => p.isNew) ? { rootId: root.id, posts } : null;
 }
 
+/** The later of `current` and the newest post this conversation shows as
+ * new. */
+function newestNew(
+  conv: DigestLoungeConversation,
+  byId: Map<string, Row>,
+  current: Date,
+): Date {
+  let newest = current;
+  for (const p of conv.posts) {
+    const at = p.isNew ? byId.get(p.comment.id)?.createdAt : undefined;
+    if (at && at > newest) newest = at;
+  }
+  return newest;
+}
+
 export async function loadLoungeDigestCard(
   input: LoungeDigestInput,
 ): Promise<DigestLoungeCard | null> {
@@ -231,14 +250,17 @@ export async function loadLoungeDigestCard(
   const newIds = new Set(qualifying.map((q) => q.id));
 
   const conversations: DigestLoungeConversation[] = [];
+  let shownUntil = new Date(0);
   // Roots arrive in bump order. A hidden or deleted opening post takes its
   // conversation out of the email (hidden posts are admin-only in the app).
   for (const root of roots) {
     if (root.hiddenAt || root.deletedAt) continue;
     const conv = buildConversation(root, byId, newIds);
-    if (conv) conversations.push(conv);
+    if (!conv) continue;
+    conversations.push(conv);
+    shownUntil = newestNew(conv, byId, shownUntil);
     if (conversations.length >= MAX_CONVERSATIONS) break;
   }
   if (conversations.length === 0) return null;
-  return { path: `/f/${input.forumSlug}/lounge`, conversations };
+  return { path: `/f/${input.forumSlug}/lounge`, conversations, shownUntil };
 }

@@ -3716,3 +3716,73 @@ describe("{host} Lounge (hosts and admins only, off by default)", () => {
     });
   });
 });
+
+describe("{host} Lounge — hidden and deleted posts", () => {
+  const settings = { lounge: { enabled: true } };
+  const base = {
+    id: "33333333-3333-3333-3333-333333333333",
+    timetableId: "11111111-1111-1111-1111-111111111111",
+    parentId: null,
+    rootId: null,
+    authorId: "host-1",
+    body: "hello",
+    lastActivityAt: new Date(),
+    hiddenAt: null as Date | null,
+    hiddenByUserId: null,
+    deletedAt: null as Date | null,
+    editedAt: null,
+    pinnedAt: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+  const post = async (baseUrl: string, query: string) =>
+    (await (
+      await fetch(`${baseUrl}/graphql`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query }),
+      })
+    ).json()) as { errors?: unknown[] };
+  const REACT = `mutation { setLoungeReaction(commentId: "${base.id}", emoji: "👍", on: true) }`;
+  const REPLY = `mutation { replyInLounge(commentId: "${base.id}", body: "still here") }`;
+
+  it("puts a hidden post out of reach for everyone but admins", async () => {
+    vi.mocked(core.setLoungeReaction).mockClear();
+    vi.mocked(core.getTimetableById).mockResolvedValue(
+      timetableFixture({ settings }),
+    );
+    vi.mocked(core.getLoungeComment).mockResolvedValue({
+      ...base,
+      hiddenAt: new Date(),
+    });
+    await withTestServer(async (baseUrl) => {
+      mockSession("host-1", ["host"]);
+      expect((await post(baseUrl, REACT)).errors?.length).toBeGreaterThan(0);
+      expect(core.setLoungeReaction).not.toHaveBeenCalled();
+      mockSession("admin-1", ["admin"]);
+      expect((await post(baseUrl, REACT)).errors).toBeUndefined();
+    });
+  });
+
+  it("keeps a deleted post's chain open while replies hang off it", async () => {
+    vi.mocked(core.replyInLounge).mockClear();
+    vi.mocked(core.getTimetableById).mockResolvedValue(
+      timetableFixture({ settings }),
+    );
+    vi.mocked(core.getLoungeComment).mockResolvedValue({
+      ...base,
+      deletedAt: new Date(),
+    });
+    vi.mocked(core.replyInLounge).mockResolvedValue({
+      ...base,
+      id: "44444444-4444-4444-4444-444444444444",
+      parentId: base.id,
+      rootId: base.id,
+    });
+    await withTestServer(async (baseUrl) => {
+      mockSession("host-2", ["host"]);
+      expect((await post(baseUrl, REPLY)).errors).toBeUndefined();
+      expect(core.replyInLounge).toHaveBeenCalled();
+    });
+  });
+});

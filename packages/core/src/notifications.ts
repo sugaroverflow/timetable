@@ -351,12 +351,15 @@ function loungeNotificationConditions(
   userId: string,
   parentAuthorId: AnyPgColumn,
   mentionUserId: AnyPgColumn,
+  rootHiddenAt: AnyPgColumn,
 ) {
   return [
     eq(loungeComments.timetableId, timetableId),
     ne(loungeComments.authorId, userId),
     isNull(loungeComments.hiddenAt),
     isNull(loungeComments.deletedAt),
+    // A reply inside a hidden conversation stays hidden with it.
+    isNull(rootHiddenAt),
     or(eq(parentAuthorId, userId), isNotNull(mentionUserId)),
   ];
 }
@@ -367,6 +370,7 @@ async function listLoungeNotifications(
   limit: number,
 ): Promise<NotificationItem[]> {
   const parents = alias(loungeComments, "lounge_parents");
+  const roots = alias(loungeComments, "lounge_roots");
   const mentions = alias(loungeMentions, "viewer_lounge_mentions");
   const rows = await db
     .select({
@@ -382,6 +386,7 @@ async function listLoungeNotifications(
     })
     .from(loungeComments)
     .leftJoin(parents, eq(parents.id, loungeComments.parentId))
+    .leftJoin(roots, eq(roots.id, loungeComments.rootId))
     .leftJoin(
       mentions,
       and(
@@ -403,6 +408,7 @@ async function listLoungeNotifications(
           userId,
           parents.authorId,
           mentions.userId,
+          roots.hiddenAt,
         ),
       ),
     )
@@ -436,18 +442,21 @@ async function countUnreadLounge(
 ): Promise<number> {
   if (!canReadLounge) return 0;
   const loungeParents = alias(loungeComments, "lounge_parents");
+  const loungeRoots = alias(loungeComments, "lounge_roots");
   const loungeMentioned = alias(loungeMentions, "viewer_lounge_mentions");
   const loungeConds = loungeNotificationConditions(
     timetableId,
     userId,
     loungeParents.authorId,
     loungeMentioned.userId,
+    loungeRoots.hiddenAt,
   );
   if (seenAt) loungeConds.push(gt(loungeComments.createdAt, seenAt));
   const [loungeRow] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(loungeComments)
     .leftJoin(loungeParents, eq(loungeParents.id, loungeComments.parentId))
+    .leftJoin(loungeRoots, eq(loungeRoots.id, loungeComments.rootId))
     .leftJoin(
       loungeMentioned,
       and(

@@ -4,6 +4,7 @@ import {
   editLoungeComment,
   getLoungeComment,
   getLoungeConversation,
+  isLoungeConversationHidden,
   getTimetableById,
   hasUnreadLounge,
   listLoungePage,
@@ -61,7 +62,10 @@ function mayEnter(timetable: Timetable, viewer: Viewer): boolean {
 }
 
 /** The gate for mutations on an existing post: the post's forum must let
- * this viewer in. Refusals read as "not found" so the room stays unseen. */
+ * this viewer in, and a hidden post — or anything in a hidden
+ * conversation — is out of reach for everyone but admins (they moderate
+ * it; nobody else can see it to answer it). Refusals read as "not found"
+ * so the room stays unseen. */
 async function loadPostForViewer(
   ctx: ApiContext,
   commentId: string,
@@ -72,6 +76,9 @@ async function loadPostForViewer(
   const timetable = await getTimetableById(post.timetableId);
   const viewer = await ctx.getViewer(post.timetableId);
   if (!timetable || !mayEnter(timetable, viewer)) notFound("Post not found");
+  if (!canModerate(viewer) && (await isLoungeConversationHidden(post))) {
+    notFound("Post not found");
+  }
   return { post, viewer, userId: user.id };
 }
 
@@ -266,8 +273,9 @@ builder.mutationFields((t) => ({
       body: t.arg.string({ required: true }),
     },
     resolve: async (_p, args, ctx) => {
+      // A deleted post stays in the room as a tombstone only while
+      // replies hang off it — so its chain stays open, as on topics.
       const { post, userId } = await loadPostForViewer(ctx, args.commentId);
-      if (post.deletedAt) notFound("Post not found");
       const body = requireBody(args.body, MAX_REPLY);
       await assertActionLimit(userId, "comment");
       const reply = await replyInLounge(post, userId, body);
@@ -360,6 +368,7 @@ builder.mutationFields((t) => ({
       if (post.deletedAt) notFound("Post not found");
       const emoji = normalizeReaction(args.emoji);
       if (!emoji) throw new GraphQLError("That isn't a reaction we accept");
+      await assertActionLimit(userId, "reaction");
       await setLoungeReaction(post.id, userId, emoji, args.on);
       return post.id;
     },

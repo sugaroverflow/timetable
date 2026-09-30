@@ -60,8 +60,7 @@ const KIND_LABELS: Record<DigestKind, (hosts: string) => string> = {
   slotReleases: () => "New dates released on the calendar",
   drafts: () => "Reminders about your unpublished drafts",
   newMembers: () => "New members joining",
-  lounge: () =>
-    "The Lounge: new conversations, and replies and @mentions for you",
+  lounge: () => "Lounge: new conversations, and replies and @mentions for you",
 };
 
 /** The "(… only)" audience scaffold beside a restricted switch, in the

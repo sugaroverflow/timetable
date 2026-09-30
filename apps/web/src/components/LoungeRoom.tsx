@@ -1,7 +1,7 @@
 "use client";
 
 import { Plus } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { CollapsibleTopicBody } from "@/components/CollapsibleTopicBody";
 import { CommentList } from "@/components/CommentList";
@@ -56,6 +56,60 @@ type Loaded = {
   order: string[];
 };
 
+/** A reload never fetches past this many pages, whatever it must cover. */
+const MAX_RELOAD_PAGES = 25;
+
+/** A reload that stopped short of the end (a cursor remains) can't prove a
+ * missing conversation is gone — it may just lie past the pages fetched
+ * (e.g. appended by a "Show older" that finished meanwhile) — so keep what
+ * was showing. One that reached the end is authoritative. */
+function keepUnfetched(
+  next: Omit<Loaded, "order">,
+  prev: Loaded,
+): Omit<Loaded, "order"> {
+  if (next.nextCursor === null) return next;
+  const got = new Set(next.list.map((c) => c.id));
+  return {
+    ...next,
+    list: [...next.list, ...prev.list.filter((c) => !got.has(c.id))],
+    pages: Math.max(next.pages, prev.pages),
+  };
+}
+
+async function fetchLoungePage(
+  slug: string,
+  cursor: string | null,
+  focusId: string | null,
+): Promise<LoungePageData> {
+  const data: { lounge: LoungePageData | null } = await clientGql(
+    LOUNGE_QUERY,
+    { s: slug, cursor, c: focusId },
+  );
+  if (!data.lounge) throw new Error("The Lounge is closed");
+  return data.lounge;
+}
+
+/** A page's conversations plus the linked one, when it isn't among them. */
+function withFocused(page: LoungePageData): LoungeConversation[] {
+  const list = [...page.conversations];
+  if (page.focused && !list.some((c) => c.id === page.focused!.id)) {
+    list.push(page.focused);
+  }
+  return list;
+}
+
+function needsMore(
+  fetched: number,
+  pages: number,
+  list: LoungeConversation[],
+  cover: Set<string>,
+): boolean {
+  if (fetched >= MAX_RELOAD_PAGES) return false;
+  if (fetched < pages) return true;
+  const got = new Set(list.map((c) => c.id));
+  return [...cover].some((id) => !got.has(id));
+}
+
 /** Settle a fresh fetch into the order the reader has already seen. */
 function arrange(next: Omit<Loaded, "order">, seen: string[]): Loaded {
   const pinned = new Set(next.pinned.map((c) => c.id));
@@ -87,42 +141,40 @@ function useLoungePages(
   const { toastError } = useToast();
   const [loaded, setLoaded] = useState<Loaded>(() => fromFirstPage(initial));
   const [loadingMore, setLoadingMore] = useState(false);
+  // What's on screen now, for a reload to cover (read when it starts).
+  const showing = useRef<string[]>(loaded.order);
+  useEffect(() => {
+    showing.current = loaded.order;
+  }, [loaded.order]);
 
   const fetchPages = useCallback(
-    async (pages: number): Promise<Omit<Loaded, "order">> => {
-      let cursor: string | null = null;
-      let first: LoungePageData | null = null;
-      const list: LoungeConversation[] = [];
-      let fetched = 0;
-      do {
-        const data: { lounge: LoungePageData | null } = await clientGql(
-          LOUNGE_QUERY,
-          { s: slug, cursor, c: fetched === 0 ? focusId : null },
-        );
-        if (!data.lounge) throw new Error("The Lounge is closed");
-        first ??= data.lounge;
-        list.push(...data.lounge.conversations);
-        if (fetched === 0 && data.lounge.focused) {
-          if (!list.some((c) => c.id === data.lounge!.focused!.id)) {
-            list.push(data.lounge.focused);
-          }
-        }
-        cursor = data.lounge.nextCursor;
+    async (
+      pages: number,
+      cover: Set<string>,
+    ): Promise<Omit<Loaded, "order">> => {
+      const first = await fetchLoungePage(slug, null, focusId);
+      const list = withFocused(first);
+      let cursor = first.nextCursor;
+      let fetched = 1;
+      // Keep going until every conversation on screen is re-fetched: a new
+      // conversation above pushes the last one onto the next page, and it
+      // must not vanish from under the reader.
+      while (cursor && needsMore(fetched, pages, list, cover)) {
+        const page = await fetchLoungePage(slug, cursor, null);
+        list.push(...page.conversations);
+        cursor = page.nextCursor;
         fetched += 1;
-      } while (cursor && fetched < pages);
-      return {
-        pinned: first?.pinned ?? [],
-        list,
-        nextCursor: cursor,
-        pages: fetched,
-      };
+      }
+      return { pinned: first.pinned, list, nextCursor: cursor, pages: fetched };
     },
     [slug, focusId],
   );
 
   const reload = useCallback(() => {
-    fetchPages(loaded.pages)
-      .then((next) => setLoaded((prev) => arrange(next, prev.order)))
+    fetchPages(loaded.pages, new Set(showing.current))
+      .then((next) =>
+        setLoaded((prev) => arrange(keepUnfetched(next, prev), prev.order)),
+      )
       .catch((err: unknown) =>
         toastError(err instanceof Error ? err.message : "Could not reload"),
       );

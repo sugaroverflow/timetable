@@ -23,6 +23,9 @@ export const ACTION_LIMITS = {
    * through a review queue reaches; binding on a script that would otherwise
    * churn hearts (and their weighted-score recomputation) in a loop. */
   heart: { windowMs: 60_000, max: 60 },
+  /** {host} Lounge emoji reacts — the ❤️ bucket's shape: generous for
+   * people, binding on a toggle loop. */
+  reaction: { windowMs: 60_000, max: 60 },
   /** Topic creation. */
   topic: { windowMs: 60 * 60_000, max: 30 },
   /** Personal API token creation. Ten fresh credentials an hour is plenty
@@ -43,6 +46,7 @@ export type LimitedAction = keyof typeof ACTION_LIMITS;
 const BLOCKED_MESSAGES: Record<LimitedAction, string> = {
   comment: "You're commenting too quickly",
   heart: "You're ❤️-ing too quickly",
+  reaction: "You're reacting too quickly",
   topic: "You're creating topics too quickly",
   tokenMint: "You're creating API tokens too quickly",
   invite: "Too many invites sent recently",

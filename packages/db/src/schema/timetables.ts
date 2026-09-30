@@ -1,6 +1,5 @@
 import { relations } from "drizzle-orm";
 import {
-  boolean,
   index,
   jsonb,
   pgTable,
@@ -179,9 +178,11 @@ export const digestSends = pgTable(
       .references(() => timetables.id, { onDelete: "cascade" }),
     /** Topics whose card showed comment/reply threads in this email. */
     commentTopicIds: jsonb().$type<string[]>().notNull().default([]),
-    /** The email carried the {host} Lounge card — a click then moves the
-     * membership's loungeSeenAt up to `sentAt`. */
-    loungeShown: boolean().notNull().default(false),
+    /** The newest {host} Lounge post the email's Lounge card showed (null
+     * = no card). A click moves the membership's loungeSeenAt up to it —
+     * never to the send time, which would mark read posts the card left
+     * out. */
+    loungeShownUntil: timestamp({ withTimezone: true }),
     sentAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("digest_sends_user_idx").on(t.userId)],
