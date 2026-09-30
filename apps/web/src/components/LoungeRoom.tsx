@@ -216,6 +216,7 @@ function useLoungePages(
 /** The comment components, pointed at the Lounge: its mutations, its
  * rich opening posts and their editor, and reacts under every post. */
 function useLoungeAdapter(
+  slug: string,
   loaded: Loaded,
   reload: () => void,
 ): CommentThreadAdapter {
@@ -250,6 +251,7 @@ function useLoungeAdapter(
         if (!post || post.parentId !== null) return undefined;
         return (
           <LoungeOpeningEditor
+            slug={slug}
             postId={post.id}
             initialBody={post.body}
             onDone={onDone}
@@ -269,7 +271,7 @@ function useLoungeAdapter(
         );
       },
     }),
-    [posts, reload],
+    [slug, posts, reload],
   );
 }
 
@@ -303,7 +305,7 @@ export function LoungeRoom({
     initial,
     focusId,
   );
-  const adapter = useLoungeAdapter(loaded, reload);
+  const adapter = useLoungeAdapter(slug, loaded, reload);
   const [composing, setComposing] = useState(false);
   const byId = new Map(loaded.list.map((c) => [c.id, c]));
   const ordered = loaded.order

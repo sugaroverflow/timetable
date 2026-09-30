@@ -1166,6 +1166,42 @@ describe("createApiApp", () => {
     });
   });
 
+  it("signs post images for hosts and refuses electors", async () => {
+    configureStorageEnv();
+    const sign = (baseUrl: string) =>
+      fetch(`${baseUrl}/api/uploads`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          purpose: "post-image",
+          timetableIdOrSlug: "public-calendar",
+          filename: "photo.webp",
+          contentType: "image/webp",
+          size: 100,
+        }),
+      });
+    await withTestServer(async (baseUrl) => {
+      mockSession("elector-1", ["elector"]);
+      vi.mocked(core.getReadableTimetable).mockResolvedValue({
+        timetable: timetableFixture(),
+        roles: ["elector"],
+      });
+      expect((await sign(baseUrl)).status).toBe(403);
+
+      mockSession("host-1", ["host"]);
+      vi.mocked(core.getReadableTimetable).mockResolvedValue({
+        timetable: timetableFixture(),
+        roles: ["host"],
+      });
+      const res = await sign(baseUrl);
+      const body = (await res.json()) as { key: string };
+      expect(res.status).toBe(200);
+      expect(body.key).toMatch(
+        /^test-uploads\/post-image\/timetables\/11111111-1111-1111-1111-111111111111\/host-1\/[0-9a-f-]+\.webp$/,
+      );
+    });
+  });
+
   it("does not run the digest job when the cron secret is unset", async () => {
     delete process.env.CRON_SECRET;
 

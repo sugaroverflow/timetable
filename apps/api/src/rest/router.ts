@@ -655,7 +655,7 @@ type UploadAuth =
   | { ok: false; status: number; error: string };
 
 /** Forum-branding uploads target a timetable: resolve it and check the
- * viewer's role there (hosts for topic covers, admins for the timetable
+ * viewer's role there (hosts for topic covers and post images, admins for the timetable
  * cover AND icon — the icon was un-gated until the 2026-08-17 audit).
  * Only profile images need no timetable. */
 async function authorizeUpload(
@@ -676,8 +676,10 @@ async function authorizeUpload(
   }
 
   const viewer = { userId, roles: readable.roles };
+  // Topic covers and images inside posts (topic bodies, the {host}
+  // Lounge): whoever may write those — hosts and admins.
   if (
-    purpose === "topic-cover" &&
+    (purpose === "topic-cover" || purpose === "post-image") &&
     !(canProposeTopics(viewer) || canModerate(viewer))
   ) {
     return { ok: false, status: 403, error: "Hosts only" };

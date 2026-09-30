@@ -125,6 +125,7 @@ export function TopicEditForm({
           value={body}
           onChange={(next) => patch({ body: next })}
           minHeight={280}
+          uploadForum={slug}
         />
       </div>
       <div className="row">
