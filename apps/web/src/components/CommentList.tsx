@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { draftKey, hasDraft } from "@/lib/commentDrafts";
+import { useCommentThread } from "@/lib/commentThreadAdapter";
 import type { FeedComment } from "@/lib/feedTypes";
 import { COMMENT_TREE_DEPTH } from "@/lib/gqlFragments";
 import { relativeTime } from "@/lib/relativeTime";
@@ -77,6 +78,8 @@ function CommentBubble({
   topicHref?: string | null;
 }) {
   const visibilityPill = VISIBILITY_PILLS[comment.visibility];
+  const thread = useCommentThread();
+  const customBody = thread.renderBody?.(comment);
   return (
     <div className="c-bubble">
       <span className="c-name">
@@ -93,10 +96,7 @@ function CommentBubble({
       <PrimaryRolePill roles={comment.authorRoles} labels={roleLabels} />
       <CommentTime comment={comment} topicHref={topicHref} />
       {comment.pinnedAt ? (
-        <span
-          style={{ marginLeft: 6, fontSize: 11 }}
-          title="Pinned by the topic's author"
-        >
+        <span style={{ marginLeft: 6, fontSize: 11 }} title={thread.pinTitle}>
           📌
         </span>
       ) : null}
@@ -123,15 +123,15 @@ function CommentBubble({
         </span>
       ) : null}
       <div className="c-text">
-        {editing ? (
-          <CommentEditForm
-            commentId={comment.id}
-            initialBody={comment.body}
-            onDone={onEditDone}
-          />
-        ) : (
-          <CommentBody body={comment.body} />
-        )}
+        {editing
+          ? (thread.renderEditor?.(comment, onEditDone) ?? (
+              <CommentEditForm
+                commentId={comment.id}
+                initialBody={comment.body}
+                onDone={onEditDone}
+              />
+            ))
+          : (customBody ?? <CommentBody body={comment.body} />)}
       </div>
     </div>
   );
@@ -261,6 +261,7 @@ function CommentItem({
     hasDraft(draftKey.edit(comment.id)),
   );
   const isOwn = viewerId != null && viewerId === comment.authorId;
+  const thread = useCommentThread();
 
   return (
     <div
@@ -287,6 +288,7 @@ function CommentItem({
             topicHref={topicHref}
           />
         )}
+        {comment.deleted ? null : thread.renderFooter?.(comment)}
         {comment.deleted ? null : (
           <CommentActions
             commentId={comment.id}
@@ -351,6 +353,7 @@ export function CommentList({
   roleLabels,
   topicHref,
   topicHostId = null,
+  canPin: canPinOverride,
 }: {
   comments: FeedComment[];
   canReply: boolean;
@@ -366,11 +369,14 @@ export function CommentList({
   /** The topic's owner — a viewer who matches gets Pin/Unpin on top-level
    * comments (#258). Omit on threads where pinning shouldn't offer. */
   topicHostId?: string | null;
+  /** Overrides the topic-author pin rule (the Lounge: admins pin). */
+  canPin?: boolean;
 }) {
   // Snapshot of the roots present at mount, for the fresh-above-pins rule.
   const [initialIds] = useState(() => new Set(comments.map((c) => c.id)));
   if (!comments.length) return null;
-  const canPin = viewerId != null && viewerId === topicHostId;
+  const canPin =
+    canPinOverride ?? (viewerId != null && viewerId === topicHostId);
 
   return (
     <div className="comments">
