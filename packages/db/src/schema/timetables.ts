@@ -1,5 +1,6 @@
 import { relations } from "drizzle-orm";
 import {
+  boolean,
   index,
   jsonb,
   pgTable,
@@ -117,6 +118,11 @@ export const timetableMemberships = pgTable(
      * the People page, their digests don't send, and the forum leaves
      * their switcher. Reactivation clears it. */
     deactivatedAt: timestamp({ withTimezone: true }),
+    /** {host} Lounge read watermark (2026-09-30): Lounge posts after it
+     * are unread (the nav dot) and still news for the digest. Moved by
+     * visiting the Lounge or clicking a digest that showed it. Null =
+     * never visited. */
+    loungeSeenAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
@@ -173,6 +179,9 @@ export const digestSends = pgTable(
       .references(() => timetables.id, { onDelete: "cascade" }),
     /** Topics whose card showed comment/reply threads in this email. */
     commentTopicIds: jsonb().$type<string[]>().notNull().default([]),
+    /** The email carried the {host} Lounge card — a click then moves the
+     * membership's loungeSeenAt up to `sentAt`. */
+    loungeShown: boolean().notNull().default(false),
     sentAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("digest_sends_user_idx").on(t.userId)],
