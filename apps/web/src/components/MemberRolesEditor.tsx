@@ -1,5 +1,6 @@
 "use client";
 
+import { Lock } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -15,13 +16,14 @@ import { RichTextEditor } from "@/components/RichTextEditor";
 import { useToast } from "@/components/Toast";
 import { clientApi } from "@/lib/clientApi";
 import { clientGql } from "@/lib/clientGraphql";
+import { CONTACT_DETAILS_AUDIENCE } from "@/lib/profileLabels";
 import { roleLabel } from "@/lib/timetableSettings";
 import { useGqlAction } from "@/lib/useGqlAction";
 import { useSavedSnapshot } from "@/lib/useSavedSnapshot";
 
-const PERSON_BIO = `query($s: String!, $u: String!) { person(idOrSlug: $s, userId: $u) { name bio image } }`;
-const UPDATE_BIO = `mutation($s: String!, $u: String!, $name: String!, $bio: String!, $image: String!) {
-  updateMemberBio(idOrSlug: $s, userId: $u, name: $name, bio: $bio, image: $image) { userId }
+const PERSON_BIO = `query($s: String!, $u: String!) { person(idOrSlug: $s, userId: $u) { name bio contactDetails image } }`;
+const UPDATE_BIO = `mutation($s: String!, $u: String!, $name: String!, $bio: String!, $contactDetails: String!, $image: String!) {
+  updateMemberBio(idOrSlug: $s, userId: $u, name: $name, bio: $bio, contactDetails: $contactDetails, image: $image) { userId }
 }`;
 
 const PILL_CLASS: Record<AssignableRole, string> = {
@@ -30,9 +32,10 @@ const PILL_CLASS: Record<AssignableRole, string> = {
   elector: "pill-elector",
 };
 
-/** Admins can edit any member's per-forum name (2026-08-27), bio (markdown,
- * QA #42) and profile picture (production QA) — the same three fields the
- * member's own profile page edits.
+/** Admins can edit any member's per-forum Contact Details (2026-09-30),
+ * name (2026-08-27), bio (markdown, QA #42) and profile picture
+ * (production QA) — the same fields the member's own profile page edits,
+ * Contact Details first as there.
  *
  * Fetched on mount rather than behind a second "Edit bio & photo" click
  * (Ed, 2026-08-27: the People card's Edit should BE the profile editor).
@@ -48,18 +51,30 @@ function MemberProfileFields({
   const { run, busy: bioBusy } = useGqlAction();
   const [name, setName] = useState("");
   const [bio, setBio] = useState<string | null>(null);
+  const [contactDetails, setContactDetails] = useState("");
   const [image, setImage] = useState("");
   const [uploadingImage, setUploadingImage] = useState(false);
-  const { saved, markSaved } = useSavedSnapshot([name, bio, image.trim()]);
+  const { saved, markSaved } = useSavedSnapshot([
+    name,
+    bio,
+    contactDetails,
+    image.trim(),
+  ]);
 
   useEffect(() => {
     let live = true;
     clientGql<{
-      person: { name: string | null; bio: string | null; image: string | null };
+      person: {
+        name: string | null;
+        bio: string | null;
+        contactDetails: string | null;
+        image: string | null;
+      };
     }>(PERSON_BIO, { s: slug, u: userId })
       .then((d) => {
         if (!live) return;
         setName(d.person?.name ?? "");
+        setContactDetails(d.person?.contactDetails ?? "");
         setBio(d.person?.bio ?? "");
         setImage(d.person?.image ?? "");
       })
@@ -82,6 +97,7 @@ function MemberProfileFields({
         u: userId,
         name: name.trim(),
         bio: bio ?? "",
+        contactDetails,
         image: image.trim(),
       },
       {
@@ -94,6 +110,22 @@ function MemberProfileFields({
 
   return (
     <div className="stack" style={{ marginTop: 12, gap: 8 }}>
+      <div className="field" style={{ marginBottom: 0 }}>
+        <label>Contact Details</label>
+        <p className="hint profile-audience">
+          <Lock size={12} aria-hidden /> {CONTACT_DETAILS_AUDIENCE}
+        </p>
+        {bio === null ? (
+          <div className="rte" style={{ minHeight: 140 }} aria-busy="true" />
+        ) : (
+          <RichTextEditor
+            value={contactDetails}
+            onChange={setContactDetails}
+            minHeight={140}
+            placeholder="How members can reach them"
+          />
+        )}
+      </div>
       <div className="field" style={{ marginBottom: 0 }}>
         <label htmlFor={`member-name-${userId}`}>Name</label>
         <input

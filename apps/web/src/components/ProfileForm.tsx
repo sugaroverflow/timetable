@@ -1,34 +1,58 @@
 "use client";
 
+import { Lock } from "lucide-react";
 import { useState } from "react";
 
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { RichTextEditor } from "@/components/RichTextEditor";
+import {
+  CONTACT_DETAILS_AUDIENCE,
+  profileAudience,
+  profileHeading,
+} from "@/lib/profileLabels";
 import { useGqlAction } from "@/lib/useGqlAction";
 import { useSavedSnapshot } from "@/lib/useSavedSnapshot";
 
-const MUTATION = `mutation($s: String!, $name: String, $bio: String, $image: String) {
-  updateMyProfile(idOrSlug: $s, name: $name, bio: $bio, image: $image) { userId }
+const MUTATION = `mutation($s: String!, $name: String, $bio: String, $contactDetails: String, $image: String) {
+  updateMyProfile(idOrSlug: $s, name: $name, bio: $bio, contactDetails: $contactDetails, image: $image) { userId }
 }`;
 
-/** Edits the viewer's profile in ONE forum (per-forum profiles). */
+/** Edits the viewer's profile in ONE forum (per-forum profiles). Contact
+ * Details lead (Ed, 2026-09-30): the members-only box, above the profile
+ * whose heading and audience line say who can actually read it here. */
 export function ProfileForm({
   slug,
   name: initialName,
   bio: initialBio,
+  contactDetails: initialContactDetails,
   image: initialImage,
+  privacy,
+  roles,
 }: {
   slug: string;
   name: string | null;
   bio: string | null;
+  contactDetails: string | null;
   image: string | null;
+  privacy: string;
+  /** The viewer's roles here — on a hosts-only forum a host's profile is
+   * public and an elector's isn't. */
+  roles: string[];
 }) {
   const { run, busy } = useGqlAction();
   const [name, setName] = useState(initialName ?? "");
   const [bio, setBio] = useState(initialBio ?? "");
+  const [contactDetails, setContactDetails] = useState(
+    initialContactDetails ?? "",
+  );
   const [image, setImage] = useState(initialImage ?? "");
   const [uploadingImage, setUploadingImage] = useState(false);
-  const { saved, markSaved } = useSavedSnapshot([name, bio, image.trim()]);
+  const { saved, markSaved } = useSavedSnapshot([
+    name,
+    bio,
+    contactDetails,
+    image.trim(),
+  ]);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -36,7 +60,7 @@ export function ProfileForm({
       MUTATION,
       // Empty string, not null: the API treats null as "leave unchanged",
       // so clearing the field must send "" for the image to be removed.
-      { s: slug, name, bio, image: image.trim() },
+      { s: slug, name, bio, contactDetails, image: image.trim() },
       {
         success: "Profile saved",
         errorFallback: "Could not save profile",
@@ -52,10 +76,21 @@ export function ProfileForm({
   }
 
   return (
-    <form onSubmit={submit} className="card">
-      <h2 className="section-title" style={{ marginBottom: 10 }}>
-        Profile
-      </h2>
+    <form onSubmit={submit} className="card profile-form">
+      <h2 className="section-title">Contact Details</h2>
+      <p className="hint profile-audience">
+        <Lock size={12} aria-hidden /> {CONTACT_DETAILS_AUDIENCE}
+      </p>
+      <div className="field">
+        <RichTextEditor
+          value={contactDetails}
+          onChange={setContactDetails}
+          minHeight={140}
+          placeholder="Email, phone, Signal — however members can reach you."
+        />
+      </div>
+      <h2 className="section-title">{profileHeading(privacy, roles)}</h2>
+      <p className="hint profile-audience">{profileAudience(privacy, roles)}</p>
       <div className="field">
         <label htmlFor="name">Name</label>
         <input

@@ -2949,6 +2949,40 @@ a.queue-btn-back:hover {
   font-size: var(--text-xs);
 }
 
+/* Contact Details (2026-09-30): the members-only box above a profile — a
+   hairline frame sets it apart from the public bio it sits over. */
+.contact-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.contact-details-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-sm);
+}
+.contact-details-head .hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* The profile editor's two sections — Contact Details, then the
+   (Public) Profile — each a heading with a who-can-see-this line. */
+.profile-form .section-title:not(:first-child) {
+  margin-top: 18px;
+}
+.profile-audience {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 2px 0 10px;
+}
+
 /* Bold form-field label (was inline fontSize: 13 on <strong>). */
 .field-heading {
   font-size: var(--text-sm);

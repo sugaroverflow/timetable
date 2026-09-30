@@ -453,6 +453,25 @@ Stable names for feature pieces, so instructions can reference them precisely.
   pollute it (all reading marks are mutations, refused while previewing);
   keep any NEW reading mark a mutation for that reason.
 
+- **contact-details** — `timetableMemberships.contactDetails` (migration
+  0043) + shared `canSeeContactDetails` / `isProfilePublic` +
+  `ContactDetails.tsx` (Ed, 2026-09-30, from users on public forums
+  wanting somewhere to put contact details the internet can't read): a
+  second per-forum Markdown profile box that ONLY forum members see —
+  never the public, never deactivated members, never the JSON export.
+  Stripped in `personForViewer` (members.ts), the one gate every
+  profile read passes; the export builds its people field by field and
+  deliberately omits it (Ed: nobody collects everyone's contact details
+  in one download). It sits ABOVE the profile everywhere (editor, person
+  page, host header on /topics, People cards). Named "Contact Details",
+  not "Private Profile", so people don't write a second whole profile.
+  The profile's heading is **"Public Profile"** only when
+  `isProfilePublic` says the internet can read it (public/no_comments;
+  hosts and admins on hosts_only) and plain **"Profile"** otherwise, each
+  with a who-can-see-this line (`lib/profileLabels.ts`); readers see a
+  🔒 "Members only" note on Contact Details only where the profile around
+  them is public.
+
 - **feed-position-store** — `lib/feedPosition.ts` (Ed's "going back feels
   fragile", 2026-08-28): remembers, per feed view, how many pages the
   infinite feed had appended and the scroll offset, so Back replays them

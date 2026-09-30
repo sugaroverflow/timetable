@@ -358,6 +358,12 @@ Forum visibility is enforced server-side across five levels:
 
 Members always see everything their role allows, regardless of level.
 
+**Contact Details** (2026-09-30) are the exception to "bios follow the
+level": a second profile box, shown above the profile, that only forum
+members ever see — on every level, public included — and that the JSON
+export leaves out. The profile's own heading says **Public Profile** only
+where the public can actually read it, **Profile** otherwise.
+
 ## Notifications and Email
 
 In-app: each forum has a Notifications pane listing comments on the member's
