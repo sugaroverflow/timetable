@@ -238,6 +238,11 @@ Main queries include:
 - `topicPermalink`
 - `hostDashboard`
 - `moderationQueue` (submitted topics)
+- `lounge` / `loungeUnread` (the {host} Lounge: a bump-ordered page with a
+  keyset cursor, plus the nav dot — null / false for anyone who can't
+  enter; mutations `startLoungeConversation`, `replyInLounge`,
+  `editLoungePost`, `deleteLoungePost`, `hideLoungePost`,
+  `pinLoungeConversation`, `setLoungeReaction`, `markLoungeSeen`)
 - `activityTimeline` (actor, date-range args)
 - `notifications` / `notificationsUnread`
 - `myFeedLastSeenAt`
@@ -414,13 +419,22 @@ Core tables:
   green/yellow/red counts; + `edited_at`/`hidden_at`/`hidden_by_user_id`
   for author edits and admin moderation)
 - `api_rate_limit_buckets`
+- `lounge_comments` / `lounge_mentions` / `lounge_reactions` (the {host}
+  Lounge, 2026-09-30, migration 0044: one hosts-and-admins-only threaded
+  room per forum, in its OWN tables so no reader of topic comments can
+  see it — private by construction. A conversation is a root row
+  (Markdown body) whose `last_activity_at` every reply bumps; replies
+  carry `root_id`. Reactions are one row per post+person+emoji. Read
+  mark: `timetable_memberships.lounge_seen_at`; digest click-to-read:
+  `digest_sends.lounge_shown`)
 
 Notable columns: `timetables.settings` is a JSON blob holding role labels,
 theme (colours, fonts, dark palette), icon/cover URLs, digest defaults, the
 calendar group (enabled flag, confirm policy, locations, pattern cells,
 terms), the topics policy (`hostsPublishDirectly`), and the host-comments
 option (`hostComments.enabled`, default on — hides the host-only thread and
-💙 attribution when off);
+💙 attribution when off), and the {host} Lounge switch (`lounge.enabled`,
+default OFF);
 `timetables.heartsCountFrom` is the heart-count cutoff; `topics.slug` +
 `timetable_memberships.slug` power permalinks (member profiles are
 per-forum); `topics.contentUpdatedAt` tracks content edits
