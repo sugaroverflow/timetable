@@ -7,6 +7,7 @@ export * from "./permissions";
 export * from "./hearts";
 export * from "./commentScores";
 export * from "./mentions";
+export * from "./lounge";
 export * from "./slotPlan";
 export * from "./slug";
 export * from "./validation";

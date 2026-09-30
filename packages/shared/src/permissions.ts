@@ -144,6 +144,16 @@ export function canSeeHostOnly(viewer: Viewer): boolean {
   return isHost(viewer.roles) || isAdmin(viewer.roles);
 }
 
+/** The {host} Lounge (docs/host-lounge-plan.md, 2026-09-30): owner, admins
+ * and hosts. Electors never; deactivated members resolve to no roles, so
+ * they fall out for free. Whether the forum has the Lounge switched on is
+ * a separate check (isLoungeEnabled). */
+export function canUseLounge(viewer: Viewer): boolean {
+  return (
+    isAuthenticated(viewer) && (isHost(viewer.roles) || isAdmin(viewer.roles))
+  );
+}
+
 /** Per-slot discussion threads on the calendar (2026-08-14): open to every
  * member so what actually happens in a slot is discussed with everyone.
  * Attaching a topic claim snapshot to a slot comment stays canSeeHostOnly. */
