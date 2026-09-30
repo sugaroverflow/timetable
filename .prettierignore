@@ -12,3 +12,6 @@ test-results/
 *.md
 prototype.html
 *.local-backup
+
+# vendored emoji data for the Lounge picker
+apps/web/public/emojibase/

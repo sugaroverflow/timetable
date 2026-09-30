@@ -426,6 +426,39 @@ async function listLoungeNotifications(
   }));
 }
 
+/** Unread Lounge replies and mentions — 0 unless the viewer may read the
+ * Lounge. */
+async function countUnreadLounge(
+  timetableId: string,
+  userId: string,
+  seenAt: Date | null,
+  canReadLounge: boolean,
+): Promise<number> {
+  if (!canReadLounge) return 0;
+  const loungeParents = alias(loungeComments, "lounge_parents");
+  const loungeMentioned = alias(loungeMentions, "viewer_lounge_mentions");
+  const loungeConds = loungeNotificationConditions(
+    timetableId,
+    userId,
+    loungeParents.authorId,
+    loungeMentioned.userId,
+  );
+  if (seenAt) loungeConds.push(gt(loungeComments.createdAt, seenAt));
+  const [loungeRow] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(loungeComments)
+    .leftJoin(loungeParents, eq(loungeParents.id, loungeComments.parentId))
+    .leftJoin(
+      loungeMentioned,
+      and(
+        eq(loungeMentioned.commentId, loungeComments.id),
+        eq(loungeMentioned.userId, userId),
+      ),
+    )
+    .where(and(...loungeConds));
+  return loungeRow?.n ?? 0;
+}
+
 /** Unread notifications since the member's watermark (null = all unread). */
 export async function countUnreadNotifications(
   timetableId: string,
@@ -506,33 +539,12 @@ export async function countUnreadNotifications(
     )
     .where(and(...sentBackConds));
 
-  let loungeCount = 0;
-  if (opts.lounge) {
-    const loungeParents = alias(loungeComments, "lounge_parents");
-    const loungeMentioned = alias(loungeMentions, "viewer_lounge_mentions");
-    const loungeConds = loungeNotificationConditions(
-      timetableId,
-      userId,
-      loungeParents.authorId,
-      loungeMentioned.userId,
-    );
-    if (membership.seenAt) {
-      loungeConds.push(gt(loungeComments.createdAt, membership.seenAt));
-    }
-    const [loungeRow] = await db
-      .select({ n: sql<number>`count(*)::int` })
-      .from(loungeComments)
-      .leftJoin(loungeParents, eq(loungeParents.id, loungeComments.parentId))
-      .leftJoin(
-        loungeMentioned,
-        and(
-          eq(loungeMentioned.commentId, loungeComments.id),
-          eq(loungeMentioned.userId, userId),
-        ),
-      )
-      .where(and(...loungeConds));
-    loungeCount = loungeRow?.n ?? 0;
-  }
+  const loungeCount = await countUnreadLounge(
+    timetableId,
+    userId,
+    membership.seenAt,
+    opts.lounge === true,
+  );
 
   return (
     (row?.n ?? 0) + (sessionRow?.n ?? 0) + (sentBackRow?.n ?? 0) + loungeCount

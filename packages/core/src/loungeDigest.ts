@@ -66,12 +66,11 @@ export type LoungeDigestInput = {
   since: Date;
 };
 
-export async function loadLoungeDigestCard(
-  input: LoungeDigestInput,
-): Promise<DigestLoungeCard | null> {
-  const { recipientId: me, timetableId, since } = input;
+type Fresh = { id: string; parentId: string | null; rootId: string | null };
 
-  const fresh = await db
+/** Posts by others since `since` — the candidates for news. */
+function loadFresh(input: LoungeDigestInput): Promise<Fresh[]> {
+  return db
     .select({
       id: loungeComments.id,
       parentId: loungeComments.parentId,
@@ -80,65 +79,69 @@ export async function loadLoungeDigestCard(
     .from(loungeComments)
     .where(
       and(
-        eq(loungeComments.timetableId, timetableId),
-        gt(loungeComments.createdAt, since),
-        ne(loungeComments.authorId, me),
+        eq(loungeComments.timetableId, input.timetableId),
+        gt(loungeComments.createdAt, input.since),
+        ne(loungeComments.authorId, input.recipientId),
         isNull(loungeComments.hiddenAt),
         isNull(loungeComments.deletedAt),
       ),
     );
-  if (fresh.length === 0) return null;
+}
 
-  // The recipient's footprint: every post they wrote (and its parent, as
-  // chains attach at the root — loadChainScope's rule for topic threads),
-  // plus the conversations they started.
-  const mine = await db
-    .select({
-      id: loungeComments.id,
-      parentId: loungeComments.parentId,
-    })
-    .from(loungeComments)
-    .where(
-      and(
-        eq(loungeComments.timetableId, timetableId),
-        eq(loungeComments.authorId, me),
+/** The recipient's footprint: every post they wrote (and its parent, as
+ * chains attach at the root — loadChainScope's rule for topic threads),
+ * the conversations they started, and fresh posts that @mention them. */
+async function loadFootprint(input: LoungeDigestInput, fresh: Fresh[]) {
+  const [mine, mentions] = await Promise.all([
+    db
+      .select({ id: loungeComments.id, parentId: loungeComments.parentId })
+      .from(loungeComments)
+      .where(
+        and(
+          eq(loungeComments.timetableId, input.timetableId),
+          eq(loungeComments.authorId, input.recipientId),
+        ),
       ),
-    );
+    db
+      .select({ commentId: loungeMentions.commentId })
+      .from(loungeMentions)
+      .where(
+        and(
+          eq(loungeMentions.userId, input.recipientId),
+          inArray(
+            loungeMentions.commentId,
+            fresh.map((f) => f.id),
+          ),
+        ),
+      ),
+  ]);
   const chains = new Set<string>();
-  const startedByMe = new Set<string>();
+  const started = new Set<string>();
   for (const m of mine) {
     chains.add(m.id);
     if (m.parentId) chains.add(m.parentId);
-    else startedByMe.add(m.id);
+    else started.add(m.id);
   }
-  const mentioned = new Set(
-    (
-      await db
-        .select({ commentId: loungeMentions.commentId })
-        .from(loungeMentions)
-        .where(
-          and(
-            eq(loungeMentions.userId, me),
-            inArray(
-              loungeMentions.commentId,
-              fresh.map((f) => f.id),
-            ),
-          ),
-        )
-    ).map((r) => r.commentId),
-  );
+  return {
+    chains,
+    started,
+    mentioned: new Set(mentions.map((r) => r.commentId)),
+  };
+}
 
-  const qualifying = fresh.filter(
-    (f) =>
-      f.parentId === null ||
-      mentioned.has(f.id) ||
-      (f.rootId !== null && startedByMe.has(f.rootId)) ||
-      chains.has(f.parentId),
-  );
-  if (qualifying.length === 0) return null;
+type Footprint = Awaited<ReturnType<typeof loadFootprint>>;
 
-  const rootIds = [...new Set(qualifying.map((q) => q.rootId ?? q.id))];
-  const rows: Row[] = await db
+/** New conversations, replies in ones they started or chains they're in,
+ * and @mentions — the rest of the room stays in the room. */
+function isNewsFor(f: Fresh, fp: Footprint): boolean {
+  if (f.parentId === null) return true;
+  if (fp.mentioned.has(f.id) || fp.chains.has(f.parentId)) return true;
+  return f.rootId !== null && fp.started.has(f.rootId);
+}
+
+/** Posts with their author's name in this forum. */
+function selectRows(timetableId: string) {
+  return db
     .select({
       id: loungeComments.id,
       parentId: loungeComments.parentId,
@@ -158,79 +161,82 @@ export async function loadLoungeDigestCard(
         eq(timetableMemberships.userId, loungeComments.authorId),
         eq(timetableMemberships.timetableId, timetableId),
       ),
-    )
-    .where(
-      and(
-        eq(loungeComments.timetableId, timetableId),
-        // Roots and their replies, in one pass.
-        inArray(loungeComments.id, rootIds),
-      ),
-    )
-    .orderBy(desc(loungeComments.lastActivityAt));
-  const replyRows: Row[] = await db
-    .select({
-      id: loungeComments.id,
-      parentId: loungeComments.parentId,
-      rootId: loungeComments.rootId,
-      authorId: loungeComments.authorId,
-      authorName: timetableMemberships.name,
-      body: loungeComments.body,
-      hiddenAt: loungeComments.hiddenAt,
-      deletedAt: loungeComments.deletedAt,
-      createdAt: loungeComments.createdAt,
-      lastActivityAt: loungeComments.lastActivityAt,
-    })
-    .from(loungeComments)
-    .leftJoin(
-      timetableMemberships,
-      and(
-        eq(timetableMemberships.userId, loungeComments.authorId),
-        eq(timetableMemberships.timetableId, timetableId),
-      ),
-    )
-    .where(inArray(loungeComments.rootId, rootIds));
+    );
+}
 
-  const byId = new Map<string, Row>();
-  for (const r of [...rows, ...replyRows]) byId.set(r.id, r);
-  const newIds = new Set(qualifying.map((q) => q.id));
-
-  const toComment = (r: Row): DigestComment => ({
+function toComment(r: Row): DigestComment {
+  return {
     id: r.id,
     parentId: r.parentId,
     author: { name: r.authorName, userId: r.authorId, image: null },
     body: r.deletedAt ? "[comment removed]" : r.body,
-  });
+  };
+}
+
+/** One conversation's shown posts: the opening post, each new post, and
+ * the ancestors that give it context — opening post first, then oldest
+ * first. Null when nothing in it is new. */
+function buildConversation(
+  root: Row,
+  byId: Map<string, Row>,
+  newIds: Set<string>,
+): DigestLoungeConversation | null {
+  const shown = new Set<string>([root.id]);
+  for (const id of newIds) {
+    const post = byId.get(id);
+    if (!post || (post.rootId ?? post.id) !== root.id) continue;
+    for (let at: Row | undefined = post; at; ) {
+      shown.add(at.id);
+      at = at.parentId ? byId.get(at.parentId) : undefined;
+    }
+  }
+  const rows = [...shown]
+    .map((id) => byId.get(id))
+    .filter((r): r is Row => r !== undefined && r.hiddenAt === null);
+  const replies = rows
+    .filter((r) => r.parentId !== null)
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  const posts = [root, ...replies].map((r) => ({
+    comment: toComment(r),
+    isNew: newIds.has(r.id),
+  }));
+  return posts.some((p) => p.isNew) ? { rootId: root.id, posts } : null;
+}
+
+export async function loadLoungeDigestCard(
+  input: LoungeDigestInput,
+): Promise<DigestLoungeCard | null> {
+  const fresh = await loadFresh(input);
+  if (fresh.length === 0) return null;
+  const footprint = await loadFootprint(input, fresh);
+  const qualifying = fresh.filter((f) => isNewsFor(f, footprint));
+  if (qualifying.length === 0) return null;
+
+  const rootIds = [...new Set(qualifying.map((q) => q.rootId ?? q.id))];
+  const [roots, replies] = await Promise.all([
+    selectRows(input.timetableId)
+      .where(
+        and(
+          eq(loungeComments.timetableId, input.timetableId),
+          inArray(loungeComments.id, rootIds),
+        ),
+      )
+      .orderBy(desc(loungeComments.lastActivityAt)),
+    selectRows(input.timetableId).where(
+      inArray(loungeComments.rootId, rootIds),
+    ),
+  ]);
+  const byId = new Map<string, Row>();
+  for (const r of [...roots, ...replies]) byId.set(r.id, r);
+  const newIds = new Set(qualifying.map((q) => q.id));
 
   const conversations: DigestLoungeConversation[] = [];
-  // `rows` holds the roots, already in bump order.
-  for (const root of rows) {
-    // A hidden or deleted opening post takes its conversation out of the
-    // email (hidden posts are admin-only in the app, too).
+  // Roots arrive in bump order. A hidden or deleted opening post takes its
+  // conversation out of the email (hidden posts are admin-only in the app).
+  for (const root of roots) {
     if (root.hiddenAt || root.deletedAt) continue;
-    const shown = new Set<string>([root.id]);
-    for (const id of newIds) {
-      const post = byId.get(id);
-      if (!post || (post.rootId ?? post.id) !== root.id) continue;
-      // The post and its ancestors, up to the opening post.
-      let cursor: Row | undefined = post;
-      while (cursor) {
-        shown.add(cursor.id);
-        cursor = cursor.parentId ? byId.get(cursor.parentId) : undefined;
-      }
-    }
-    const posts = [...shown]
-      .map((id) => byId.get(id))
-      .filter((r): r is Row => r !== undefined && r.hiddenAt === null)
-      .sort((a, b) =>
-        a.parentId === null
-          ? -1
-          : b.parentId === null
-            ? 1
-            : a.createdAt.getTime() - b.createdAt.getTime(),
-      )
-      .map((r) => ({ comment: toComment(r), isNew: newIds.has(r.id) }));
-    if (posts.some((p) => p.isNew))
-      conversations.push({ rootId: root.id, posts });
+    const conv = buildConversation(root, byId, newIds);
+    if (conv) conversations.push(conv);
     if (conversations.length >= MAX_CONVERSATIONS) break;
   }
   if (conversations.length === 0) return null;

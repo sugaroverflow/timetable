@@ -60,6 +60,32 @@ function CommentTime({
   );
 }
 
+/** The comment's text, or its editor while editing — a thread adapter
+ * (the Lounge) may swap in its own of either. */
+function CommentText({
+  comment,
+  editing,
+  onEditDone,
+}: {
+  comment: FeedComment;
+  editing: boolean;
+  onEditDone(): void;
+}) {
+  const thread = useCommentThread();
+  if (editing) {
+    return (
+      thread.renderEditor?.(comment, onEditDone) ?? (
+        <CommentEditForm
+          commentId={comment.id}
+          initialBody={comment.body}
+          onDone={onEditDone}
+        />
+      )
+    );
+  }
+  return thread.renderBody?.(comment) ?? <CommentBody body={comment.body} />;
+}
+
 /** The name row + body for a live (non-deleted) comment; the body swaps
  * for the inline editor while editing (edit-in-place, QA 2026-07-29). */
 function CommentBubble({
@@ -78,8 +104,7 @@ function CommentBubble({
   topicHref?: string | null;
 }) {
   const visibilityPill = VISIBILITY_PILLS[comment.visibility];
-  const thread = useCommentThread();
-  const customBody = thread.renderBody?.(comment);
+  const { pinTitle } = useCommentThread();
   return (
     <div className="c-bubble">
       <span className="c-name">
@@ -96,7 +121,7 @@ function CommentBubble({
       <PrimaryRolePill roles={comment.authorRoles} labels={roleLabels} />
       <CommentTime comment={comment} topicHref={topicHref} />
       {comment.pinnedAt ? (
-        <span style={{ marginLeft: 6, fontSize: 11 }} title={thread.pinTitle}>
+        <span style={{ marginLeft: 6, fontSize: 11 }} title={pinTitle}>
           📌
         </span>
       ) : null}
@@ -123,15 +148,11 @@ function CommentBubble({
         </span>
       ) : null}
       <div className="c-text">
-        {editing
-          ? (thread.renderEditor?.(comment, onEditDone) ?? (
-              <CommentEditForm
-                commentId={comment.id}
-                initialBody={comment.body}
-                onDone={onEditDone}
-              />
-            ))
-          : (customBody ?? <CommentBody body={comment.body} />)}
+        <CommentText
+          comment={comment}
+          editing={editing}
+          onEditDone={onEditDone}
+        />
       </div>
     </div>
   );
