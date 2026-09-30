@@ -10,7 +10,7 @@ import {
   or,
   sql,
 } from "drizzle-orm";
-import { alias } from "drizzle-orm/pg-core";
+import { alias, type AnyPgColumn } from "drizzle-orm/pg-core";
 
 import {
   activityEvents,
@@ -18,6 +18,8 @@ import {
   comments,
   db,
   hearts,
+  loungeComments,
+  loungeMentions,
   timetableMemberships,
   topics,
 } from "@timetable/db";
@@ -29,7 +31,10 @@ import {
  * 2026-09-08) an admin sending the viewer's ready draft back to drafting.
  * For the activity-log kinds, `commentId` is the activity-event id; for
  * sessions `body` carries the slot's startsAt ISO for the pane to
- * format, for send-backs it is empty. */
+ * format, for send-backs it is empty. The {host} Lounge kinds (2026-09-30)
+ * — a reply to the viewer's Lounge post, or a Lounge post that @mentions
+ * them — have no topic: their topic fields are empty strings and
+ * `loungeRootId` names the conversation instead. */
 export type NotificationItem = {
   commentId: string;
   kind:
@@ -39,7 +44,9 @@ export type NotificationItem = {
     | "session_pencilled"
     | "session_confirmed"
     | "session_cleared"
-    | "sent_back_to_drafting";
+    | "sent_back_to_drafting"
+    | "lounge_reply"
+    | "lounge_mention";
   authorId: string;
   authorName: string | null;
   authorImage: string | null;
@@ -53,6 +60,8 @@ export type NotificationItem = {
   topicTitle: string;
   topicSlug: string | null;
   topicHostSlug: string | null;
+  /** Lounge kinds only: the conversation (its opening post's id). */
+  loungeRootId?: string | null;
 };
 
 const SESSION_ACTIONS = ["slot.pencil", "slot.confirm", "slot.clear"];
@@ -227,6 +236,9 @@ export async function listNotifications(
   timetableId: string,
   userId: string,
   limit = 50,
+  /** The viewer may read this forum's {host} Lounge (canUseLounge and the
+   * Lounge switched on) — only then do its replies and mentions show. */
+  opts: { lounge?: boolean } = {},
 ): Promise<NotificationItem[]> {
   const sessions = await listSessionNotifications(timetableId, userId, limit);
   const sentBack = await listSentBackNotifications(timetableId, userId, limit);
@@ -235,7 +247,10 @@ export async function listNotifications(
     userId,
     limit,
   );
-  return [...commentItems, ...sessions, ...sentBack]
+  const lounge = opts.lounge
+    ? await listLoungeNotifications(timetableId, userId, limit)
+    : [];
+  return [...commentItems, ...sessions, ...sentBack, ...lounge]
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
     .slice(0, limit);
 }
@@ -329,10 +344,93 @@ async function listCommentNotifications(
   }));
 }
 
+/** Lounge replies to the viewer's posts and Lounge posts @mentioning them
+ * (the caller has already checked the viewer may read the Lounge). */
+function loungeNotificationConditions(
+  timetableId: string,
+  userId: string,
+  parentAuthorId: AnyPgColumn,
+  mentionUserId: AnyPgColumn,
+) {
+  return [
+    eq(loungeComments.timetableId, timetableId),
+    ne(loungeComments.authorId, userId),
+    isNull(loungeComments.hiddenAt),
+    isNull(loungeComments.deletedAt),
+    or(eq(parentAuthorId, userId), isNotNull(mentionUserId)),
+  ];
+}
+
+async function listLoungeNotifications(
+  timetableId: string,
+  userId: string,
+  limit: number,
+): Promise<NotificationItem[]> {
+  const parents = alias(loungeComments, "lounge_parents");
+  const mentions = alias(loungeMentions, "viewer_lounge_mentions");
+  const rows = await db
+    .select({
+      id: loungeComments.id,
+      rootId: loungeComments.rootId,
+      parentAuthorId: parents.authorId,
+      authorId: loungeComments.authorId,
+      authorName: timetableMemberships.name,
+      authorRoles: timetableMemberships.roles,
+      authorImage: timetableMemberships.image,
+      body: loungeComments.body,
+      createdAt: loungeComments.createdAt,
+    })
+    .from(loungeComments)
+    .leftJoin(parents, eq(parents.id, loungeComments.parentId))
+    .leftJoin(
+      mentions,
+      and(
+        eq(mentions.commentId, loungeComments.id),
+        eq(mentions.userId, userId),
+      ),
+    )
+    .leftJoin(
+      timetableMemberships,
+      and(
+        eq(timetableMemberships.userId, loungeComments.authorId),
+        eq(timetableMemberships.timetableId, timetableId),
+      ),
+    )
+    .where(
+      and(
+        ...loungeNotificationConditions(
+          timetableId,
+          userId,
+          parents.authorId,
+          mentions.userId,
+        ),
+      ),
+    )
+    .orderBy(desc(loungeComments.createdAt))
+    .limit(limit);
+  return rows.map((r) => ({
+    commentId: r.id,
+    kind: r.parentAuthorId === userId ? "lounge_reply" : "lounge_mention",
+    authorId: r.authorId,
+    authorName: r.authorName,
+    authorRoles: (r.authorRoles ?? []) as string[],
+    authorImage: r.authorImage,
+    body: r.body,
+    visibility: "lounge",
+    createdAt: r.createdAt,
+    topicId: "",
+    topicTitle: "",
+    topicSlug: null,
+    topicHostSlug: null,
+    loungeRootId: r.rootId ?? r.id,
+  }));
+}
+
 /** Unread notifications since the member's watermark (null = all unread). */
 export async function countUnreadNotifications(
   timetableId: string,
   userId: string,
+  opts: { lounge?: boolean } = {},
 ): Promise<number> {
   const [membership] = await db
     .select({ seenAt: timetableMemberships.lastSeenNotificationsAt })
@@ -408,7 +506,37 @@ export async function countUnreadNotifications(
     )
     .where(and(...sentBackConds));
 
-  return (row?.n ?? 0) + (sessionRow?.n ?? 0) + (sentBackRow?.n ?? 0);
+  let loungeCount = 0;
+  if (opts.lounge) {
+    const loungeParents = alias(loungeComments, "lounge_parents");
+    const loungeMentioned = alias(loungeMentions, "viewer_lounge_mentions");
+    const loungeConds = loungeNotificationConditions(
+      timetableId,
+      userId,
+      loungeParents.authorId,
+      loungeMentioned.userId,
+    );
+    if (membership.seenAt) {
+      loungeConds.push(gt(loungeComments.createdAt, membership.seenAt));
+    }
+    const [loungeRow] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(loungeComments)
+      .leftJoin(loungeParents, eq(loungeParents.id, loungeComments.parentId))
+      .leftJoin(
+        loungeMentioned,
+        and(
+          eq(loungeMentioned.commentId, loungeComments.id),
+          eq(loungeMentioned.userId, userId),
+        ),
+      )
+      .where(and(...loungeConds));
+    loungeCount = loungeRow?.n ?? 0;
+  }
+
+  return (
+    (row?.n ?? 0) + (sessionRow?.n ?? 0) + (sentBackRow?.n ?? 0) + loungeCount
+  );
 }
 
 /** Reset the unread badge — called when the member opens Notifications. */

@@ -108,16 +108,13 @@ export const loungeReactions = pgTable(
   ],
 );
 
-export const loungeCommentsRelations = relations(
-  loungeComments,
-  ({ one }) => ({
-    timetable: one(timetables, {
-      fields: [loungeComments.timetableId],
-      references: [timetables.id],
-    }),
-    author: one(users, {
-      fields: [loungeComments.authorId],
-      references: [users.id],
-    }),
+export const loungeCommentsRelations = relations(loungeComments, ({ one }) => ({
+  timetable: one(timetables, {
+    fields: [loungeComments.timetableId],
+    references: [timetables.id],
   }),
-);
+  author: one(users, {
+    fields: [loungeComments.authorId],
+    references: [users.id],
+  }),
+}));
