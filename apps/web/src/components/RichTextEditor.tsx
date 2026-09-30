@@ -3,6 +3,12 @@
 import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
+import {
+  DOMParser as PMDOMParser,
+  Slice,
+  type ResolvedPos,
+} from "@tiptap/pm/model";
+import type { EditorView } from "@tiptap/pm/view";
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import {
@@ -31,6 +37,53 @@ function imageFiles(data: DataTransfer | null): File[] {
   return Array.from(data?.files ?? []).filter((f) =>
     f.type.startsWith("image/"),
   );
+}
+
+/**
+ * Plain-text paste (Ed, QA 2026-09-30). tiptap-markdown parses pasted text
+ * as ONE inline run with whitespace preserved, so every newline became a
+ * hard break — a triple-click copy (which carries the line ending) pasted
+ * as a line plus stray breaks, and pasted paragraphs collapsed into
+ * <br>s. Instead: trim the surrounding blank lines, parse as ordinary
+ * Markdown (blank lines → paragraphs), and open the slice fully so a
+ * single line joins the paragraph you paste into, as rich pastes do.
+ * Shift-paste (`plain`) keeps ProseMirror's own plain handling.
+ */
+function parsePastedText(
+  text: string,
+  context: ResolvedPos,
+  plain: boolean,
+  view: EditorView,
+): Slice {
+  const editor = (view.dom as HTMLElement & { editor?: Editor }).editor;
+  const trimmed = text.replace(/^\s*\n|\n\s*$/g, "");
+  // ProseMirror's own reading of plain text, for shift-paste and the
+  // cases this parser can't handle.
+  const fallback = () => {
+    // One paragraph per line, as ProseMirror itself reads plain text.
+    const dom = document.createElement("div");
+    for (const line of trimmed.split(/\r?\n/)) {
+      dom.append(
+        Object.assign(document.createElement("p"), { textContent: line }),
+      );
+    }
+    return PMDOMParser.fromSchema(view.state.schema).parseSlice(dom, {
+      context,
+    });
+  };
+  if (plain || !editor || !trimmed) return Slice.maxOpen(fallback().content);
+  const storage = editor.storage as {
+    markdown?: { parser: { parse(md: string): string } };
+  };
+  const html = storage.markdown?.parser.parse(trimmed);
+  if (html === undefined) return Slice.maxOpen(fallback().content);
+  // An inert document, never innerHTML on a live element: pasted text is
+  // untrusted, and a live <img onerror> would run even detached.
+  const dom = new window.DOMParser().parseFromString(html, "text/html").body;
+  const slice = PMDOMParser.fromSchema(view.state.schema).parseSlice(dom, {
+    context,
+  });
+  return Slice.maxOpen(slice.content);
 }
 
 /** WYSIWYG editor for topic descriptions (QA #59). Off-the-shelf TipTap;
@@ -77,6 +130,7 @@ export function RichTextEditor({
     content: value,
     immediatelyRender: false,
     editorProps: {
+      clipboardTextParser: parsePastedText,
       handlePaste: (_view, event) => {
         const files = imageFiles(event.clipboardData);
         if (files.length === 0 || !upload.current) return false;

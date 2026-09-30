@@ -3034,8 +3034,26 @@ a.queue-btn-back:hover {
 .lounge-conversation {
   padding: 14px 16px;
 }
+/* Ed, QA 2026-09-30: each conversation is its own card, so the thread's
+   top rule, the bubble's fit-to-text width and the first-level reply
+   indent (which set a topic's comments apart from the topic above them)
+   have nothing to separate here. */
 .lounge-conversation .comments {
   margin: 0;
+  border-top: none;
+  padding-top: 0;
+}
+/* The opening post always spans the card. */
+.lounge-conversation .comments > .comment > .comment-main > .c-bubble {
+  width: 100%;
+}
+/* First-level replies line up under the opening post's avatar: no rule,
+   no step — the 36px pulls them back across the avatar column (26px
+   .avatar-sm + 10px .comment gap). Deeper forks keep the usual indent. */
+.lounge-conversation .comments > .comment > .comment-main > .replies {
+  margin-left: -36px;
+  padding-left: 0;
+  border-left: none;
 }
 .lounge-opening .topic-body {
   margin: 2px 0 0;
@@ -3062,8 +3080,9 @@ a.queue-btn-back:hover {
   .lounge-fab {
     display: inline-flex;
     position: fixed;
-    right: 16px;
-    bottom: calc(16px + env(safe-area-inset-bottom));
+    /* 24px in from the edge (Ed, QA 2026-09-30: 16 felt cramped). */
+    right: 24px;
+    bottom: calc(24px + env(safe-area-inset-bottom));
     width: 56px;
     height: 56px;
     box-shadow: var(--shadow-pop);
@@ -3071,7 +3090,7 @@ a.queue-btn-back:hover {
   }
   /* Room under the floating "+" so it never covers the last post. */
   .lounge {
-    padding-bottom: 88px;
+    padding-bottom: 96px;
   }
   /* The composer becomes a full-screen writing sheet. */
   .lounge-composer {
