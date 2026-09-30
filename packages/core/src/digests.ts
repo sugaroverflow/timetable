@@ -16,6 +16,7 @@ import {
   isCalendarEnabled,
   isDigestKindEnabled,
   isHostCommentsEnabled,
+  isLoungeEnabled,
   topicPath,
   type DigestKind,
   type DigestKinds,
@@ -41,6 +42,8 @@ import {
 } from "@timetable/db";
 
 import { listUpcomingSessions, type DigestSession } from "./calendar";
+import { markLoungeSeen } from "./lounge";
+import { loadLoungeDigestCard, type DigestLoungeCard } from "./loungeDigest";
 
 export type DigestRecipient = {
   id: string;
@@ -170,6 +173,10 @@ export type ForumDigest = {
   /** Members who signed in for the first time since the window (round 2,
    * admin switch). */
   newMembers: DigestPerson[];
+  /** The {host} Lounge card (2026-09-30) — rendered LAST, after every
+   * topic card, and never counted in the subject line. Null when the
+   * Lounge had nothing for this recipient. */
+  lounge: DigestLoungeCard | null;
 };
 
 /** One released timeslot in the "New dates" section. */
@@ -274,6 +281,10 @@ type DigestContext = {
   /** Forums with the host-only thread on — the only ones whose 💙s may
    * appear in digests (same visibility rule as the thread's 💙 row). */
   hostCommentsTimetableIds: string[];
+  /** Forums with the {host} Lounge switched on. */
+  loungeTimetableIds: string[];
+  /** Per-forum Lounge read mark (visits and digest clicks). */
+  loungeSeenAt: Map<string, Date | null>;
   /** Per-forum effective digest settings (2026-08-11): on/off, cadence,
    * kinds — membership values over the user's stored globals. */
   effectiveByForum: Map<string, EffectiveDigestSettings>;
@@ -338,6 +349,7 @@ async function loadDigestContext(
       digestSettings: timetableMemberships.digestSettings,
       lastDigestAt: timetableMemberships.lastDigestAt,
       deactivatedAt: timetableMemberships.deactivatedAt,
+      loungeSeenAt: timetableMemberships.loungeSeenAt,
       name: timetables.name,
       slug: timetables.slug,
       settings: timetables.settings,
@@ -420,6 +432,14 @@ async function loadDigestContext(
         isHostCommentsEnabled((m.settings as TimetableSettings | null) ?? {}),
       )
       .map((m) => m.timetableId),
+    loungeTimetableIds: memberships
+      .filter((m) =>
+        isLoungeEnabled((m.settings as TimetableSettings | null) ?? {}),
+      )
+      .map((m) => m.timetableId),
+    loungeSeenAt: new Map(
+      memberships.map((m) => [m.timetableId, m.loungeSeenAt]),
+    ),
     effectiveByForum: new Map(
       memberships.map((m) => [m.timetableId, m.effective]),
     ),
@@ -1677,12 +1697,14 @@ export async function computeUserForumDigests(
   const myTopicIds = myTopics.map((t) => t.id);
   const timetableByTopic = new Map(myTopics.map((t) => [t.id, t.timetableId]));
 
-  const [sessions, collectedA, newSlots, newMembers] = await Promise.all([
-    loadSessionSections(ctx, now, new Set(myTopicIds)),
-    collectActivities(ctx, since, wantsIn, myTopicIds, timetableByTopic),
-    loadSlotReleases(ctx, now),
-    loadNewMembers(ctx),
-  ]);
+  const [sessions, collectedA, newSlots, newMembers, lounges] =
+    await Promise.all([
+      loadSessionSections(ctx, now, new Set(myTopicIds)),
+      collectActivities(ctx, since, wantsIn, myTopicIds, timetableByTopic),
+      loadSlotReleases(ctx, now),
+      loadNewMembers(ctx),
+      loadLoungeCards(ctx),
+    ]);
 
   // Sessions on the recipient's OWN topics: an admin override — no
   // switch, always in (the missing `switch` tag passes the post-filter).
@@ -1759,6 +1781,7 @@ export async function computeUserForumDigests(
       newMembers: newMembers
         .filter((m) => m.timetableId === forumId)
         .map(({ timetableId: _t, ...person }) => person),
+      lounge: lounges.get(forumId) ?? null,
     };
   });
 
@@ -1766,6 +1789,31 @@ export async function computeUserForumDigests(
     digests: digests.filter((d) => !isForumDigestEmpty(d)),
     dueForumIds: ctx.forumIds,
   };
+}
+
+/** The {host} Lounge card per forum where the recipient is a host or
+ * admin, the Lounge is on, and their switches want it. */
+async function loadLoungeCards(
+  ctx: DigestContext,
+): Promise<Map<string, DigestLoungeCard>> {
+  const eligible = eligibleForums(
+    ctx,
+    ctx.hostTimetableIds.filter((id) => ctx.loungeTimetableIds.includes(id)),
+    "lounge",
+  );
+  const cards = new Map<string, DigestLoungeCard>();
+  await Promise.all(
+    eligible.map(async (forumId) => {
+      const card = await loadLoungeDigestCard({
+        recipientId: ctx.recipient.id,
+        timetableId: forumId,
+        forumSlug: ctx.forumSlug.get(forumId) ?? "",
+        since: afterSeen(sinceFor(ctx, forumId), ctx.loungeSeenAt.get(forumId)),
+      });
+      if (card) cards.set(forumId, card);
+    }),
+  );
+  return cards;
 }
 
 /** Group raw activities into ordered topic cards. */
@@ -1827,6 +1875,7 @@ export async function recordDigestSend(
       userId: digest.userId,
       timetableId: digest.forumId,
       commentTopicIds: digestCommentTopicIds(digest),
+      loungeShown: digest.lounge !== null,
       sentAt,
     })
     .returning({ id: digestSends.id });
@@ -1863,6 +1912,10 @@ export async function markDigestRead(
     .where(and(eq(digestSends.id, sendId), eq(digestSends.userId, userId)))
     .limit(1);
   if (!send) return false;
+  // The email showed the Lounge card: the room is read up to the send.
+  if (send.loungeShown) {
+    await markLoungeSeen(send.timetableId, userId, send.sentAt);
+  }
   if (send.commentTopicIds.length === 0) return true;
   // ISO string + explicit cast, NEVER a raw Date param in a sql template
   // (the Drizzle date-mapping gotcha — see CLAUDE.md).
@@ -1904,10 +1957,12 @@ export function isForumDigestEmpty(digest: ForumDigest): boolean {
     card.activities.some(activityIsNews),
   );
   const askNews = digest.availabilityAsks.some((s) => s.isNew);
+  // The Lounge card only exists when it carries something new.
   return (
     !topicNews &&
     !askNews &&
     digest.newSlots.length === 0 &&
-    digest.newMembers.length === 0
+    digest.newMembers.length === 0 &&
+    digest.lounge === null
   );
 }

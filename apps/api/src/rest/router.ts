@@ -46,6 +46,7 @@ import {
   createTimetableSchema,
   inviteSchema,
   isCalendarEnabled,
+  isLoungeEnabled,
   normalizeEmail,
   officeHoursLabel,
   updateMemberEmailSchema,
@@ -779,6 +780,8 @@ function buildTestDigest(
     forumSlug: timetable.slug,
     accent: timetable.settings?.theme?.primary ?? null,
     kindDefaults: timetable.settings?.digestKindDefaults ?? {},
+    hostLabel: timetable.settings?.roleLabels?.host ?? "Host",
+    loungeEnabled: isLoungeEnabled(timetable.settings ?? {}),
   });
 }
 

@@ -267,3 +267,64 @@ describe("wrapLinksWithSignInTicket (one-click digest links)", () => {
     expect(url.searchParams.get("redirect_url")).toBe("/");
   });
 });
+
+describe("renderDigest — the {host} Lounge card", () => {
+  const WITH_LOUNGE = sampleDigest({
+    email: "admin@example.com",
+    name: "Ada",
+    forumId: "forum-1",
+    forumName: "Sparkle Bureaucracy",
+    forumSlug: "sparkle",
+    hostLabel: "Faculty",
+    loungeEnabled: true,
+  });
+
+  it("appears only where the forum has the Lounge on", () => {
+    expect(SAMPLE.lounge).toBeNull();
+    expect(renderDigest(SAMPLE).html).not.toContain("Lounge");
+    expect(WITH_LOUNGE.lounge).not.toBeNull();
+  });
+
+  it("is named for the forum's host label and renders after every topic card", () => {
+    const { html } = renderDigest(WITH_LOUNGE);
+    const loungeAt = html.indexOf(">Faculty Lounge<");
+    expect(loungeAt).toBeGreaterThan(-1);
+    for (const card of WITH_LOUNGE.topics) {
+      expect(html.indexOf(card.title.replace(/'/g, "&#39;"))).toBeLessThan(
+        loungeAt,
+      );
+    }
+    expect(html).toContain("Open the Faculty Lounge →");
+  });
+
+  it("never counts toward the subject line", () => {
+    const withIt = renderDigest(WITH_LOUNGE).subject;
+    const without = renderDigest({ ...WITH_LOUNGE, lounge: null }).subject;
+    expect(withIt).toBe(without);
+    expect(withIt).not.toMatch(/lounge/i);
+  });
+
+  it("excerpts the opening post's Markdown and links replies to the conversation", () => {
+    const { html } = renderDigest(WITH_LOUNGE);
+    expect(html).toContain("Reading list for next term I've been");
+    expect(html).not.toContain("**readings**");
+    expect(html).toContain(
+      "/f/sparkle/lounge?c=sample-lounge-2&amp;reply=sample-lounge-3#comment-sample-lounge-3",
+    );
+  });
+
+  it("makes a Lounge-only digest non-empty, and sends under the bare subject", () => {
+    const loungeOnly: ForumDigest = {
+      ...WITH_LOUNGE,
+      topics: [],
+      availabilityAsks: [],
+      newSlots: [],
+      newMembers: [],
+    };
+    expect(isForumDigestEmpty(loungeOnly)).toBe(false);
+    expect(isForumDigestEmpty({ ...loungeOnly, lounge: null })).toBe(true);
+    expect(renderDigest(loungeOnly).subject).toBe(
+      "Sparkle Bureaucracy Topics Digest",
+    );
+  });
+});

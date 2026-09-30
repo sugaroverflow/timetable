@@ -10,6 +10,7 @@ export * from "./heartEvents";
 export * from "./queue";
 export * from "./comments";
 export * from "./lounge";
+export * from "./loungeDigest";
 export * from "./activity";
 export * from "./settings";
 export * from "./profile";
