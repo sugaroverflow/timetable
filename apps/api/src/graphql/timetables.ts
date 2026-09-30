@@ -353,6 +353,7 @@ type SettingsArgs = {
   calendarJson?: string | null;
   hostsPublishDirectly?: boolean | null;
   hostCommentsEnabled?: boolean | null;
+  loungeEnabled?: boolean | null;
 };
 
 /** Each builder owns one settings concern (mirroring the web form that
@@ -450,8 +451,9 @@ function digestPatch(
   return patch;
 }
 
-/** Feature switches: calendar group, hosts-publish-directly, and the
- * host-only comment thread (host hearts, 2026-08-04). */
+/** Feature switches: calendar group, hosts-publish-directly, the
+ * host-only comment thread (host hearts, 2026-08-04), and the {host}
+ * Lounge (2026-09-30). */
 function featurePatch(
   args: SettingsArgs,
   current: TimetableSettings,
@@ -473,6 +475,9 @@ function featurePatch(
       ...(current.hostComments ?? {}),
       enabled: args.hostCommentsEnabled,
     };
+  }
+  if (args.loungeEnabled != null) {
+    patch.lounge = { ...(current.lounge ?? {}), enabled: args.loungeEnabled };
   }
   return patch;
 }
@@ -510,6 +515,8 @@ builder.mutationFields((t) => ({
        * 💙s in digests). Default on; off turns 💙s into admin-only
        * bookmarks (host hearts, 2026-08-04). */
       hostCommentsEnabled: t.arg.boolean({ required: false }),
+      /** The {host} Lounge — a hosts-only room per forum. Default off. */
+      loungeEnabled: t.arg.boolean({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
       const { user, readable, viewer } = await loadTimetableAndViewer(

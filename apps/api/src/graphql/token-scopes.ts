@@ -44,6 +44,11 @@ export const MUTATION_SCOPES: Readonly<Record<string, TokenScope>> = {
   addSlotComment: "comments:write",
   updateSlotComment: "comments:write",
   deleteSlotComment: "comments:write",
+  startLoungeConversation: "comments:write",
+  replyInLounge: "comments:write",
+  editLoungePost: "comments:write",
+  deleteLoungePost: "comments:write",
+  setLoungeReaction: "comments:write",
 
   // topics:write — a host's own topics.
   createTopic: "topics:write",
@@ -65,6 +70,7 @@ export const MUTATION_SCOPES: Readonly<Record<string, TokenScope>> = {
   markNotificationsSeen: "feed:write",
   markCommentsSeen: "feed:write",
   markDigestRead: "feed:write",
+  markLoungeSeen: "feed:write",
 
   // profile:write — the member's own profile and notification preferences.
   updateMyProfile: "profile:write",
