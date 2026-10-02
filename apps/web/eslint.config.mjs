@@ -29,13 +29,13 @@ const config = [
   // Architecture rules from the audit, enforced mechanically:
   // web talks to the API only through the transport wrappers, and
   // NEXT_PUBLIC_* is read only in env.ts (proxy.ts is infra and exempt;
-  // ImageUploadField PUTs straight to the storage bucket, not the API).
+  // lib/uploadImage PUTs straight to the storage bucket, not the API).
   {
     files: ["src/**/*.{ts,tsx}"],
     ignores: [
       "src/env.ts",
       "src/lib/transport.ts",
-      "src/components/ImageUploadField.tsx",
+      "src/lib/uploadImage.ts",
       "src/proxy.ts",
     ],
     rules: {

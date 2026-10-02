@@ -3214,3 +3214,15 @@ a.queue-btn-back:hover {
 .emoji-picker-emoji[data-active] {
   background: var(--primary-soft);
 }
+
+/* Rich-text editor: "Uploading image…" beside the toolbar (2026-09-30). */
+.rte-status {
+  align-self: center;
+  margin-left: 6px;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+.rte-content img {
+  max-width: 100%;
+  height: auto;
+}

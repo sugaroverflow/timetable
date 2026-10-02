@@ -111,7 +111,12 @@ export function LoungeComposer({
         onChange={(body) => patch({ body })}
         placeholder={`Share something with the ${hostLabel} Lounge…`}
         minHeight={180}
+        uploadForum={slug}
       />
+      <p className="hint" style={{ margin: 0 }}>
+        Pictures you add can be opened by anyone who has their link — the Lounge
+        keeps its words private, not its images.
+      </p>
       <div className="row wrap lounge-composer-actions">
         <button
           className="btn btn-primary"
@@ -139,11 +144,14 @@ export function LoungeComposer({
 /** Editing a conversation's opening post: the same rich editor, swapped
  * in place of the post (edit-in-place, Ed's app-wide rule). */
 export function LoungeOpeningEditor({
+  slug,
   postId,
   initialBody,
   onDone,
   onSaved,
 }: {
+  /** The forum, for image uploads. */
+  slug: string;
   postId: string;
   initialBody: string;
   onDone(): void;
@@ -179,6 +187,7 @@ export function LoungeOpeningEditor({
         value={values.body}
         onChange={(body) => patch({ body })}
         minHeight={140}
+        uploadForum={slug}
       />
       <div className="row wrap">
         <button

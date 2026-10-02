@@ -501,6 +501,19 @@ Stable names for feature pieces, so instructions can reference them precisely.
   dot, not a count. Replies/mentions reach the notifications pane. Counts
   as Last activity; excluded from the JSON export.
 
+- **editor-image-upload** — `ImageControl` in `RichTextEditor.tsx` +
+  `lib/uploadImage.ts` (Ed, 2026-09-30): where the editor gets
+  `uploadForum` (topic create/edit, the Lounge) its image button, paste
+  and drag-and-drop upload through the same signed-PUT path as covers
+  (purpose `post-image`, hosts and admins), after `shrinkImage` re-encodes
+  anything over 1600px or 1.5 MB to WebP (GIFs untouched). Without it
+  (profile bios, which electors edit) the button still asks for an image
+  URL. Uploads are PUBLIC-READ at an unguessable address — never private,
+  Lounge included, and the Lounge composer says so. Paste: a clipboard
+  carrying image files uploads them (`imageFiles` decides; `handlePaste`
+  claims the event), anything else falls through to #359's plain-text
+  `clipboardTextParser`.
+
 - **comment-thread-adapter** — `lib/commentThreadAdapter.tsx`
   (2026-09-30): the context CommentList, CommentActions, CommentEditForm
   and ChainTailComposer read their mutations (and optional body / editor

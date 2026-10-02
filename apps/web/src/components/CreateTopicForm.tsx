@@ -85,6 +85,7 @@ export function CreateTopicForm({
           value={body}
           onChange={(next) => patch({ body: next })}
           placeholder="What is this session about?"
+          uploadForum={slug}
         />
       </div>
       {hosts && hosts.length > 0 ? (

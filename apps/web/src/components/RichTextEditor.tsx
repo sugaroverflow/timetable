@@ -22,8 +22,16 @@ import {
   ListOrdered,
   Quote,
 } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Markdown } from "tiptap-markdown";
+
+import { useToast } from "@/components/Toast";
+import {
+  ACCEPTED_IMAGE_TYPES,
+  imageFiles,
+  shrinkImage,
+  uploadImageFile,
+} from "@/lib/uploadImage";
 
 /**
  * Plain-text paste (Ed, QA 2026-09-30). tiptap-markdown parses pasted text
@@ -80,12 +88,23 @@ export function RichTextEditor({
   onChange,
   placeholder = "Write…",
   minHeight = 420,
+  uploadForum,
 }: {
   value: string;
   onChange: (markdown: string) => void;
   placeholder?: string;
   minHeight?: number;
+  /** The forum whose storage takes images (hosts and admins may upload):
+   * the image button uploads, and pasting or dropping an image does too.
+   * Without it the button asks for an image's web address. */
+  uploadForum?: string;
 }) {
+  // Paste/drop handlers are fixed when the editor is created, so they call
+  // through a ref that ImageControl keeps pointed at the live uploader.
+  const upload = useRef<((file: File) => void) | null>(null);
+  const setUploader = useCallback((fn: ((file: File) => void) | null) => {
+    upload.current = fn;
+  }, []);
   // Tracks what the editor last emitted so external resets (e.g. Discard,
   // post-save clear) can be told apart from our own onUpdate echoes.
   const lastEmitted = useRef(value);
@@ -104,7 +123,23 @@ export function RichTextEditor({
     ],
     content: value,
     immediatelyRender: false,
-    editorProps: { clipboardTextParser: parsePastedText },
+    editorProps: {
+      clipboardTextParser: parsePastedText,
+      handlePaste: (_view, event) => {
+        const files = imageFiles(event.clipboardData);
+        if (files.length === 0 || !upload.current) return false;
+        event.preventDefault();
+        for (const f of files) upload.current(f);
+        return true;
+      },
+      handleDrop: (_view, event, _slice, moved) => {
+        const files = imageFiles(event.dataTransfer);
+        if (moved || files.length === 0 || !upload.current) return false;
+        event.preventDefault();
+        for (const f of files) upload.current(f);
+        return true;
+      },
+    },
     onUpdate: ({ editor: e }) => {
       const md = getMarkdown(e);
       lastEmitted.current = md;
@@ -191,14 +226,10 @@ export function RichTextEditor({
             else chain.unsetLink().run();
           }}
         />
-        <ToolButton
-          active={false}
-          label={<ImageIcon size={16} aria-hidden />}
-          title="Image from URL"
-          onClick={() => {
-            const url = window.prompt("Image URL");
-            if (url) editor.chain().focus().setImage({ src: url }).run();
-          }}
+        <ImageControl
+          editor={editor}
+          uploadForum={uploadForum}
+          onUploader={setUploader}
         />
       </div>
       <EditorContent
@@ -207,6 +238,85 @@ export function RichTextEditor({
         style={{ minHeight }}
       />
     </div>
+  );
+}
+
+/** The toolbar's image button. With a forum to upload into it opens a file
+ * picker (and keeps `upload` — what paste and drop call — pointed at the
+ * uploader); without one it asks for an image's web address. Photos are
+ * shrunk in the browser before they go up. */
+function ImageControl({
+  editor,
+  uploadForum,
+  onUploader,
+}: {
+  editor: Editor;
+  uploadForum?: string;
+  onUploader: (fn: ((file: File) => void) | null) => void;
+}) {
+  const { toastError } = useToast();
+  const [uploading, setUploading] = useState(0);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const uploader = useCallback(
+    (file: File) => {
+      if (!uploadForum) return;
+      setUploading((n) => n + 1);
+      shrinkImage(file)
+        .then((small) => uploadImageFile(small, "post-image", uploadForum))
+        .then((src) => editor.chain().focus().setImage({ src }).run())
+        .catch((err: unknown) =>
+          toastError(err instanceof Error ? err.message : "Upload failed"),
+        )
+        .finally(() => setUploading((n) => n - 1));
+    },
+    [editor, uploadForum, toastError],
+  );
+
+  useEffect(() => {
+    onUploader(uploadForum ? uploader : null);
+    return () => onUploader(null);
+  }, [uploadForum, uploader, onUploader]);
+
+  if (!uploadForum) {
+    return (
+      <ToolButton
+        active={false}
+        label={<ImageIcon size={16} aria-hidden />}
+        title="Image from URL"
+        onClick={() => {
+          const url = window.prompt("Image URL");
+          if (url) editor.chain().focus().setImage({ src: url }).run();
+        }}
+      />
+    );
+  }
+  return (
+    <>
+      <ToolButton
+        active={false}
+        label={<ImageIcon size={16} aria-hidden />}
+        title={uploading > 0 ? "Uploading image…" : "Add an image"}
+        onClick={() => fileInput.current?.click()}
+      />
+      <input
+        ref={fileInput}
+        type="file"
+        accept={ACCEPTED_IMAGE_TYPES}
+        multiple
+        hidden
+        onChange={(e) => {
+          for (const f of Array.from(e.target.files ?? [])) {
+            uploader(f);
+          }
+          e.target.value = "";
+        }}
+      />
+      {uploading > 0 ? (
+        <span className="rte-status" role="status">
+          Uploading image…
+        </span>
+      ) : null}
+    </>
   );
 }
 

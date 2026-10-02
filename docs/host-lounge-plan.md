@@ -40,7 +40,9 @@ front door. A Slack they'd never open; a Lounge in their digest they will.
     @mentions are parsed from the Markdown source. The composer keeps
     its draft through topic-draft-recovery (`useStoredDraft`, key
     `lounge-new:<slug>`), since these are topic-length pieces of writing.
-    The editor's image button stays (same Spaces upload path as topics).
+    The editor's image button uploads (plus paste and drag-and-drop) —
+    editor-image-upload, 2026-09-30. Uploads are public-read at an
+    unguessable address, so the composer says pictures aren't private.
 6. **Top-level order: bump** — most recent activity (post or any reply in
    the conversation) first, pins above. A revived six-week-old
    conversation surfaces instead of hiding under newer ones, which matters
