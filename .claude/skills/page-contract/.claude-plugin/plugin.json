@@ -1,0 +1,5 @@
+{
+  "name": "page-contract",
+  "version": "0.1.0",
+  "description": "Holds every write to Ed's questions page to its contract (claude/QUESTIONS-PAGE.md), stamps the coordinator's lastActive, and flags answers left without handledAt."
+}

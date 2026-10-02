@@ -509,7 +509,10 @@ Stable names for feature pieces, so instructions can reference them precisely.
   anything over 1600px or 1.5 MB to WebP (GIFs untouched). Without it
   (profile bios, which electors edit) the button still asks for an image
   URL. Uploads are PUBLIC-READ at an unguessable address — never private,
-  Lounge included, and the Lounge composer says so.
+  Lounge included, and the Lounge composer says so. Paste: a clipboard
+  carrying image files uploads them (`imageFiles` decides; `handlePaste`
+  claims the event), anything else falls through to #359's plain-text
+  `clipboardTextParser`.
 
 - **comment-thread-adapter** — `lib/commentThreadAdapter.tsx`
   (2026-09-30): the context CommentList, CommentActions, CommentEditForm
@@ -606,3 +609,10 @@ Stable names for feature pieces, so instructions can reference them precisely.
   bypass the column's Date mapping and THROW at runtime on hosted Postgres
   while passing every local check — always use `gte`/`lte`/`eq` operators
   for date comparisons (calendar-v2 dev outage, 2026-07-31).
+
+## How this project is run (Ed's dev-ops conventions)
+
+- Agents also follow Ed's shared instructions in edsaperia/dev-ops: `AGENTS.md`, `CONVENTIONS.md` (builders, coordinators, pull requests) and `claude/QUESTIONS-PAGE.md` (Ed's questions page, where every ask of Ed goes). Read them from dev-ops `main`; a session whose GitHub tool cannot reach edsaperia clones dev-ops (public) instead. This file wins where the two disagree.
+- **Merging is Ed's decision, on his page**, and the coordinator does the merge. Merging to `main` deploys **dev** only. **Production is never deployed by an agent**: when a release is ready, the coordinator asks Ed, and Ed runs `deploy-production.yml` himself (see Git & deploy workflow above).
+- **Other people's PRs** (contributors other than Ed's builders) are theirs: the coordinator reviews and asks Ed, and never pushes to or merges them unasked.
+- `.claude/skills/page-contract/` (checks writes to Ed's page) is copied from dev-ops; refresh it from there. `.claude/settings.json` carries the shared standing permissions on top of this project's own, and `defaultMode: "auto"`.

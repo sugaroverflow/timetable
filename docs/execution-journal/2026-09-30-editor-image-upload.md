@@ -30,3 +30,12 @@ unguessable addresses as covers and profile photos.
   once), and pasting or dropping images uploads them, with an "Uploading
   image…" status. Wired into topic create/edit and both Lounge editors.
   Profile bios keep the URL prompt (electors can't upload post images).
+
+## Merged with main (2026-10-02)
+
+`main` gained #359's plain-text paste (`clipboardTextParser`) in the same
+editor. Both hold: ProseMirror parses the clipboard first, then asks
+`handlePaste`, which claims the event only when the clipboard carries
+image files (it uploads them); otherwise it declines and the plain-text
+slice is inserted. The image-file check moved to `imageFiles` in
+`lib/uploadImage.ts`, with a unit test.

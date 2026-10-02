@@ -10,6 +10,20 @@ export type UploadPurpose =
 export const ACCEPTED_IMAGE_TYPES =
   "image/png,image/jpeg,image/webp,image/gif,image/avif";
 
+/**
+ * Image files carried by a paste or a drop, if any. This is the paste
+ * decision in the rich-text editor: any image file → the paste uploads it
+ * (and the clipboard's text/HTML is ignored); none → ProseMirror inserts
+ * the text through the plain-text parser (#359).
+ */
+export function imageFiles(
+  data: { files: ArrayLike<File> } | null | undefined,
+): File[] {
+  return Array.from(data?.files ?? []).filter((f) =>
+    f.type.startsWith("image/"),
+  );
+}
+
 type SignedUpload = {
   publicUrl: string;
   uploadUrl: string;

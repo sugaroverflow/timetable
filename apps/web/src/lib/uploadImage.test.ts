@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { shrunkSize } from "./uploadImage";
+import { imageFiles, shrunkSize } from "./uploadImage";
 
 describe("shrunkSize", () => {
   it("leaves small images that already fit alone", () => {
@@ -23,5 +23,23 @@ describe("shrunkSize", () => {
       width: 1500,
       height: 1000,
     });
+  });
+});
+
+describe("imageFiles", () => {
+  const file = (name: string, type: string) => new File(["x"], name, { type });
+
+  it("picks the image files out of a paste or drop", () => {
+    const png = file("a.png", "image/png");
+    const jpg = file("b.jpg", "image/jpeg");
+    expect(
+      imageFiles({ files: [png, file("notes.txt", "text/plain"), jpg] }),
+    ).toEqual([png, jpg]);
+  });
+
+  it("is empty for a text-only clipboard, so the paste stays plain text", () => {
+    expect(imageFiles({ files: [] })).toEqual([]);
+    expect(imageFiles(null)).toEqual([]);
+    expect(imageFiles(undefined)).toEqual([]);
   });
 });

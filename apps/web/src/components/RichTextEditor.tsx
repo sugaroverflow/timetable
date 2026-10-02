@@ -28,16 +28,10 @@ import { Markdown } from "tiptap-markdown";
 import { useToast } from "@/components/Toast";
 import {
   ACCEPTED_IMAGE_TYPES,
+  imageFiles,
   shrinkImage,
   uploadImageFile,
 } from "@/lib/uploadImage";
-
-/** Image files carried by a paste or a drop, if any. */
-function imageFiles(data: DataTransfer | null): File[] {
-  return Array.from(data?.files ?? []).filter((f) =>
-    f.type.startsWith("image/"),
-  );
-}
 
 /**
  * Plain-text paste (Ed, QA 2026-09-30). tiptap-markdown parses pasted text
