@@ -90,9 +90,9 @@ export function ChainTailComposer({
             value={body}
             onChange={setBody}
             placeholder={
-              foot
-                ? "Reply… (@ to mention)"
-                : "Continue this thread… (@ to mention)"
+              // The foot box stays one short line on a phone, so it says
+              // only "Reply…"; @ still opens the picker.
+              foot ? "Reply…" : "Continue this thread… (@ to mention)"
             }
             ariaLabel={
               foot ? "Reply to this conversation" : "Continue this thread"

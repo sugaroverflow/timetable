@@ -9,7 +9,7 @@ import { draftKey, hasDraft } from "@/lib/commentDrafts";
 import { useCommentThread } from "@/lib/commentThreadAdapter";
 import type { FeedComment } from "@/lib/feedTypes";
 import { COMMENT_TREE_DEPTH } from "@/lib/gqlFragments";
-import { relativeTime } from "@/lib/relativeTime";
+import { relativeTime, shortRelativeTime } from "@/lib/relativeTime";
 import { roleLabel, type RoleLabels } from "@/lib/timetableSettings";
 
 import { Avatar } from "./Avatar";
@@ -34,14 +34,17 @@ const VISIBILITY_PILLS: Record<string, { className: string; label: string }> = {
 function CommentTime({
   comment,
   topicHref,
+  short = false,
 }: {
   comment: FeedComment;
   topicHref?: string | null;
+  /** "9h" rather than "9 hours ago" (the quiet variant). */
+  short?: boolean;
 }) {
   // Server and client render moments differ, so both the relative label
   // and the timezone-dependent title can mismatch at hydration — harmless,
   // suppressed.
-  const label = relativeTime(comment.createdAt);
+  const label = (short ? shortRelativeTime : relativeTime)(comment.createdAt);
   const exact = new Date(comment.createdAt).toLocaleString("en-GB");
   if (!topicHref) {
     return (
@@ -125,7 +128,7 @@ function QuietHeader({
       </span>
       <span className="lq-meta">
         {role ? <span className="lq-role">{role} · </span> : null}
-        <CommentTime comment={comment} topicHref={topicHref} />
+        <CommentTime comment={comment} topicHref={topicHref} short />
         {comment.editedAt && !editing ? (
           <span title={new Date(comment.editedAt).toLocaleString()}>
             {" "}

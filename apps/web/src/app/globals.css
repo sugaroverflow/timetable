@@ -3307,6 +3307,7 @@ a.queue-btn-back:hover {
   min-height: 36px;
   border: 1px solid var(--line-strong);
   border-radius: 18px;
+  resize: none;
   padding: 7px 14px;
   font-size: var(--text-base);
   background: var(--bg);
@@ -3343,6 +3344,11 @@ a.queue-btn-back:hover {
     height: 56px;
     box-shadow: var(--shadow-pop);
     z-index: var(--z-sticky);
+  }
+  /* Phone width: the quiet thread's 24px card sides would squeeze deep
+     replies to a sliver. */
+  .lounge-conversation {
+    padding: 16px;
   }
   /* Room under the floating "+" so it never covers the last post. */
   .lounge {
