@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 
+import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { clientGql } from "@/lib/clientGraphql";
 import type { RoleLabels } from "@/lib/timetableSettings";
 import { useGqlAction } from "@/lib/useGqlAction";
+import { useSavedSnapshot } from "@/lib/useSavedSnapshot";
 
-const MUTATION = `mutation($s: String!, $name: String, $privacy: String, $cd: String) {
-  updateTimetableProfile: updateForumProfile(idOrSlug: $s, name: $name, privacy: $privacy, customDomain: $cd) { id }
+const MUTATION = `mutation($s: String!, $name: String, $privacy: String, $cd: String, $slug: String) {
+  updateTimetableProfile: updateForumProfile(idOrSlug: $s, name: $name, privacy: $privacy, customDomain: $cd, slug: $slug) { id slug }
 }`;
 
 const SETTINGS_MUTATION = `mutation Labels(
@@ -25,6 +27,7 @@ type IdentityState = {
   name: string;
   privacy: string;
   customDomain: string;
+  slug: string;
 };
 
 type LabelsState = { admin: string; host: string; elector: string };
@@ -56,9 +59,29 @@ function IdentityFields({
           onChange={(e) => onChange({ name: e.target.value })}
         />
       </div>
-      <p className="faint" style={{ margin: "0 0 12px", fontSize: 12 }}>
-        URL: /f/{slug} (set at creation)
-      </p>
+      <div className="field">
+        <label htmlFor="tt-slug">URL</label>
+        <div className="row" style={{ gap: 6, alignItems: "center" }}>
+          <span className="faint">/f/</span>
+          <input
+            id="tt-slug"
+            value={value.slug}
+            onChange={(e) =>
+              onChange({
+                slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""),
+              })
+            }
+            pattern="[a-z0-9]+(-[a-z0-9]+)*"
+            maxLength={60}
+          />
+        </div>
+        {value.slug !== slug ? (
+          <p className="hint" style={{ margin: "4px 0 0" }}>
+            Changing the URL is safe — /f/{slug} will permanently redirect here,
+            so old links and bookmarks keep working.
+          </p>
+        ) : null}
+      </div>
       <div className="field">
         <label htmlFor="tt-privacy">Visibility</label>
         <select
@@ -80,15 +103,17 @@ function IdentityFields({
         </select>
       </div>
       <div className="field">
-        <label htmlFor="tt-domain">Custom domain (coming soon)</label>
+        <label htmlFor="tt-domain">Vanity address</label>
         <input
           id="tt-domain"
           value={value.customDomain}
           onChange={(e) => onChange({ customDomain: e.target.value })}
-          placeholder="forum.2026.newspeak.house"
+          placeholder="topic.newspeak.house/2026"
         />
-        <p className="faint" style={{ margin: "4px 0 0", fontSize: 12 }}>
-          Saved for later — custom-domain routing isn&rsquo;t wired up yet.
+        <p className="hint" style={{ margin: "4px 0 0" }}>
+          A short address for posters and emails — a hostname, or a hostname and
+          path. Visitors there are sent to this forum. The hostname has to be
+          pointed at Topic first; ask your sysadmin.
         </p>
       </div>
     </>
@@ -160,15 +185,16 @@ export function TimetableProfileForm({
     name: initialName,
     privacy: initialPrivacy,
     customDomain: initialCustomDomain ?? "",
+    slug: slug,
   });
   const [labels, setLabels] = useState<LabelsState>(() =>
     initialLabels(roleLabels),
   );
-  const [saved, setSaved] = useState(false);
+  const { saved, markSaved } = useSavedSnapshot([identity, labels]);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    setSaved(false);
+    const newSlug = identity.slug.trim();
     void run(
       MUTATION,
       {
@@ -176,6 +202,7 @@ export function TimetableProfileForm({
         name: identity.name,
         privacy: identity.privacy,
         cd: identity.customDomain,
+        slug: newSlug || null,
       },
       {
         success: "Forum profile saved",
@@ -185,12 +212,19 @@ export function TimetableProfileForm({
         // only fires once both have landed.
         onSuccess: async () => {
           await clientGql(SETTINGS_MUTATION, {
-            s: slug,
+            // The old slug still resolves post-rename (history fallback),
+            // but address the forum by its fresh slug for correctness.
+            s: newSlug || slug,
             ra: labels.admin,
             rh: labels.host,
             re: labels.elector,
           });
-          setSaved(true);
+          markSaved();
+          // A slug change moves the page itself: hard-navigate to the new
+          // settings URL so the router, layout, and sidebar all re-resolve.
+          if (newSlug && newSlug !== slug) {
+            window.location.assign(`/f/${newSlug}/settings`);
+          }
         },
       },
     );
@@ -198,21 +232,20 @@ export function TimetableProfileForm({
 
   return (
     <form onSubmit={submit} className="card">
-      <h2 className="section-title" style={{ marginBottom: 10 }}>
-        Forum profile
-      </h2>
-      <IdentityFields
-        slug={slug}
-        value={identity}
-        onChange={(patch) => setIdentity((s) => ({ ...s, ...patch }))}
-      />
-      <RoleLabelFields
-        value={labels}
-        onChange={(patch) => setLabels((s) => ({ ...s, ...patch }))}
-      />
-      <button className="btn btn-primary" type="submit" disabled={busy}>
-        {busy ? "Saving…" : saved ? "Saved" : "Save"}
-      </button>
+      <CollapsibleSection title="Forum profile">
+        <IdentityFields
+          slug={slug}
+          value={identity}
+          onChange={(patch) => setIdentity((s) => ({ ...s, ...patch }))}
+        />
+        <RoleLabelFields
+          value={labels}
+          onChange={(patch) => setLabels((s) => ({ ...s, ...patch }))}
+        />
+        <button className="btn btn-primary" type="submit" disabled={busy}>
+          {busy ? "Saving…" : saved ? "Saved" : "Save"}
+        </button>
+      </CollapsibleSection>
     </form>
   );
 }

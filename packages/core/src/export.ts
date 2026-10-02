@@ -1,15 +1,30 @@
-import type { Topic } from "@timetable/db";
+import type { AvailabilityState, Topic } from "@timetable/db";
 import {
+  canDiscussSlots,
+  canManageCalendar,
   canModerate,
   canProposeTopics,
+  canSeeComments,
   canSeeHostOnly,
   canSeePersonProfile,
+  isCalendarEnabled,
+  isMember,
   type Privacy,
   type Role,
+  type TimetableSettings,
   type Viewer,
 } from "@timetable/shared";
 
+import {
+  buildCalendar,
+  getAudienceElectorIds,
+  listSlotCommentsForSlots,
+  type CalendarSession,
+  type SlotCommentView,
+  type SlotCounts,
+} from "./calendar";
 import { listCommentTreesForTopics, type CommentNode } from "./comments";
+import { listHeartEvents, type HeartEvent } from "./heartEvents";
 import { listPeople } from "./members";
 import {
   buildFeed,
@@ -19,11 +34,10 @@ import {
 } from "./topics";
 
 /**
- * The read-only data export behind GET /api/timetables/:id/export and the
+ * The read-only data export behind GET /api/forums/:id/export and the
  * forum's "API" page: everything the viewer's role can already read in the
  * app, as one timestamped JSON document. Role filtering reuses the same
- * shared permission checks as the GraphQL resolvers. Timeslot/calendar data
- * is deliberately absent until that feature ships.
+ * shared permission checks as the GraphQL resolvers.
  */
 
 export type ExportTopic = {
@@ -53,6 +67,8 @@ export type ExportPerson = {
   slug: string | null;
   bio: string | null;
   roles: Role[];
+  /** ISO timestamp while deactivated (admin exports only), else null. */
+  deactivatedAt: string | null;
   publishedTopics: { id: string; title: string; slug: string | null }[];
 };
 
@@ -70,6 +86,33 @@ export type ExportManagedTopic = {
   comments: CommentNode[];
 };
 
+/** One timeslot, role-filtered exactly like the calendar page: sessions
+ * are public to any reader of the forum, discussions belong to members,
+ * availability (tallies + per-elector states) to hosts/admins. */
+export type ExportSlot = {
+  id: string;
+  startsAt: Date;
+  endsAt: Date;
+  /** Locations offered at this time (empty on location-free slots). */
+  locations: string[];
+  /** The slot's bookings: pencilled/confirmed topics, office hours,
+   * admin custom events. */
+  sessions: CalendarSession[];
+  /** Signed-in members: the exporting user's own 🟢🟡🔴 for this slot. */
+  viewerAvailability?: AvailabilityState | null;
+  /** Hosts/admins: elector availability tallies. */
+  availability?: SlotCounts;
+  /** Hosts/admins: each answering elector's state. */
+  availabilityByUser?: {
+    userId: string;
+    name: string | null;
+    state: AvailabilityState;
+  }[];
+  /** Members: the slot's discussion, oldest first — claim comments carry
+   * `topicId`/`topicTitle` and a frozen `counts` snapshot. */
+  comments?: SlotCommentView[];
+};
+
 export type DataExport = {
   readme: string;
   forum: {
@@ -82,8 +125,14 @@ export type DataExport = {
   people: ExportPerson[];
   /** Hosts/admins: the viewer's own topics across all statuses. */
   myTopics?: ExportManagedTopic[];
-  /** Admins: submitted topics awaiting review. */
+  /** Admins: draft topics awaiting publication. */
   pendingTopics?: ExportManagedTopic[];
+  /** Admins: the append-only ❤️/💙 ledger, oldest first. Unlike `hearts`
+   * on each topic (current, post-cutoff state), this history survives
+   * un-hearts and cutoff resets. */
+  heartEvents?: HeartEvent[];
+  /** Forums with the calendar on: every timeslot, past included. */
+  calendar?: { slots: ExportSlot[] };
 };
 
 const README = [
@@ -96,7 +145,15 @@ const README = [
   "public, host_only, or admin_only). `people` — members' public profiles",
   "and their published topics. `myTopics` — present for hosts/admins: the",
   "exporting user's own topics in every status, with their comment threads.",
-  "`pendingTopics` — present for admins: submitted topics awaiting review.",
+  "`pendingTopics` — present for admins: draft topics awaiting publication.",
+  "`heartEvents` — present for admins: the append-only ledger of every ❤️",
+  "(kind `heart`) and 💙 (kind `host_heart`) add/remove, oldest first;",
+  "unlike per-topic `hearts` it is unaffected by the hearts cutoff, so",
+  "past voting rounds can be reconstructed from it. `calendar` — present",
+  "when the forum's calendar is enabled: every timeslot (past included)",
+  "with its sessions; members also get each slot's discussion and their",
+  "own availability answer; hosts and admins additionally get the elector",
+  "availability tallies and per-elector states.",
 ].join(" ");
 
 async function managedTopics(rows: Topic[]): Promise<ExportManagedTopic[]> {
@@ -119,30 +176,87 @@ async function managedTopics(rows: Topic[]): Promise<ExportManagedTopic[]> {
   }));
 }
 
+/** The calendar section: the same role-filtered view the calendar page
+ * serves, past slots included (the export is an archive). */
+async function calendarExport(
+  timetableId: string,
+  viewer: Viewer,
+): Promise<{ slots: ExportSlot[] }> {
+  const hostOnly = canSeeHostOnly(viewer);
+  // The wash audience — only computed for viewers who get the tallies.
+  const audience = hostOnly
+    ? await getAudienceElectorIds(timetableId, { kind: "all" })
+    : [];
+  const slots = await buildCalendar(timetableId, audience, viewer.userId, {
+    includePast: true,
+  });
+  // Slot discussions are members-only (canDiscussSlots); admins also see
+  // hidden messages, as on the calendar page. One batched query — a year
+  // of commented slots used to fan out one query each (audit 2026-08-17).
+  const commentsBySlot = canDiscussSlots(viewer)
+    ? await listSlotCommentsForSlots(
+        slots.filter((s) => s.commentCount > 0).map((s) => s.id),
+        { includeHidden: canManageCalendar(viewer) },
+      )
+    : null;
+
+  return {
+    slots: slots.map((s) => ({
+      id: s.id,
+      startsAt: s.startsAt,
+      endsAt: s.endsAt,
+      locations: s.locations,
+      sessions: s.sessions,
+      ...(viewer.userId ? { viewerAvailability: s.viewerState } : {}),
+      ...(hostOnly
+        ? {
+            availability: s.counts,
+            availabilityByUser: s.perUser.map((p) => ({
+              userId: p.userId,
+              name: p.name,
+              state: p.state,
+            })),
+          }
+        : {}),
+      ...(commentsBySlot ? { comments: commentsBySlot.get(s.id) ?? [] } : {}),
+    })),
+  };
+}
+
 export async function buildDataExport(
-  timetable: { id: string; name: string; slug: string; privacy: Privacy },
+  timetable: {
+    id: string;
+    name: string;
+    slug: string;
+    privacy: Privacy;
+    settings: TimetableSettings;
+  },
   viewer: Viewer,
 ): Promise<DataExport> {
   const hostOnly = canSeeHostOnly(viewer);
   const moderate = canModerate(viewer);
+  // Mirror the resolvers' privacy gates (QA #42 matrix): on hosts_only /
+  // no_comments forums the public gets no comment threads, and elector
+  // identity (who hearts what) belongs to members on any non-public forum.
+  const seesComments = canSeeComments(timetable.privacy, viewer);
+  const seesElectorIds =
+    viewer.sysadmin || isMember(viewer.roles) || timetable.privacy === "public";
 
   const feed = await buildFeed(timetable.id, viewer.userId, {});
-  const heartRows = await loadPublishedHearts(timetable.id);
-  const heartsByTopic = new Map<string, string[]>();
-  for (const h of heartRows) {
-    const list = heartsByTopic.get(h.topicId) ?? [];
-    list.push(h.electorId);
-    heartsByTopic.set(h.topicId, list);
-  }
+  const heartsByTopic = seesElectorIds
+    ? await heartersByTopic(timetable.id)
+    : new Map<string, string[]>();
 
-  const trees = await listCommentTreesForTopics(
-    feed.map((t) => t.id),
-    {
-      includeHostOnly: hostOnly,
-      includeAdminOnly: moderate,
-      includeHidden: false,
-    },
-  );
+  const trees = seesComments
+    ? await listCommentTreesForTopics(
+        feed.map((t) => t.id),
+        {
+          includeHostOnly: hostOnly,
+          includeAdminOnly: moderate,
+          includeHidden: false,
+        },
+      )
+    : new Map<string, CommentNode[]>();
 
   const topics: ExportTopic[] = feed.map((t) => ({
     id: t.id,
@@ -167,6 +281,8 @@ export async function buildDataExport(
 
   const people: ExportPerson[] = (await listPeople(timetable.id))
     .filter((p) => canSeePersonProfile(timetable.privacy, viewer, p.roles))
+    // Deactivated members are admin-eyes-only, same as the People page.
+    .filter((p) => moderate || !p.deactivatedAt)
     .map((p) => ({
       userId: p.userId,
       name: p.name,
@@ -174,6 +290,7 @@ export async function buildDataExport(
       bio: p.bio,
       // Owner stays admin-eyes-only, same as the People page.
       roles: moderate ? p.roles : p.roles.filter((r) => r !== "owner"),
+      deactivatedAt: p.deactivatedAt?.toISOString() ?? null,
       publishedTopics: p.publishedTopics ?? [],
     }));
 
@@ -184,7 +301,17 @@ export async function buildDataExport(
   const pendingTopics = moderate
     ? await managedTopics(await listSubmittedTopics(timetable.id))
     : undefined;
+  // 💙 tallies are admin-eyes-only in the app, and removal history is more
+  // than any non-admin surface shows — so the ledger is admin-only too.
+  const heartEvents = moderate
+    ? await listHeartEvents(timetable.id)
+    : undefined;
+  const calendar = isCalendarEnabled(timetable.settings)
+    ? await calendarExport(timetable.id, viewer)
+    : undefined;
 
+  // Role-gated keys are undefined for viewers who don't get them —
+  // JSON serialisation drops them from the download entirely.
   return {
     readme: README,
     forum: {
@@ -195,7 +322,22 @@ export async function buildDataExport(
     },
     topics,
     people,
-    ...(myTopics ? { myTopics } : {}),
-    ...(pendingTopics ? { pendingTopics } : {}),
+    myTopics,
+    pendingTopics,
+    heartEvents,
+    calendar,
   };
+}
+
+/** Current post-cutoff hearter ids per published topic. */
+async function heartersByTopic(
+  timetableId: string,
+): Promise<Map<string, string[]>> {
+  const map = new Map<string, string[]>();
+  for (const h of await loadPublishedHearts(timetableId)) {
+    const list = map.get(h.topicId) ?? [];
+    list.push(h.electorId);
+    map.set(h.topicId, list);
+  }
+  return map;
 }

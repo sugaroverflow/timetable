@@ -1,17 +1,31 @@
 "use client";
 
-import { useState } from "react";
-
 import { Avatar } from "@/components/Avatar";
 import { PersonChip } from "@/components/PersonChip";
 import { SortHeader } from "@/components/SortHeader";
 import { formatShortDate } from "@/lib/dates";
 import type { WeightedHeart } from "@/lib/feedTypes";
+import { useTableSort } from "@/lib/useTableSort";
 
 type SortKey = "name" | "l1" | "l2" | "devotion" | "heartedAt";
 
 function fmt(n: number): string {
   return n.toFixed(2);
+}
+
+function compareRows(a: WeightedHeart, b: WeightedHeart, key: SortKey) {
+  switch (key) {
+    case "name":
+      return (a.electorName ?? "").localeCompare(b.electorName ?? "");
+    case "l1":
+      return a.weight - b.weight;
+    case "l2":
+      return a.l2Weight - b.l2Weight;
+    case "devotion":
+      return a.devotionWeight - b.devotionWeight;
+    case "heartedAt":
+      return Date.parse(a.heartedAt) - Date.parse(b.heartedAt);
+  }
 }
 
 /**
@@ -24,56 +38,26 @@ export function BreakdownTable({
   slug,
   rows,
   electorLabel = "Elector",
+  weights = true,
 }: {
   slug: string;
   rows: WeightedHeart[];
   /** The forum's custom role label (QA 2026-07-28). */
   electorLabel?: string;
+  /** False for a retired topic's dormant ❤️s (my-topics-heart-row):
+   * weights exist only among published topics, so only names and dates
+   * show. */
+  weights?: boolean;
 }) {
-  const [sortKey, setSortKey] = useState<SortKey>("l1");
-  const [dir, setDir] = useState<"asc" | "desc">("desc");
-
-  function toggleSort(key: SortKey) {
-    if (key === sortKey) {
-      setDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortKey(key);
-      // Text sorts read best ascending; weights/dates descending.
-      setDir(key === "name" ? "asc" : "desc");
-    }
-  }
-
-  const sorted = [...rows].sort((a, b) => {
-    let cmp = 0;
-    switch (sortKey) {
-      case "name":
-        cmp = (a.electorName ?? "").localeCompare(b.electorName ?? "");
-        break;
-      case "l1":
-        cmp = a.weight - b.weight;
-        break;
-      case "l2":
-        cmp = a.l2Weight - b.l2Weight;
-        break;
-      case "devotion":
-        cmp = a.devotionWeight - b.devotionWeight;
-        break;
-      case "heartedAt":
-        cmp = Date.parse(a.heartedAt) - Date.parse(b.heartedAt);
-        break;
-    }
-    return dir === "asc" ? cmp : -cmp;
+  const { sortRows, headerProps } = useTableSort<SortKey, WeightedHeart>({
+    initial: weights ? "l1" : "heartedAt",
+    ascendingKeys: ["name"],
+    compare: compareRows,
   });
+  const sorted = sortRows(rows);
 
   function header(key: SortKey, label: string) {
-    return (
-      <SortHeader
-        label={label}
-        active={sortKey === key}
-        dir={dir}
-        onToggle={() => toggleSort(key)}
-      />
-    );
+    return <SortHeader label={label} {...headerProps(key)} />;
   }
 
   const sum = (pick: (w: WeightedHeart) => number) =>
@@ -81,13 +65,17 @@ export function BreakdownTable({
 
   return (
     <div className="table-wrap">
-      <table className="data-table sortable-table breakdown-table">
+      <table className="data-table breakdown-table">
         <thead>
           <tr>
             {header("name", electorLabel)}
-            {header("l1", "L1")}
-            {header("l2", "L2")}
-            {header("devotion", "Devotion")}
+            {weights ? (
+              <>
+                {header("l1", "L1")}
+                {header("l2", "L2")}
+                {header("devotion", "Devotion")}
+              </>
+            ) : null}
             {header("heartedAt", "Hearted")}
           </tr>
         </thead>
@@ -105,9 +93,13 @@ export function BreakdownTable({
                   </span>
                 </PersonChip>
               </td>
-              <td className="mono">{fmt(w.weight)}</td>
-              <td className="mono">{fmt(w.l2Weight)}</td>
-              <td className="mono">{fmt(w.devotionWeight)}</td>
+              {weights ? (
+                <>
+                  <td className="mono">{fmt(w.weight)}</td>
+                  <td className="mono">{fmt(w.l2Weight)}</td>
+                  <td className="mono">{fmt(w.devotionWeight)}</td>
+                </>
+              ) : null}
               <td className="mono">
                 {formatShortDate(w.heartedAt, { year: true })}
               </td>
@@ -117,9 +109,13 @@ export function BreakdownTable({
         <tfoot>
           <tr className="breakdown-sums">
             <td>Σ · {rows.length} ❤️</td>
-            <td className="mono">{fmt(sum((w) => w.weight))}</td>
-            <td className="mono">{fmt(sum((w) => w.l2Weight))}</td>
-            <td className="mono">{fmt(sum((w) => w.devotionWeight))}</td>
+            {weights ? (
+              <>
+                <td className="mono">{fmt(sum((w) => w.weight))}</td>
+                <td className="mono">{fmt(sum((w) => w.l2Weight))}</td>
+                <td className="mono">{fmt(sum((w) => w.devotionWeight))}</td>
+              </>
+            ) : null}
             <td />
           </tr>
         </tfoot>

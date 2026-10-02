@@ -7,16 +7,21 @@ type CommentVisibility = "public" | "host_only" | "admin_only";
 
 export type FeedComment = {
   id: string;
-  parentId: string | null;
   authorId: string;
   authorName: string | null;
   authorImage: string | null;
+  /** The author's roles in this forum (role pill); empty for ex-members
+   * and tombstones. */
+  authorRoles: string[];
   body: string;
   visibility: CommentVisibility;
   hidden: boolean;
   /** Author-deleted tombstone: body/author arrive blanked from the API. */
   deleted: boolean;
   editedAt: string | null;
+  /** Pinned by the topic's author (#258) — selected on thread roots only,
+   * so absent on replies. */
+  pinnedAt?: string | null;
   createdAt: string;
   replies: FeedComment[];
 };
@@ -35,9 +40,16 @@ export type WeightedHeart = {
   heartedAt: string;
 };
 
+/** One attributed 💙 in the host-only thread's "💙 Sarah, Amir" row. */
+export type HostHearter = {
+  userId: string;
+  name: string | null;
+  image: string | null;
+  slug: string | null;
+};
+
 export type FeedTopic = {
   id: string;
-  timetableId: string;
   hostId: string;
   hostName: string | null;
   hostImage: string | null;
@@ -49,15 +61,26 @@ export type FeedTopic = {
   coverImageUrl: string | null;
   status: TopicStatus;
   heartCount: number;
-  weightedScore: number | null;
   viewerHasHearted: boolean;
+  /** The viewer's own 💙 (host-non-electors; false for everyone else). */
+  viewerHasHostHearted: boolean;
+  /** Attributed 💙s — hosts/admins only, null while the forum's host-only
+   * thread is off (💙s are then admin-analysis bookmarks). */
+  hostHearters: HostHearter[] | null;
   commentCount: number;
+  /** Future slots where this topic is pencilled/confirmed — gates the
+   * card's sessions tab (0 while the forum's calendar is off). */
+  sessionSlotCount: number;
+  /** The viewer's per-topic comments-seen watermark (teaser "new"
+   * previews) — null when they never engaged with this discussion. */
+  viewerCommentsSeenAt: string | null;
   publishedAt: string | null;
   contentUpdatedAt: string | null;
   createdAt: string;
   comments: FeedComment[];
   /** Drafting thread — the API serves it only to the topic's owner and
-   * admins; selected by the permalink page alone. */
+   * admins, and every card selects it now that it has a tab (2026-08-15);
+   * [] for everyone else. */
   adminComments?: FeedComment[];
 };
 
@@ -73,14 +96,27 @@ export type ManagedTopic = {
   bodyHtml: string;
   coverImageUrl: string | null;
   updatedAt: string;
+  /** Host's "Ready to publish" signal — null/absent while still drafting
+   * (only meaningful on submitted topics; 2026-08-06). */
+  readyAt?: string | null;
   hostName?: string | null;
   hostImage?: string | null;
   /** Public thread — My Topics renders feed-identical cards (QA #59). */
   comments?: FeedComment[];
+  /** The viewer's comments-seen watermark, for the card's comment-teaser
+   * (My Topics teases like the feed, 2026-08-16). */
+  viewerCommentsSeenAt?: string | null;
   /** Faculty-only thread on published topics. */
   hostOnlyComments?: FeedComment[];
+  /** 💙s received — the host-only box shows them to the topic's owner on
+   * My Topics too (host hearts, QA 2026-08-04). */
+  hostHearters?: HostHearter[] | null;
   /** Drafting thread — admins + topic owner only (QA #59 round 3). */
   adminComments?: FeedComment[];
+  /** managed-heart-fields (My Topics only): the feed's count on a
+   * published topic, the dormant ❤️s on an unpublished/archived one. */
+  heartCount?: number;
+  viewerHasHearted?: boolean;
 };
 
 export type ActivityEvent = {
@@ -100,4 +136,15 @@ export type ActivityEvent = {
   commentId: string | null;
   invitedEmail: string | null;
   invitedRoles: string[];
+  /** The member the event was done TO (log overhaul, 2026-08-17). */
+  targetUserId: string | null;
+  targetName: string | null;
+  targetRoles: string[];
+  /** member.role_change: the roles the target ended up with. */
+  rolesTo: string[];
+  /** Calendar events: the timeslot involved. */
+  slotId: string | null;
+  slotStartsAt: string | null;
+  availabilityState: string | null;
+  location: string | null;
 };

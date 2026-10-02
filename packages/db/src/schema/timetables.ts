@@ -9,7 +9,10 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-import type { TimetableSettings } from "@timetable/shared";
+import type {
+  MembershipDigestSettings,
+  TimetableSettings,
+} from "@timetable/shared";
 
 import { users } from "./auth";
 import { inviteStatusEnum, privacyEnum, roleEnum } from "./enums";
@@ -35,6 +38,21 @@ export const timetables = pgTable("timetables", {
   updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });
 
+/** Old forum slugs (editable slugs, 2026-08-10): each row keeps a
+ * previously-used slug resolving to its forum forever, so links in sent
+ * emails and bookmarks survive a rename. A slug here is globally
+ * reserved — creation and slug edits both refuse it for other forums, so
+ * an old link can never be hijacked. A forum reclaiming its own old slug
+ * deletes the row (the slug goes live again). */
+export const timetableSlugHistory = pgTable("timetable_slug_history", {
+  id: uuid().primaryKey().defaultRandom(),
+  timetableId: uuid()
+    .notNull()
+    .references(() => timetables.id, { onDelete: "cascade" }),
+  slug: text().notNull().unique(),
+  createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+});
+
 /**
  * Joins a global user to a timetable with one or more roles. This is the single
  * source of truth for authorization: a user may be admin in one timetable and
@@ -58,6 +76,10 @@ export const timetableMemberships = pgTable(
     name: text(),
     image: text(),
     bio: text(),
+    /** Contact Details (2026-09-30): Markdown shown above the profile to
+     * forum MEMBERS only — never the public, never the export. Gated by
+     * shared `canSeeContactDetails`. */
+    contactDetails: text(),
     /** URL slug, unique per timetable (person pages /f/[slug]/[userSlug]
      * and the cosmetic host segment in topic permalinks). */
     slug: text(),
@@ -75,6 +97,31 @@ export const timetableMemberships = pgTable(
     // instant come around again; topics published after it are 🆕 and jump
     // the queue. Null = first round (nothing is "new", all seen rows count).
     queueRoundStartedAt: timestamp({ withTimezone: true }),
+    /** Per-forum digest preferences (2026-08-11): on/off, cadence, and
+     * the kind switches — the digest is one email per forum, so all of it
+     * is a membership choice. Absent fields fall back to the user's
+     * stored global settings (see shared effectiveDigestSettings). */
+    digestSettings: jsonb()
+      .$type<MembershipDigestSettings>()
+      .notNull()
+      .default({}),
+    /** Per-forum digest send watermark (2026-08-11) — each forum's digest
+     * runs on its own cadence. Null falls back to users.lastDigestAt so
+     * the rollout doesn't resend old windows. */
+    lastDigestAt: timestamp({ withTimezone: true }),
+    /** Member deactivation (Ed, 2026-09-10): set when an admin deactivates
+     * the member, null while active. The row STAYS — it is what gives
+     * their comments a byline and their topics a host profile, which is
+     * why this is a column and not a delete. While set: roles resolve as
+     * empty (a non-member for every permission check), the member is off
+     * the People page, their digests don't send, and the forum leaves
+     * their switcher. Reactivation clears it. */
+    deactivatedAt: timestamp({ withTimezone: true }),
+    /** {host} Lounge read watermark (2026-09-30): Lounge posts after it
+     * are unread (the nav dot) and still news for the digest. Moved by
+     * visiting the Lounge or clicking a digest that showed it. Null =
+     * never visited. */
+    loungeSeenAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
@@ -113,6 +160,32 @@ export const timetableInvites = pgTable(
     uniqueIndex("invites_timetable_email_uq").on(t.timetableId, t.email),
     index("invites_email_idx").on(t.email),
   ],
+);
+
+/** One row per digest email sent (2026-08-13): every app link in that
+ * email carries `dg=<id>`, so ANY click proves the email was read — the
+ * app then marks the digest's shown comment threads (`commentTopicIds`)
+ * seen up to `sentAt`. Doubles as a send log. */
+export const digestSends = pgTable(
+  "digest_sends",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    timetableId: uuid()
+      .notNull()
+      .references(() => timetables.id, { onDelete: "cascade" }),
+    /** Topics whose card showed comment/reply threads in this email. */
+    commentTopicIds: jsonb().$type<string[]>().notNull().default([]),
+    /** The newest {host} Lounge post the email's Lounge card showed (null
+     * = no card). A click moves the membership's loungeSeenAt up to it —
+     * never to the send time, which would mark read posts the card left
+     * out. */
+    loungeShownUntil: timestamp({ withTimezone: true }),
+    sentAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("digest_sends_user_idx").on(t.userId)],
 );
 
 export const usersRelations = relations(users, ({ many }) => ({

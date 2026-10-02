@@ -19,18 +19,39 @@ import {
 export const ACTION_LIMITS = {
   /** Topic comments, replies, and slot comments. */
   comment: { windowMs: 60_000, max: 12 },
+  /** ❤️ toggles, on topics and as a host. Well above what a human clicking
+   * through a review queue reaches; binding on a script that would otherwise
+   * churn hearts (and their weighted-score recomputation) in a loop. */
+  heart: { windowMs: 60_000, max: 60 },
+  /** {host} Lounge emoji reacts — the ❤️ bucket's shape: generous for
+   * people, binding on a toggle loop. */
+  reaction: { windowMs: 60_000, max: 60 },
   /** Topic creation. */
   topic: { windowMs: 60 * 60_000, max: 30 },
+  /** Personal API token creation. Ten fresh credentials an hour is plenty
+   * for humans rotating tokens; a mint loop is what this stops. */
+  tokenMint: { windowMs: 60 * 60_000, max: 10 },
   /** Invite emails, counted per recipient (bulk paste of a cohort is fine). */
   invite: { windowMs: 60 * 60_000, max: 100 },
+  /** Forum creation. Each one emails the sysadmins and mints an admin
+   * surface, so this is deliberately the tightest bucket. */
+  forum: { windowMs: 24 * 60 * 60_000, max: 5 },
+  /** Signed upload URLs. Objects are public-read and never garbage
+   * collected, so cap how fast one account can mint them. */
+  upload: { windowMs: 60 * 60_000, max: 60 },
 } as const;
 
 export type LimitedAction = keyof typeof ACTION_LIMITS;
 
 const BLOCKED_MESSAGES: Record<LimitedAction, string> = {
   comment: "You're commenting too quickly",
+  heart: "You're ❤️-ing too quickly",
+  reaction: "You're reacting too quickly",
   topic: "You're creating topics too quickly",
+  tokenMint: "You're creating API tokens too quickly",
   invite: "Too many invites sent recently",
+  forum: "You're creating forums too quickly",
+  upload: "You're uploading too quickly",
 };
 
 export type ActionDecision = { allowed: boolean; retryAfterSeconds: number };

@@ -82,6 +82,12 @@ export function createTransport(auth: TransportAuth): Transport {
    * Deliberately does NOT forward x-view-as: previews are read-only and
    * the REST surface is all writes, which the API blocks under preview. */
   const rest = async (path: string, init?: RequestInit): Promise<Response> => {
+    // Every call site passes a literal "/api/..." path today; this guard
+    // keeps a future caller from smuggling an absolute or scheme-relative
+    // URL in and sending the bearer token cross-origin (audit 2026-08-17).
+    if (!path.startsWith("/") || path.startsWith("//")) {
+      throw new Error(`rest() takes a same-origin path, got "${path}"`);
+    }
     return fetch(`${env.apiUrl}${path}`, {
       ...init,
       headers: {

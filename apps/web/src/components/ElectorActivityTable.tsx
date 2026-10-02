@@ -7,10 +7,12 @@ import { Avatar } from "@/components/Avatar";
 import { BreakdownCaret } from "@/components/BreakdownPanel";
 import { SortHeader } from "@/components/SortHeader";
 import { formatExactTime } from "@/lib/dates";
+import { personPath } from "@/lib/personPath";
 import { relativeTime } from "@/lib/relativeTime";
 import { topicPath } from "@/lib/topicPath";
+import { useTableSort } from "@/lib/useTableSort";
 
-type HeartedTopic = {
+export type HeartedTopic = {
   topicId: string;
   title: string;
   slug: string | null;
@@ -35,10 +37,41 @@ export type ElectorRow = {
 type SortKey = "name" | "hearts" | "comments" | "queue" | "activity";
 type TopicSortKey = "name" | "host" | "comments";
 
+function compareTopics(a: HeartedTopic, b: HeartedTopic, key: TopicSortKey) {
+  switch (key) {
+    case "name":
+      return a.title.localeCompare(b.title);
+    case "host":
+      return (a.hostName ?? "").localeCompare(b.hostName ?? "");
+    case "comments":
+      return a.commentCount - b.commentCount;
+  }
+}
+
+function compareElectors(a: ElectorRow, b: ElectorRow, key: SortKey) {
+  switch (key) {
+    case "name":
+      return (a.electorName ?? "").localeCompare(b.electorName ?? "");
+    case "hearts":
+      return a.heartCount - b.heartCount;
+    case "comments":
+      return a.commentCount - b.commentCount;
+    case "queue":
+      return a.queueCount - b.queueCount;
+    case "activity":
+      return (
+        (a.latestActivityAt ? Date.parse(a.latestActivityAt) : 0) -
+        (b.latestActivityAt ? Date.parse(b.latestActivityAt) : 0)
+      );
+  }
+}
+
 /** The fold under an elector row: the topics they ❤️'d as a sortable table
  * (QA 2026-07-27 — replaced the page-wide "Show ❤️s" toggle and its
- * host-grouped lists). "Comments" is THIS elector's comments per topic. */
-function HeartedTopicsTable({
+ * host-grouped lists). "Comments" is THIS elector's comments per topic.
+ * Exported for the host-activity rows' 💙 fold (host hearts, 2026-08-04),
+ * which shares the shape. */
+export function HeartedTopicsTable({
   slug,
   topics,
   hostLabel,
@@ -47,56 +80,20 @@ function HeartedTopicsTable({
   topics: HeartedTopic[];
   hostLabel: string;
 }) {
-  const [key, setKey] = useState<TopicSortKey>("name");
-  const [dir, setDir] = useState<"asc" | "desc">("asc");
-
-  function toggle(next: TopicSortKey) {
-    if (next === key) {
-      setDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setKey(next);
-      setDir(next === "comments" ? "desc" : "asc");
-    }
-  }
-
-  const sorted = [...topics].sort((a, b) => {
-    let cmp = 0;
-    switch (key) {
-      case "name":
-        cmp = a.title.localeCompare(b.title);
-        break;
-      case "host":
-        cmp = (a.hostName ?? "").localeCompare(b.hostName ?? "");
-        break;
-      case "comments":
-        cmp = a.commentCount - b.commentCount;
-        break;
-    }
-    return dir === "asc" ? cmp : -cmp;
+  const { sortRows, headerProps } = useTableSort<TopicSortKey, HeartedTopic>({
+    initial: "name",
+    ascendingKeys: ["name", "host"],
+    compare: compareTopics,
   });
+  const sorted = sortRows(topics);
 
   return (
     <table className="data-table sortable-table">
       <thead>
         <tr>
-          <SortHeader
-            label="Topic"
-            active={key === "name"}
-            dir={dir}
-            onToggle={() => toggle("name")}
-          />
-          <SortHeader
-            label={hostLabel}
-            active={key === "host"}
-            dir={dir}
-            onToggle={() => toggle("host")}
-          />
-          <SortHeader
-            label="Comments"
-            active={key === "comments"}
-            dir={dir}
-            onToggle={() => toggle("comments")}
-          />
+          <SortHeader label="Topic" {...headerProps("name")} />
+          <SortHeader label={hostLabel} {...headerProps("host")} />
+          <SortHeader label="Comments" {...headerProps("comments")} />
         </tr>
       </thead>
       <tbody>
@@ -105,7 +102,11 @@ function HeartedTopicsTable({
           return (
             <tr key={t.topicId}>
               <td>{href ? <Link href={href}>{t.title}</Link> : t.title}</td>
-              <td>{t.hostName ?? hostLabel}</td>
+              <td>
+                <Link href={personPath(slug, t.hostSlug ?? t.hostId)}>
+                  {t.hostName ?? hostLabel}
+                </Link>
+              </td>
               <td className="mono">{t.commentCount}</td>
             </tr>
           );
@@ -133,12 +134,19 @@ function ElectorRowItem({
         <td>
           <span className="row" style={{ gap: 6, alignItems: "center" }}>
             <BreakdownCaret open={open} onToggle={() => setOpen(!open)} />
-            <Avatar
-              small
-              name={elector.electorName}
-              image={elector.electorImage}
-            />
-            <strong>{elector.electorName ?? electorLabel}</strong>
+            {/* Avatar + name click through to the elector's page
+                (links pass 2026-08-03). */}
+            <Link
+              className="person-trigger"
+              href={personPath(slug, elector.electorId)}
+            >
+              <Avatar
+                small
+                name={elector.electorName}
+                image={elector.electorImage}
+              />
+              <strong>{elector.electorName ?? electorLabel}</strong>
+            </Link>
           </span>
         </td>
         <td className="mono">{elector.heartCount}</td>
@@ -163,9 +171,7 @@ function ElectorRowItem({
         <tr className="elector-hearts-row">
           <td colSpan={5}>
             {elector.heartedTopics.length === 0 ? (
-              <span className="faint" style={{ fontSize: 12 }}>
-                No ❤️s yet.
-              </span>
+              <span className="hint">No ❤️s yet.</span>
             ) : (
               <HeartedTopicsTable
                 slug={slug}
@@ -197,78 +203,23 @@ export function ElectorActivityTable({
   hostLabel?: string;
   rows: ElectorRow[];
 }) {
-  const [sortKey, setSortKey] = useState<SortKey>("activity");
-  const [dir, setDir] = useState<"asc" | "desc">("desc");
-
-  function toggleSort(key: SortKey) {
-    if (key === sortKey) {
-      setDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortKey(key);
-      // Text sorts read best ascending; counts/dates descending.
-      setDir(key === "name" ? "asc" : "desc");
-    }
-  }
-
-  const sorted = [...rows].sort((a, b) => {
-    let cmp = 0;
-    switch (sortKey) {
-      case "name":
-        cmp = (a.electorName ?? "").localeCompare(b.electorName ?? "");
-        break;
-      case "hearts":
-        cmp = a.heartCount - b.heartCount;
-        break;
-      case "comments":
-        cmp = a.commentCount - b.commentCount;
-        break;
-      case "queue":
-        cmp = a.queueCount - b.queueCount;
-        break;
-      case "activity":
-        cmp =
-          (a.latestActivityAt ? Date.parse(a.latestActivityAt) : 0) -
-          (b.latestActivityAt ? Date.parse(b.latestActivityAt) : 0);
-        break;
-    }
-    return dir === "asc" ? cmp : -cmp;
+  const { sortRows, headerProps } = useTableSort<SortKey, ElectorRow>({
+    initial: "activity",
+    ascendingKeys: ["name"],
+    compare: compareElectors,
   });
+  const sorted = sortRows(rows);
 
   return (
     <div className="table-wrap">
-      <table className="data-table sortable-table">
+      <table className="data-table">
         <thead>
           <tr>
-            <SortHeader
-              label={electorLabel}
-              active={sortKey === "name"}
-              dir={dir}
-              onToggle={() => toggleSort("name")}
-            />
-            <SortHeader
-              label="❤️"
-              active={sortKey === "hearts"}
-              dir={dir}
-              onToggle={() => toggleSort("hearts")}
-            />
-            <SortHeader
-              label="Comments"
-              active={sortKey === "comments"}
-              dir={dir}
-              onToggle={() => toggleSort("comments")}
-            />
-            <SortHeader
-              label="Queue"
-              active={sortKey === "queue"}
-              dir={dir}
-              onToggle={() => toggleSort("queue")}
-            />
-            <SortHeader
-              label="Last activity"
-              active={sortKey === "activity"}
-              dir={dir}
-              onToggle={() => toggleSort("activity")}
-            />
+            <SortHeader label={electorLabel} {...headerProps("name")} />
+            <SortHeader label="❤️" {...headerProps("hearts")} />
+            <SortHeader label="Comments" {...headerProps("comments")} />
+            <SortHeader label="Queue" {...headerProps("queue")} />
+            <SortHeader label="Last activity" {...headerProps("activity")} />
           </tr>
         </thead>
         <tbody>

@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
+
+import type { MembershipDigestSettings } from "@timetable/shared";
 
 import {
   db,
@@ -38,22 +40,18 @@ export async function getUserByIcsToken(token: string): Promise<User | null> {
   return user ?? null;
 }
 
-export async function getUserProfile(userId: string): Promise<User | null> {
-  const [user] = await db
-    .select()
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
-  return user ?? null;
-}
-
 /** Update a member's per-forum profile (2026-07: name/photo/bio/slug are
  * forum-scoped; only the account itself — email, auth — stays global).
  * The slug follows renames within this forum only. */
 export async function updateMemberProfile(
   timetableId: string,
   userId: string,
-  patch: { name?: string; bio?: string | null; image?: string | null },
+  patch: {
+    name?: string;
+    bio?: string | null;
+    contactDetails?: string | null;
+    image?: string | null;
+  },
 ): Promise<TimetableMembership | null> {
   const [membership] = await db
     .select({ id: timetableMemberships.id })
@@ -79,6 +77,9 @@ export async function updateMemberProfile(
       ...(patch.name !== undefined ? { name: patch.name } : {}),
       ...(slug !== undefined ? { slug } : {}),
       ...(patch.bio !== undefined ? { bio: patch.bio } : {}),
+      ...(patch.contactDetails !== undefined
+        ? { contactDetails: patch.contactDetails }
+        : {}),
       ...(patch.image !== undefined ? { image: patch.image } : {}),
       updatedAt: new Date(),
     })
@@ -102,12 +103,56 @@ export async function updateUserNotificationSettings(
   userId: string,
   patch: Partial<NotificationSettings>,
 ): Promise<User | null> {
-  const current = await getUserNotificationSettings(userId);
-  const merged: NotificationSettings = { ...current, ...patch };
+  // In-database shallow merge — see updateTimetableSettings for why.
   const [user] = await db
     .update(users)
-    .set({ notificationSettings: merged })
+    .set({
+      notificationSettings: sql`coalesce(${users.notificationSettings}, '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb`,
+    })
     .where(eq(users.id, userId))
     .returning();
   return user ?? null;
+}
+
+/** The member's per-forum digest settings ({} = all fallbacks). */
+export async function getMembershipDigestSettings(
+  timetableId: string,
+  userId: string,
+): Promise<MembershipDigestSettings> {
+  const [membership] = await db
+    .select({ digestSettings: timetableMemberships.digestSettings })
+    .from(timetableMemberships)
+    .where(
+      and(
+        eq(timetableMemberships.timetableId, timetableId),
+        eq(timetableMemberships.userId, userId),
+      ),
+    )
+    .limit(1);
+  return membership?.digestSettings ?? {};
+}
+
+/** Patch the member's per-forum digest settings (2026-08-11): provided
+ * fields overwrite, absent fields keep their stored value ({} clears
+ * nothing). */
+export async function updateMembershipDigestSettings(
+  timetableId: string,
+  userId: string,
+  patch: MembershipDigestSettings,
+): Promise<boolean> {
+  // In-database shallow merge — see updateTimetableSettings for why.
+  const [updated] = await db
+    .update(timetableMemberships)
+    .set({
+      digestSettings: sql`coalesce(${timetableMemberships.digestSettings}, '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb`,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(timetableMemberships.timetableId, timetableId),
+        eq(timetableMemberships.userId, userId),
+      ),
+    )
+    .returning({ id: timetableMemberships.id });
+  return Boolean(updated);
 }

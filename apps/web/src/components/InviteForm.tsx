@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { RoleCheckboxGroup } from "@/components/RoleCheckboxGroup";
 import { clientApi } from "@/lib/clientApi";
 
@@ -50,7 +51,7 @@ export function InviteForm({ timetableId }: { timetableId: string }) {
     ).length;
     const invited = data.results.filter((r) => r.status === "invited").length;
     setMessage(
-      `Done — ${added} added now, ${invited} pending invite(s) for users who haven't signed up yet.`,
+      `Done — ${added} added now, ${invited} pending invite(s) for users who haven't signed up yet. No emails sent — use "Send invite" on each card when ready.`,
     );
     setEmails("");
     router.refresh();
@@ -58,38 +59,40 @@ export function InviteForm({ timetableId }: { timetableId: string }) {
 
   return (
     <form onSubmit={onSubmit} className="card">
-      <h2 className="section-title" style={{ marginBottom: 10 }}>
-        Invite people
-      </h2>
-      <p className="muted" style={{ marginTop: 0 }}>
-        Existing users are added immediately. Unknown emails get a pending
-        invite claimed when they sign up.
-      </p>
-
-      <div className="field">
-        <label htmlFor="emails">Emails (comma or newline separated)</label>
-        <textarea
-          id="emails"
-          value={emails}
-          onChange={(e) => setEmails(e.target.value)}
-          placeholder="alex@example.com, sam@example.com"
-        />
-      </div>
-
-      <div className="field">
-        <label>Roles</label>
-        <RoleCheckboxGroup value={roles} onChange={setRoles} variant="pill" />
-      </div>
-
-      {message ? (
-        <p style={{ fontSize: 13 }} className="muted">
-          {message}
+      <CollapsibleSection title="Invite people">
+        <p className="muted" style={{ marginTop: 0 }}>
+          Existing users are added immediately. Unknown emails get a pending
+          invite claimed when they sign up.{" "}
+          <strong>Nobody is emailed at this step</strong> — send each person
+          their invite email with the &ldquo;Send invite&rdquo; button on their
+          card below, once their profile and topics are ready.
         </p>
-      ) : null}
 
-      <button className="btn btn-primary" type="submit" disabled={busy}>
-        {busy ? "Sending…" : "Send invites"}
-      </button>
+        <div className="field">
+          <label htmlFor="emails">Emails (comma or newline separated)</label>
+          <textarea
+            id="emails"
+            value={emails}
+            onChange={(e) => setEmails(e.target.value)}
+            placeholder="alex@example.com, sam@example.com"
+          />
+        </div>
+
+        <div className="field">
+          <label>Roles</label>
+          <RoleCheckboxGroup value={roles} onChange={setRoles} variant="pill" />
+        </div>
+
+        {message ? (
+          <p style={{ fontSize: 13 }} className="muted">
+            {message}
+          </p>
+        ) : null}
+
+        <button className="btn btn-primary" type="submit" disabled={busy}>
+          {busy ? "Adding…" : "Add people"}
+        </button>
+      </CollapsibleSection>
     </form>
   );
 }

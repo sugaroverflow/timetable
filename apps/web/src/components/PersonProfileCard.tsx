@@ -1,10 +1,14 @@
 import { Pencil } from "lucide-react";
 import Link from "next/link";
 
+import type { Privacy } from "@timetable/shared";
+
+import { formatShortDate } from "@/lib/dates";
 import { personPath } from "@/lib/personPath";
 import type { RoleLabels } from "@/lib/timetableSettings";
 
 import { Avatar } from "./Avatar";
+import { ContactDetails } from "./ContactDetails";
 import { RolePills } from "./RolePills";
 
 export type ProfileCardPerson = {
@@ -14,6 +18,12 @@ export type ProfileCardPerson = {
   slug: string | null;
   roles: string[];
   bioHtml: string | null;
+  /** Members-only (2026-09-30): null for the public, and when unset. */
+  contactDetailsHtml?: string | null;
+  /** Set while deactivated (member-deactivation, 2026-09-10). Only admin
+   * viewers ever receive such a person, so the note this renders is for
+   * them: "why am I seeing this page when they're gone?" */
+  deactivatedAt?: string | null;
 };
 
 /** Profile header shared by the host-filtered feed and the person pages
@@ -25,9 +35,13 @@ export function PersonProfileCard({
   labels,
   linkPhoto = true,
   isSelf = false,
+  privacy,
 }: {
   slug: string;
   person: ProfileCardPerson;
+  /** The forum's privacy — decides the Contact Details "Members only"
+   * note. Omitted: no note. */
+  privacy?: Privacy;
   labels: RoleLabels | undefined;
   linkPhoto?: boolean;
   /** This is the viewer's own profile: show the edit link to
@@ -47,6 +61,12 @@ export function PersonProfileCard({
   );
   return (
     <div className="card stack">
+      {person.deactivatedAt ? (
+        <div className="hint">
+          Deactivated {formatShortDate(person.deactivatedAt)} — only admins can
+          see this page.
+        </div>
+      ) : null}
       {/* Portrait with the name and role pills beneath (QA 2026-07-28).
        * The name is the page's top heading — tier 1 of the hierarchy. */}
       <div className="profile-head">
@@ -65,6 +85,11 @@ export function PersonProfileCard({
           </Link>
         ) : null}
       </div>
+      <ContactDetails
+        html={person.contactDetailsHtml}
+        privacy={privacy}
+        roles={person.roles}
+      />
       {person.bioHtml ? (
         <div
           className="topic-body"

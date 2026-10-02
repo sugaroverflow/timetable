@@ -20,6 +20,10 @@ const uploadPurposes = [
   "topic-cover",
   "timetable-cover",
   "timetable-icon",
+  // Images inside a topic body or a {host} Lounge post (the rich-text
+  // editor, 2026-09-30). Public-read like every upload: unguessable, not
+  // private.
+  "post-image",
 ] as const;
 
 export type UploadPurpose = (typeof uploadPurposes)[number];

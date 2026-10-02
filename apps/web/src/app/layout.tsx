@@ -1,10 +1,11 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 
 import "./tokens.css";
 import "./globals.css";
 
-import { env } from "@/env";
+import { e2eTestMode, env } from "@/env";
 import { emojiFavicon } from "@/lib/favicon";
 
 export const metadata: Metadata = {
@@ -19,18 +20,49 @@ export const metadata: Metadata = {
   icons: { icon: emojiFavicon("📚") },
 };
 
-export default function RootLayout({
+// Clerk's prebuilt UI (sign-in/sign-up cards, the account modal) themed to
+// the app's tokens — CSS-variable values track per-forum themes and
+// light/dark automatically. The modal's own "Profile" (name/photo) section
+// is hidden: identity lives in per-forum Topic profiles, and Clerk's copy
+// is only mirrored once at first sign-in, so edits there change nothing in
+// the app and it read as a confusing second profile (QA 2026-08-10).
+const clerkAppearance = {
+  variables: {
+    colorPrimary: "var(--primary)",
+    colorPrimaryForeground: "var(--primary-ink)",
+    colorBackground: "var(--card)",
+    colorForeground: "var(--ink)",
+    colorMutedForeground: "var(--muted)",
+    colorNeutral: "var(--ink)",
+    colorInput: "var(--card)",
+    colorInputForeground: "var(--ink)",
+    colorBorder: "var(--line)",
+    borderRadius: "var(--radius-md)",
+    fontFamily: "var(--sans)",
+  },
+  elements: {
+    profileSection__profile: { display: "none" },
+  },
+};
+
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   // Applies the stored light/dark choice before paint — no flash.
   const themeScript = `(function(){try{var m=localStorage.getItem("theme-mode");var d=m==="dark"||((!m||m==="system")&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.dataset.theme=d?"dark":"light";}catch(e){}})();`;
+  // The proxy's per-request CSP nonce — without it the script above is
+  // exactly what the policy exists to block (lib/csp.ts).
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
 
   const content = (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en-GB" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script
+          nonce={nonce}
+          dangerouslySetInnerHTML={{ __html: themeScript }}
+        />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
           rel="preconnect"
@@ -46,7 +78,15 @@ export default function RootLayout({
     </html>
   );
 
-  if (process.env.E2E_TEST_MODE === "1") return content;
+  if (e2eTestMode) return content;
 
-  return <ClerkProvider>{content}</ClerkProvider>;
+  // The nonce rides into Clerk's own injected <script> tags: under the
+  // CSP's strict-dynamic, host allowlisting is off, so without it Clerk's
+  // clerk.browser.js is blocked (caught live on dev, 2026-08-17 — the
+  // local probe couldn't see it because E2E mode skips Clerk entirely).
+  return (
+    <ClerkProvider appearance={clerkAppearance} nonce={nonce} dynamic>
+      {content}
+    </ClerkProvider>
+  );
 }

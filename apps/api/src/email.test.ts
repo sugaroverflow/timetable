@@ -1,7 +1,8 @@
-import type { ForumDigest } from "@timetable/core";
+import { isForumDigestEmpty, type ForumDigest } from "@timetable/core";
 import { describe, expect, it } from "vitest";
 
-import { renderDigest, sampleDigest } from "./email";
+import { linkBase, renderDigest, wrapLinksWithSignInTicket } from "./email";
+import { sampleDigest } from "./email-sample";
 
 const SAMPLE = sampleDigest({
   email: "admin@example.com",
@@ -16,8 +17,8 @@ describe("renderDigest (v3, topic cards)", () => {
   it("subjects and brands as '{Forum} Topics Digest'", () => {
     const { subject, html } = renderDigest(SAMPLE);
     expect(subject).toMatch(/^Sparkle Bureaucracy Topics Digest — /);
-    expect(subject).toContain("comments on your topics");
-    expect(subject).toContain("1 new topic");
+    expect(subject).toContain("10 comments");
+    expect(subject).toContain("2 new topics");
     expect(html).toContain(">Sparkle Bureaucracy Topics</td>");
     expect(html).toContain("#1f7a4d");
     expect(html).not.toContain("Hi Ada");
@@ -37,6 +38,7 @@ describe("renderDigest (v3, topic cards)", () => {
   it("shows status as a pill and the topic body (truncated) on status cards", () => {
     const { html } = renderDigest(SAMPLE);
     expect(html).toContain("Assigned to you");
+    expect(html).toContain("Sent back to drafting");
     expect(html).toContain("Unpublished draft");
     expect(html).toContain("New</span>");
     // Long new-topic body is truncated with a Show more link.
@@ -77,9 +79,38 @@ describe("renderDigest (v3, topic cards)", () => {
     expect(html).toContain("border-top:1px solid");
   });
 
+  it("renders 💙s from fellow hosts under the ❤️s (host hearts)", () => {
+    const withHostHearts: ForumDigest = {
+      ...SAMPLE,
+      topics: [
+        {
+          ...SAMPLE.topics[0]!,
+          activities: [
+            ...SAMPLE.topics[0]!.activities,
+            {
+              kind: "hostHeart",
+              hearters: [{ name: "Eli Morgan", userId: "u9", image: null }],
+              at: new Date("2026-07-30T00:00:00Z"),
+            },
+          ],
+        },
+        ...SAMPLE.topics.slice(1),
+      ],
+    };
+    const { html } = renderDigest(withHostHearts);
+    expect(html).toContain("💙 <strong>Eli Morgan</strong>");
+  });
+
   it("builds Reply deep-links; commenters plain, byline still linked", () => {
     const { html } = renderDigest(SAMPLE);
-    expect(html).toContain("?reply=garden-robin#comment-garden-robin");
+    expect(html).toContain(
+      "?tab=comments&amp;topic=sample-garden&amp;reply=garden-robin#comment-garden-robin",
+    );
+    // A {host}-only comment aims at the {host}-only tab: topic-tabs
+    // unmounts the others, so the composer isn't on the page otherwise.
+    expect(html).toContain(
+      "?tab=host&amp;topic=sample-mine&amp;reply=assembly-eli#comment-assembly-eli",
+    );
     expect(html).toContain("Reply →");
     // Commenter names are plain bold text, not profile links…
     expect(html).toContain("<strong>Robin Vale</strong>");
@@ -126,5 +157,174 @@ describe("renderDigest (v3, topic cards)", () => {
     expect(html).not.toContain("<b>Eve</b>");
     expect(html).not.toContain("<svg onload");
     expect(html).not.toContain("<u>Trudy</u>");
+  });
+});
+
+describe("renderDigest calendar content (calendar v2)", () => {
+  const sessionCard = SAMPLE.topics.find((c) =>
+    c.activities.some((a) => a.kind === "session"),
+  )!;
+
+  it("renders the confirmed session inside its topic's card, not a section", () => {
+    const { html } = renderDigest(SAMPLE);
+    expect(html).not.toContain("Coming up");
+    // The session's when-line and register link ride the ranked-choice card.
+    expect(html).toContain("Tue 4 Aug, 18:00–20:00 · Classroom");
+    expect(html).toContain("Register → lu.ma/sample-rcv");
+    // The ask is still its own section, before the cards.
+    const ask = html.indexOf("Can you make it?");
+    const card = html.indexOf("sketched three options");
+    expect(ask).toBeGreaterThan(-1);
+    expect(card).toBeGreaterThan(ask);
+  });
+
+  it("counts fresh sessions into the subject", () => {
+    const { subject } = renderDigest(SAMPLE);
+    expect(subject).toContain("3 sessions confirmed");
+    expect(subject).toContain("2 sessions want your availability");
+  });
+
+  it("links URL-less sessions to the forum calendar", () => {
+    // The sample ask carries no URL → it points at the calendar page.
+    expect(renderDigest(SAMPLE).html).toContain("/f/sparkle/calendar");
+  });
+
+  it("standing session listings alone never make a digest non-empty", () => {
+    const staleSession = (isNew: boolean): ForumDigest => ({
+      ...SAMPLE,
+      topics: [
+        {
+          ...sessionCard,
+          activities: sessionCard.activities
+            .filter((a) => a.kind === "session")
+            .map((a) =>
+              a.kind === "session"
+                ? { ...a, session: { ...a.session, isNew } }
+                : a,
+            ),
+        },
+      ],
+      availabilityAsks: [],
+      newSlots: [],
+      newMembers: [],
+    });
+    expect(isForumDigestEmpty(staleSession(false))).toBe(true);
+    expect(isForumDigestEmpty(staleSession(true))).toBe(false);
+  });
+});
+
+describe("wrapLinksWithSignInTicket (one-click digest links)", () => {
+  const ticket = "tok_abc+/=";
+
+  it("wraps every app link in the rendered digest, preserving destinations", () => {
+    const { html } = renderDigest(SAMPLE);
+    const wrapped = wrapLinksWithSignInTicket(html, ticket);
+    // Every remaining app href goes through /sign-in with the ticket…
+    const appHrefs = [...wrapped.matchAll(/href="([^"]*)"/g)]
+      .map((m) => m[1]!.replace(/&amp;/g, "&"))
+      .filter((u) => u.startsWith(linkBase));
+    expect(appHrefs.length).toBeGreaterThan(0);
+    for (const href of appHrefs) {
+      expect(href).toContain("/sign-in?__clerk_ticket=");
+    }
+    // …and the original destination rides redirect_url, decodable.
+    const first = new URL(appHrefs[0]!);
+    const dest = first.searchParams.get("redirect_url");
+    expect(dest).toMatch(/^\//);
+  });
+
+  it("wraps only linkBase URLs and keeps sign-in links untouched", () => {
+    const html = [
+      `<a href="${linkBase}/f/sparkle/topics?sort=new&amp;q=x">in</a>`,
+      `<a href="https://elsewhere.example/page">out</a>`,
+      `<a href="${linkBase}/sign-in?redirect_url=%2Ff%2Fsparkle">already</a>`,
+    ].join("");
+    const wrapped = wrapLinksWithSignInTicket(html, ticket);
+    expect(wrapped).toContain("https://elsewhere.example/page");
+    expect(wrapped).toContain(
+      `${linkBase}/sign-in?redirect_url=%2Ff%2Fsparkle`,
+    );
+    const inbound = new URL(
+      /href="([^"]*sign-in\?__clerk_ticket[^"]*)"/
+        .exec(wrapped)![1]!
+        .replace(/&amp;/g, "&"),
+    );
+    expect(inbound.searchParams.get("__clerk_ticket")).toBe(ticket);
+    expect(inbound.searchParams.get("redirect_url")).toBe(
+      "/f/sparkle/topics?sort=new&q=x",
+    );
+  });
+
+  it("treats a bare linkBase link as the root path", () => {
+    const wrapped = wrapLinksWithSignInTicket(
+      `<a href="${linkBase}">home</a>`,
+      ticket,
+    );
+    const url = new URL(
+      /href="([^"]*)"/.exec(wrapped)![1]!.replace(/&amp;/g, "&"),
+    );
+    expect(url.pathname).toBe("/sign-in");
+    expect(url.searchParams.get("redirect_url")).toBe("/");
+  });
+});
+
+describe("renderDigest — the {host} Lounge card", () => {
+  const WITH_LOUNGE = sampleDigest({
+    email: "admin@example.com",
+    name: "Ada",
+    forumId: "forum-1",
+    forumName: "Sparkle Bureaucracy",
+    forumSlug: "sparkle",
+    hostLabel: "Faculty",
+    loungeEnabled: true,
+  });
+
+  it("appears only where the forum has the Lounge on", () => {
+    expect(SAMPLE.lounge).toBeNull();
+    expect(renderDigest(SAMPLE).html).not.toContain("Lounge");
+    expect(WITH_LOUNGE.lounge).not.toBeNull();
+  });
+
+  it("is named for the forum's host label and renders after every topic card", () => {
+    const { html } = renderDigest(WITH_LOUNGE);
+    const loungeAt = html.indexOf(">Faculty Lounge<");
+    expect(loungeAt).toBeGreaterThan(-1);
+    for (const card of WITH_LOUNGE.topics) {
+      expect(html.indexOf(card.title.replace(/'/g, "&#39;"))).toBeLessThan(
+        loungeAt,
+      );
+    }
+    expect(html).toContain("Open the Faculty Lounge →");
+  });
+
+  it("never counts toward the subject line", () => {
+    const withIt = renderDigest(WITH_LOUNGE).subject;
+    const without = renderDigest({ ...WITH_LOUNGE, lounge: null }).subject;
+    expect(withIt).toBe(without);
+    expect(withIt).not.toMatch(/lounge/i);
+  });
+
+  it("excerpts the opening post's Markdown and links replies to the conversation", () => {
+    const { html } = renderDigest(WITH_LOUNGE);
+    expect(html).toContain("Reading list for next term I've been");
+    expect(html).not.toContain("**readings**");
+    expect(html).toContain(
+      "/f/sparkle/lounge?c=sample-lounge-2&amp;reply=sample-lounge-3#comment-sample-lounge-3",
+    );
+  });
+
+  it("makes a Lounge-only digest non-empty, and sends under the bare subject", () => {
+    const loungeOnly: ForumDigest = {
+      ...WITH_LOUNGE,
+      topics: [],
+      availabilityAsks: [],
+      newSlots: [],
+      newMembers: [],
+    };
+    expect(isForumDigestEmpty(loungeOnly)).toBe(false);
+    expect(isForumDigestEmpty({ ...loungeOnly, lounge: null })).toBe(true);
+    expect(renderDigest(loungeOnly).subject).toBe(
+      "Sparkle Bureaucracy Topics Digest",
+    );
   });
 });

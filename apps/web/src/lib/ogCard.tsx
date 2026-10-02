@@ -1,5 +1,10 @@
 import { env } from "@/env";
 
+// Mirrors @timetable/shared's HEX_COLOUR — kept LOCAL on purpose: this
+// module is bundled into Next's opengraph-image routes, whose separate
+// compilation can't resolve the workspace package (junction quirk).
+const HEX_COLOUR = /^#[0-9a-fA-F]{6}$/;
+
 /** Social-preview (Open Graph) card helpers (QA 2026-07-27). Cards are
  * deliberately simple: text on white with the accent bar, no photos yet.
  * Inside a forum the card carries the FORUM's identity only — no topic.forum
@@ -79,9 +84,7 @@ export function ogCard(args: {
   accent?: string | null;
 }) {
   const accent =
-    args.accent && /^#[0-9a-fA-F]{6}$/.test(args.accent)
-      ? args.accent
-      : ACCENT_FALLBACK;
+    args.accent && HEX_COLOUR.test(args.accent) ? args.accent : ACCENT_FALLBACK;
   return (
     <div
       style={{
@@ -159,9 +162,7 @@ export function ogCoverCard(args: {
   accent?: string | null;
 }) {
   const accent =
-    args.accent && /^#[0-9a-fA-F]{6}$/.test(args.accent)
-      ? args.accent
-      : ACCENT_FALLBACK;
+    args.accent && HEX_COLOUR.test(args.accent) ? args.accent : ACCENT_FALLBACK;
   return (
     <div
       style={{

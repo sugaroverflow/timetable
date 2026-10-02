@@ -10,6 +10,42 @@ import { useTopicEditing } from "./TopicEditScope";
 const UNPUBLISH = `mutation($id: String!){ unpublishTopic(topicId: $id){ id } }`;
 const PUBLISH = `mutation($id: String!){ moderateTopic(topicId: $id, action: "publish"){ id } }`;
 const REASSIGN = `mutation($id: String!, $host: String!){ reassignTopic(topicId: $id, hostId: $host){ id } }`;
+const UNREADY = `mutation($id: String!){ setTopicReady(topicId: $id, ready: false){ id } }`;
+
+/** Admin sends a draft its host marked "Ready to publish" back to
+ * drafting (Ed, 2026-09-08). One-way on purpose: "ready" is the host's
+ * call (their ReadySwitch), the admin's is "not yet" — so this only ever
+ * clears the mark, and the topic drops out of the Pending page's default
+ * ready view on refresh. Renders nothing unless the topic is a ready
+ * draft. */
+function BackToDraftingButton({
+  topicId,
+  status,
+  readyAt,
+}: {
+  topicId: string;
+  status?: string;
+  readyAt?: string | null;
+}) {
+  const { run, busy } = useGqlAction();
+  if (status !== "submitted" || !readyAt) return null;
+  return (
+    <button
+      className="btn btn-ghost"
+      type="button"
+      disabled={busy}
+      onClick={() =>
+        void run(
+          UNREADY,
+          { id: topicId },
+          { success: "Moved back to drafting", errorFallback: "Action failed" },
+        )
+      }
+    >
+      Back to drafting
+    </button>
+  );
+}
 
 export function AdminTopicActions({
   topic,
@@ -24,6 +60,10 @@ export function AdminTopicActions({
     bodyMd: string;
     coverImageUrl: string | null;
     status?: string;
+    /** The host's "Ready to publish" mark on a draft; call sites that
+     * don't carry it (feed cards) never show the Back to drafting
+     * button. */
+    readyAt?: string | null;
   };
   slug: string;
   label?: string;
@@ -89,6 +129,11 @@ export function AdminTopicActions({
         >
           {published ? "Unpublish" : "Publish"}
         </button>
+        <BackToDraftingButton
+          topicId={topicId}
+          status={topic.status}
+          readyAt={topic.readyAt}
+        />
         {reassignOptions.length > 0 ? (
           <>
             <select

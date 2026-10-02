@@ -1,17 +1,21 @@
 # Architecture
 
-Timetable is a TypeScript npm-workspaces monorepo with a Next.js web app, an
+Topic is a TypeScript npm-workspaces monorepo with a Next.js web app, an
 Express/GraphQL API, shared domain services, and a PostgreSQL database managed
 through Drizzle.
 
-Since the 2026-07 rebrand the product is branded **Topic** (future domain
-topic.forum) and the tenant entity is a "forum" in all user-facing copy. Code
-identifiers, the `@timetable/*` package names, the `/timetables` resolver,
-CSS classes, and the DB schema deliberately keep `timetable` naming — but the
-PUBLIC API surface (GraphQL exposed names, `/api/forums/*` REST URLs) says
-forum (2026-07-27; see the GraphQL Surface section), and new user-visible
-strings must say forum/Topic. This document otherwise uses the code names.
-The domain cutover (still timetable.love) happens separately.
+**Naming:** the product was built as "Timetable" and later rebranded to
+**Topic** (topic.forum), with the tenant entity called a **forum** in all
+user-facing copy. The rename was applied outside-in and deliberately stopped
+at the code boundary:
+
+- **Say forum:** UI copy, the public API surface — GraphQL exposed names and
+  `/api/forums/*` REST URLs — and web routes (`/f/[slug]`).
+- **Say timetable:** code identifiers, `@timetable/*` package names, the
+  `/timetables` resolver, CSS classes, and the DB schema.
+
+New user-visible strings must say forum/Topic; this document otherwise uses
+the code names.
 
 ## Repository Shape
 
@@ -88,13 +92,15 @@ Codex/agent workflows are separate from the app runtime.
   with section nav, a "Report a bug" link, and the timetable switcher (with
   visibility pills) in its footer
 - topic feed with infinite scroll, sort controls (the four heart
-  normalisations, latest comments, newest-including-edits, seeded random),
+  normalisations, latest comments, latest created, latest updated —
+  content edits count — and seeded random), a search box (server-side
+  match, highlighted hits on the cards, a "No topics match" empty state),
   host filter with profile card, and "new since last visit" highlights;
-  electors also get the **Topic Queue** (`/f/[slug]/queue`, its own
+  every member gets the **Topic Queue** (`/f/[slug]/queue`, its own
   sidebar page with a red never-seen badge; old `?sort=queue` redirects):
-  one unhearted topic at a time in a per-user stable shuffle with big
-  🔁/❤️ decision buttons, round-based with an explicit restart
-  (`packages/core/src/queue.ts`);
+  one unhearted topic at a time in a per-user stable shuffle — electors
+  decide with big 🔁/❤️ buttons, other members read through — round-based
+  with an explicit restart (`packages/core/src/queue.ts`);
   hosts/admins get a sortable per-elector breakdown table (the shared
   `BreakdownTable` component: L1/L2/devotion weights + hearted-at, footer
   sums matching the topic's scores, names linking to person pages)
@@ -103,20 +109,39 @@ Codex/agent workflows are separate from the app runtime.
 - person pages at `/f/[slug]/[userSlug]` (per-forum member profiles; a
   userId segment canonically redirects to the member's slug)
 - My Topics (feed-identical cards + manage controls, TipTap editor; admins
-  can create a topic on behalf of another host)
-- Pending Topics (the submitted moderation queue; the draft topic status was
-  removed — new topics are created as `submitted`)
+  can create a topic on behalf of another host; each card’s tabs —
+  public comments / host-only / drafting / Scheduling — are one horizontal
+  tab strip (topic-tabs: `MyTopicsTabs`, 2026-08-14); the Scheduling tab is the
+  topic-workbench — a lazy per-topic mini-calendar: hearters' availability
+  across future slots as the calendar's own rows (`CalendarTable`, the one
+  row implementation since 2026-08-16; the sessions tab renders with the
+  same component) with the avatar fold, a Date/Availability sort toggle,
+  and pencil/unpencil per row)
+- Pending Topics (the submitted moderation queue — new topics are created
+  as `submitted`; there is no draft status)
 - activity timeline (week/day grouping, date range, actor/role/type filters)
-- notifications pane (comments on your topics, replies to you, unread badge)
+- notifications pane (comments on your topics, replies to you, @mentions,
+  and session pencilled/confirmed/cleared changes on topics you ❤️'d;
+  unread badge)
 - People page (role-grouped members, bios, admin editing; admins get an
   add-person card plus per-member invite state and a View as → Send invite →
   Edit profile action stack)
 - settings (timetable profile + theme sections, hearts cutoff, invites)
-- user profile (name, avatar, markdown bio, digest preferences)
-- availability calendar (route live; nav link removed pending #55)
+- user profile (name, avatar, markdown bio; digest preferences live on
+  each forum's Notifications page)
+- Calendar (feature-flagged per forum via
+  `settings.calendar.enabled` — nav link and page exist only when on):
+  month-grouped slot rows with a topic lens, per-elector avatar groups
+  (host/admin), elector weekly-pattern grid, admin pattern×terms setup with
+  client-side slot generation, host off-piste proposals, session
+  pencil/confirm controls, per-slot discussion threads open to every member
+  (2026-08-14; claim comments with frozen availability snapshots stay a
+  host/admin gesture, but everyone reads them)
 - Analysis page (`/f/[slug]/analysis`): topics analysis table with ❤️ and 💬
   normalisations, per-table host filters, elector activity table with
   per-row topic folds, admin-only host activity table
+- per-forum API page (`/f/[slug]/api`): the JSON export download, personal
+  API token management, GraphQL endpoint docs, and the Atom/ICS feed URLs
 - `/admin` sysadmin dashboard (SYSADMIN_EMAILS-gated forum overview/delete)
 - `/timetables` resolver → last-engaged timetable's feed, or the create screen
 - social preview (Open Graph) cards for the app, forums, topics, and people
@@ -151,6 +176,7 @@ and the topic status in one place, and `topicCardProps` assembles the shared
 - REST under `/api`
 - health check at `/health`
 - Clerk token verification
+- personal API token verification (GraphQL only) and per-token mutation scopes
 - local user upsert on first API request
 - digest rendering/sending
 - ICS generation
@@ -169,11 +195,15 @@ REST routes currently include:
 | `POST /api/forums/:id/people` | Admin add-person: silently create the Clerk user + local row + membership in one call, no email |
 | `POST /api/memberships/:id/invite` | Admin send (or resend) the invite email via Resend; records `inviteSentAt` |
 | `PATCH /api/memberships/:id/roles` | Change member roles |
+| `PATCH /api/memberships/:id/email` | Admin fixes a never-signed-in member's address (409 once they have signed in) |
 | `DELETE /api/memberships/:id` | Remove a member (the owner can never be removed) |
+| `POST /api/memberships/:id/deactivate` | Deactivate a member (member-deactivation, 2026-09-10): roles suspended, off the People page, live topics unpublished, digests paused; comments and profile kept. Owner and self refused |
+| `POST /api/memberships/:id/reactivate` | Undo deactivation (nothing republished) |
 | `POST /api/jobs/digests` | Cron-protected digest job |
+| `POST /api/forums/:idOrSlug/digest-test` | Admin-only: send the requesting admin a test digest built from sample data |
 | `GET /api/forums/:idOrSlug/calendar.ics` | Calendar feed |
 | `GET /api/forums/:idOrSlug/feed.atom` | Atom feed of the newest published topics (anonymous-only — private forums 404) |
-| `GET /api/forums/:idOrSlug/export` | Read-only JSON export of a forum's public data |
+| `GET /api/forums/:idOrSlug/export` | Read-only, role-filtered JSON export of everything the viewer can read (calendar included when enabled) |
 | `DELETE /api/forums/:id` | Delete a forum (sysadmin dashboard) |
 | `POST /api/uploads` | Signed direct browser uploads to S3-compatible storage |
 | `GET /health` | Health check |
@@ -190,7 +220,7 @@ and the invite email is an explicit second step. `inviteSentAt` on
 
 ## GraphQL Surface
 
-The public surface uses **forum** naming (2026-07-27); the web app's own
+The public surface uses **forum** naming; the web app's own
 queries alias the fields back to internal `timetable` names
 (`timetable: forum(idOrSlug: $s)`), so TypeScript identifiers stay unchanged.
 
@@ -203,50 +233,90 @@ Main queries include:
 - `forumMembers`
 - `forumPeople` / `person` (People page and person pages, with published
   topics per person)
-- `topicFeed` (sort + seed + host + hearted-by-me filters, offset paging)
+- `topicFeed` (sort + seed + search `q` + host / hearted-by /
+  hearted-by-me / host-hearted-by-me filters, offset paging)
 - `topicPermalink`
 - `hostDashboard`
-- `moderationQueue` (submitted topics; the draft topic status was removed)
+- `moderationQueue` (submitted topics)
+- `lounge` / `loungeUnread` (the {host} Lounge: a bump-ordered page with a
+  keyset cursor, plus the nav dot — null / false for anyone who can't
+  enter; mutations `startLoungeConversation`, `replyInLounge`,
+  `editLoungePost`, `deleteLoungePost`, `hideLoungePost`,
+  `pinLoungeConversation`, `setLoungeReaction`, `markLoungeSeen`)
 - `activityTimeline` (actor, date-range args)
 - `notifications` / `notificationsUnread`
 - `myFeedLastSeenAt`
 - `forumHosts`
-- `calendar`
+- `calendar` (audience lens + `includePast`; per-elector rows host/admin-only)
 - `slotComments`
+- `topicSlotFit` (topic-workbench: one topic's hearters vs future slots)
+- `topicSessions` (sessions tab: a topic's future sessions for any viewer
+  of a readable forum, anonymous included; hosts/admins also get the
+  availability wash — counts and per-elector rows charted on this topic's
+  hearters — while everyone else gets only their own 🟢🟡🔴)
+- `myAvailabilityPattern`
 - `dashboard`
 - `myIcsToken`
-- `timetableRouteByDomain`
+- `forumRouteByDomain`
 - `forumByDomain`
 
 The `dashboard` query accepts optional host and elector-activity filters for
 host/admin planning views.
 
 `Member` exposes `inviteSentAt` so the People page can show per-member invite
-state.
+state, and `deactivatedAt` (as does `Person`) so admins see deactivated
+members apart; non-admin viewers never receive a deactivated person from
+`forumPeople` or `person`.
 
 Main mutations cover:
 
 - topic creation (hosts and admins; `createTopic` takes an admin-only
   `hostId` to create on behalf of another host, logged as `topic.reassign`),
-  editing, submission, moderation, unpublishing, and owner reassignment
-  (`reassignTopic`)
-- heart toggling and the timetable hearts cutoff (`setHeartsCountFrom`)
-- public and host-only comments
+  editing, submission, the host's "Ready to publish" signal
+  (`setTopicReady`, 2026-08-06), moderation, unpublishing, and owner
+  reassignment (`reassignTopic`)
+- heart toggling and the timetable hearts cutoff (`setHeartsCountFrom`);
+  host 💙 toggling (`hostHeartTopic`, host-non-electors only — tallies and
+  the per-topic host breakdown are admin-only, attribution rides the
+  host-only thread)
+- public and host-only comments (the host-only thread is a forum option,
+  `settings.hostComments.enabled`, default on)
 - comment hiding
 - profile and notification settings; admin member-bio editing
   (`updateMemberBio`)
 - timetable profile and settings, including validated theme JSON
-- feed and notification watermarks (`markFeedSeen`, `markNotificationsSeen`)
-- slot creation, weekly repeat creation, editing, deletion
-- availability and weekday availability
-- slot comments
-- slot topic tagging
+- seen watermarks: feed and notifications (`markFeedSeen`,
+  `markNotificationsSeen`), per-topic comments-seen on engagement
+  (`markCommentsSeen`), and digest click-to-read (`markDigestRead`)
+- slot bulk creation (`createTimeslots`, idempotent pattern×terms
+  generation and one-off dates; returns `{created, augmented}` — augmented
+  counts existing slots that gained locations), host off-piste proposals
+  (`proposeSlot`), editing (incl. `locationsJson`), deletion
+- per-slot availability (`setAvailability`) and the weekly template
+  (`setMyAvailabilityPattern`); effective state resolves explicit → pattern
+  cell (via the slot's `cellKey`) → yellow
+- slot comments, optionally as session claims (`topicId` + a
+  server-computed, frozen 🟢🟡🔴 snapshot of that topic's hearters), with
+  author edit/delete and admin hide (`updateSlotComment`,
+  `deleteSlotComment`, `hideSlotComment`)
+- the session lifecycle (`addSlotSession`: a topic, an office-hours
+  `sessionHostId`, or an admin-only custom `title` — always location-less;
+  `updateSlotSession` for confirm/URL/location — the room is assigned at
+  confirm time, and confirmed sessions are exclusive per (slot, location);
+  `clearSlotSession`), gated by the forum's confirm policy and the
+  never-displace rule per booking (`canTouchSlotSession` against
+  `session_host_id`; custom sessions gate on the admin bit). Any number of
+  pencils can share a slot; only confirmed rooms contend. Calendar actions
+  are activity-logged and session events notify the topic's hearters
+- topic publishing by the owning host when
+  `settings.topics.hostsPublishDirectly` is on (same `moderateTopic`
+  mutation; admin review becomes post-hoc)
 
 Hearts, comments, invites, and first sign-ins are logged as activity events
 alongside moderation and lifecycle actions.
 
-The web proxy uses `timetableRouteByDomain` to rewrite custom-domain requests
-onto the existing `/f/[slug]` route tree.
+The web proxy queries `forumRouteByDomain` (aliased `timetableRouteByDomain`)
+to rewrite custom-domain requests onto the existing `/f/[slug]` route tree.
 
 ## Auth Flow
 
@@ -264,32 +334,121 @@ There are no Auth.js tables and no Clerk webhook is required for normal
 operation. A future `user.deleted` webhook could be added if hard deletion of
 local rows is required.
 
+### Personal API tokens (2026-08-13)
+
+A second credential, for scripts and external clients that can't hold a
+60-second Clerk session token. `buildContext` resolves either one:
+
+1. A `Bearer tpk_…` value is looked up by its SHA-256 in `api_token` (only the
+   hash is stored) and resolves to its owner plus the token's scopes; anything
+   else goes to the Clerk path above.
+2. `apps/api/src/graphql/token-scopes.ts` gates mutations by those scopes in one
+   `onExecute` plugin, **default-deny**: a mutation it doesn't map is
+   unreachable by any token, which is what keeps moderation, forum settings,
+   member management, and token administration session-only regardless of the
+   owner's roles. The resolvers' own role checks still run on top.
+3. Scope enforcement is GraphQL-only, so **REST must not accept these tokens**:
+   `buildContext` takes `allowApiToken` and only the Yoga context passes true.
+   See the flag's own docs — this is enforced by construction, not convention.
+
+Tokens are account-wide and carry no impersonation (`x-view-as` is ignored).
+Rate limiting is two-layer (2026-08-14 hardening): the pre-auth middleware
+buckets strictly by client IP — bucketing by the presented token would let
+unvalidated `tpk_` strings mint a fresh bucket per request — and a token is
+charged its own request budget only after its hash lookup succeeds
+(`auth/api-token.ts`), plus per-token write budgets — hourly burst and daily
+volume caps per action class (`TOKEN_WRITE_LIMITS` in
+`graphql/token-scopes.ts`). Minting is capped
+(10/hour, 25 active per user) and an omitted expiry defaults to 90 days
+server-side; "never expires" needs an explicit null.
+
 ## Data Model
 
 Core tables:
 
 - `user`
 - `timetables`
+- `timetable_slug_history` (editable slugs, 2026-08-10: every slug a forum
+  has ever had, globally reserved so old links can never be hijacked;
+  resolves via the `getReadableTimetable` fallback and 308-redirects via
+  the web proxy; a forum reclaiming its own old slug deletes the row)
 - `timetable_memberships`
 - `timetable_invites`
 - `topics`
 - `hearts`
+- `host_hearts` (host 💙s: the host-non-elector parallel gesture, mirrored
+  from `hearts` in its own table so elector weighting never sees it;
+  ignores `heartsCountFrom`)
+- `heart_events` (append-only ❤️/💙 add/remove ledger — never updated or
+  deleted by the app, unaffected by the cutoff; lets voting history be
+  reconstructed across un-hearts and cutoff resets. Written by both
+  toggles, read only by the admin data export)
 - `comments`
+- `comment_mentions` (@mention rows, written only for members allowed to
+  see the thread)
+- `topic_seen` (per-user queue-exposure record: queue Next or hearting;
+  suppresses new-topic digest cards)
+- `comment_seen` (per-user-per-topic comments-seen watermark, 2026-08-13:
+  bumped only on engagement — teaser expand, permalink visit, digest
+  click — drives the teaser's "new" previews and comment digest
+  suppression)
+- `digest_sends` (one row per digest email sent: which topics' cards
+  showed comment threads; every link in that email carries `dg=<id>`, so
+  any click marks the digest read. Doubles as a send log)
 - `activity_events`
-- `timeslots`
-- `availability`
-- `slot_comments`
-- `slot_topics`
+- `timeslots` (bookings model, 2026-08-06: a pure TIME WINDOW, unique per
+  forum+start+end; `created_by_id`, `cell_key` — the pattern-cell
+  provenance for inference. Availability and discussion attach here
+  because both are about the time. `locations` (2026-08-11): the set of
+  locations offered at this time, chosen at creation — same-time creation
+  AGGREGATES locations into the existing slot (`planSlotCreation` in
+  shared), and the calendar's location filter matches this set; empty =
+  legacy/location-free forum)
+- `slot_sessions` (bookings, zero-to-many per slot; pencils are
+  location-less time-intents since 2026-08-14 — unique per slot+topic,
+  plus one office-hours pencil per slot+host; `location` is assigned at
+  confirm time, and a partial unique index makes confirmed sessions
+  exclusive per slot+non-empty location. A singular `topic_id` OR
+  `session_host_id` (THE ownership column:
+  the topic's host, or the host themselves for topic-less "office hours")
+  OR an admin-only `custom_title`; `status` `proposed`/`confirmed` + `url`
+  — an empty slot simply has no rows)
+- `availability` (explicit per-slot answers — location-independent)
+- `availability_patterns` (one row per forum+user; jsonb cell → state map)
+- `slot_comments` (+ optional claim: `topic_id` and frozen
+  green/yellow/red counts; + `edited_at`/`hidden_at`/`hidden_by_user_id`
+  for author edits and admin moderation)
 - `api_rate_limit_buckets`
+- `lounge_comments` / `lounge_mentions` / `lounge_reactions` (the {host}
+  Lounge, 2026-09-30, migration 0044: one hosts-and-admins-only threaded
+  room per forum, in its OWN tables so no reader of topic comments can
+  see it — private by construction. A conversation is a root row
+  (Markdown body) whose `last_activity_at` every reply bumps; replies
+  carry `root_id`. Reactions are one row per post+person+emoji. Read
+  mark: `timetable_memberships.lounge_seen_at`; digest click-to-read:
+  `digest_sends.lounge_shown_until` — up to the newest post the card showed)
 
 Notable columns: `timetables.settings` is a JSON blob holding role labels,
-theme (colours, fonts, dark palette), icon/cover URLs, and digest defaults;
+theme (colours, fonts, dark palette), icon/cover URLs, digest defaults, the
+calendar group (enabled flag, confirm policy, locations, pattern cells,
+terms), the topics policy (`hostsPublishDirectly`), and the host-comments
+option (`hostComments.enabled`, default on — hides the host-only thread and
+💙 attribution when off), and the {host} Lounge switch (`lounge.enabled`,
+default OFF);
 `timetables.heartsCountFrom` is the heart-count cutoff; `topics.slug` +
 `timetable_memberships.slug` power permalinks (member profiles are
 per-forum); `topics.contentUpdatedAt` tracks content edits
-for "newest" sorting; memberships carry `lastSeenFeedAt` and
-`lastSeenNotificationsAt` watermarks plus `inviteSentAt` (null = added by an
-admin but never invited).
+for "newest" sorting; `topics.readyAt` is the host's "Ready to publish"
+signal on a submitted topic (null = still drafting; the Pending page and
+sidebar badge filter on it, unpublishing clears it); memberships carry
+`lastSeenFeedAt` and
+`lastSeenNotificationsAt` watermarks, `inviteSentAt` (null = added by an
+admin but never invited), the per-forum `digestSettings` JSON +
+`lastDigestAt` send watermark (2026-08-11, falling back to the user-level
+equivalents), and `queueRoundStartedAt`. A membership with `inviteSentAt`
+null AND both seen-watermarks null is a pre-created account whose owner
+doesn't know the forum exists — the digest builder skips those forums
+entirely.
 
 The settings JSON shapes (`TimetableSettings`, `ThemeSettings`, role labels,
 notification defaults) live in `packages/shared/src/settings.ts` as the single
@@ -306,19 +465,17 @@ workflow builds the web Docker image, pushes it to the DigitalOcean container
 registry (`timetable-reg`), and deploys from `.do/app.dev.yaml`. After each
 deploy it prunes the registry to the newest 5 `web` tags and starts a garbage
 collection (the 500 MiB Starter registry otherwise fills in weeks).
-Production deploys are manual-only. Per-PR review apps were removed
-(2026-07-22) — dev is where QA happens. Details in `docs/DEPLOYMENT.md`.
+Production (topic.forum, with timetable.love as an alias) deploys manually
+only. There are no per-PR review apps — dev is where QA happens. Details in
+`docs/DEPLOYMENT.md`.
 
 ## Assets
 
-Static README images live in `docs/assets/readme`.
-
-Web assets live in `apps/web/public/assets`. Next.js serves them from the site
-root. Since the rebrand the logo is the 📚 emoji rendered inline (topbar
-brand and landing page) and the favicon is an emoji data URI (`lib/favicon.ts`
-— forums can override it with their own icon emoji); the old
-`timetable.love-logo-transparent.png` asset is unreferenced and slated for
-deletion at the domain cutover.
+Static README images live in `docs/assets/readme`. The app has no image
+assets of its own: the logo is the 📚 emoji rendered inline (topbar brand
+and landing page) and the favicon is an emoji data URI (`lib/favicon.ts` —
+forums can override it with their own icon emoji). `apps/web/public/` is
+kept (empty) so Next.js serves any future static files from the site root.
 
 ## Architecture Risks
 
@@ -333,8 +490,12 @@ deletion at the domain cutover.
   sign-ins, and settings changes; new user actions should keep logging.
 - Weighted feed and dashboard queries may need batching/materialization at
   scale; the 2026-07-22 simplify audit measured on the order of 120 DB queries
-  to render the feed page for an admin (lazy breakdown loading, batched
-  comments, and per-request memoisation are queued fixes).
+  to render the feed page for an admin. Lazy breakdown loading, batched
+  comment trees, and per-request memoisation have all since shipped.
 - Feed sorting (including seeded random) happens in the service layer after
-  loading the timetable's published topics; fine at current sizes, revisit for
-  very large timetables.
+  loading the timetable's published topics — and so do the `q` substring
+  search, filtering, and `limit`/`offset` paging, because the weighted
+  scores need global denominators. Pagination therefore gives no
+  database-side relief and search cost grows linearly with forum size;
+  fine at current sizes, revisit for very large timetables (audit
+  2026-08-17).

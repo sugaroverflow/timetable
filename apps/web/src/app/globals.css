@@ -45,7 +45,6 @@ h3 {
 :focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
-  border-radius: var(--radius-xs);
 }
 
 /* Lucide icons inline with text sit ON the baseline by default and look
@@ -122,10 +121,6 @@ html[data-theme="dark"] .mode-light-only {
   cursor: pointer;
   line-height: 0;
   border-radius: 50%;
-}
-.account-trigger:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
 }
 .account-menu {
   min-width: 200px;
@@ -236,8 +231,6 @@ html[data-theme="dark"] .mode-light-only {
   box-shadow: var(--shadow);
 }
 
-/* Single-column everywhere (QA #42): .grid-2 keeps its name but no longer
-   splits into columns at any width. */
 .grid {
   display: grid;
   gap: 14px;
@@ -328,6 +321,11 @@ textarea {
 }
 .error-text {
   color: var(--red);
+}
+/* Default size for bare error text; zero-specificity so elements with
+   their own type scale (.btn) keep it when they adopt the class. */
+:where(.error-text) {
+  font-size: var(--text-sm);
 }
 
 /* Badges / role pills */
@@ -422,25 +420,44 @@ textarea {
 .topic-body-collapsed > *:not(:first-child) {
   display: none;
 }
+/* The last couple of lines fade out while collapsed (Ed, 2026-08-21): a
+   soft edge reads as "there is more below" before you notice the pill,
+   where a hard cut can look like the end of the text. A mask, not a
+   colour overlay — it only touches alpha, so it works over any card
+   background in both themes. Applied only once hydration has confirmed
+   something IS hidden, so a short body never flashes faded. */
+.topic-body-fade {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    black calc(100% - 2.5em),
+    transparent
+  );
+  mask-image: linear-gradient(to bottom, black calc(100% - 2.5em), transparent);
+}
 /* Show more/less: a small pill in the accent colour — easy to miss as
    bare muted text, and readers skipped past without realising text was
    hidden (QA 2026-07-29). Pulled up against the stack gap so it hugs the
    body it truncates rather than floating between body and divider. */
-.topic-body-toggle {
+.topic-body-toggle,
+.teaser-toggle {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   align-self: flex-start;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--wash);
   padding: 3px 11px;
   font-size: var(--text-xs);
   font-weight: var(--fw-semibold);
   color: var(--primary);
+  cursor: pointer;
+}
+.topic-body-toggle {
   margin-top: -8px;
 }
-.topic-body-toggle:hover {
+.topic-body-toggle:hover,
+.teaser-toggle:hover {
   background: var(--primary-soft);
   border-color: var(--primary);
 }
@@ -637,7 +654,7 @@ textarea {
   font-size: 20px;
   line-height: 1;
   background: var(--card);
-  border: 1px solid var(--border);
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
   cursor: pointer;
 }
@@ -649,38 +666,59 @@ textarea {
   box-shadow: 0 0 0 2px var(--primary-soft);
 }
 
-/* People card: name links to the host's filtered feed */
-.person-name-link {
-  color: inherit;
-  text-decoration: none;
-}
-.person-name-link:hover strong {
-  text-decoration: underline;
-}
-
-/* People page: jump-to-section table of contents */
+/* people-toc (QA 2026-08-16, layout per Ed): a real table of contents —
+   every person, grouped by role, in the order the page lists them. Role
+   headings stack down the page, each with its people flowing across and
+   wrapping underneath it (NOT a column per role). */
 .people-toc {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: var(--space-2);
 }
-.people-toc-link {
+.people-toc-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.people-toc-heading {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  padding: 4px 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
+  align-self: flex-start;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: var(--text-xs);
+  font-weight: var(--fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.people-toc-heading:hover {
+  color: var(--ink);
+}
+.people-toc-people {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px 4px;
+  /* Indented under its heading, like entries under a label. */
+  padding-left: var(--space-2);
+}
+.people-toc-person {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 7px;
+  border-radius: var(--radius-sm);
   color: inherit;
   text-decoration: none;
   font-size: var(--text-sm);
-  font-weight: var(--fw-semibold);
+  /* Each entry stays on one line; the row wraps between people. */
+  white-space: nowrap;
 }
-.people-toc-link:hover {
-  border-color: var(--line-strong);
+.people-toc-person:hover {
   background: var(--wash);
 }
-.people-section {
+.people-section,
+.people-card {
   scroll-margin-top: 80px;
 }
 
@@ -813,22 +851,6 @@ textarea {
   text-decoration: underline;
 }
 
-/* "View N replies" / "View all N comments" disclosure */
-.thread-toggle {
-  border: none;
-  background: none;
-  padding: 4px 0;
-  font-size: var(--text-xs);
-  font-weight: var(--fw-semibold);
-  color: var(--muted);
-  cursor: pointer;
-  text-align: left;
-}
-.thread-toggle:hover {
-  color: var(--ink);
-  text-decoration: underline;
-}
-
 .muted {
   color: var(--muted);
 }
@@ -865,8 +887,37 @@ textarea {
   text-decoration: none;
 }
 .nav a.on {
-  background: var(--primary-soft);
+  /* Deepened with a dash of the accent so the selection reads against
+     the page bg — bare --primary-soft was light-blue-on-light-grey in
+     light mode (QA 2026-08-10). */
+  background: color-mix(in srgb, var(--primary) 10%, var(--primary-soft));
   color: var(--primary);
+}
+
+/* Short viewports (QA 2026-08-03): the rail's content is ~716px, so on
+   screens under ~815px it grew a scrollbar. Compress instead — the nav
+   buttons give up vertical padding first, then type and gaps tighten.
+   overflow-y stays as the last-resort fallback below ~620px. */
+@media (max-height: 820px) {
+  .side-nav a {
+    padding: 4px 12px;
+  }
+}
+@media (max-height: 720px) {
+  .sidebar {
+    gap: 10px;
+  }
+  .side-nav {
+    gap: 2px;
+  }
+  .side-nav a {
+    padding: 3px 12px;
+    font-size: var(--text-sm);
+  }
+  .sidebar-foot {
+    padding-top: 8px;
+    gap: 6px;
+  }
 }
 
 .stack {
@@ -931,6 +982,12 @@ textarea {
   border-radius: var(--radius-sm);
   background: var(--card);
 }
+/* The TipTap content area sets outline: none; the wrapper carries the
+   keyboard focus ring instead. */
+.rte:focus-within {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
 .rte-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -958,7 +1015,20 @@ textarea {
   padding: 10px 12px;
   min-height: inherit;
   outline: none;
-  font-size: var(--text-base);
+  /* Match the published rich-text typography so editing is genuinely
+     WYSIWYG for wrapping and vertical rhythm. */
+  font-size: var(--text-md);
+  line-height: var(--lh-relaxed);
+}
+/* Profile bios on the People page render as a nested list, whose first level
+   uses hollow markers. Match that appearance in the editor, and remove the
+   paragraph margins TipTap adds inside each list item so its rhythm matches
+   the compact Markdown output. */
+.rte-content .tiptap > ul {
+  list-style-type: circle;
+}
+.rte-content .tiptap li > p {
+  margin-block: 0;
 }
 .rte-content .tiptap p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
@@ -983,6 +1053,14 @@ textarea {
   padding-top: 12px;
 }
 
+/* A deactivated member's card (member-deactivation, 2026-09-10 — admin
+   viewers only): dimmed as a whole so the "Deactivated" section reads as
+   a shelf, not a roster; the actions row stays full-strength so
+   Reactivate is obviously live. */
+.people-card-deactivated > :not(.people-card-actions) {
+  opacity: 0.6;
+}
+
 .person-topics ul {
   margin: 6px 0 0;
   padding-left: 18px;
@@ -990,6 +1068,28 @@ textarea {
 }
 .person-topics li {
   margin: 2px 0;
+}
+/* page-topic-toc (Ed, 2026-08-17): the same list, bare on the page
+   background under the My Topics / ❤️ Topics page titles. The negative
+   margin tucks it toward its title — a TOC belongs to the heading, not
+   the content flow's 14px rhythm. */
+.page-topic-toc {
+  margin-top: -6px;
+}
+.page-topic-toc ul {
+  margin-top: 0;
+}
+/* Jump-link landing spot for the anchored topic cards, clear of the
+   sticky topbar (same idea as the People page's #people-* anchors). */
+.list > .card[id^="topic-"] {
+  scroll-margin-top: calc(var(--topbar-h, 55px) + 14px);
+}
+/* Jump slack (Ed, 2026-08-17): a page can't scroll past its own end, so
+   without spare room below the list the LAST card's anchor jump stops
+   short of putting its heading at the top. Sized so a shortest-realistic
+   (~160px) final card still makes it; taller ones just leave less blank. */
+.toc-jump-slack {
+  height: calc(100vh - var(--topbar-h, 55px) - 174px);
 }
 
 /* Topic card — tier 3 of the heading hierarchy: below page titles and
@@ -1046,30 +1146,158 @@ textarea {
   padding: 6px 9px;
 }
 
-/* Feed variant: a sticky header pinned under the topbar, flush on the page
-   background — no card surface, border, or radius — with compact controls. */
+/* Feed variant: a sticky frosted-glass pill floating over the cards
+   (QA 2026-08-10 — the old opaque full-width bar read as "background",
+   so scrolling cards seemed to slide under nothing). Translucent surface
+   + backdrop blur means cards visibly pass BEHIND glass, and the gap
+   under the topbar keeps them visible around the pill. */
 .feed-toolbar {
   position: sticky;
-  top: var(--topbar-h);
+  top: calc(var(--topbar-h) + 8px);
   z-index: calc(var(--z-sticky) - 1); /* under the topbar and dropdowns */
-  background: var(--bg);
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-  /* Cards' box-shadow (8px blur) bleeds past their edges — widen the
-     pinned bar's opaque background so scrolled-under card shadows can't
-     peek out its sides (QA 2026-07-29). The .container's 20px side
-     padding absorbs the overhang at every viewport. */
-  margin-inline: -14px;
-  padding: 8px 14px;
-  /* Pull the list up: with the .stack gap (14px) this nets 14px between
-     the controls and the first card — the same rhythm as card-to-card
-     (QA 2026-07-28: "the feed needs to be higher"). */
-  margin-bottom: -8px;
+  /* --glass (tokens.css): lighter than the page in light mode, darker
+     than the cards in dark mode — its own material either way, with a
+     soft accent glow lifting it off the page (QA 2026-08-10). */
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  backdrop-filter: blur(14px) saturate(160%);
+  border: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+  /* Half the bar's one-line height — identical to a true pill on one
+     line, but a wrapped (two-line) bar keeps these same corners instead
+     of ballooning into a stadium (QA 2026-08-10 round 3). */
+  border-radius: 19px;
+  box-shadow:
+    var(--shadow),
+    0 6px 24px -4px color-mix(in srgb, var(--primary) 16%, transparent);
+  padding: 6px 14px;
+  margin-bottom: 0;
+}
+/* Desktop: the bar floats 15px in from the feed's edges (QA 2026-08-10),
+   underlining that cards slide under it rather than butting against it. */
+@media (min-width: 640px) {
+  .feed-toolbar {
+    margin-inline: 15px;
+  }
+}
+/* No blur support → the glass would be unreadably see-through; fall back
+   to a solid fill in the same spirit. */
+@supports not (backdrop-filter: blur(1px)) {
+  .feed-toolbar {
+    background: color-mix(in srgb, var(--primary) 5%, var(--card));
+  }
 }
 .feed-toolbar select {
   font-size: var(--text-xs);
   padding: 5px 8px;
+}
+
+/* Search box inside the glass pill: icon-led input in its own always-washed
+   inner pill (QA 2026-08-10 round 3 — the wash reads as "a search field"
+   at rest, not only on focus). Sits left; everything after it right-aligns
+   across the full-width bar. */
+.feed-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+}
+/* Desktop rhythm (QA 2026-08-10): the search field GROWS into the bar's
+   middle (toolbar pattern — the field is the bar's main affordance) and
+   the filters keep to the right; the void between them stays bounded by
+   the search cap. */
+.feed-toolbar > .feed-search {
+  margin-right: auto;
+  flex: 1 1 auto;
+  max-width: 420px;
+  min-width: 150px;
+}
+.feed-toolbar > .feed-search input {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+}
+.feed-search input {
+  /* One width focused and blurred — the pill jumping around on focus read
+     badly (search QA 2026-08-10). */
+  width: 140px;
+  border: 0;
+  background: transparent;
+  outline: none;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  padding: 2px 0;
+}
+.feed-search input::placeholder {
+  color: var(--muted);
+}
+/* The inner input sets outline: none; the pill carries the keyboard focus
+   ring instead. */
+.feed-search:focus-within {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Search-match highlight (CSS Custom Highlight API — ranges are marked
+   without touching the DOM, so the markdown-rendered bodies stay inert).
+   Browsers without support simply skip it. */
+::highlight(topic-search) {
+  background: var(--primary-soft);
+}
+
+/* Wrapped (multi-control) bars breathe: wider gaps between control
+   clusters, tighter between wrapped lines (Activity log, QA 2026-08-10). */
+.feed-toolbar.wrap {
+  column-gap: 16px;
+  row-gap: 6px;
+}
+
+/* "Live" marker in the activity log's pill (issue #58) — anchored to the
+   bar's right end, away from the filter cluster. */
+.live-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--text-xs);
+  font-weight: var(--fw-semibold);
+  color: var(--muted);
+  margin-left: auto;
+}
+.live-dot-pulse {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: live-pulse 2s ease-in-out infinite;
+}
+@keyframes live-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* Native select popups: Windows/Linux Chrome render styleable popups whose
+   labels inherit the select's ink while the popup bg stays light — in dark
+   mode the "By ❤️" optgroup label went light-on-light (QA 2026-08-10).
+   Pin both explicitly; macOS uses system popups and ignores this (they
+   already follow color-scheme). */
+option,
+optgroup {
+  color: var(--ink);
+  background: var(--card);
+}
+
+/* Toolbar dropdowns never wear the focus ring (QA 2026-08-10): Chrome
+   marks a clicked select :focus-visible, so the global ring appeared on
+   every click — the open dropdown is feedback enough. That same Chrome
+   behaviour means CSS can't restore a keyboard-only ring here without
+   bringing the click ring back; the a11y trade stays a known open item
+   (audit 2026-08-17). */
+.select-minimal select:focus-visible,
+.feed-toolbar select:focus-visible {
+  outline: none;
 }
 
 /* Minimalist select (All Topics toolbar): no box, no native arrow — a
@@ -1079,6 +1307,12 @@ textarea {
   align-items: center;
   gap: 2px;
   color: var(--ink);
+  /* A native select sizes to its LONGEST option — topic-lens options carry
+     whole topic titles, which pushed the page into sideways scroll on
+     phones. Cap at the toolbar line and ellipsize the value instead
+     (mobile pass 2026-08-03). */
+  min-width: 0;
+  max-width: 100%;
 }
 .select-minimal svg {
   flex: none;
@@ -1091,6 +1325,8 @@ textarea {
   border: none;
   background: transparent;
   width: auto;
+  min-width: 0;
+  text-overflow: ellipsis;
   padding: 4px 2px;
   font-weight: var(--fw-semibold);
   cursor: pointer;
@@ -1195,26 +1431,38 @@ textarea {
   font-size: var(--text-md);
 }
 
-/* Comments */
+/* Comments.
+ * Card spacing spec (2026-08-05): the card's .stack gap (14px) is the ONLY
+ * space between sections — sections carry no vertical margins; a divided
+ * section puts 8px between its border and its content; sub-thread boxes
+ * (.thread-stack) run a 10px internal gap. */
 .comments {
   border-top: 1px solid var(--line);
-  margin-top: 14px;
-  padding-top: 12px;
+  padding-top: 8px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-}
-/* Directly under the action bar, the row-to-divider space was 8px padding
-   + 14px stack gap + the 14px margin above = 36px of dead air (QA
-   2026-07-29). Pull the divider up so the row sits 14px from it — the
-   same rhythm as the body-to-divider space above the bar. */
-.card-actions + .comments {
-  margin-top: -8px;
 }
 .comment {
   display: flex;
   align-items: flex-start;
   gap: 10px;
+  /* Deep links (#comment-<id> from the activity log, notifications,
+     digests) land clear of the sticky topbar. */
+  scroll-margin-top: calc(var(--topbar-h, 55px) + 14px);
+}
+/* The addressed comment wears a quiet ring so the eye finds it after the
+   jump (log overhaul, 2026-08-17). Direct-child path — a descendant
+   selector would ring every reply bubble under it too. */
+.comment:target > .comment-main > .c-bubble {
+  box-shadow: 0 0 0 2px var(--primary-soft);
+}
+/* Same treatment for the calendar's #slot-<id> anchors. */
+.cal-row {
+  scroll-margin-top: calc(var(--topbar-h, 55px) + 14px);
+}
+.cal-row:target {
+  box-shadow: 0 0 0 2px var(--primary-soft);
 }
 /* Centre the avatar on the username line: with the bubble flush at the
    row top (block display), the name's tight line box spans 8→25px, so
@@ -1222,6 +1470,11 @@ textarea {
    (QA 2026-07-29). */
 .comment > .avatar {
   margin-top: 3px;
+}
+/* Composer rows (viewer avatar + form, QA 2026-08-10): centre the 26px
+   avatar on the one-line 40px textarea instead of a username line. */
+.comment-composer > .avatar {
+  margin-top: 7px;
 }
 .comment-main {
   flex: 1;
@@ -1238,20 +1491,90 @@ textarea {
   color: var(--muted);
   font-weight: var(--fw-semibold);
   font-size: var(--text-xs);
-  padding: 0;
+  /* ≥24px tap target without moving the layout: padding grows the hit
+     area, the negative margin gives the space back (audit 2026-08-17).
+     Horizontal stays inside the row's 12px gap. */
+  padding: 5px 4px;
+  margin: -5px -4px;
 }
+/* Dialogue-first threading (2026-08-13): the open discussion section
+   (permalink page) — top-composer above the thread. The section carries
+   the divider, so the inner .comments gives its border up. */
+.comment-section {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.comment-section .comments {
+  border-top: 0;
+  padding-top: 0;
+}
+/* Same ❤️-pill air rule as .card-actions + .comments (QA 2026-08-10). */
+.card-actions + .comment-section {
+  margin-top: -13px;
+}
+/* chain-tail-composer: quieter than the section composer — a slimmer box
+   reading as "continue", not "start". */
+.tail-composer textarea {
+  height: 34px;
+  min-height: 34px;
+  font-size: var(--text-sm);
+}
+.tail-composer .btn-send {
+  transform: scale(0.85);
+}
+/* comment-teaser: new top-level comment previews + the "💬 n comments"
+   toggle (styled with the topic-body Show-more pill above). Previews are
+   buttons — clicking one opens the tree, same as the pill. */
+.comment-teaser {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  /* A little air under the composer (10px section gap + 4 = the card's
+     14px rhythm), and the previews + pill indented to the comment text
+     column — 26px .avatar-sm + 10px .comment gap (Ed, QA 2026-08-16). */
+  margin-top: 4px;
+  padding-left: 36px;
+}
+.teaser-snippet {
+  border: none;
+  background: none;
+  /* Same padding/negative-margin tap-target trick as .comment-actions —
+     these one-line previews are primary navigation into a thread. */
+  padding: 5px 0;
+  margin: -5px 0;
+  cursor: pointer;
+  max-width: 100%;
+  text-align: left;
+  font-size: var(--text-xs);
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.teaser-snippet:hover {
+  color: var(--ink);
+}
+.teaser-snippet strong {
+  color: var(--ink);
+}
+
 .replies {
   margin-top: 10px;
-  padding-left: 14px;
+  /* Threads now nest to 8 fetched levels (was 3) — a shallow 6px step
+     (8px with the rule) keeps deep dialogues on-screen on mobile. */
+  padding-left: 6px;
   border-left: 2px solid var(--line);
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-/* Host-only panel */
+/* Host-only panel (no own margin — card spacing spec, 2026-08-05) */
 .host-panel {
-  margin-top: 14px;
   background: var(--host-wash);
   border: 1px solid var(--host-line);
   border-radius: var(--radius-sm);
@@ -1273,6 +1596,12 @@ textarea {
   display: flex;
   gap: 8px;
   align-items: flex-end;
+}
+/* Reply/edit forms nested inside a comment row (never section-level —
+ * those are spaced by their stack context; card spacing spec 2026-08-05,
+ * replacing per-site inline margins of 4/6px). */
+.inline-form-nested {
+  margin-top: 4px;
 }
 .inline-form textarea {
   height: 40px;
@@ -1302,9 +1631,9 @@ textarea {
   max-height: 220px;
   overflow-y: auto;
   background: var(--card);
-  border: 1px solid var(--border);
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-pop, 0 8px 24px rgba(0, 0, 0, 0.16));
+  box-shadow: var(--shadow-pop);
 }
 .mention-option {
   display: flex;
@@ -1356,15 +1685,23 @@ textarea {
   border-radius: var(--radius-pill);
   font-size: var(--text-xs);
   font-weight: var(--fw-semibold);
+  /* A wrapping card title must not squeeze the pill's own text onto two
+     lines (Pending queue, QA 2026-08-10). */
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .status-submitted {
   background: var(--warning-soft);
   color: var(--warning-ink);
 }
+/* Pending-queue readiness (2026-08-06): host-declared signal, not a
+   status — ready reads as "go", drafting stays muted. */
+.status-ready,
 .status-published {
   background: var(--green-soft);
   color: var(--green-ink);
 }
+.status-drafting,
 .status-unpublished,
 .status-archived {
   background: var(--status-neutral-bg);
@@ -1396,51 +1733,427 @@ textarea {
 .avail-btn.red {
   background: var(--red-soft);
 }
-.avail-bar {
-  display: inline-flex;
-  height: 10px;
-  border-radius: var(--radius-pill);
-  overflow: hidden;
-  min-width: 120px;
-  border: 1px solid var(--line);
-}
-.avail-bar > span {
-  display: block;
-  height: 100%;
-}
-.avail-bar .g {
-  background: var(--green);
-}
-.avail-bar .y {
-  background: var(--yellow);
-}
-.avail-bar .r {
-  background: var(--red);
-}
-.dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  display: inline-block;
-}
-.dot.green {
-  background: var(--green);
-}
-.dot.yellow {
-  background: var(--yellow);
-}
-.dot.red {
-  background: var(--red);
-}
-.slot-when {
-  font-family: var(--serif);
-  font-weight: var(--fw-semibold);
-  font-size: var(--text-lg);
-}
 .weekday-grid {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+/* Generic toggle switch (QA 2026-08-03) — the queue ❤️ switch's
+   track/thumb, reusable; primary-coloured when on. */
+.ui-switch-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  color: var(--ink);
+  font-size: var(--text-sm);
+}
+.ui-switch-row:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.ui-switch {
+  position: relative;
+  flex: none;
+  width: 38px;
+  height: 22px;
+  margin-top: 1px;
+  border-radius: var(--radius-pill);
+  background: var(--line-strong);
+  transition: background 0.15s ease;
+}
+.ui-switch.on {
+  background: var(--primary);
+}
+.ui-switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--card);
+  box-shadow: var(--shadow);
+  transition: left 0.15s ease;
+}
+.ui-switch.on .ui-switch-thumb {
+  left: 18px;
+}
+.ui-switch-label {
+  min-width: 0;
+}
+
+/* Forum Settings combined card (QA 2026-08-03). */
+.settings-subtitle {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: var(--fw-semibold);
+}
+.settings-divider {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 2px 0;
+}
+
+/* Calendar v2 — row-wash list (2026-08-05, replaced the table+meter
+   design): the row IS the chart. One rounded block per slot; availability
+   renders as three low-alpha washes across the row's own background, so
+   the eye reads one object per row instead of three (hairline, bar, text
+   baseline). Gaps separate rows; bigger gaps separate weeks. */
+.cal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cal-list .cal-week-start {
+  /* 6px list gap + 6px = the 12px week gap. */
+  margin-top: 6px;
+}
+.cal-row {
+  position: relative;
+  min-height: 52px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+/* The tinted region: content line + (open) avatar row. The discussion
+   fold below sits outside the washes (QA 2026-08-05). Rounds + clips its
+   own corners: when the fold is open the washes end mid-row, where the
+   row's overflow can't round their bottom edge (QA 2026-08-06). */
+.cal-row-head {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.cal-row-expandable {
+  cursor: pointer;
+}
+.cal-row:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+/* Washes composite over the surface (color-mix with transparent, never
+   pale hexes — those break in dark mode). Green runs slightly stronger:
+   it reads weaker than amber/red at equal alpha. Text colour is unchanged
+   over the tints. */
+.cal-row-tint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  pointer-events: none;
+}
+.cal-row-tint > span {
+  display: block;
+  height: 100%;
+}
+.cal-row-tint .g {
+  background: color-mix(in srgb, var(--green) 16%, transparent);
+}
+.cal-row-tint .y {
+  background: color-mix(in srgb, var(--yellow) 13%, transparent);
+}
+.cal-row-tint .r {
+  background: color-mix(in srgb, var(--red) 13%, transparent);
+}
+/* The saturated version exists, but only ever on one row at a time. */
+.cal-row:hover .cal-row-tint .g,
+.cal-row:focus-visible .cal-row-tint .g {
+  background: color-mix(in srgb, var(--green) 22%, transparent);
+}
+.cal-row:hover .cal-row-tint .y,
+.cal-row:focus-visible .cal-row-tint .y {
+  background: color-mix(in srgb, var(--yellow) 19%, transparent);
+}
+.cal-row:hover .cal-row-tint .r,
+.cal-row:focus-visible .cal-row-tint .r {
+  background: color-mix(in srgb, var(--red) 19%, transparent);
+}
+/* Dark surfaces swallow the washes — run them stronger (QA 2026-08-05). */
+html[data-theme="dark"] .cal-row-tint .g {
+  background: color-mix(in srgb, var(--green) 28%, transparent);
+}
+html[data-theme="dark"] .cal-row-tint .y {
+  background: color-mix(in srgb, var(--yellow) 23%, transparent);
+}
+html[data-theme="dark"] .cal-row-tint .r {
+  background: color-mix(in srgb, var(--red) 23%, transparent);
+}
+html[data-theme="dark"] .cal-row:hover .cal-row-tint .g,
+html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .g {
+  background: color-mix(in srgb, var(--green) 36%, transparent);
+}
+html[data-theme="dark"] .cal-row:hover .cal-row-tint .y,
+html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .y {
+  background: color-mix(in srgb, var(--yellow) 30%, transparent);
+}
+html[data-theme="dark"] .cal-row:hover .cal-row-tint .r,
+html[data-theme="dark"] .cal-row:focus-visible .cal-row-tint .r {
+  background: color-mix(in srgb, var(--red) 30%, transparent);
+}
+/* The when-line rides above the tint: datetime, with the comment count /
+   elector toggle right-aligned. Bookings sit BELOW it, one per row (QA
+   2026-08-06 — sharing the line wrapped ugly). One type size, 15px sans;
+   emphasis is weight only: bold date, bold topic title. */
+.cal-row-line {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 8px 14px;
+  font-size: var(--text-md);
+}
+/* With bookings below, the when-line gives up its 52px centring — the
+   line and the booking rows make the row's height together. */
+.cal-row-line:has(+ .cal-row-sessions) {
+  min-height: 0;
+  padding-bottom: 0;
+}
+/* One booking per row, indented from the datetime. */
+.cal-row-sessions {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 14px 9px 32px;
+  font-size: var(--text-md);
+}
+.cal-when {
+  flex: none;
+  white-space: nowrap;
+}
+.cal-where {
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+.cal-row-right {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.cal-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+.cal-person-link {
+  display: inline-flex;
+  /* Fold avatars clamp to 15px on mobile — pad the link's hit area out
+     to ~25px tall. Horizontal stays tight (±2px): neighbouring faces sit
+     ~3px apart and must not steal each other's taps. */
+  position: relative;
+}
+.cal-person-link::after {
+  content: "";
+  position: absolute;
+  inset: -5px -2px;
+}
+/* Collapsible section heading (QA 2026-08-03, generalized from the
+   schedule-setup card): a pressable section title with a chevron. */
+.section-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+.section-toggle .section-title {
+  margin: 0;
+}
+/* The fold-up section's panel content (was a per-site inline margin). */
+.section-body {
+  margin-top: 10px;
+}
+/* Month headings between row groups — muted eyebrows (primary-blue read
+   as links, Ed QA 2026-08-16), with the past toggle riding in the FIRST
+   month break (QA 2026-08-03). Padding lines the text up with the rows'
+   14px inset. */
+.cal-month-row {
+  padding: 8px 14px 1px;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: var(--fw-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.cal-list .cal-month-row:first-child {
+  padding-top: 0;
+}
+.cal-month-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.cal-month-inner .topic-body-toggle {
+  margin-top: 0;
+  text-transform: none;
+  letter-spacing: normal;
+}
+/* The fold inside the tinted block: avatars in their wash segments, then
+   discussion + controls. Clicks inside are the fold's own. Top padding
+   keeps the first comment off the wash's bottom edge (QA 2026-08-06). */
+.cal-row-detail {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 14px 12px;
+  cursor: auto;
+}
+/* Native selects size to their longest option — topic titles in the
+   pencil-in select pushed the row hundreds of px past a phone screen. Cap
+   every fold control at the row's width (mobile pass 2026-08-03). */
+.cal-row-detail select,
+.cal-row-detail input {
+  max-width: 100%;
+  text-overflow: ellipsis;
+}
+/* The pencil-in select reads as an ACTION, not an input — btn-styled so
+   it can't be mistaken for the composer above it — and capped so select +
+   "Pencil in" button share a row; long titles ellipsize into the popup
+   (QA 2026-08-06). */
+/* Slot control rows (QA 2026-08-10): both the pencil-in row and the
+   per-booking URL row align with the COMPOSE BOX ("Talk about this
+   timeslot…"), not the full column — indented past the composer's
+   avatar (26px .avatar-sm + 10px .comment gap). Their flexible element
+   (select / URL input) grows to fill, buttons keep natural width. */
+.cal-controls-row {
+  margin-left: 36px;
+}
+.cal-controls-row > select,
+.cal-controls-row > input {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+.cal-controls-row > input[aria-label="Location"],
+.cal-controls-row > input[aria-label="Event title"],
+.cal-controls-row > input[aria-label="Event link"] {
+  flex: 0 1 160px;
+}
+
+.cal-row-detail .cal-pencil-select {
+  width: auto;
+  max-width: calc(100% - 110px);
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  background: var(--card);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  cursor: pointer;
+}
+.cal-row-detail .host-thread {
+  border-top: 0;
+  margin-top: 0;
+  padding-top: 0;
+}
+/* Who exactly: avatars sit inside their wash segment. Identical flex
+   rules to the tint layer (avatarFitStyle) resolve to identical segment
+   widths, so the washes fit the faces. Edge-to-edge — horizontal padding
+   would break that alignment. */
+.cal-fold-avatars {
+  position: relative;
+  display: flex;
+  padding-bottom: 10px;
+  /* Container so faces can size themselves from the row's real width
+     (--face uses cqw; set inline per row from the audience count). */
+  container-type: inline-size;
+}
+.cal-fold-avatars .cal-fold-seg {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-evenly;
+  min-height: 24px;
+}
+/* Bigger faces when there's space, within reason (QA 2026-08-05):
+   --face = clamp(15px, per-head share of the row, 32px). Browsers
+   without cqw fall back to the avatar-sm base size. */
+.cal-fold-avatars .avatar {
+  width: var(--face, 17px);
+  height: var(--face, 17px);
+  font-size: calc(var(--face, 17px) * 0.41);
+  flex: none;
+  box-shadow: 0 0 0 1px var(--card);
+}
+.cal-fold-avatars .cal-person-link {
+  flex: none;
+}
+/* Emoji-only availability segments for table cells. */
+.avseg-compact button {
+  padding: 3px 7px;
+  font-size: var(--text-xs);
+  line-height: 1;
+  /* The compact segments are ~18px tall; an invisible overlay pad brings
+     the hit area to ≥24px without growing the visible pill. Vertical
+     only — segments tile edge-to-edge horizontally. */
+  position: relative;
+}
+.avseg-compact button::after {
+  content: "";
+  position: absolute;
+  inset: -4px 0;
+}
+
+/* A past slot stays readable but visibly archived. */
+.cal-past {
+  opacity: 0.6;
+}
+/* Hidden slot comment (admins only see these) — faded like elsewhere. */
+/* Admin-hidden comment, both trees (topic + slot discussions): dimmed for
+   the moderators who still see it; the "hidden" head label says why. The
+   topic tree's class went unstyled until the 2026-08-17 audit. */
+.cal-comment-hidden .c-bubble,
+.comment.hidden .c-bubble {
+  opacity: 0.5;
+}
+/* Frozen availability snapshot on a session-claim comment. */
+.cal-claim {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--line);
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+/* The same chip under the composer, previewing what a post attaches —
+   the stack gap already spaces it (QA 2026-08-06). No dashed separator —
+   it belongs to the posted bubble, where it splits body from chip; under
+   the composer it floated oddly. */
+.cal-claim-preview {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+/* Mobile calendar: tighter rows; the when-line still wraps if the right
+   cluster can't fit beside the datetime. */
+@media (max-width: 640px) {
+  .cal-row {
+    min-height: 44px;
+  }
+  .cal-row-line {
+    flex-wrap: wrap;
+    row-gap: 2px;
+    min-height: 44px;
+  }
+  /* Bookings already live on their own rows; tighten the indent. */
+  .cal-row-sessions {
+    padding-left: 24px;
+  }
+  /* No avatar override: --face's 15px clamp floor covers narrow rows. */
 }
 
 /* Host insights panel — collapsible vote breakdown */
@@ -1473,38 +2186,44 @@ textarea {
   cursor: pointer;
 }
 .host-thread {
-  margin-top: 12px;
   border-top: 1px solid var(--host-line);
-  padding-top: 10px;
+  padding-top: 8px;
 }
-
-/* Slot date widget */
-.slot-date {
-  flex: none;
-  width: 54px;
-  text-align: center;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  padding: 7px 0;
+/* Card sub-threads (faculty/admin boxes, the queue's comment fold): one
+ * internal rhythm — a 10px gap between actions row / comment list /
+ * composer; nested sections drop their own dividers and padding (the box
+ * supplies the divider). Card spacing spec, 2026-08-05. */
+.thread-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.thread-stack .card-actions {
+  border-top: 0;
+  padding: 0;
+}
+.thread-stack .comments {
+  border-top: 0;
+  padding-top: 0;
+}
+/* The host 💙 wears the host palette at rest and when on — same lucide
+ * heart symbol as the elector button (outline/filled = state), told apart
+ * by colour, never by a different glyph (QA 2026-08-05). */
+.host-heart-btn {
+  color: var(--host-ink);
+}
+.host-heart-btn.on {
+  border-color: var(--host-ink);
   background: var(--card);
+  color: var(--host-ink);
 }
-.slot-date .d-wd {
-  font-size: var(--text-2xs);
-  font-weight: var(--fw-bold);
-  color: var(--red);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-.slot-date .d-day {
-  font-family: var(--serif);
-  font-size: var(--text-3xl);
-  font-weight: var(--fw-semibold);
-  line-height: 1;
-}
-.slot-date .d-mo {
-  font-size: var(--text-2xs);
-  color: var(--muted);
-  text-transform: uppercase;
+/* The 💙-givers disclosure list: card surface on the host wash, instead
+ * of nesting a second .host-panel box. */
+.host-hearts-list {
+  padding: 8px 12px;
+  background: var(--card);
+  border: 1px solid var(--host-line);
+  border-radius: var(--radius-sm);
 }
 
 /* Comment bubbles (prototype .c-bubble style). Block + fit-content, NOT
@@ -1525,51 +2244,24 @@ textarea {
   font-size: var(--text-sm);
   line-height: var(--lh-tight);
 }
+/* Relative timestamp in the name row — doubles as the comment's permalink
+   (#259), so the link stays quiet until hovered, like .tl-quote-link. */
+.c-time {
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--faint);
+  text-decoration: none;
+}
+a.c-time:hover {
+  text-decoration: underline;
+}
 .c-text {
   font-size: var(--text-base);
   margin-top: 2px;
-}
-
-/* Slot discussion expand row */
-.slot-expand {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  padding: 9px 18px;
-  border-top: 1px solid var(--line);
-  font-size: var(--text-sm);
-  font-weight: var(--fw-semibold);
-  color: var(--muted);
-  background: none;
-  border-left: none;
-  border-right: none;
-  border-bottom: none;
-  text-align: left;
-  cursor: pointer;
-}
-.slot-expand:hover {
-  background: var(--wash);
-}
-
-/* Host chat thread bubbles */
-.hc {
-  display: flex;
-  gap: 9px;
-  padding: 7px 0;
-}
-.hc-bubble {
-  background: var(--card);
-  border: 1px solid var(--host-line);
-  border-radius: 11px;
-  padding: 7px 11px;
-  font-size: 13.5px;
-}
-.hc-name {
-  font-weight: var(--fw-semibold);
-  font-size: 12.5px;
-  color: var(--host-ink);
-  margin-bottom: 2px;
+  /* Bodies are plain text: honor typed newlines, and break long pasted URLs
+     so they can't push the bubble past its container. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 /* Sysadmin operator access to private forums (2026-07-29): the mode must
@@ -1580,15 +2272,6 @@ textarea {
   color: var(--warning-ink);
   font-weight: var(--fw-semibold);
   margin-bottom: 14px;
-}
-
-/* The My Topics "Create New Topic" reveal (QA 2026-07-29): one big
-   unmissable call to action standing in for the hidden form. */
-.btn-create {
-  width: 100%;
-  justify-content: center;
-  padding: 14px;
-  font-size: var(--text-lg);
 }
 
 /* Small button variant */
@@ -1649,6 +2332,15 @@ textarea {
   border-radius: var(--radius-sm);
   font-size: var(--text-sm);
   color: var(--muted);
+}
+/* The quoted snippet doubles as the deep link to its comment (Ed,
+   2026-08-17) — quiet by default, reveals itself on hover. */
+.tl-quote-link {
+  color: inherit;
+  text-decoration: none;
+}
+.tl-quote-link:hover {
+  text-decoration: underline;
 }
 .tl-note .tn-by {
   font-weight: var(--fw-semibold);
@@ -1765,29 +2457,48 @@ textarea {
 .queue-btn-next {
   color: var(--ink);
 }
+/* queue-back (Ed, 2026-08-21): a smaller, quieter twin of Next on the
+   left — revisiting a topic is a secondary move next to deciding on this
+   one, and it must not read as the primary action. Rendered as a link
+   (the step lives in the URL), so it needs the button's own centring. */
+.queue-btn-back {
+  width: 48px;
+  height: 48px;
+  color: var(--muted);
+  text-decoration: none;
+}
+a.queue-btn-back:hover {
+  color: var(--ink);
+}
+/* queue-keys (2026-09-07): the arrow legend under the decision bar. The
+   keys are the fast path through a round and the buttons alone don't say
+   so. Sits inside the card, above the topic-tabs strip. */
+.queue-keys {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 14px;
+  margin: 0 0 2px;
+  font-size: var(--text-xs);
+}
+.queue-keys kbd {
+  display: inline-block;
+  min-width: 18px;
+  padding: 1px 4px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-xs);
+  background: var(--wash);
+  color: var(--muted);
+  font: inherit;
+  text-align: center;
+}
+
 .queue-progress {
   text-align: center;
   font-size: var(--text-sm);
 }
 .queue-done {
   align-items: center;
-}
-
-/* Folded comments on the queue card */
-.comments-fold {
-  border-top: 1px solid var(--line);
-}
-.comments-fold-toggle {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 0 4px;
-  font-size: var(--text-sm);
-  font-weight: var(--fw-semibold);
-  color: var(--muted);
-  border: none;
-  background: none;
-  cursor: pointer;
 }
 
 /* Topic card action bar. No horizontal padding: the ❤️ pill and counters
@@ -1800,6 +2511,16 @@ textarea {
   gap: 6px;
   padding: 8px 0;
   border-top: 1px solid var(--line);
+}
+/* Equal air around the ❤️ pill (QA 2026-08-10): above it sits 8px pad +
+   1px rule; below, the card's 14px stack gap stacked onto the 8px pad
+   made 22px to the comments rule. Pull the comments rule up so both
+   sides read 9px. Thread-stack panels have no rules — reset there. */
+.card-actions + .comments {
+  margin-top: -13px;
+}
+.thread-stack .card-actions + .comments {
+  margin-top: 0;
 }
 .act {
   display: inline-flex;
@@ -1941,6 +2662,177 @@ textarea {
   cursor: default;
   opacity: 0.6;
 }
+/* topic-tabs (2026-08-14): the My Topics card's tab strip —
+   public comments / {host}-only / drafting / scheduling as horizontal
+   tabs instead of stacked collapsibles. */
+/* One line, always (QA 2026-08-15): wrapped tabs read as a pile of
+   buttons — the shared baseline is what says "tabs". Narrow screens shed
+   the UNSELECTED labels instead (icon + count; the selected tab always
+   says what it is), which Ed prefers to sideways scrolling. Overflow stays
+   scrollable as a silent last resort, with the `local`/`scroll` background
+   trick showing an edge shadow only when something really is cut off. */
+.topic-tabs {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 2px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  /* Inset, not border-bottom: the strip is a scroll container now, so a
+     selected underline hung past the content box (the old -1px margin)
+     would be clipped. The tab's own 2px border covers this line. */
+  box-shadow: inset 0 -1px 0 var(--line-strong);
+  background:
+    linear-gradient(to right, var(--card), transparent) left / 24px 100%
+      no-repeat local,
+    linear-gradient(to left, var(--card), transparent) right / 24px 100%
+      no-repeat local,
+    linear-gradient(
+        to right,
+        color-mix(in srgb, var(--ink) 14%, transparent),
+        transparent
+      )
+      left / 12px 100% no-repeat scroll,
+    linear-gradient(
+        to left,
+        color-mix(in srgb, var(--ink) 14%, transparent),
+        transparent
+      )
+      right / 12px 100% no-repeat scroll;
+}
+.topic-tabs::-webkit-scrollbar {
+  display: none;
+}
+.topic-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 10px;
+  font-size: 12.5px;
+  font-weight: var(--fw-semibold);
+  color: var(--muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.topic-tabs button:hover {
+  color: var(--ink);
+}
+.topic-tabs button[aria-selected="true"] {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+}
+/* The count riding a tab label (e.g. "Comments 3"). */
+.tab-badge {
+  font-size: var(--text-2xs);
+  font-weight: var(--fw-normal);
+  color: var(--faint);
+}
+/* One rhythm inside every tab (QA 2026-08-16, after the ❤️ pill collided
+   with the comments rule): the pane is a 10px-gapped stack, exactly like
+   .thread-stack, so the Comments tab and the {host}-only tab lay their
+   action bars out identically. The strip's own bottom rule is the pane's
+   only divider — nested blocks drop theirs, the bar drops its padding,
+   and the card-level pull rules (which assume the card's 14px stack gap
+   sits below the bar — there is none here, so they simply overlapped)
+   are reset. Untabbed cards, which DO live in that stack, keep all of it. */
+.topic-tab-panel {
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.topic-tab-panel > .card-actions {
+  border-top: 0;
+  padding: 0;
+}
+.topic-tab-panel > .comment-section,
+.topic-tab-panel .host-thread {
+  border-top: 0;
+  padding-top: 0;
+}
+.topic-tab-panel .card-actions + .comment-section,
+.topic-tab-panel .card-actions + .comments {
+  margin-top: 0;
+}
+@media (max-width: 480px) {
+  .topic-tabs button {
+    padding: 7px 8px;
+  }
+}
+/* Icon + count only on the tabs you are NOT on, once a card carries three
+   or more (two always fit). Clipped rather than `display: none` so the
+   label stays in the accessible name (QA 2026-08-15). */
+@media (max-width: 640px) {
+  .topic-tabs:has(button:nth-child(3)) button[aria-selected="false"] .tab-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+/* A calendar card's heading as a fold control (Ed, QA 2026-08-16): the
+   workbench's "Your sessions" and "Scheduling" sections each collapse.
+   Inherits the section-title type — it IS the heading, not a button
+   sitting next to one. */
+.cal-section-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
+.cal-section-toggle:hover {
+  color: var(--ink);
+}
+/* The bare table's heading (card={false}: workbench sections inside a tab
+   panel, 2026-08-16) — sans, full ink, a step above the month eyebrows
+   but below the card-level serif .section-title (Ed, QA 2026-08-16). */
+.cal-subhead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  /* Explicit — the global h1–h3 rule sets serif, and this is an h3. */
+  font-family: var(--sans);
+  font-size: var(--text-base);
+  font-weight: var(--fw-semibold);
+  color: var(--ink);
+}
+.cal-subhead .topic-body-toggle {
+  margin-top: 0;
+}
+/* The controls row under a table's heading (workbench: sort toggle left,
+   Show past right), folding with the rows. Rendered unconditionally —
+   :empty hides it when the caller passes none. */
+.cal-table-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.cal-table-controls:empty {
+  display: none;
+}
+
+/* Neutral segmented state (topic-workbench sort toggle, 2026-08-14). */
+.avseg button.on {
+  background: var(--wash-strong);
+  color: var(--ink);
+}
 .avseg button.on-g {
   background: var(--green-soft);
   color: var(--green-ink);
@@ -2048,4 +2940,289 @@ textarea {
 /* Hairline divider above an action row (was inline borderTop:1px solid var(--line)). */
 .divider-top {
   border-top: 1px solid var(--line);
+}
+
+/* Small helper text under a control (was inline className="faint"
+   style={{ fontSize: 12 }}). */
+.hint {
+  color: var(--faint);
+  font-size: var(--text-xs);
+}
+
+/* Contact Details (2026-09-30): the members-only box above a profile — a
+   hairline frame sets it apart from the public bio it sits over. */
+.contact-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.contact-details-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-sm);
+}
+.contact-details-head .hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* The who-can-read-this line under a profile field's label (Contact
+   Details, About). */
+.profile-audience {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 2px 0 10px;
+}
+
+/* Bold form-field label (was inline fontSize: 13 on <strong>). */
+.field-heading {
+  font-size: var(--text-sm);
+}
+
+/* ---------------------------------------------------------------------
+   {host} Lounge (docs/host-lounge-plan.md, 2026-09-30)
+   --------------------------------------------------------------------- */
+
+/* Nav: a dot, not a count — new posts are an invitation, not a backlog. */
+.nav-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--primary);
+}
+
+.lounge-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+/* The round "+" (Ed): beside the heading on desktop, floating on phones. */
+.lounge-new,
+.lounge-fab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--primary);
+  color: var(--primary-ink);
+  cursor: pointer;
+}
+.lounge-new {
+  width: 36px;
+  height: 36px;
+  flex: none;
+}
+.lounge-new:hover,
+.lounge-fab:hover {
+  filter: brightness(1.08);
+}
+.lounge-fab {
+  display: none;
+}
+
+.lounge-conversation {
+  padding: 14px 16px;
+}
+/* Ed, QA 2026-09-30: each conversation is its own card, so the thread's
+   top rule, the bubble's fit-to-text width and the first-level reply
+   indent (which set a topic's comments apart from the topic above them)
+   have nothing to separate here. */
+.lounge-conversation .comments {
+  margin: 0;
+  border-top: none;
+  padding-top: 0;
+}
+/* The opening post always spans the card. */
+.lounge-conversation .comments > .comment > .comment-main > .c-bubble {
+  width: 100%;
+}
+/* First-level replies line up under the opening post's avatar: no rule,
+   no step — the 36px pulls them back across the avatar column (26px
+   .avatar-sm + 10px .comment gap). Deeper forks keep the usual indent. */
+.lounge-conversation .comments > .comment > .comment-main > .replies {
+  margin-left: -36px;
+  padding-left: 0;
+  border-left: none;
+}
+.lounge-opening .topic-body {
+  margin: 2px 0 0;
+}
+
+.lounge-composer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.lounge-composer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.lounge-composer-head .section-title {
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .lounge-new {
+    display: none;
+  }
+  .lounge-fab {
+    display: inline-flex;
+    position: fixed;
+    /* 24px in from the edge (Ed, QA 2026-09-30: 16 felt cramped). */
+    right: 24px;
+    bottom: calc(24px + env(safe-area-inset-bottom));
+    width: 56px;
+    height: 56px;
+    box-shadow: var(--shadow-pop);
+    z-index: var(--z-sticky);
+  }
+  /* Room under the floating "+" so it never covers the last post. */
+  .lounge {
+    padding-bottom: 96px;
+  }
+  /* The composer becomes a full-screen writing sheet. */
+  .lounge-composer {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-modal);
+    margin: 0;
+    border-radius: 0;
+    overflow-y: auto;
+    padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+    background: var(--card);
+  }
+}
+
+/* Emoji reacts — the first reactions in Topic. */
+.lounge-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 2px;
+}
+.reaction-chip,
+.reaction-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--card);
+  color: var(--muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.reaction-chip.mine {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--ink);
+}
+.reaction-count {
+  font-size: var(--text-xs);
+  font-weight: var(--fw-semibold);
+}
+.reaction-add {
+  padding: 0 6px;
+}
+.reaction-chip:hover,
+.reaction-add:hover {
+  border-color: var(--primary);
+  color: var(--ink);
+}
+.reaction-positioner {
+  z-index: var(--z-dropdown);
+}
+.reaction-popup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  background: var(--card);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-pop);
+}
+.reaction-quick {
+  display: flex;
+  gap: 2px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+/* Frimousse is unstyled by design; these give it our tokens. */
+.emoji-picker {
+  display: flex;
+  flex-direction: column;
+  width: min(304px, calc(100vw - 48px));
+  height: 300px;
+  isolation: isolate;
+}
+.emoji-picker-search {
+  margin-bottom: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--ink);
+  font-size: var(--text-sm);
+}
+.emoji-picker-viewport {
+  flex: 1;
+  outline: none;
+}
+.emoji-picker-note {
+  display: block;
+  padding: 12px;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+.emoji-picker-category {
+  padding: 6px 4px 2px;
+  background: var(--card);
+  color: var(--muted);
+  font-size: var(--text-2xs);
+  font-weight: var(--fw-semibold);
+}
+.emoji-picker-emoji {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  font-size: 20px;
+  cursor: pointer;
+}
+.emoji-picker-emoji:hover,
+.emoji-picker-emoji[data-active] {
+  background: var(--primary-soft);
+}
+
+/* Rich-text editor: "Uploading image…" beside the toolbar (2026-09-30). */
+.rte-status {
+  align-self: center;
+  margin-left: 6px;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+.rte-content img {
+  max-width: 100%;
+  height: auto;
 }

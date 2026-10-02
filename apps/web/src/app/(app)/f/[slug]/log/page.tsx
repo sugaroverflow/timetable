@@ -9,13 +9,20 @@ import { ActivityRoleFilter } from "@/components/ActivityRoleFilter";
 import { ActorFilter } from "@/components/ActorFilter";
 import { Avatar } from "@/components/Avatar";
 import { EmptyState } from "@/components/EmptyState";
+import { LiveLogSync } from "@/components/LiveLogSync";
 import { PersonChip } from "@/components/PersonChip";
-import { ACTION_LABELS } from "@/lib/activityLabels";
+import { PrimaryRolePill } from "@/components/RolePills";
+import {
+  ACTION_LABELS,
+  AVAILABILITY_EMOJI,
+  TARGETED_LABELS,
+} from "@/lib/activityLabels";
 import type { ActivityEvent } from "@/lib/feedTypes";
 import { gqlFetch } from "@/lib/graphql";
 import { displayRolesFromCookies } from "@/lib/previewRoles.server";
 import {
   parseTimetableSettings,
+  pluralLabel,
   roleLabel,
   type RoleLabels,
 } from "@/lib/timetableSettings";
@@ -33,11 +40,19 @@ const QUERY = `
       id action note actorId actorName actorImage actorRoles createdAt
       topicTitle topicSlug topicHostSlug topicHostName snippet
       commentId invitedEmail invitedRoles
+      targetUserId targetName targetRoles rolesTo
+      slotId slotStartsAt availabilityState location
     }
   }
 `;
 
+/** The verb phrase after the actor's name. Events with a named target use
+ * the connective variant ("previewed the forum as") so TargetSuffix
+ * completes the sentence; everything else gets the generic label. */
 function describe(event: ActivityEvent): string {
+  if (event.targetName && TARGETED_LABELS[event.action]) {
+    return TARGETED_LABELS[event.action] as string;
+  }
   return ACTION_LABELS[event.action] ?? event.action;
 }
 
@@ -144,11 +159,87 @@ function InvitedSuffix({
   );
 }
 
+/** The member an admin action was done TO — a linked name chip with their
+ * role at event time, completing the TARGETED_LABELS sentence. Role
+ * changes append the roles the member ended up with (Ed, 2026-08-17). */
+function TargetSuffix({
+  event,
+  slug,
+  roleLabels,
+}: {
+  event: ActivityEvent;
+  slug: string;
+  roleLabels?: RoleLabels;
+}) {
+  if (!event.targetName || !TARGETED_LABELS[event.action]) return null;
+  return (
+    <>
+      {" "}
+      <ChipWrap slug={slug} actorId={event.targetUserId}>
+        <b>{event.targetName}</b>
+      </ChipWrap>
+      <PrimaryRolePill roles={event.targetRoles} labels={roleLabels} />
+      {event.action === "member.role_change" && event.rolesTo.length > 0 ? (
+        <span className="faint">
+          {" "}
+          to {event.rolesTo.map((r) => roleLabel(roleLabels, r)).join(", ")}
+        </span>
+      ) : null}
+      {event.action === "member.remove" ? " from the forum" : null}
+    </>
+  );
+}
+
+/** Same shape as the calendar page's isPast — a plain helper, since the
+ * react-compiler rule bars Date.now() inside component render. */
+function slotInPast(at: Date): boolean {
+  return at.getTime() < Date.now();
+}
+
+/** The timeslot a calendar event refers to, linked to its calendar row
+ * (past slots route through ?past=1 so the row is actually shown).
+ * availability.set leads with the 🟢🟡🔴 answer. */
+function SlotSuffix({ event, slug }: { event: ActivityEvent; slug: string }) {
+  if (!event.slotStartsAt) return null;
+  const at = new Date(event.slotStartsAt);
+  const label = at.toLocaleString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const past = slotInPast(at);
+  const href = event.slotId
+    ? `/f/${slug}/calendar${past ? "?past=1" : ""}#slot-${event.slotId}`
+    : null;
+  const emoji = event.availabilityState
+    ? AVAILABILITY_EMOJI[event.availabilityState]
+    : null;
+  return (
+    <>
+      {emoji ? ` ${emoji}` : null}
+      {/* "at" when a topic already anchored the sentence, dash otherwise. */}
+      {event.topicTitle ? " at " : " — "}
+      {href ? <Link href={href}>{label}</Link> : label}
+      {event.location ? (
+        <span className="faint"> ({event.location})</span>
+      ) : null}
+    </>
+  );
+}
+
+/** Deep link for the event's topic — anchored to the comment when the
+ * event names one. Shared by the topic-title link and the snippet quote
+ * (Ed, 2026-08-17: the quote is the natural click target). */
+function topicOrCommentHref(event: ActivityEvent, slug: string) {
+  const href = topicPath(slug, event.topicHostSlug, event.topicSlug);
+  return href && event.commentId ? `${href}#comment-${event.commentId}` : href;
+}
+
 function TopicSuffix({ event, slug }: { event: ActivityEvent; slug: string }) {
   if (!event.topicTitle) return null;
-  const href = topicPath(slug, event.topicHostSlug, event.topicSlug);
-  const commentHref =
-    href && event.commentId ? `${href}#comment-${event.commentId}` : href;
+  const commentHref = topicOrCommentHref(event, slug);
   return (
     <>
       {" — "}
@@ -161,6 +252,20 @@ function TopicSuffix({ event, slug }: { event: ActivityEvent; slug: string }) {
         <span className="faint"> ({event.topicHostName})</span>
       ) : null}
     </>
+  );
+}
+
+/** The quoted comment/body text, linked to the comment itself when the
+ * event carries one (unstyled-link class keeps the quiet quote look). */
+function SnippetQuote({ event, slug }: { event: ActivityEvent; slug: string }) {
+  const href = topicOrCommentHref(event, slug);
+  const quote = <>&ldquo;{event.snippet}&rdquo;</>;
+  return href ? (
+    <Link className="tl-quote-link" href={href}>
+      {quote}
+    </Link>
+  ) : (
+    quote
   );
 }
 
@@ -177,7 +282,6 @@ function TimelineItem({
   roleLabels?: RoleLabels;
   adminLabel: string;
 }) {
-  const actorRole = actorPrimaryRole(event.actorRoles);
   return (
     <div className={`tl-item${actionClass(event.action)}`}>
       <div className="tl-when">
@@ -194,26 +298,32 @@ function TimelineItem({
           <ChipWrap slug={slug} actorId={event.actorId}>
             <b>{event.actorName ?? "Someone"}</b>
           </ChipWrap>
-          {actorRole ? (
-            <span
-              className={`pill pill-${actorRole}`}
-              style={{ marginLeft: 6, fontSize: 10 }}
-            >
-              {roleLabel(roleLabels, actorRole)}
-            </span>
-          ) : null}{" "}
+          <PrimaryRolePill roles={event.actorRoles} labels={roleLabels} />{" "}
           {describe(event)}
+          <TargetSuffix event={event} slug={slug} roleLabels={roleLabels} />
           <InvitedSuffix event={event} roleLabels={roleLabels} />
           <TopicSuffix event={event} slug={slug} />
+          <SlotSuffix event={event} slug={slug} />
         </span>
       </div>
       {event.snippet ? (
-        <div className="tl-note">&ldquo;{event.snippet}&rdquo;</div>
+        <div className="tl-note">
+          {/* The quote links where the title does — straight to the
+              comment when the event names one. */}
+          <SnippetQuote event={event} slug={slug} />
+        </div>
       ) : null}
       {event.note ? (
         <div className="tl-note">
           <span className="tn-by">
-            {event.actorName ?? adminLabel} ({adminLabel.toLowerCase()})
+            {/* The actor's real role — slot-discussion notes come from any
+                member, so the old hardcoded "(admin)" often lied. */}
+            {event.actorName ?? adminLabel} (
+            {(
+              roleLabel(roleLabels, actorPrimaryRole(event.actorRoles) ?? "") ||
+              adminLabel
+            ).toLowerCase()}
+            )
           </span>
           <br />
           {event.note}
@@ -246,10 +356,11 @@ function ActivityToolbar({
   );
   return (
     <div className="toolbar feed-toolbar wrap">
-      <ActivityFilter value={filters.action ?? ""} actions={uniqueActions} />
-      <ActorFilter value={filters.actor ?? ""} actors={uniqueActors} />
       <ActivityRoleFilter value={filters.role ?? ""} options={roleOptions} />
+      <ActorFilter value={filters.actor ?? ""} actors={uniqueActors} />
+      <ActivityFilter value={filters.action ?? ""} actions={uniqueActions} />
       <ActivityDateFilter from={filters.from ?? ""} to={filters.to ?? ""} />
+      <LiveLogSync />
     </div>
   );
 }
@@ -275,7 +386,7 @@ export default async function ActivityPage({
   const adminLabel = roleLabel(settings.roleLabels, "admin");
 
   if (!isAdmin(roles)) {
-    return <div className="notice">{adminLabel}s only.</div>;
+    return <div className="notice">{pluralLabel(adminLabel)} only.</div>;
   }
 
   const visibleEvents = data.activityTimeline.filter(

@@ -1,13 +1,17 @@
 # Deployment
 
-Timetable is deployed to DigitalOcean App Platform with two app services, one
+Topic is deployed to DigitalOcean App Platform with two app services, one
 migration job, and managed PostgreSQL. Clerk handles authentication.
+
+This document covers how deploys work. For what to do when something is
+**broken** — the risk register, the incident runbook, backups and alerting —
+see `docs/OPERATIONS.md`.
 
 ## Environments
 
 | | Local | Dev | Production |
 | --- | --- | --- | --- |
-| URL | `http://localhost:3000` | `https://dev.timetable.love` | `https://timetable.love` |
+| URL | `http://localhost:3000` | `https://dev.timetable.love` | `https://topic.forum` (`timetable.love` is an alias) |
 | DO app | none | `topic-dev` | `topic-prod` |
 | App spec | none | `.do/app.dev.yaml` | `.do/app.yaml` |
 | Database | Docker Postgres | `timetable-db` | `timetable-db-prod` |
@@ -200,8 +204,8 @@ backup or applying a forward fix.
 
 ## Clerk
 
-Use Clerk Development keys for local and dev. Use Clerk Production keys only for
-`timetable.love`.
+Use Clerk Development keys for local and dev. Use Clerk Production keys only
+for the production app (`topic.forum`).
 
 Required app paths:
 
@@ -212,6 +216,31 @@ Required app paths:
 For production on a custom domain, create a Clerk production instance, configure
 domains and DNS in Clerk, then update the GitHub `production` environment
 secrets to live keys.
+
+## Vanity addresses (per-forum short URLs)
+
+A forum admin can set a **vanity address** in Forum Settings — a hostname
+(`forum.example.org`) or hostname and path (`topic.newspeak.house/2026`).
+Requests arriving there are 307-redirected by the web proxy to the forum on
+the app's own origin; the forum is never served under the other name (Clerk
+sessions are per host). Several forums may share one hostname with different
+path prefixes.
+
+The proxy only sees the request once TLS terminates, so each HOSTNAME needs
+ops work once (the paths need none):
+
+1. Add the hostname to the app's `domains:` list in `.do/app.yaml` as
+   `type: ALIAS` (applied on the next production deploy), or add it in the
+   DigitalOcean control panel under the app's Settings → Domains.
+2. At the domain's DNS, add a CNAME for that hostname pointing at the app's
+   `*.ondigitalocean.app` hostname. DigitalOcean issues the certificate once
+   it sees the record (minutes).
+3. The admin then types the address into Forum Settings. Until step 2
+   resolves, the browser can't reach us at all — the proxy has nothing to do
+   with that failure.
+
+An unknown host that reaches the app (a stray CNAME) is redirected to the
+origin's home page rather than served.
 
 ## Digest Cron
 
@@ -345,8 +374,10 @@ Without the required `SPACES_*` variables, `POST /api/uploads` returns `503`.
 
 After deploy:
 
-1. Open `/health`; it should return JSON with `ok: true`. Note that `/health`
-   passing does not guarantee GraphQL works — always follow up with step 2.
+1. Open `/health`; it should return `{"ok":true,"db":"up"}`. Since 2026-08-21
+   this pings Postgres and returns 503 with `"db":"down"` when it cannot
+   (`docs/OPERATIONS.md` R3), so it is now a real readiness signal — but it
+   still exercises none of the GraphQL path, so always follow up with step 2.
 2. Send `POST /graphql` with `query { __typename }`; it should return `200`
    with a GraphQL `data` payload.
 3. Sign in through Clerk.
@@ -362,7 +393,7 @@ After deploy:
 Useful anonymous hosted smoke commands:
 
 ```bash
-for host in timetable.love dev.timetable.love; do
+for host in topic.forum dev.timetable.love; do
   curl -sS -L -o /dev/null -w "$host / %{http_code}\n" "https://${host}/"
   curl -sS -L -o /dev/null -w "$host /sign-in %{http_code}\n" "https://${host}/sign-in"
   curl -sS -L -o /dev/null -w "$host /sign-up %{http_code}\n" "https://${host}/sign-up"
@@ -377,7 +408,7 @@ done
 Run a short repeated GraphQL probe when checking the hosted rate limiter:
 
 ```bash
-for host in timetable.love dev.timetable.love; do
+for host in topic.forum dev.timetable.love; do
   for i in 1 2 3 4 5; do
     curl -sS -o /dev/null -w "$host graphql run=$i %{http_code}\n" \
       -X POST "https://${host}/graphql" \

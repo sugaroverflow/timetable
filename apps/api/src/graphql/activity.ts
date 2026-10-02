@@ -5,7 +5,13 @@ import {
   markNotificationsSeen,
   type ActivityEntry,
 } from "@timetable/core";
-import { canModerate } from "@timetable/shared";
+import {
+  canModerate,
+  canUseLounge,
+  isLoungeEnabled,
+  type TimetableSettings,
+  type Viewer,
+} from "@timetable/shared";
 
 import { builder } from "./builder";
 import { loadTimetableAndViewer, readTimetable } from "./guards";
@@ -13,6 +19,31 @@ import { loadTimetableAndViewer, readTimetable } from "./guards";
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+
+/** First string payload value under any of `keys` (log sites named their
+ * target keys inconsistently over time — targetUserId/userId/removedUserId
+ * all mean "the member this was done to"). */
+function payloadString(
+  payload: Record<string, unknown>,
+  ...keys: string[]
+): string | null {
+  for (const key of keys) {
+    const value = payload[key];
+    if (typeof value === "string" && value) return value;
+  }
+  return null;
+}
+
+function payloadRoles(
+  payload: Record<string, unknown>,
+  ...keys: string[]
+): string[] {
+  for (const key of keys) {
+    const value = payload[key];
+    if (Array.isArray(value)) return value.filter((r) => typeof r === "string");
+  }
+  return [];
+}
 
 const ActivityType = builder
   .objectRef<ActivityEntry>("ActivityEvent")
@@ -54,6 +85,46 @@ const ActivityType = builder
         resolve: (a) =>
           (a.payload["invitedRoles"] as string[] | undefined) ?? [],
       }),
+      // Member-target events — bio/role/email edits, preview, removal
+      // (log overhaul, Ed 2026-08-17): who it was done TO, so the line
+      // reads "previewed the forum as <name> <role>" with a person link.
+      targetUserId: t.string({
+        nullable: true,
+        resolve: (a) =>
+          payloadString(a.payload, "targetUserId", "userId", "removedUserId"),
+      }),
+      targetName: t.string({
+        nullable: true,
+        resolve: (a) =>
+          payloadString(a.payload, "targetName", "name", "removedName"),
+      }),
+      /** The target's roles at event time (impersonate/remove). */
+      targetRoles: t.stringList({
+        resolve: (a) => payloadRoles(a.payload, "targetRoles", "roles"),
+      }),
+      /** member.role_change: the roles the target ended up with. */
+      rolesTo: t.stringList({
+        resolve: (a) => payloadRoles(a.payload, "to"),
+      }),
+      // Calendar events: which timeslot, so the line links to its row.
+      slotId: t.string({
+        nullable: true,
+        resolve: (a) => payloadString(a.payload, "slotId"),
+      }),
+      slotStartsAt: t.string({
+        nullable: true,
+        resolve: (a) => payloadString(a.payload, "startsAt"),
+      }),
+      /** availability.set: 🟢🟡🔴. */
+      availabilityState: t.string({
+        nullable: true,
+        resolve: (a) => payloadString(a.payload, "state"),
+      }),
+      /** slot.clear / slot.delete: the room involved, when one was. */
+      location: t.string({
+        nullable: true,
+        resolve: (a) => payloadString(a.payload, "location"),
+      }),
     }),
   });
 
@@ -74,8 +145,29 @@ const NotificationType = builder
       topicTitle: t.exposeString("topicTitle"),
       topicSlug: t.exposeString("topicSlug", { nullable: true }),
       topicHostSlug: t.exposeString("topicHostSlug", { nullable: true }),
+      /** {host} Lounge kinds only: the conversation to open. Their topic
+       * fields are empty strings. */
+      loungeRootId: t.string({
+        nullable: true,
+        resolve: (n) => n.loungeRootId ?? null,
+      }),
     }),
   });
+
+/** Lounge replies and mentions notify only while the viewer can still
+ * enter the Lounge (it's on, and they're a host or admin there). */
+function seesLounge(
+  readable: {
+    timetable: { settings: TimetableSettings | null };
+    roles: Viewer["roles"];
+  },
+  userId: string,
+): boolean {
+  return (
+    isLoungeEnabled(readable.timetable.settings ?? {}) &&
+    canUseLounge({ userId, roles: readable.roles })
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Queries
@@ -91,7 +183,9 @@ builder.queryFields((t) => ({
       if (!ctx.user) return [];
       const readable = await readTimetable(ctx, args.idOrSlug);
       if (!readable || readable.roles.length === 0) return [];
-      return listNotifications(readable.timetable.id, ctx.user.id);
+      return listNotifications(readable.timetable.id, ctx.user.id, 50, {
+        lounge: seesLounge(readable, ctx.user.id),
+      });
     },
   }),
 
@@ -102,7 +196,9 @@ builder.queryFields((t) => ({
       if (!ctx.user) return 0;
       const readable = await readTimetable(ctx, args.idOrSlug);
       if (!readable || readable.roles.length === 0) return 0;
-      return countUnreadNotifications(readable.timetable.id, ctx.user.id);
+      return countUnreadNotifications(readable.timetable.id, ctx.user.id, {
+        lounge: seesLounge(readable, ctx.user.id),
+      });
     },
   }),
 

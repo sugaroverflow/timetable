@@ -1,23 +1,13 @@
 "use client";
 
 import { Send } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState } from "react";
 
+import { ComposerRow } from "@/components/ComposerRow";
 import { GrowingTextarea } from "@/components/GrowingTextarea";
+import { draftKey, hasDraft, useDraft } from "@/lib/commentDrafts";
+import { nounTitle, useCommentThread } from "@/lib/commentThreadAdapter";
 import { useGqlAction } from "@/lib/useGqlAction";
-
-const REPLY = `mutation Reply($id: String!, $body: String!) {
-  replyToComment(commentId: $id, body: $body) { id }
-}`;
-
-const HIDE = `mutation Hide($id: String!, $hidden: Boolean!) {
-  hideComment(commentId: $id, hidden: $hidden) { id }
-}`;
-
-const DELETE = `mutation Delete($id: String!) {
-  deleteComment(commentId: $id)
-}`;
 
 export function CommentActions({
   commentId,
@@ -26,6 +16,8 @@ export function CommentActions({
   hidden,
   isOwn = false,
   onEdit,
+  canPin = false,
+  pinned = false,
 }: {
   commentId: string;
   canReply: boolean;
@@ -34,35 +26,50 @@ export function CommentActions({
   /** The viewer authored this comment: shows Edit/Delete (QA 2026-07-29). */
   isOwn?: boolean;
   onEdit?: () => void;
+  /** The viewer authored the TOPIC and this is a top-level comment:
+   * shows Pin/Unpin (#258). */
+  canPin?: boolean;
+  pinned?: boolean;
 }) {
+  // ?reply= deep links focus a chain-tail composer (dialogue-first
+  // threading, 2026-08-13) — this composer only opens from its button.
   const { run, busy } = useGqlAction();
-  const searchParams = useSearchParams();
-  // Deep link from the notifications pane (QA #59 round 3): ?reply=<id>
-  // opens and focuses this comment's reply composer.
-  const deepLinked = canReply && searchParams.get("reply") === commentId;
-  const [open, setOpen] = useState(deepLinked);
-  const [body, setBody] = useState("");
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Topic comments by default; the Lounge swaps in its own mutations.
+  const thread = useCommentThread();
+  const Noun = nounTitle(thread);
+  const after = {
+    refresh: thread.routerRefresh,
+    onSuccess: () => thread.onChanged?.(),
+  };
+  // The box only exists while it is open, so an unsent draft has to be
+  // able to reopen it — otherwise the text survives the tab switch but
+  // stays out of reach (comment-draft-store, 2026-08-21).
+  const key = draftKey.reply(commentId);
+  const [open, setOpen] = useState(() => hasDraft(key));
+  const [body, setBody, clearBody] = useDraft(key);
 
-  useEffect(() => {
-    if (!deepLinked) return;
-    textareaRef.current?.focus();
-    textareaRef.current?.scrollIntoView({ block: "center" });
-  }, [deepLinked]);
+  /** Collapsing the box is a discard: it drops the draft, so "a draft
+   * exists" always means live unsent text. */
+  function toggleReply() {
+    if (open) clearBody();
+    setOpen((v) => !v);
+  }
 
   function reply(e: React.FormEvent) {
     e.preventDefault();
     const text = body.trim();
     if (!text) return;
     void run(
-      REPLY,
+      thread.reply,
       { id: commentId, body: text },
       {
         success: "Reply posted",
         errorFallback: "Could not reply",
+        refresh: thread.routerRefresh,
         onSuccess: () => {
-          setBody("");
+          clearBody();
           setOpen(false);
+          thread.onChanged?.();
         },
       },
     );
@@ -70,23 +77,39 @@ export function CommentActions({
 
   function toggleHidden() {
     void run(
-      HIDE,
+      thread.hide,
       { id: commentId, hidden: !hidden },
       {
-        success: hidden ? "Comment unhidden" : "Comment hidden",
-        errorFallback: "Could not update comment",
+        success: hidden ? `${Noun} unhidden` : `${Noun} hidden`,
+        errorFallback: `Could not update ${thread.noun}`,
+        ...after,
+      },
+    );
+  }
+
+  function togglePinned() {
+    void run(
+      thread.pin,
+      { id: commentId, pinned: !pinned },
+      {
+        success: pinned ? `${Noun} unpinned` : `${Noun} pinned`,
+        errorFallback: `Could not update ${thread.noun}`,
+        ...after,
       },
     );
   }
 
   function remove() {
-    if (!confirm("Delete this comment? This can't be undone.")) return;
+    if (!confirm(`Delete this ${thread.noun}? This can't be undone.`)) {
+      return;
+    }
     void run(
-      DELETE,
+      thread.remove,
       { id: commentId },
       {
-        success: "Comment deleted",
-        errorFallback: "Could not delete comment",
+        success: `${Noun} deleted`,
+        errorFallback: `Could not delete ${thread.noun}`,
+        ...after,
       },
     );
   }
@@ -95,8 +118,13 @@ export function CommentActions({
     <>
       <div className="comment-actions">
         {canReply ? (
-          <button type="button" onClick={() => setOpen((v) => !v)}>
+          <button type="button" onClick={toggleReply}>
             Reply
+          </button>
+        ) : null}
+        {canPin ? (
+          <button type="button" onClick={togglePinned} disabled={busy}>
+            {pinned ? "Unpin" : "Pin"}
           </button>
         ) : null}
         {isOwn ? (
@@ -116,24 +144,25 @@ export function CommentActions({
         ) : null}
       </div>
       {open ? (
-        <form onSubmit={reply} className="inline-form" style={{ marginTop: 6 }}>
-          <GrowingTextarea
-            ref={textareaRef}
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder="Write a reply…"
-            aria-label="Reply"
-          />
-          <button
-            className="btn btn-primary btn-send"
-            type="submit"
-            disabled={busy}
-            aria-label="Post reply"
-            title="Reply"
-          >
-            <Send size={16} aria-hidden />
-          </button>
-        </form>
+        <ComposerRow className="inline-form-nested">
+          <form onSubmit={reply} className="inline-form">
+            <GrowingTextarea
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              placeholder="Write a reply…"
+              aria-label="Reply"
+            />
+            <button
+              className="btn btn-primary btn-send"
+              type="submit"
+              disabled={busy}
+              aria-label="Post reply"
+              title="Reply"
+            >
+              <Send size={16} aria-hidden />
+            </button>
+          </form>
+        </ComposerRow>
       ) : null}
     </>
   );

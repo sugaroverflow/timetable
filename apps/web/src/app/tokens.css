@@ -62,8 +62,6 @@
   --amber-100: #fff4e0; /* status/feedback warning surface */
   --amber-ink: #a9700f;
   --amber-ink-d: #e0b24d;
-  --amber-line: #f3e0b8;
-  --amber-line-d: #5a4a2a;
   --amber-950: #3a2f1a;
 
   /* Danger red */
@@ -98,6 +96,15 @@
   color-scheme: light; /* native UI (scrollbars, form controls) follows mode */
   --bg: #eceef3; /* page background (themeable) */
   --card: #ffffff; /* raised surface: cards, inputs, menus */
+  /* Frosted-glass toolbar fill (over backdrop blur). Light mode mixes from
+     WHITE so the pill sits lighter than the grey page behind it; dark mode
+     mixes from the page bg so it sits darker than the cards. Both carry a
+     whisper of the forum accent (QA 2026-08-10). */
+  --glass: color-mix(
+    in srgb,
+    var(--primary) 4%,
+    color-mix(in srgb, #ffffff 75%, transparent)
+  );
   --wash: #f4f5f8; /* subtle fill / hover on cards */
   --wash-strong: #e4e7ef; /* stronger hover (nav) */
   --scrim: rgba(20, 22, 30, 0.45); /* modal backdrop */
@@ -105,7 +112,7 @@
   /* --- Text --- */
   --ink: #1b2330; /* primary text (themeable) */
   --muted: #69727f; /* secondary text — AA on --card */
-  --faint: #6e7784; /* tertiary text — darkened from #9aa2af to pass WCAG AA (4.53:1) */
+  --faint: #616a77; /* tertiary text — AA on --bg (4.72:1) AND --card (5.47:1); was #6e7784, which passed only on cards (audit 2026-08-17: the log timeline sits on bare --bg) */
   --on-accent: #ffffff; /* text/icon on a saturated colored fill */
 
   /* --- Borders --- */
@@ -136,7 +143,6 @@
   --yellow-soft: var(--yellow-100);
   --warning-ink: var(--amber-ink);
   --warning-soft: var(--amber-100);
-  --warning-line: var(--amber-line);
 
   /* --- Status: danger / availability "can't" --- */
   --red: var(--red-500);
@@ -250,6 +256,11 @@ html[data-theme="dark"] {
   color-scheme: dark; /* native UI (scrollbars, form controls) follows mode */
   --bg: #14171e;
   --card: #1d222c;
+  --glass: color-mix(
+    in srgb,
+    var(--primary) 6%,
+    color-mix(in srgb, var(--bg) 60%, transparent)
+  );
   --wash: #262b35;
   --wash-strong: #2f3644;
   --scrim: rgba(0, 0, 0, 0.6);
@@ -286,7 +297,6 @@ html[data-theme="dark"] {
   --yellow-soft: var(--amber-950);
   --warning-ink: var(--amber-ink-d);
   --warning-soft: var(--amber-950);
-  --warning-line: var(--amber-line-d);
 
   /* Status: danger */
   --red: var(--red-400);

@@ -17,9 +17,11 @@
     "@timetable/shared": "*",
     "@tiptap/extension-image": "^2.27.2",
     "@tiptap/extension-link": "^2.27.2",
+    "@tiptap/pm": "^2.27.2",
     "@tiptap/extension-placeholder": "^2.27.2",
     "@tiptap/react": "^2.27.2",
     "@tiptap/starter-kit": "^2.27.2",
+    "frimousse": "^0.4.0",
     "lucide-react": "^1.24.0",
     "next": "^16.2.9",
     "react": "^19.2.7",
@@ -27,10 +29,13 @@
     "tiptap-markdown": "^0.8.10"
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.2.9",
+    "jsdom": "^29.1.1",
     "vitest": "^4.1.9"
   }
 }

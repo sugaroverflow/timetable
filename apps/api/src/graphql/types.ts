@@ -4,11 +4,14 @@
  */
 import {
   countViewerPublishedHearts,
+  forumHasSlots,
+  getMembershipDigestSettings,
   getPerson,
   type CommentNode,
   type WeightedHeartEntry,
 } from "@timetable/core";
 import type { Timetable } from "@timetable/db";
+import { isCalendarEnabled } from "@timetable/shared";
 
 import { builder } from "./builder";
 
@@ -42,6 +45,13 @@ export const TimetableType = builder
         type: "String",
         resolve: (tt) => JSON.stringify(tt.settings ?? {}),
       }),
+      /** Whether any timeslots exist (past included) — the calendar nav
+       * link/page hide from non-admins until the schedule does
+       * (QA 2026-08-03). False without a COUNT when the calendar's off. */
+      calendarHasSlots: t.boolean({
+        resolve: (tt) =>
+          isCalendarEnabled(tt.settings ?? {}) ? forumHasSlots(tt.id) : false,
+      }),
       /**
        * Published topics the signed-in viewer currently hearts — their vote
        * weight is 1/count. Null for anonymous viewers. Viewer-scoped, so safe
@@ -51,6 +61,17 @@ export const TimetableType = builder
         nullable: true,
         resolve: (tt, _args, ctx) =>
           ctx.user ? countViewerPublishedHearts(tt.id, ctx.user.id) : null,
+      }),
+      /** The viewer's per-forum digest settings (2026-08-11) as JSON
+       * (on/off, cadence, kind switches); "{}" (all fallbacks) for
+       * anonymous viewers and non-members. */
+      viewerDigestSettings: t.string({
+        resolve: async (tt, _args, ctx) =>
+          JSON.stringify(
+            ctx.user
+              ? await getMembershipDigestSettings(tt.id, ctx.user.id)
+              : {},
+          ),
       }),
       /** The viewer's own membership profile here; null for anonymous
        * viewers and non-members. */
@@ -89,6 +110,7 @@ CommentType.implement({
     authorId: t.exposeID("authorId"),
     authorName: t.exposeString("authorName", { nullable: true }),
     authorImage: t.exposeString("authorImage", { nullable: true }),
+    authorRoles: t.exposeStringList("authorRoles"),
     body: t.exposeString("body"),
     visibility: t.exposeString("visibility"),
     hidden: t.exposeBoolean("hidden"),
@@ -98,16 +120,13 @@ CommentType.implement({
       nullable: true,
       resolve: (c) => c.editedAt?.toISOString() ?? null,
     }),
+    /** Pinned by the topic's author (#258) — set on top-level comments
+     * only; ordering is the client's job (the tree stays newest-first). */
+    pinnedAt: t.string({
+      nullable: true,
+      resolve: (c) => c.pinnedAt?.toISOString() ?? null,
+    }),
     createdAt: t.string({ resolve: (c) => c.createdAt.toISOString() }),
     replies: t.field({ type: [CommentType], resolve: (c) => c.replies }),
   }),
 });
-
-export const SlotTagType = builder
-  .objectRef<{ id: string; title: string }>("SlotTag")
-  .implement({
-    fields: (t) => ({
-      id: t.exposeID("id"),
-      title: t.exposeString("title"),
-    }),
-  });

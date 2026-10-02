@@ -2,30 +2,11 @@
 
 import { useRef, useState } from "react";
 
-import { clientApi } from "@/lib/clientApi";
-
-type UploadPurpose =
-  | "profile-image"
-  | "topic-cover"
-  | "timetable-cover"
-  | "timetable-icon";
-
-type SignedUpload = {
-  publicUrl: string;
-  uploadUrl: string;
-  method: "PUT";
-  headers: Record<string, string>;
-  maxBytes: number;
-};
-
-async function parseError(res: Response): Promise<string> {
-  try {
-    const body = (await res.json()) as { error?: string };
-    return body.error ?? `Upload failed (${res.status})`;
-  } catch {
-    return `Upload failed (${res.status})`;
-  }
-}
+import {
+  ACCEPTED_IMAGE_TYPES,
+  uploadImageFile,
+  type UploadPurpose,
+} from "@/lib/uploadImage";
 
 export function ImageUploadField({
   id,
@@ -60,38 +41,7 @@ export function ImageUploadField({
     setError(null);
 
     try {
-      const signedRes = await clientApi("/api/uploads", {
-        method: "POST",
-        body: JSON.stringify({
-          purpose,
-          filename: file.name,
-          contentType: file.type,
-          size: file.size,
-          timetableIdOrSlug,
-        }),
-      });
-
-      if (!signedRes.ok) throw new Error(await parseError(signedRes));
-      const signed = (await signedRes.json()) as SignedUpload;
-
-      // Direct browser→bucket PUT. A TypeError here is almost always the
-      // bucket rejecting the origin (CORS not configured for this site) —
-      // surface that instead of a bare "Failed to fetch".
-      let uploadRes: Response;
-      try {
-        uploadRes = await fetch(signed.uploadUrl, {
-          method: signed.method,
-          headers: signed.headers,
-          body: file,
-        });
-      } catch {
-        throw new Error(
-          "Storage isn't accepting uploads from this site yet (bucket CORS). You can paste an image URL instead.",
-        );
-      }
-      if (!uploadRes.ok) throw new Error(await parseError(uploadRes));
-
-      onChange(signed.publicUrl);
+      onChange(await uploadImageFile(file, purpose, timetableIdOrSlug));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
@@ -104,7 +54,7 @@ export function ImageUploadField({
     <div className="field">
       <label htmlFor={id}>{label}</label>
       {hint ? (
-        <p className="faint" style={{ margin: "0 0 5px", fontSize: 12 }}>
+        <p className="hint" style={{ margin: "0 0 5px" }}>
           {hint}
         </p>
       ) : null}
@@ -118,7 +68,7 @@ export function ImageUploadField({
         <input
           ref={fileInput}
           type="file"
-          accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
+          accept={ACCEPTED_IMAGE_TYPES}
           onChange={(e) => {
             const file = e.target.files?.[0];
             if (file) void upload(file);

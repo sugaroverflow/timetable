@@ -5,7 +5,8 @@ import {
   comments,
   db,
   hearts,
-  slotTopics,
+  hostHearts,
+  slotSessions,
   timeslots,
   timetableMemberships,
   topics,
@@ -16,9 +17,13 @@ import {
   topicCommentScores,
   type CommentTally,
   type TopicCommentScores,
+  type TopicNormScores,
 } from "@timetable/shared";
 
+import { givenByActiveMember } from "./activeMember";
 import { coerceDate } from "./dates";
+import { computeHostHeartScores } from "./hostHearts";
+import { loadLastActivitySignals } from "./lastActivity";
 import { loadQueueCoverage } from "./queue";
 import { getHeartsCountFrom } from "./topics";
 import { buildFeed, type FeedTopic } from "./topics";
@@ -39,7 +44,6 @@ export type DashboardData = {
   totalHearts: number;
   electorCount: number;
   hostCount: number;
-  slotCount: number;
   topicLeaderboard: {
     id: string;
     title: string;
@@ -60,6 +64,13 @@ export type DashboardData = {
     commentL2: number;
     commentL1: number;
     commentDevotion: number;
+    /** 💙 metrics (host hearts, 2026-08-04): same four normalisations over
+     * the host_hearts rows. Admin eyes only — the API nulls these for
+     * non-admin dashboard viewers. */
+    hostHeartCount: number;
+    hostHeartL2: number;
+    hostHeartL1: number;
+    hostHeartDevotion: number;
   }[];
   /** Host activity (QA 2026-07-27, replaced the weighted-votes host
    * leaderboard): every host-role member — topic-less ones included —
@@ -72,6 +83,23 @@ export type DashboardData = {
     hostSlug: string | null;
     topicCount: number;
     commentCount: number;
+    /** 💙s this host has given (host hearts, 2026-08-04). Admin eyes only —
+     * nulled by the API for non-admin viewers. Their TIMING does reach
+     * latestActivityAt since last-activity-signals (Ed, 2026-09-25: "any
+     * sign we have", shown to everyone who sees the table). */
+    hostHeartCount: number;
+    /** The topics this host 💙'd (the row's fold-open sub-table, mirroring
+     * the elector rows' heartedTopics). Admin eyes only, same as the count.
+     * `commentCount` is this host's public comments on that topic. */
+    hostHeartedTopics: {
+      topicId: string;
+      title: string;
+      slug: string | null;
+      hostId: string;
+      hostName: string | null;
+      hostSlug: string | null;
+      commentCount: number;
+    }[];
     latestActivityAt: Date | null;
   }[];
   electorActivity: {
@@ -102,12 +130,6 @@ export type DashboardData = {
     title: string;
     slug: string | null;
     hostSlug: string | null;
-  }[];
-  conflicts: {
-    slotId: string;
-    startsAt: Date;
-    location: string;
-    topics: { id: string; title: string }[];
   }[];
 };
 
@@ -168,7 +190,10 @@ async function countTopicsByStatus(
   return topicCounts;
 }
 
-/** Members with their roles; electors keep their name for the activity list. */
+/** Members with their roles; electors keep their name for the activity list.
+ * Deactivated members are left out (Ed, 2026-09-11): they are off People and
+ * the host picker, so they are off the Analysis tables and the elector/host
+ * counts too — their past ❤️s still count towards topic totals. */
 async function loadMembers(timetableId: string): Promise<{
   electorRows: { userId: string; name: string | null; image: string | null }[];
   hostRows: {
@@ -187,47 +212,58 @@ async function loadMembers(timetableId: string): Promise<{
       slug: timetableMemberships.slug,
     })
     .from(timetableMemberships)
-    .where(eq(timetableMemberships.timetableId, timetableId));
+    .where(
+      and(
+        eq(timetableMemberships.timetableId, timetableId),
+        isNull(timetableMemberships.deactivatedAt),
+      ),
+    );
   const electorRows = memberRows.filter((m) => m.roles.includes("elector"));
   const hostRows = memberRows.filter((m) => m.roles.includes("host"));
   return { electorRows, hostRows };
 }
 
-async function countSlots(timetableId: string): Promise<number> {
-  const [{ n } = { n: 0 }] = await db
-    .select({ n: sql<number>`count(*)::int` })
-    .from(timeslots)
-    .where(eq(timeslots.timetableId, timetableId));
-  return n;
+function commentScoreFields(c: TopicCommentScores | undefined) {
+  return {
+    commentTotal: c?.total ?? 0,
+    commenterCount: c?.commenters ?? 0,
+    commentL2: c?.l2 ?? 0,
+    commentL1: c?.l1 ?? 0,
+    commentDevotion: c?.devotion ?? 0,
+  };
+}
+
+function hostHeartScoreFields(hh: TopicNormScores | undefined) {
+  return {
+    hostHeartCount: hh?.raw ?? 0,
+    hostHeartL2: hh?.l2 ?? 0,
+    hostHeartL1: hh?.l1 ?? 0,
+    hostHeartDevotion: hh?.devotion ?? 0,
+  };
 }
 
 function buildLeaderboards(
   feed: FeedTopic[],
   commentScores: Map<string, TopicCommentScores>,
+  hostHeartScores: Map<string, TopicNormScores>,
 ): DashboardData["topicLeaderboard"] {
   // All published topics, not a top-10 — QA #42 wants the dashboard to show
   // every host and every topic, each linked to its permalink.
-  return feed.map((t) => {
-    const c = commentScores.get(t.id);
-    return {
-      id: t.id,
-      title: t.title,
-      slug: t.slug,
-      hostId: t.hostId,
-      hostName: t.hostName,
-      hostImage: t.hostImage,
-      hostSlug: t.hostSlug,
-      weightedScore: t.weightedScore,
-      l2Score: t.l2Score,
-      devotionScore: t.devotionScore,
-      heartCount: t.heartCount,
-      commentTotal: c?.total ?? 0,
-      commenterCount: c?.commenters ?? 0,
-      commentL2: c?.l2 ?? 0,
-      commentL1: c?.l1 ?? 0,
-      commentDevotion: c?.devotion ?? 0,
-    };
-  });
+  return feed.map((t) => ({
+    id: t.id,
+    title: t.title,
+    slug: t.slug,
+    hostId: t.hostId,
+    hostName: t.hostName,
+    hostImage: t.hostImage,
+    hostSlug: t.hostSlug,
+    weightedScore: t.weightedScore,
+    l2Score: t.l2Score,
+    devotionScore: t.devotionScore,
+    heartCount: t.heartCount,
+    ...commentScoreFields(commentScores.get(t.id)),
+    ...hostHeartScoreFields(hostHeartScores.get(t.id)),
+  }));
 }
 
 /** Published-topic count + latest publish/edit per host, forum-wide — the
@@ -269,7 +305,16 @@ function buildHostActivity(args: {
   }[];
   topicStats: Map<string, Stat>;
   commentsByAuthor: Map<string, Stat>;
+  hostHeartRows: HeartActivityRow[];
+  commentsByAuthorTopic: Map<string, number>;
+  /** last-activity-signals — every trace, unwindowed. */
+  lastSignals: Map<string, Date>;
 }): DashboardData["hostActivity"] {
+  const givenByHost = heartStatsByElector(args.hostHeartRows);
+  const heartedByHost = heartedTopicsByElector(
+    args.hostHeartRows,
+    args.commentsByAuthorTopic,
+  );
   return args.hostRows
     .map((h) => {
       const topicStat = args.topicStats.get(h.userId);
@@ -281,9 +326,12 @@ function buildHostActivity(args: {
         hostSlug: h.slug,
         topicCount: topicStat?.count ?? 0,
         commentCount: commentStat?.count ?? 0,
+        hostHeartCount: givenByHost.get(h.userId)?.count ?? 0,
+        hostHeartedTopics: heartedByHost.get(h.userId) ?? [],
         latestActivityAt: latestDate(
           topicStat?.latestAt,
           commentStat?.latestAt,
+          args.lastSignals.get(h.userId),
         ),
       };
     })
@@ -370,6 +418,44 @@ async function loadHeartActivity(
       ),
     )
     .where(and(...heartCountConds));
+}
+
+/** All 💙s on published topics, HeartActivityRow-shaped: `electorId` is
+ * the GIVING host; topic fields describe the 💙'd topic and its owner.
+ * No cutoff/window — 💙s ignore heartsCountFrom (host hearts,
+ * 2026-08-04). Feeds the leaderboard 💙 norms, the given-counts, and the
+ * host rows' fold-open topic lists. */
+async function loadHostHeartActivity(
+  timetableId: string,
+): Promise<HeartActivityRow[]> {
+  return db
+    .select({
+      electorId: hostHearts.userId,
+      topicId: topics.id,
+      title: topics.title,
+      slug: topics.slug,
+      hostId: topics.hostId,
+      hostName: timetableMemberships.name,
+      hostSlug: timetableMemberships.slug,
+      createdAt: hostHearts.createdAt,
+    })
+    .from(hostHearts)
+    .innerJoin(topics, eq(topics.id, hostHearts.topicId))
+    .leftJoin(
+      timetableMemberships,
+      and(
+        eq(timetableMemberships.userId, topics.hostId),
+        eq(timetableMemberships.timetableId, topics.timetableId),
+      ),
+    )
+    .where(
+      and(
+        eq(topics.timetableId, timetableId),
+        eq(topics.status, "published" as const),
+        // The join above is the TOPIC's host; this checks the GIVER.
+        givenByActiveMember(hostHearts.userId, topics.timetableId),
+      ),
+    );
 }
 
 function heartStatsByElector(
@@ -497,6 +583,7 @@ async function loadCommentTallies(
         isNull(comments.hiddenAt),
         isNull(comments.deletedAt),
         sql`'elector' = ANY(${timetableMemberships.roles})`,
+        isNull(timetableMemberships.deactivatedAt),
         ne(comments.authorId, topics.hostId),
         ...(activitySince ? [gte(comments.createdAt, activitySince)] : []),
       ),
@@ -550,6 +637,8 @@ function buildElectorActivity(args: {
   availabilityByElector: Map<string, Stat>;
   queueCoverage: { publishedCount: number; coveredByUser: Map<string, number> };
   filter: ElectorActivityFilter;
+  /** last-activity-signals — every trace, unwindowed. */
+  lastSignals: Map<string, Date>;
 }): DashboardData["electorActivity"] {
   const heartsByElector = heartStatsByElector(args.heartActivityRows);
   const heartedByElector = heartedTopicsByElector(
@@ -576,6 +665,7 @@ function buildElectorActivity(args: {
           heartStat?.latestAt,
           commentStat?.latestAt,
           availabilityStat?.latestAt,
+          args.lastSignals.get(elector.userId),
         ),
         heartedTopics: heartedByElector.get(elector.userId) ?? [],
       };
@@ -584,38 +674,21 @@ function buildElectorActivity(args: {
     .sort(compareElectorActivity);
 }
 
-type SlotTagRow = {
-  slotId: string;
-  topicId: string;
-  title: string;
-  hostId: string;
-  startsAt: Date;
-  location: string;
-};
-
-/** Topic↔slot tags for this timetable, with slot metadata for conflicts. */
-async function loadSlotTagRows(timetableId: string): Promise<SlotTagRow[]> {
-  return db
-    .select({
-      slotId: slotTopics.slotId,
-      topicId: slotTopics.topicId,
-      title: topics.title,
-      hostId: topics.hostId,
-      startsAt: timeslots.startsAt,
-      location: timeslots.location,
-    })
-    .from(slotTopics)
-    .innerJoin(timeslots, eq(timeslots.id, slotTopics.slotId))
-    .innerJoin(topics, eq(topics.id, slotTopics.topicId))
-    .where(eq(timeslots.timetableId, timetableId));
-}
-
-/** Published topics not tagged into any slot. */
-function findUnallocated(
+/** Published topics with no session pencilled into any slot. (Bookings
+ * model 2026-08-06: sessions live in slot_sessions, several per slot;
+ * competing claims are conversation, not data.) */
+async function findUnallocated(
+  timetableId: string,
   feed: FeedTopic[],
-  tagRows: SlotTagRow[],
-): DashboardData["unallocatedTopics"] {
-  const taggedTopicIds = new Set(tagRows.map((r) => r.topicId));
+): Promise<DashboardData["unallocatedTopics"]> {
+  const tagRows = await db
+    .select({ topicId: slotSessions.topicId })
+    .from(slotSessions)
+    .innerJoin(timeslots, eq(timeslots.id, slotSessions.slotId))
+    .where(eq(timeslots.timetableId, timetableId));
+  const taggedTopicIds = new Set(
+    tagRows.map((r) => r.topicId).filter((id): id is string => id !== null),
+  );
   return feed
     .filter((t) => !taggedTopicIds.has(t.id))
     .map((t) => ({
@@ -623,47 +696,6 @@ function findUnallocated(
       title: t.title,
       slug: t.slug,
       hostSlug: t.hostSlug,
-    }));
-}
-
-/** Slots with more than one tagged topic = conflicts. */
-function findConflicts(
-  tagRows: SlotTagRow[],
-  hostId?: string,
-): DashboardData["conflicts"] {
-  const bySlot = new Map<
-    string,
-    {
-      slotId: string;
-      startsAt: Date;
-      location: string;
-      topics: { id: string; title: string; hostId: string }[];
-    }
-  >();
-  for (const r of tagRows) {
-    const entry = bySlot.get(r.slotId) ?? {
-      slotId: r.slotId,
-      startsAt: r.startsAt,
-      location: r.location,
-      topics: [],
-    };
-    entry.topics.push({ id: r.topicId, title: r.title, hostId: r.hostId });
-    bySlot.set(r.slotId, entry);
-  }
-  return Array.from(bySlot.values())
-    .filter(
-      (s) =>
-        s.topics.length > 1 &&
-        (!hostId || s.topics.some((topic) => topic.hostId === hostId)),
-    )
-    .map((slot) => ({
-      slotId: slot.slotId,
-      startsAt: slot.startsAt,
-      location: slot.location,
-      topics: slot.topics.map((topic) => ({
-        id: topic.id,
-        title: topic.title,
-      })),
     }));
 }
 
@@ -686,7 +718,6 @@ export async function getDashboard(
   const { electorRows, hostRows } = await loadMembers(timetableId);
   const electorCount = electorRows.length;
   const hostCount = hostRows.length;
-  const slotCount = await countSlots(timetableId);
 
   // Weighted feed gives published topics with scores + host names.
   const feed = await buildFeed(timetableId, null, {
@@ -699,9 +730,13 @@ export async function getDashboard(
     await activityWindow(timetableId, opts);
 
   const commentTallies = await loadCommentTallies(timetableId, activitySince);
+  // 💙s ignore the activity window and cutoff — they aren't votes; the
+  // admin table shows the standing picture.
+  const hostHeartRows = await loadHostHeartActivity(timetableId);
   const topicLeaderboard = buildLeaderboards(
     feed,
     topicCommentScores(commentTallies),
+    computeHostHeartScores(hostHeartRows),
   );
 
   const heartActivityRows = await loadHeartActivity(heartCountConds);
@@ -712,15 +747,18 @@ export async function getDashboard(
   );
   // The host table ignores both host filters — recount unfiltered when the
   // elector table's filter would otherwise shrink hosts' comment stats.
-  const hostCommentStats = opts.activityHostId
-    ? (await loadCommentActivity(baseTopicConds, activitySince)).byElector
-    : commentActivity.byElector;
+  const hostCommentActivity = opts.activityHostId
+    ? await loadCommentActivity(baseTopicConds, activitySince)
+    : commentActivity;
   const availabilityByElector = await loadAvailabilityActivity(
     timetableId,
     activitySince,
   );
 
+  const lastSignals = await loadLastActivitySignals(timetableId);
+
   const electorActivity = buildElectorActivity({
+    lastSignals,
     electorRows,
     heartActivityRows,
     commentsByElector: commentActivity.byElector,
@@ -734,25 +772,24 @@ export async function getDashboard(
   });
 
   const hostActivity = buildHostActivity({
+    lastSignals,
     hostRows,
     topicStats: await loadHostTopicStats(timetableId),
-    commentsByAuthor: hostCommentStats,
+    commentsByAuthor: hostCommentActivity.byElector,
+    hostHeartRows,
+    commentsByAuthorTopic: hostCommentActivity.byElectorTopic,
   });
 
-  const tagRows = await loadSlotTagRows(timetableId);
-  const unallocatedTopics = findUnallocated(feed, tagRows);
-  const conflicts = findConflicts(tagRows, opts.hostId);
+  const unallocatedTopics = await findUnallocated(timetableId, feed);
 
   return {
     topicCounts,
     totalHearts,
     electorCount,
     hostCount,
-    slotCount,
     topicLeaderboard,
     hostActivity,
     electorActivity,
     unallocatedTopics,
-    conflicts,
   };
 }

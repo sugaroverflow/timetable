@@ -12,6 +12,7 @@ import { PersonChip } from "@/components/PersonChip";
 import { gqlFetch } from "@/lib/graphql";
 import {
   parseDigestSettings,
+  parseMembershipDigestSettings,
   parseTimetableSettings,
   roleLabel,
 } from "@/lib/timetableSettings";
@@ -19,7 +20,16 @@ import { topicPath } from "@/lib/topicPath";
 
 type Notification = {
   commentId: string;
-  kind: "reply" | "comment" | "mention";
+  kind:
+    | "reply"
+    | "comment"
+    | "mention"
+    | "session_pencilled"
+    | "session_confirmed"
+    | "session_cleared"
+    | "sent_back_to_drafting"
+    | "lounge_reply"
+    | "lounge_mention";
   authorId: string;
   authorName: string | null;
   authorImage: string | null;
@@ -27,50 +37,145 @@ type Notification = {
   body: string;
   visibility: string;
   createdAt: string;
+  topicId: string;
   topicTitle: string;
   topicSlug: string | null;
   topicHostSlug: string | null;
+  /** {host} Lounge kinds: the conversation (their topic fields are empty). */
+  loungeRootId: string | null;
 };
 
 type Data = {
-  timetable: { viewerRoles: string[]; settings: string } | null;
+  timetable: {
+    viewerRoles: string[];
+    settings: string;
+    viewerDigestSettings: string;
+  } | null;
   me: { notificationSettings: string } | null;
   notifications: Notification[];
 };
 
 const QUERY = `
   query Notifications($s: String!) {
-    timetable: forum(idOrSlug: $s) { viewerRoles settings }
+    timetable: forum(idOrSlug: $s) { viewerRoles settings viewerDigestSettings }
     me { notificationSettings }
     notifications(idOrSlug: $s) {
       commentId kind authorId authorName authorImage authorRoles body
-      visibility createdAt topicTitle topicSlug topicHostSlug
+      visibility createdAt topicId topicTitle topicSlug topicHostSlug
+      loungeRootId
     }
   }
 `;
 
-function NotificationCard({
-  n,
-  slug,
-  viewerIsAdmin,
-}: {
-  n: Notification;
-  slug: string;
-  viewerIsAdmin: boolean;
-}) {
-  // The permalink renders every comment tier the viewer may see —
-  // including the drafting thread for the topic's owner and admins
-  // (QA 2026-07-28). Fall back to the thread's list page only when no
-  // path builds.
+const KIND_VERBS: Record<Notification["kind"], string> = {
+  reply: "replied to your comment on",
+  mention: "mentioned you on",
+  // The {host} Lounge (2026-09-30) — the "title" is the room's name.
+  lounge_reply: "replied to your post in",
+  lounge_mention: "mentioned you in",
+  comment: "commented on",
+  // Calendar v2 (QA 2026-08-03): session events for topics you ❤️'d.
+  session_pencilled: "pencilled in a session for",
+  session_confirmed: "confirmed a session for",
+  session_cleared: "cleared a pencilled session for",
+  // An admin cleared your "Ready to publish" mark (Ed, 2026-09-08).
+  sent_back_to_drafting: "moved your topic back to drafting:",
+};
+
+/** A comment's visibility IS its tab in topic-tabs — the values are
+ * `TopicTab.value` in `TopicCard.tsx` / `MyTopicsTabs.tsx`. */
+const TAB_FOR_VISIBILITY: Record<string, string> = {
+  public: "comments",
+  host_only: "host",
+  admin_only: "admin",
+};
+
+function isSessionKind(kind: Notification["kind"]): boolean {
+  return kind.startsWith("session_");
+}
+
+/** For session notifications, body carries the slot's startsAt ISO. */
+function sessionWhen(iso: string): string | null {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const day = d.toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+  const time = d.toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  return `${day}, ${time}`;
+}
+
+/** Link targets per kind. Comment kinds deep-link the topic permalink —
+ * which renders every comment tier the viewer may see, including the
+ * drafting thread for the topic's owner and admins (QA 2026-07-28) — with
+ * the thread's list page as fallback. Session kinds link to the calendar. */
+function cardLinks(
+  n: Notification,
+  slug: string,
+  viewerIsAdmin: boolean,
+): { href: string | null; replyHref: string | null } {
+  if (isSessionKind(n.kind)) {
+    return { href: `/f/${slug}/calendar`, replyHref: null };
+  }
+  if (n.kind === "lounge_reply" || n.kind === "lounge_mention") {
+    // The conversation named, so an older one still loads (?c=), and the
+    // chain-tail composer answers ?reply= as it does on a topic.
+    const base = `/f/${slug}/lounge?c=${n.loungeRootId ?? n.commentId}`;
+    return {
+      href: `${base}#comment-${n.commentId}`,
+      replyHref: `${base}&reply=${n.commentId}#comment-${n.commentId}`,
+    };
+  }
+  if (n.kind === "sent_back_to_drafting") {
+    // Your card on My Topics, drafting tab open — where the admin's
+    // reason lives and where your Ready switch is. The tab must be
+    // named: an unvisited pane isn't in the page (topic-tabs).
+    return {
+      href: `/f/${slug}/my-topics?tab=admin&topic=${n.topicId}#topic-${n.topicId}`,
+      replyHref: null,
+    };
+  }
   const base =
     topicPath(slug, n.topicHostSlug, n.topicSlug) ??
     (n.visibility === "admin_only"
       ? `/f/${slug}/${viewerIsAdmin ? "pending" : "my-topics"}`
       : null);
-  const href = base ? `${base}#comment-${n.commentId}` : null;
-  const replyHref = base
-    ? `${base}?reply=${n.commentId}#comment-${n.commentId}`
-    : null;
+  if (!base) return { href: null, replyHref: null };
+  // Name the tab that holds the comment and the topic it belongs to: the
+  // other panes are unmounted, so without this the reply composer and the
+  // #comment- anchor aren't on the page at all (Ed, 2026-08-21).
+  const aim = `tab=${TAB_FOR_VISIBILITY[n.visibility] ?? "comments"}&topic=${n.topicId}`;
+  return {
+    href: `${base}?${aim}#comment-${n.commentId}`,
+    replyHref: `${base}?${aim}&reply=${n.commentId}#comment-${n.commentId}`,
+  };
+}
+
+function NotificationCard({
+  n,
+  slug,
+  viewerIsAdmin,
+  loungeTitle,
+}: {
+  n: Notification;
+  slug: string;
+  viewerIsAdmin: boolean;
+  /** "{host} Lounge" — what Lounge kinds link as their title. */
+  loungeTitle: string;
+}) {
+  const { href, replyHref } = cardLinks(n, slug, viewerIsAdmin);
+  const title = n.kind.startsWith("lounge_") ? loungeTitle : n.topicTitle;
+  const detail = isSessionKind(n.kind)
+    ? sessionWhen(n.body)
+    : n.body
+      ? `“${n.body.slice(0, 160)}”`
+      : null;
   return (
     <li className="card">
       <div className="row" style={{ alignItems: "flex-start" }}>
@@ -79,26 +184,26 @@ function NotificationCard({
         </PersonChip>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 14 }}>
-            <b>{n.authorName ?? "Someone"}</b>{" "}
-            {n.kind === "reply"
-              ? "replied to your comment on"
-              : n.kind === "mention"
-                ? "mentioned you on"
-                : "commented on"}{" "}
-            {href ? <Link href={href}>{n.topicTitle}</Link> : n.topicTitle}
+            <PersonChip slug={slug} userId={n.authorId}>
+              <b>{n.authorName ?? "Someone"}</b>
+            </PersonChip>{" "}
+            {KIND_VERBS[n.kind]}{" "}
+            {href ? <Link href={href}>{title}</Link> : title}
           </div>
-          <div
-            className="faint"
-            style={{
-              fontSize: 13,
-              marginTop: 2,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
-            &ldquo;{n.body.slice(0, 160)}&rdquo;
-          </div>
+          {detail ? (
+            <div
+              className="faint"
+              style={{
+                fontSize: 13,
+                marginTop: 2,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {detail}
+            </div>
+          ) : null}
           <div className="faint" style={{ fontSize: 11, marginTop: 2 }}>
             {new Date(n.createdAt).toLocaleString()}
           </div>
@@ -111,6 +216,27 @@ function NotificationCard({
         ) : null}
       </div>
     </li>
+  );
+}
+
+/** The digest card — fully per-forum (2026-08-11): on/off, cadence, and
+ * the kind switches are this forum's; the user's stored globals are the
+ * display fallback for untouched memberships. Roles drive which switches
+ * show (round 2); the forum's configured defaults fill untouched ones. */
+function DigestCard({ slug, data }: { slug: string; data: Data }) {
+  if (!data.me) return null;
+  const settings = parseTimetableSettings(data.timetable?.settings);
+  return (
+    <DigestSettingsForm
+      slug={slug}
+      current={parseDigestSettings(data.me.notificationSettings)}
+      currentForum={parseMembershipDigestSettings(
+        data.timetable?.viewerDigestSettings,
+      )}
+      forumDefaults={settings.digestKindDefaults ?? {}}
+      roles={data.timetable?.viewerRoles ?? []}
+      roleLabels={settings.roleLabels}
+    />
   );
 }
 
@@ -165,11 +291,7 @@ export default async function NotificationsPage({
       <h3 className="section-title">Settings</h3>
       {/* Email digest preferences live with the notifications they gate
           (QA 2026-07-28 — moved off the profile page). */}
-      {data.me ? (
-        <DigestSettingsForm
-          current={parseDigestSettings(data.me.notificationSettings)}
-        />
-      ) : null}
+      <DigestCard slug={slug} data={data} />
 
       <h3 className="section-title">Notifications</h3>
       {data.notifications.length > 0 ? (
@@ -196,6 +318,7 @@ export default async function NotificationsPage({
               n={n}
               slug={slug}
               viewerIsAdmin={viewerIsAdmin}
+              loungeTitle={`${roleLabel(settings.roleLabels, "host")} Lounge`}
             />
           ))}
         </ul>

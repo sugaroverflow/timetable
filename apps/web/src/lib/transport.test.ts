@@ -129,4 +129,17 @@ describe("rest", () => {
     const res = await createTransport(fakeAuth(null)).rest("/api/x");
     expect(res.status).toBe(403);
   });
+
+  it("refuses absolute and scheme-relative paths (token stays same-origin)", async () => {
+    const mock = stubFetch(jsonResponse({}));
+    const transport = createTransport(fakeAuth("tok"));
+
+    await expect(transport.rest("https://evil.example/x")).rejects.toThrow(
+      /same-origin path/,
+    );
+    await expect(transport.rest("//evil.example/x")).rejects.toThrow(
+      /same-origin path/,
+    );
+    expect(mock).not.toHaveBeenCalled();
+  });
 });

@@ -1,5 +1,7 @@
 import { SignIn } from "@clerk/nextjs";
 
+import { e2eTestMode } from "@/env";
+
 export default function SignInPage() {
   return (
     <main className="container auth-page">
@@ -7,7 +9,7 @@ export default function SignInPage() {
         <h1>Sign in</h1>
         <p>Continue with your account to access your forums.</p>
       </div>
-      {process.env.E2E_TEST_MODE === "1" ? null : (
+      {e2eTestMode ? null : (
         <SignIn
           path="/sign-in"
           routing="path"

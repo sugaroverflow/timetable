@@ -1,104 +1,275 @@
+import Link from "next/link";
+import { ChevronDown, ChevronUp } from "lucide-react";
+
 import { auth } from "@clerk/nextjs/server";
-import { isAdmin, isElector, isHost, type Role } from "@timetable/shared";
+import {
+  calendarConfirmPolicy,
+  isAdmin,
+  isCalendarEnabled,
+  isHost,
+  officeHoursLabel,
+  type Role,
+} from "@timetable/shared";
 
 import { env } from "@/env";
 import { AudienceFilter } from "@/components/AudienceFilter";
+import { CalendarTable } from "@/components/CalendarTable";
+import { CalendarSetup } from "@/components/CalendarSetup";
 import { EmptyState } from "@/components/EmptyState";
 import { LocationFilter } from "@/components/LocationFilter";
-import { SlotAdminForm } from "@/components/SlotAdminForm";
-import { SlotCard, type CalendarPerms } from "@/components/SlotCard";
-import { WeekdayPatternControl } from "@/components/WeekdayPatternControl";
-import type { CalendarSlot, TopicOption } from "@/lib/calendarTypes";
+import { PatternGrid } from "@/components/PatternGrid";
+import { ProposeSlotForm } from "@/components/ProposeSlotForm";
+import { SlotStatusFilter } from "@/components/SlotStatusFilter";
+import type {
+  AvailabilityState,
+  CalendarPerms,
+  CalendarSlot,
+  TopicOption,
+} from "@/lib/calendarTypes";
+import { buildCalendarPerms } from "@/lib/calendarPerms";
+import { CALENDAR_SLOT_FIELDS } from "@/lib/gqlFragments";
 import { gqlFetch } from "@/lib/graphql";
 import { displayRolesFromCookies } from "@/lib/previewRoles.server";
-import { parseTimetableSettings, roleLabel } from "@/lib/timetableSettings";
+import {
+  parseTimetableSettings,
+  pluralLabel,
+  roleLabel,
+  type RoleLabels,
+} from "@/lib/timetableSettings";
 
 type Data = {
-  timetable: { viewerRoles: string[]; settings: string } | null;
+  timetable: {
+    viewerRoles: string[];
+    settings: string;
+    calendarHasSlots: boolean;
+  } | null;
+  me: { id: string } | null;
   calendar: CalendarSlot[];
   topicFeed: TopicOption[];
   myIcsToken?: string | null;
+  myAvailabilityPattern?: string | null;
 };
 
-const SLOT_FIELDS = `
-  id startsAt endsAt location commentCount viewerState
-  topics { id title }
-  counts { green yellow red }
-  perUser { userId name state }
-`;
-
 const QUERY = `
-  query Calendar($s: String!, $audience: String) {
-    timetable: forum(idOrSlug: $s) { viewerRoles settings }
-    calendar(idOrSlug: $s, audience: $audience) { ${SLOT_FIELDS} }
-    topicFeed(idOrSlug: $s) { id title }
+  query Calendar($s: String!, $audience: String, $past: Boolean) {
+    timetable: forum(idOrSlug: $s) { viewerRoles settings calendarHasSlots }
+    calendar(idOrSlug: $s, audience: $audience, includePast: $past) { ${CALENDAR_SLOT_FIELDS} }
+    topicFeed(idOrSlug: $s) { id title hostId hostName heartCount }
   }
 `;
 
 const QUERY_AUTHED = `
-  query CalendarAuthed($s: String!, $audience: String) {
-    timetable: forum(idOrSlug: $s) { viewerRoles settings }
-    calendar(idOrSlug: $s, audience: $audience) { ${SLOT_FIELDS} }
-    topicFeed(idOrSlug: $s) { id title }
+  query CalendarAuthed($s: String!, $audience: String, $past: Boolean) {
+    timetable: forum(idOrSlug: $s) { viewerRoles settings calendarHasSlots }
+    me { id }
+    calendar(idOrSlug: $s, audience: $audience, includePast: $past) { ${CALENDAR_SLOT_FIELDS} }
+    topicFeed(idOrSlug: $s) { id title hostId hostName heartCount }
     myIcsToken
+    myAvailabilityPattern(idOrSlug: $s)
   }
 `;
 
 function buildIcsUrl(slug: string, token: string | null | undefined): string {
   return (
     `${env.apiUrl}/api/forums/${slug}/calendar.ics` +
-    (token ? `?token=${token}` : "")
+    (token ? `?token=${encodeURIComponent(token)}` : "")
   );
 }
 
 function CalendarToolbar({
   calendar,
+  configuredLocations,
   topics,
   perms,
   hostView,
   audience,
   location,
-  icsUrl,
+  show,
+  electorsLabel,
 }: {
   calendar: CalendarSlot[];
+  /** The forum's configured locations — offered in the filter even before
+   * any slot carries them ("no slots match" = not released yet). */
+  configuredLocations: string[];
   topics: TopicOption[];
   perms: CalendarPerms;
   hostView: boolean;
   audience?: string;
   location?: string;
-  icsUrl: string;
+  show?: string;
+  electorsLabel: string;
 }) {
   const locations = [
-    ...new Set(calendar.map((s) => s.location).filter(Boolean)),
-  ].sort();
-  // Every slot carries the full audience in perUser (host/admin only), so
-  // the audience size is the same across slots.
-  const audienceCount = calendar[0]?.perUser?.length ?? null;
+    ...new Set([
+      ...configuredLocations,
+      ...calendar.flatMap((s) => [
+        ...s.locations,
+        ...s.sessions.map((x) => x.location),
+      ]),
+    ]),
+  ]
+    .filter(Boolean)
+    .sort();
+
+  if (calendar.length === 0) return null;
 
   return (
-    <div className="toolbar">
+    // Flush floating filter bar, same treatment as the All Topics toolbar
+    // (QA 2026-08-02) — sits directly above the table.
+    <div className="toolbar feed-toolbar">
       {perms.canSeeHostOnly ? (
-        <>
-          <label>Audience</label>
-          <AudienceFilter
-            value={audience ?? "all"}
-            isHost={hostView}
-            topics={topics}
-          />
-        </>
+        <AudienceFilter
+          value={audience ?? "all"}
+          isHost={hostView}
+          admin={perms.canAdmin}
+          topics={topics}
+          electorsLabel={electorsLabel}
+        />
       ) : null}
+      <SlotStatusFilter value={show ?? ""} />
       {locations.length > 0 ? (
         <LocationFilter value={location ?? ""} locations={locations} />
       ) : null}
-      <span className="spacer" />
-      {perms.canSeeHostOnly && audienceCount !== null ? (
-        <span className="faint" style={{ fontSize: 12 }}>
-          {audienceCount} elector{audienceCount === 1 ? "" : "s"} in view
-        </span>
+    </div>
+  );
+}
+
+function isPast(slot: CalendarSlot): boolean {
+  return new Date(slot.endsAt).getTime() < Date.now();
+}
+
+/** Hosts pencil/claim/filter by their own published topics; admins see
+ * every topic (the lens groups them by host — QA 2026-08-02). */
+function selectClaimTopics(
+  topicFeed: TopicOption[],
+  admin: boolean,
+  viewerId: string | null,
+): TopicOption[] {
+  return admin ? topicFeed : topicFeed.filter((t) => t.hostId === viewerId);
+}
+
+/** Slot locations (2026-08-11): the "location" filter shows timeslots
+ * offering, or hosting something at, that location. (Since 2026-08-14
+ * sessions only carry a location once the room is assigned at confirm
+ * time, so an open slot here no longer means the room is free.) */
+function filterByLocation(
+  slots: CalendarSlot[],
+  location: string | undefined,
+): CalendarSlot[] {
+  return location
+    ? slots.filter(
+        (s) =>
+          s.locations.includes(location) ||
+          s.sessions.some((x) => x.location === location),
+      )
+    : slots;
+}
+
+function hasSession(slot: CalendarSlot): boolean {
+  return slot.sessions.length > 0;
+}
+
+/** Your sessions (Ed, QA 2026-08-16): future slots carrying something of
+ * the viewer's own — a session on a topic they host, or their office
+ * hours. Admin custom sessions belong to nobody, so they never qualify.
+ * Deliberately read off the UNFILTERED calendar: yours shouldn't vanish
+ * because you narrowed the view below. */
+function selectMySessionSlots(
+  slots: CalendarSlot[],
+  viewerId: string | null,
+): CalendarSlot[] {
+  if (!viewerId) return [];
+  return slots.filter(
+    (slot) =>
+      !isPast(slot) &&
+      slot.sessions.some(
+        (s) => s.topic?.hostId === viewerId || s.sessionHost?.id === viewerId,
+      ),
+  );
+}
+
+/** ?show=sessions|open — the calendar's two jobs (what's happening vs
+ * where's free) as separate views; default is the full chronology. */
+function filterBySlotState(
+  slots: CalendarSlot[],
+  show: string | undefined,
+): CalendarSlot[] {
+  if (show === "sessions") return slots.filter(hasSession);
+  if (show === "open") return slots.filter((s) => !hasSession(s));
+  return slots;
+}
+
+/** The active lens topic (from ?audience=hearted_topic:<id>), or null for
+ * "All electors" — it doubles as the comment attachment (QA 2026-08-03). */
+function findLensTopic(
+  audience: string | undefined,
+  topicFeed: TopicOption[],
+): TopicOption | null {
+  if (!audience?.startsWith("hearted_topic:")) return null;
+  const id = audience.slice("hearted_topic:".length);
+  return topicFeed.find((t) => t.id === id) ?? null;
+}
+
+function parsePattern(
+  raw: string | null | undefined,
+): Record<string, AvailabilityState> {
+  try {
+    return JSON.parse(raw ?? "{}") as Record<string, AvailabilityState>;
+  } catch {
+    return {};
+  }
+}
+
+/** The two reasons this page shows a notice instead of the calendar:
+ * feature off, or (for non-admins) no schedule yet — the nav link hides in
+ * both cases too, so this covers deep links (QA 2026-08-03). */
+function calendarGate(
+  admin: boolean,
+  settings: ReturnType<typeof parseTimetableSettings>,
+  hasSlots: boolean,
+  base: string,
+): React.ReactNode | null {
+  if (!isCalendarEnabled(settings)) {
+    return <CalendarDisabledNotice admin={admin} base={base} />;
+  }
+  if (!admin && !hasSlots) {
+    return <div className="notice">The calendar isn’t set up yet.</div>;
+  }
+  return null;
+}
+
+function CalendarDisabledNotice({
+  admin,
+  base,
+}: {
+  admin: boolean;
+  base: string;
+}) {
+  return (
+    <div className="notice">
+      The calendar isn’t enabled for this forum.
+      {admin ? (
+        <>
+          {" "}
+          Switch it on in <Link href={`${base}/settings`}>Forum Settings</Link>.
+        </>
       ) : null}
-      <a className="btn btn-ghost" href={icsUrl}>
-        Subscribe (ICS)
-      </a>
+    </div>
+  );
+}
+
+function Legend() {
+  return (
+    <div className="legend">
+      <span>
+        <i className="i-g" /> Available
+      </span>
+      <span>
+        <i className="i-y" /> Maybe
+      </span>
+      <span>
+        <i className="i-r" /> Can’t
+      </span>
     </div>
   );
 }
@@ -110,21 +281,191 @@ function CalendarEmpty({
   anySlots: boolean;
   canAdmin: boolean;
 }) {
-  if (!anySlots) {
+  if (anySlots) {
     return (
       <EmptyState
         icon="▦"
-        title="No timeslots yet"
-        hint={canAdmin ? "Add one above to get started." : undefined}
+        title="No slots match"
+        hint="Try a different filter."
       />
     );
   }
   return (
     <EmptyState
       icon="▦"
-      title="No slots match"
-      hint="Try a different location."
+      title="No timeslots yet"
+      hint={
+        canAdmin
+          ? "Set a pattern above and generate slots to get started."
+          : undefined
+      }
     />
+  );
+}
+
+/** Show past / Hide past, which on this page is a link rather than state
+ * (the past is a server-side fetch: `?past=1`). It rides in the table's
+ * first month heading (QA 2026-08-03). */
+function PastToggle({
+  showingPast,
+  base,
+}: {
+  showingPast: boolean;
+  base: string;
+}) {
+  return (
+    <Link
+      className="topic-body-toggle"
+      href={showingPast ? `${base}/calendar` : `${base}/calendar?past=1`}
+    >
+      {showingPast ? (
+        <>
+          <ChevronUp size={14} aria-hidden /> Hide past
+        </>
+      ) : (
+        <>
+          <ChevronDown size={14} aria-hidden /> Show past
+        </>
+      )}
+    </Link>
+  );
+}
+
+/** Legend + the slot table (or the empty state). */
+function CalendarBody({
+  slug,
+  visibleSlots,
+  anySlots,
+  locations,
+  perms,
+  claimTopics,
+  lensTopic,
+  adminLabel,
+  ohLabel,
+  roleLabels,
+  past,
+  base,
+}: {
+  slug: string;
+  visibleSlots: CalendarSlot[];
+  anySlots: boolean;
+  locations: string[];
+  perms: CalendarPerms;
+  claimTopics: TopicOption[];
+  lensTopic: TopicOption | null;
+  adminLabel: string;
+  ohLabel: string;
+  roleLabels?: RoleLabels;
+  past: boolean;
+  base: string;
+}) {
+  if (visibleSlots.length === 0) {
+    return <CalendarEmpty anySlots={anySlots} canAdmin={perms.canAdmin} />;
+  }
+  return (
+    <div className="stack" style={{ gap: "var(--space-2)" }}>
+      <CalendarTable
+        rows={visibleSlots.map((slot) => ({ slot, past: isPast(slot) }))}
+        slug={slug}
+        locations={locations}
+        perms={perms}
+        claimTopics={claimTopics}
+        lensTopic={lensTopic}
+        adminLabel={adminLabel}
+        officeHoursLabel={ohLabel}
+        roleLabels={roleLabels}
+        pastToggle={<PastToggle showingPast={past} base={base} />}
+        anchorRows
+      />
+      {perms.canSeeHostOnly || perms.canSetAvailability ? <Legend /> : null}
+    </div>
+  );
+}
+
+/** Your own upcoming sessions, pinned above everything else (Ed, QA
+ * 2026-08-16) — the same rows the chronology below repeats, in the same
+ * component, so a session can't look different in the two places. Renders
+ * nothing for a viewer who hosts none. */
+function MySessions({
+  slots,
+  slug,
+  locations,
+  perms,
+  claimTopics,
+  lensTopic,
+  adminLabel,
+  ohLabel,
+  roleLabels,
+}: {
+  slots: CalendarSlot[];
+  slug: string;
+  locations: string[];
+  perms: CalendarPerms;
+  claimTopics: TopicOption[];
+  lensTopic: TopicOption | null;
+  adminLabel: string;
+  ohLabel: string;
+  roleLabels?: RoleLabels;
+}) {
+  if (slots.length === 0) return null;
+  return (
+    <CalendarTable
+      title="Your Sessions"
+      rows={slots.map((slot) => ({ slot, past: false }))}
+      slug={slug}
+      locations={locations}
+      perms={perms}
+      claimTopics={claimTopics}
+      lensTopic={lensTopic}
+      adminLabel={adminLabel}
+      officeHoursLabel={ohLabel}
+      roleLabels={roleLabels}
+    />
+  );
+}
+
+/** The action cards between toolbar and table, gated per role. */
+function CalendarCards({
+  slug,
+  perms,
+  calendar,
+  myPattern,
+  claimTopics,
+  adminLabel,
+  ohLabel,
+}: {
+  slug: string;
+  perms: CalendarPerms;
+  calendar: NonNullable<ReturnType<typeof parseTimetableSettings>["calendar"]>;
+  myPattern: Record<string, AvailabilityState>;
+  claimTopics: TopicOption[];
+  adminLabel: string;
+  ohLabel: string;
+}) {
+  return (
+    <>
+      {perms.canAdmin ? (
+        <CalendarSetup slug={slug} current={calendar} adminLabel={adminLabel} />
+      ) : null}
+      {perms.canSetAvailability && (calendar.patternCells?.length ?? 0) > 0 ? (
+        <PatternGrid
+          slug={slug}
+          cells={calendar.patternCells ?? []}
+          initial={myPattern}
+        />
+      ) : null}
+      {/* Office hours need no topics, so the form shows whenever the
+          viewer may propose (QA 2026-08-03). */}
+      {perms.canPropose ? (
+        <ProposeSlotForm
+          slug={slug}
+          topics={claimTopics}
+          locations={calendar.locations ?? []}
+          perms={perms}
+          officeHoursLabel={ohLabel}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -133,81 +474,122 @@ export default async function CalendarPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ audience?: string; location?: string }>;
+  searchParams: Promise<{
+    audience?: string;
+    location?: string;
+    show?: string;
+    past?: string;
+  }>;
 }) {
   const { slug } = await params;
-  const { audience, location } = await searchParams;
+  const { audience, location, show, past: pastParam } = await searchParams;
   const { userId } = await auth();
+  const past = pastParam === "1";
 
   const data = await gqlFetch<Data>(userId ? QUERY_AUTHED : QUERY, {
     s: slug,
     audience: audience ?? null,
+    past,
   });
   const roles = await displayRolesFromCookies(
     (data.timetable?.viewerRoles ?? []) as Role[],
   );
-
-  const perms: CalendarPerms = {
-    canSetAvailability: isElector(roles),
-    canSeeHostOnly: isHost(roles) || isAdmin(roles),
-    canAdmin: isAdmin(roles),
-  };
   const settings = parseTimetableSettings(data.timetable?.settings);
-  const adminLabel = roleLabel(settings.roleLabels, "admin");
-  const icsUrl = buildIcsUrl(slug, data.myIcsToken);
+  const base = `/f/${slug}`;
 
-  const visibleSlots = location
-    ? data.calendar.filter((s) => s.location === location)
-    : data.calendar;
+  const gate = calendarGate(
+    isAdmin(roles),
+    settings,
+    data.timetable?.calendarHasSlots ?? false,
+    base,
+  );
+  if (gate) return gate;
+
+  const viewerId = data.me?.id ?? null;
+  const perms = buildCalendarPerms(
+    roles,
+    viewerId,
+    calendarConfirmPolicy(settings),
+  );
+  const adminLabel = roleLabel(settings.roleLabels, "admin");
+  const calendarSettings = { locations: [], ...(settings.calendar ?? {}) };
+
+  const claimTopics = selectClaimTopics(
+    data.topicFeed,
+    perms.canAdmin,
+    viewerId,
+  );
+  const lensTopic = findLensTopic(audience, data.topicFeed);
+  const visibleSlots = filterBySlotState(
+    filterByLocation(data.calendar, location),
+    show,
+  );
+  const mySessionSlots = selectMySessionSlots(data.calendar, viewerId);
 
   return (
     <div className="stack">
+      <div
+        className="page-head row wrap"
+        style={{ justifyContent: "space-between", alignItems: "center" }}
+      >
+        <h2 className="page-title" style={{ margin: 0 }}>
+          Calendar
+        </h2>
+        <a className="btn btn-ghost" href={buildIcsUrl(slug, data.myIcsToken)}>
+          Subscribe (ICS)
+        </a>
+      </div>
+
+      <MySessions
+        slots={mySessionSlots}
+        slug={slug}
+        locations={calendarSettings.locations}
+        perms={perms}
+        claimTopics={claimTopics}
+        lensTopic={lensTopic}
+        adminLabel={adminLabel}
+        ohLabel={officeHoursLabel(settings)}
+        roleLabels={settings.roleLabels}
+      />
+
+      <CalendarCards
+        slug={slug}
+        perms={perms}
+        calendar={calendarSettings}
+        myPattern={parsePattern(data.myAvailabilityPattern)}
+        claimTopics={claimTopics}
+        adminLabel={adminLabel}
+        ohLabel={officeHoursLabel(settings)}
+      />
+
       <CalendarToolbar
         calendar={data.calendar}
-        topics={data.topicFeed}
+        configuredLocations={calendarSettings.locations}
+        topics={claimTopics}
         perms={perms}
         hostView={isHost(roles)}
         audience={audience}
         location={location}
-        icsUrl={icsUrl}
+        show={show}
+        electorsLabel={pluralLabel(
+          roleLabel(settings.roleLabels, "elector"),
+        ).toLowerCase()}
       />
 
-      {perms.canAdmin ? <SlotAdminForm slug={slug} /> : null}
-      {perms.canSetAvailability ? <WeekdayPatternControl slug={slug} /> : null}
-
-      {data.calendar.length > 0 ? (
-        <div className="legend">
-          <span>
-            <i className="i-g" /> Available
-          </span>
-          <span>
-            <i className="i-y" /> Maybe
-          </span>
-          <span>
-            <i className="i-r" /> Can’t
-          </span>
-        </div>
-      ) : null}
-
-      {visibleSlots.length === 0 ? (
-        <CalendarEmpty
-          anySlots={data.calendar.length > 0}
-          canAdmin={perms.canAdmin}
-        />
-      ) : (
-        <ul className="list">
-          {visibleSlots.map((slot) => (
-            <SlotCard
-              key={slot.id}
-              slot={slot}
-              slug={slug}
-              perms={perms}
-              topicOptions={data.topicFeed}
-              adminLabel={adminLabel}
-            />
-          ))}
-        </ul>
-      )}
+      <CalendarBody
+        slug={slug}
+        visibleSlots={visibleSlots}
+        anySlots={data.calendar.length > 0}
+        locations={calendarSettings.locations}
+        perms={perms}
+        claimTopics={claimTopics}
+        lensTopic={lensTopic}
+        adminLabel={adminLabel}
+        ohLabel={officeHoursLabel(settings)}
+        roleLabels={settings.roleLabels}
+        past={past}
+        base={base}
+      />
     </div>
   );
 }

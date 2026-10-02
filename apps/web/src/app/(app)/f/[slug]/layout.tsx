@@ -5,7 +5,13 @@ import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 
-import { isAdmin, isElector, isHost, type Role } from "@timetable/shared";
+import {
+  isAdmin,
+  isElector,
+  isHost,
+  isLoungeEnabled,
+  type Role,
+} from "@timetable/shared";
 
 import { NavLink } from "@/components/NavLink";
 import { Sidebar } from "@/components/Sidebar";
@@ -23,6 +29,7 @@ import {
   buildThemeCss,
   parseTimetableSettings,
   privacyDescription,
+  roleLabel,
 } from "@/lib/timetableSettings";
 import { parseViewAs, VIEW_AS_COOKIE } from "@/lib/userPreview";
 
@@ -35,6 +42,7 @@ type TimetableResult = {
     customDomain: string | null;
     viewerRoles: string[];
     settings: string;
+    calendarHasSlots: boolean;
   } | null;
 };
 
@@ -48,6 +56,7 @@ const TIMETABLE_QUERY = `
       customDomain
       viewerRoles
       settings
+      calendarHasSlots
     }
   }
 `;
@@ -98,7 +107,8 @@ const UNREAD_QUERY = `
   query Unread($s: String!) {
     notificationsUnread(idOrSlug: $s)
     topicQueue(idOrSlug: $s) { neverSeenCount }
-    moderationQueue(idOrSlug: $s) { id }
+    moderationQueue(idOrSlug: $s) { id readyAt }
+    loungeUnread(idOrSlug: $s)
   }
 `;
 
@@ -129,21 +139,30 @@ async function loadSwitcherAndUnread(
   unread: number;
   queueNeverSeen: number;
   pendingCount: number;
+  loungeUnread: boolean;
 }> {
   if (!isAuthed)
-    return { switcherItems: [], unread: 0, queueNeverSeen: 0, pendingCount: 0 };
+    return {
+      switcherItems: [],
+      unread: 0,
+      queueNeverSeen: 0,
+      pendingCount: 0,
+      loungeUnread: false,
+    };
   const [mine, unreadData] = await Promise.all([
     getMyTimetables(),
     isMember
       ? gqlFetch<{
           notificationsUnread: number;
           topicQueue: { neverSeenCount: number } | null;
-          moderationQueue: { id: string }[];
+          moderationQueue: { id: string; readyAt: string | null }[];
+          loungeUnread: boolean;
         }>(UNREAD_QUERY, { s: slug })
       : Promise.resolve({
           notificationsUnread: 0,
           topicQueue: null,
           moderationQueue: [],
+          loungeUnread: false,
         }),
   ]);
   const switcherItems = mine.map((t) => {
@@ -161,70 +180,112 @@ async function loadSwitcherAndUnread(
     switcherItems,
     unread: unreadData.notificationsUnread,
     queueNeverSeen: unreadData.topicQueue?.neverSeenCount ?? 0,
-    pendingCount: unreadData.moderationQueue?.length ?? 0,
+    // Only ready-to-publish topics count — the badge must agree with what
+    // the Pending page's default view shows (2026-08-06).
+    pendingCount:
+      unreadData.moderationQueue?.filter((t) => t.readyAt).length ?? 0,
+    loungeUnread: unreadData.loungeUnread ?? false,
   };
 }
 
-function NotificationsNavLink({
+/** Non-admins see the Calendar link only once slots exist (QA 2026-08-03)
+ * — admins need it regardless, to set the schedule up. */
+function calendarNavVisible(
+  settings: ReturnType<typeof parseTimetableSettings>,
+  roles: Role[],
+  hasSlots: boolean,
+): boolean {
+  if (!settings.calendar?.enabled) return false;
+  return isAdmin(roles) || hasSlots;
+}
+
+/** A nav link with a count badge — hidden at zero, clamped at 999+.
+ * `quiet` = the grey variant (the Topic Queue for non-electors: they
+ * don't get in trouble for not doing the reading; red means the reading
+ * is your vote). */
+function BadgeNavLink({
+  href,
+  label,
+  count,
+  quiet = false,
+}: {
+  href: string;
+  label: string;
+  count: number;
+  quiet?: boolean;
+}) {
+  return (
+    <NavLink href={href}>
+      {label}
+      {count > 0 ? (
+        <span className={`nav-badge${quiet ? " nav-badge-quiet" : ""}`}>
+          {count > 999 ? "999+" : count}
+        </span>
+      ) : null}
+    </NavLink>
+  );
+}
+
+/** "{host} Lounge" when the viewer can enter it (the forum has it on and
+ * they're a host or admin), else null — no link. */
+function loungeNavLabel(
+  settings: ReturnType<typeof parseTimetableSettings>,
+  roles: Role[],
+): string | null {
+  if (!isLoungeEnabled(settings)) return null;
+  if (!isHost(roles) && !isAdmin(roles)) return null;
+  return `${roleLabel(settings.roleLabels, "host")} Lounge`;
+}
+
+/** The {host} Lounge link, with a dot while there are posts the viewer
+ * hasn't seen. */
+function LoungeNavLink({
   base,
+  label,
   unread,
 }: {
   base: string;
-  unread: number;
+  label: string | null;
+  unread: boolean;
 }) {
+  if (!label) return null;
   return (
-    <NavLink href={`${base}/notifications`}>
-      Notifications
-      {unread > 0 ? (
-        <span className="nav-badge">{unread > 999 ? "999+" : unread}</span>
+    <NavLink href={`${base}/lounge`}>
+      {label}
+      {unread ? (
+        <span className="nav-dot" role="img" aria-label="new posts" />
       ) : null}
     </NavLink>
   );
 }
 
-/** Every member (v2 2026-07-29 — hosts asked for the queue too). The
- * badge is the never-seen count (the Analysis "Queue" number), gone at
- * zero; round restarts don't revive it, moving the ❤️-count-from cutoff
- * does. Red for electors (the reading is their vote); grey for everyone
- * else — they don't get in trouble for not doing the reading. */
-function QueueNavLink({
+/** The viewer's own-gesture collection page: electors' ❤️ Topics, or
+ * host-non-electors' 💙 Topics (host hearts, 2026-08-04) — never both,
+ * since one person has one gesture. */
+function GestureTopicsLinks({
   base,
-  neverSeen,
   elector,
+  hostNonElector,
 }: {
   base: string;
-  neverSeen: number;
   elector: boolean;
+  hostNonElector: boolean;
 }) {
-  return (
-    <NavLink href={`${base}/queue`}>
-      Topic Queue
-      {neverSeen > 0 ? (
-        <span className={`nav-badge${elector ? "" : " nav-badge-quiet"}`}>
-          {neverSeen > 999 ? "999+" : neverSeen}
-        </span>
-      ) : null}
-    </NavLink>
-  );
-}
-
-function PendingNavLink({
-  base,
-  pendingCount,
-}: {
-  base: string;
-  pendingCount: number;
-}) {
-  return (
-    <NavLink href={`${base}/pending`}>
-      Pending Topics
-      {pendingCount > 0 ? (
-        <span className="nav-badge">
-          {pendingCount > 999 ? "999+" : pendingCount}
-        </span>
-      ) : null}
-    </NavLink>
-  );
+  if (elector) {
+    return (
+      <NavLink href={`${base}/topics?hearted=me`}>
+        <Heart size={14} fill="currentColor" aria-hidden /> Topics
+      </NavLink>
+    );
+  }
+  if (hostNonElector) {
+    return (
+      <NavLink href={`${base}/topics?hearted=host`}>
+        <span aria-hidden>💙</span> Topics
+      </NavLink>
+    );
+  }
+  return null;
 }
 
 function SideNav({
@@ -232,8 +293,12 @@ function SideNav({
   isAuthed,
   isMember,
   elector,
+  hostNonElector,
   hostOrAdmin,
   admin,
+  calendarOn,
+  loungeLabel,
+  loungeUnread,
   unread,
   queueNeverSeen,
   pendingCount,
@@ -242,8 +307,15 @@ function SideNav({
   isAuthed: boolean;
   isMember: boolean;
   elector: boolean;
+  /** Eligible to 💙 (host hearts, 2026-08-04) — gets the 💙 Topics link. */
+  hostNonElector: boolean;
   hostOrAdmin: boolean;
   admin: boolean;
+  calendarOn: boolean;
+  /** "{host} Lounge" when the viewer can enter it; null hides the link. */
+  loungeLabel: string | null;
+  /** A Lounge post by someone else since the viewer's last visit. */
+  loungeUnread: boolean;
   unread: number;
   queueNeverSeen: number;
   pendingCount: number;
@@ -253,20 +325,37 @@ function SideNav({
       <NavLink href={`${base}/topics`} whenAbsent={["hearted"]}>
         All Topics
       </NavLink>
+      {/* Every member (v2 2026-07-29). The badge is the never-seen count
+          (the Analysis "Queue" number); round restarts don't revive it,
+          moving the ❤️-count-from cutoff does. */}
       {isMember && (
-        <QueueNavLink
-          base={base}
-          neverSeen={queueNeverSeen}
-          elector={elector}
+        <BadgeNavLink
+          href={`${base}/queue`}
+          label="Topic Queue"
+          count={queueNeverSeen}
+          quiet={!elector}
         />
       )}
       {hostOrAdmin && <NavLink href={`${base}/my-topics`}>My Topics</NavLink>}
-      {elector && (
-        <NavLink href={`${base}/topics?hearted=me`}>
-          <Heart size={14} fill="currentColor" aria-hidden /> Topics
-        </NavLink>
+      <GestureTopicsLinks
+        base={base}
+        elector={elector}
+        hostNonElector={hostNonElector}
+      />
+      {/* Calendar v2 (closes #55): the link exists only when the forum has
+          switched the feature on. */}
+      {calendarOn && <NavLink href={`${base}/calendar`}>Calendar</NavLink>}
+      {/* The {host} Lounge (2026-09-30): hosts and admins, once an admin
+          has switched it on. A dot, not a count — new posts are an
+          invitation to look, not a backlog to clear. */}
+      <LoungeNavLink base={base} label={loungeLabel} unread={loungeUnread} />
+      {isMember && (
+        <BadgeNavLink
+          href={`${base}/notifications`}
+          label="Notifications"
+          count={unread}
+        />
       )}
-      {isMember && <NotificationsNavLink base={base} unread={unread} />}
       {/* People shows for every viewer who can read the forum — the API
           filters the list to the profiles their access allows (all members
           on public forums; hosts + admins on hosts_only ones). */}
@@ -275,7 +364,13 @@ function SideNav({
           (QA 2026-07-30). */}
       {isAuthed && <NavLink href={`${base}/profile`}>Profile</NavLink>}
       {hostOrAdmin && <NavLink href={`${base}/analysis`}>Analysis</NavLink>}
-      {admin && <PendingNavLink base={base} pendingCount={pendingCount} />}
+      {admin && (
+        <BadgeNavLink
+          href={`${base}/pending`}
+          label="Pending Topics"
+          count={pendingCount}
+        />
+      )}
       {admin && <NavLink href={`${base}/log`}>Activity Log</NavLink>}
       {admin && <NavLink href={`${base}/settings`}>Forum Settings</NavLink>}
       {isMember && <NavLink href={`${base}/api`}>API</NavLink>}
@@ -308,7 +403,7 @@ export default async function TimetableLayout({
   const { previewUserId, previewName } = await loadPreview(slug);
   const settings = parseTimetableSettings(timetable.settings);
   const base = `/f/${slug}`;
-  const { switcherItems, unread, queueNeverSeen, pendingCount } =
+  const { switcherItems, unread, queueNeverSeen, pendingCount, loungeUnread } =
     await loadSwitcherAndUnread(isAuthed, isMember, slug);
 
   const themeCss = buildThemeCss(settings);
@@ -339,8 +434,16 @@ export default async function TimetableLayout({
             isAuthed={isAuthed}
             isMember={isMember}
             elector={isElector(roles)}
+            hostNonElector={isHost(roles) && !isElector(roles)}
             hostOrAdmin={isHost(roles) || isAdmin(roles)}
             admin={isAdmin(roles)}
+            calendarOn={calendarNavVisible(
+              settings,
+              roles,
+              timetable.calendarHasSlots,
+            )}
+            loungeLabel={loungeNavLabel(settings, roles)}
+            loungeUnread={loungeUnread}
             unread={unread}
             queueNeverSeen={queueNeverSeen}
             pendingCount={pendingCount}

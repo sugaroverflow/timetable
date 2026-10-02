@@ -6,6 +6,7 @@ import {
   type Privacy,
   type Role,
 } from "./roles";
+import type { ConfirmPolicy, TimetableSettings } from "./settings";
 
 /**
  * The acting user evaluated in the context of a single timetable. `userId` is
@@ -22,7 +23,7 @@ export type Viewer = {
 
 export const ANONYMOUS: Viewer = { userId: null, roles: [] };
 
-export function isAuthenticated(viewer: Viewer): boolean {
+function isAuthenticated(viewer: Viewer): boolean {
   return viewer.userId !== null;
 }
 
@@ -76,9 +77,49 @@ export function canSeePersonProfile(
   return true;
 }
 
+/** Contact Details (2026-09-30): forum members only, whatever the privacy
+ * level — the whole point is the part of a profile the public never sees.
+ * A deactivated member resolves to no roles, so they lose sight too. */
+export function canSeeContactDetails(viewer: Viewer): boolean {
+  if (viewer.sysadmin) return true;
+  return isMember(viewer.roles);
+}
+
+/** Whether this person's profile is open to the internet (2026-09-30) —
+ * decides the editor's who-reads-your-About line and the readers'
+ * "Members only" note on Contact Details. */
+export function isProfilePublic(
+  privacy: Privacy,
+  personRoles: readonly Role[],
+): boolean {
+  return (
+    canReadTimetable(privacy, ANONYMOUS) &&
+    canSeePersonProfile(privacy, ANONYMOUS, personRoles)
+  );
+}
+
 /** Only logged-in electors can heart topics. */
 export function canHeart(viewer: Viewer): boolean {
   return isAuthenticated(viewer) && isElector(viewer.roles);
+}
+
+/** Host 💙s (2026-08-04): the parallel gesture for hosts who are NOT
+ * electors — a dual-role member's ❤️ IS their gesture (one person, one
+ * gesture), so in forums where every host is an elector nobody is
+ * eligible and the feature self-disables. 💙s never enter elector
+ * weighting; tallies and sorting are admin-only (canSeeHostHeartTallies),
+ * only the attributed names row in the host-only thread is host-visible. */
+export function canHostHeart(viewer: Viewer): boolean {
+  return (
+    isAuthenticated(viewer) && isHost(viewer.roles) && !isElector(viewer.roles)
+  );
+}
+
+/** 💙 tallies, normalisations, and per-topic host breakdowns: admin eyes
+ * only — hosts see who 💙'd in the host-only thread, never counts across
+ * topics (no peer leaderboard). */
+export function canSeeHostHeartTallies(viewer: Viewer): boolean {
+  return isAdmin(viewer.roles);
 }
 
 /** Every member gets a Topic Queue (v2 2026-07-29 — hosts asked for it):
@@ -103,6 +144,26 @@ export function canSeeHostOnly(viewer: Viewer): boolean {
   return isHost(viewer.roles) || isAdmin(viewer.roles);
 }
 
+/** The {host} Lounge (docs/host-lounge-plan.md, 2026-09-30): owner, admins
+ * and hosts. Electors never; deactivated members resolve to no roles, so
+ * they fall out for free. Whether the forum has the Lounge switched on is
+ * a separate check (isLoungeEnabled). */
+export function canUseLounge(viewer: Viewer): boolean {
+  return (
+    isAuthenticated(viewer) && (isHost(viewer.roles) || isAdmin(viewer.roles))
+  );
+}
+
+/** Per-slot discussion threads on the calendar (2026-08-14): open to every
+ * member so what actually happens in a slot is discussed with everyone.
+ * Attaching a topic claim snapshot to a slot comment stays canSeeHostOnly. */
+export function canDiscussSlots(viewer: Viewer): boolean {
+  return (
+    isAuthenticated(viewer) &&
+    (isElector(viewer.roles) || isHost(viewer.roles) || isAdmin(viewer.roles))
+  );
+}
+
 /** Hosts propose topics; admins can also create them (QA #42) and may
  * keep ownership or reassign to a host afterwards. */
 export function canProposeTopics(viewer: Viewer): boolean {
@@ -125,6 +186,73 @@ export function canEditTopic(viewer: Viewer, topicHostId: string): boolean {
 
 export function canModerate(viewer: Viewer): boolean {
   return isAdmin(viewer.roles);
+}
+
+// ---------------------------------------------------------------------------
+// Settings-dependent permissions (calendar v2, 2026-07-31). These are the
+// first checks that need the forum's parsed settings alongside the viewer —
+// keep them here rather than scattering settings reads through resolvers.
+// ---------------------------------------------------------------------------
+
+/** The whole Calendar feature sits behind this flag (default off). */
+export function isCalendarEnabled(settings: TimetableSettings): boolean {
+  return Boolean(settings.calendar?.enabled);
+}
+
+export function calendarConfirmPolicy(
+  settings: TimetableSettings,
+): ConfirmPolicy {
+  return settings.calendar?.confirmPolicy ?? "hosts_propose";
+}
+
+/** Admin-only calendar management: the slot grid (pattern × terms,
+ * edit/delete slots) and clearing/overriding any session. */
+export function canManageCalendar(viewer: Viewer): boolean {
+  return isAdmin(viewer.roles);
+}
+
+/** Pencil a topic onto a slot (status → proposed), including creating an
+ * off-piste proposed slot at a new time. */
+export function canProposeSession(
+  viewer: Viewer,
+  policy: ConfirmPolicy,
+): boolean {
+  if (isAdmin(viewer.roles)) return true;
+  return isHost(viewer.roles) && policy !== "admins";
+}
+
+/** Confirm a session (status → confirmed). */
+export function canConfirmSession(
+  viewer: Viewer,
+  policy: ConfirmPolicy,
+): boolean {
+  if (isAdmin(viewer.roles)) return true;
+  return isHost(viewer.roles) && policy === "hosts_confirm";
+}
+
+/** The never-displace invariant: a host may only touch a slot's session
+ * when the slot is empty or already carries THEIR topic — another host's
+ * pencilled/confirmed topic is read-only to them at every policy level.
+ * Admins can act on anything. */
+export function canTouchSlotSession(
+  viewer: Viewer,
+  currentTopicHostId: string | null,
+): boolean {
+  if (isAdmin(viewer.roles)) return true;
+  return currentTopicHostId === null || currentTopicHostId === viewer.userId;
+}
+
+/** Host publishing their own topic without admin review — only when the
+ * forum opted in. Admin publishes go through canModerate as before. */
+export function canPublishTopicDirectly(
+  viewer: Viewer,
+  settings: TimetableSettings,
+  topicHostId: string,
+): boolean {
+  return (
+    Boolean(settings.topics?.hostsPublishDirectly) &&
+    ownsTopicAsHost(viewer, topicHostId)
+  );
 }
 
 export function canManageMembers(viewer: Viewer): boolean {

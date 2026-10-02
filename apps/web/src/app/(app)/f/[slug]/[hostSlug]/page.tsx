@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
-import { isElector, isHost, type Role } from "@timetable/shared";
+import { isElector, isHost, type Privacy, type Role } from "@timetable/shared";
 
 import { anonGql } from "@/lib/ogCard";
 
@@ -25,16 +25,18 @@ import { loadMoreFeed } from "../topics/actions";
 const PERSON_QUERY = `
   query PersonPage($s: String!, $userSlug: String!) {
     person(idOrSlug: $s, userSlug: $userSlug) {
-      userId name image slug roles bioHtml
+      userId name image slug roles bioHtml contactDetailsHtml deactivatedAt
     }
+    timetable: forum(idOrSlug: $s) { privacy }
   }
 `;
 
 const PERSON_BY_ID_QUERY = `
   query PersonPageById($s: String!, $userId: String!) {
     person(idOrSlug: $s, userId: $userId) {
-      userId name image slug roles bioHtml
+      userId name image slug roles bioHtml contactDetailsHtml deactivatedAt
     }
+    timetable: forum(idOrSlug: $s) { privacy }
   }
 `;
 
@@ -83,11 +85,8 @@ function TopicSection({
       ) : (
         <InfiniteFeed
           key={`${host}|${heartedBy}`}
-          slug={page.slug}
-          sort="recent"
-          host={host}
-          heartedBy={heartedBy}
-          seed=""
+          positionKey={`${page.slug}|person|${host}|${heartedBy}`}
+          query={{ slug: page.slug, sort: "recent", host, heartedBy }}
           refreshToken={refreshToken}
           pageSize={FEED_PAGE_SIZE}
           initialHasNext={page.hasNext}
@@ -106,21 +105,26 @@ function TopicSection({
  * id (they don't know slugs) and land here; those get redirected to the
  * canonical slug URL. Slug lookup runs first, so a slug can never be
  * shadowed by an id. */
+type PersonData = {
+  person: ProfileCardPerson | null;
+  timetable: { privacy: Privacy } | null;
+};
+
 async function resolvePerson(
   slug: string,
   hostSlug: string,
-): Promise<ProfileCardPerson | null> {
-  const { person } = await gqlFetch<{ person: ProfileCardPerson | null }>(
-    PERSON_QUERY,
-    { s: slug, userSlug: hostSlug },
-  );
-  if (person) return person;
-  const byId = await gqlFetch<{ person: ProfileCardPerson | null }>(
-    PERSON_BY_ID_QUERY,
-    { s: slug, userId: hostSlug },
-  );
+): Promise<PersonData> {
+  const bySlug = await gqlFetch<PersonData>(PERSON_QUERY, {
+    s: slug,
+    userSlug: hostSlug,
+  });
+  if (bySlug.person) return bySlug;
+  const byId = await gqlFetch<PersonData>(PERSON_BY_ID_QUERY, {
+    s: slug,
+    userId: hostSlug,
+  });
   if (byId.person?.slug) redirect(`/f/${slug}/${byId.person.slug}`);
-  return byId.person;
+  return byId;
 }
 
 /** Person page: /f/[slug]/[userSlug] — profile header, then their topics
@@ -133,7 +137,7 @@ export default async function PersonPage({
 }) {
   const { slug, hostSlug } = await params;
 
-  const person = await resolvePerson(slug, hostSlug);
+  const { person, timetable } = await resolvePerson(slug, hostSlug);
   if (!person) notFound();
 
   const roles = person.roles as Role[];
@@ -146,10 +150,10 @@ export default async function PersonPage({
   // ballot, so no shuffle seed here.
   const [hostPage, heartedPage] = await Promise.all([
     host
-      ? fetchFeedPage(slug, "recent", person.userId, 0, false)
+      ? fetchFeedPage({ slug, sort: "recent", host: person.userId })
       : Promise.resolve(null),
     elector
-      ? fetchFeedPage(slug, "recent", "", 0, false, "", person.userId)
+      ? fetchFeedPage({ slug, sort: "recent", heartedBy: person.userId })
       : Promise.resolve(null),
   ]);
   const feed = hostPage ?? heartedPage;
@@ -161,6 +165,7 @@ export default async function PersonPage({
         person={person}
         labels={feed?.settings.roleLabels}
         linkPhoto={false}
+        privacy={timetable?.privacy}
         isSelf={feed?.viewerId === person.userId}
       />
       {hostPage ? (

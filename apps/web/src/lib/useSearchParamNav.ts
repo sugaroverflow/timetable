@@ -4,11 +4,12 @@ import { useCallback } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 export type SetSearchParamOptions = {
-  /** Also delete the "page" param so pagination restarts (feed filters). */
-  resetPage?: boolean;
   /** Extra params to mutate in the same navigation (e.g. the feed's
-   * random-sort shuffle seed). Runs after the key/resetPage updates. */
+   * random-sort shuffle seed). Runs after the key update. */
   mutate?: (params: URLSearchParams) => void;
+  /** router.replace instead of push — for keystroke-driven params (the
+   * search box), so typing doesn't pile up history entries. */
+  replace?: boolean;
 };
 
 /**
@@ -27,10 +28,13 @@ export function useSetSearchParam() {
       const params = new URLSearchParams(searchParams.toString());
       if (value) params.set(key, value);
       else params.delete(key);
-      if (opts?.resetPage) params.delete("page");
       opts?.mutate?.(params);
       const query = params.toString();
-      router.push(query ? `${pathname}?${query}` : pathname);
+      const url = query ? `${pathname}?${query}` : pathname;
+      // Filters refine the view in place — never yank the user back to
+      // the top of the page (Analysis activity table, QA 2026-08-10).
+      if (opts?.replace) router.replace(url, { scroll: false });
+      else router.push(url, { scroll: false });
     },
     [router, pathname, searchParams],
   );

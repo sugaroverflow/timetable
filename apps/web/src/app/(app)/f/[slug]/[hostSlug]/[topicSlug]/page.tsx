@@ -1,19 +1,21 @@
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 
-import { type Role } from "@timetable/shared";
+import { isHostCommentsEnabled, type Role } from "@timetable/shared";
 
 import { anonGql } from "@/lib/ogCard";
 
-import { AdminCommentsPanel } from "@/components/AdminCommentsPanel";
+import { MarkCommentsSeen } from "@/components/MarkCommentsSeen";
 import { TopicCard } from "@/components/TopicCard";
+import { buildWorkbenchCalendar } from "@/lib/calendarPerms";
 import { topicPerms } from "@/lib/feedPage";
 import type { FeedTopic } from "@/lib/feedTypes";
-import { commentTree, TOPIC_FEED_FIELDS } from "@/lib/gqlFragments";
+import { TOPIC_FEED_FIELDS } from "@/lib/gqlFragments";
 import { gqlFetch } from "@/lib/graphql";
 import { displayRolesFromCookies } from "@/lib/previewRoles.server";
 import { parseTimetableSettings, roleLabel } from "@/lib/timetableSettings";
 import { topicPath } from "@/lib/topicPath";
+import { topicStatusLabel } from "@/lib/topicStatusLabels";
 
 type Data = {
   timetable: {
@@ -33,7 +35,6 @@ const QUERY = `
     timetableHosts: forumHosts(idOrSlug: $s) { id name }
     topicPermalink(idOrSlug: $s, topicSlug: $topic) {
       ${TOPIC_FEED_FIELDS}
-      ${commentTree("adminComments")}
     }
   }
 `;
@@ -81,49 +82,23 @@ function redirectIfStaleHost(slug: string, hostSlug: string, topic: FeedTopic) {
   }
 }
 
-/** Unpublished/submitted topics get a status bar; published ones render
+/** Unpublished/draft topics get a status bar; published ones render
  * nothing — including the bar itself (QA 2026-07-29: the empty toolbar
  * showed as a bare stripe above every published topic). */
 function StatusBar({ status }: { status: string }) {
   if (status === "published") return null;
   return (
     <div className="toolbar">
-      <span className={`status-badge status-${status}`}>{status}</span>
+      <span className={`status-badge status-${status}`}>
+        {topicStatusLabel(status)}
+      </span>
     </div>
   );
 }
 
-/** The drafting thread, for the topic's owner and admins only — the API
- * already gates the data; this gates the chrome (QA 2026-07-28). */
-function DraftingThread({
-  topic,
-  slug,
-  viewerId,
-  canModerate,
-  adminLabel,
-  hostLabel,
-}: {
-  topic: FeedTopic;
-  slug: string;
-  viewerId: string | null;
-  canModerate: boolean;
-  adminLabel: string;
-  hostLabel: string;
-}) {
-  const isOwner = viewerId != null && viewerId === topic.hostId;
-  if (!canModerate && !isOwner) return null;
-  return (
-    <AdminCommentsPanel
-      topicId={topic.id}
-      comments={topic.adminComments ?? []}
-      canModerate={canModerate}
-      viewerId={viewerId}
-      slug={slug}
-      adminLabel={adminLabel}
-      hostLabel={hostLabel}
-    />
-  );
-}
+// The drafting thread was a collapsible panel below the card here until
+// 2026-08-15; it is now the card's own Admins tab, on every surface where
+// its people see the topic.
 
 export default async function TopicPermalinkPage({
   params,
@@ -141,13 +116,17 @@ export default async function TopicPermalinkPage({
     (data.timetable?.viewerRoles ?? []) as Role[],
   );
   const settings = parseTimetableSettings(data.timetable?.settings);
-  const perms = topicPerms(roles, topic.status);
   const viewerId = data.me?.id ?? null;
+  const perms = topicPerms(roles, topic.status, {
+    viewerId,
+    hostId: topic.hostId,
+  });
 
   return (
     // topic-permalink: here the topic title IS the page title, so it
     // renders at tier 1 (QA 2026-07-28) — see globals.css.
     <div className="stack topic-permalink">
+      {viewerId ? <MarkCommentsSeen topicId={topic.id} /> : null}
       <StatusBar status={topic.status} />
       <TopicCard
         topic={topic}
@@ -159,14 +138,13 @@ export default async function TopicPermalinkPage({
         electorLabel={roleLabel(settings.roleLabels, "elector")}
         viewerHeartCount={data.timetable?.viewerHeartedPublishedCount ?? null}
         hosts={data.timetableHosts}
-      />
-      <DraftingThread
-        topic={topic}
-        slug={slug}
-        viewerId={viewerId}
-        canModerate={perms.canModerate}
-        adminLabel={roleLabel(settings.roleLabels, "admin")}
-        hostLabel={roleLabel(settings.roleLabels, "host")}
+        discussionOpen
+        // The whole description, no "Show more" (Ed, 2026-08-21): someone
+        // on a topic's own page came to read it. Folding is for lists you
+        // skim — the feed, My Topics, the Pending queue.
+        expandBody
+        hostCommentsEnabled={isHostCommentsEnabled(settings)}
+        calendar={buildWorkbenchCalendar(settings, roles, viewerId)}
       />
     </div>
   );

@@ -1,11 +1,20 @@
 import {
   getDashboard,
+  getHostHeartBreakdown,
   getOrCreateIcsToken,
-  getTimetableByDomain,
+  getTopicById,
   getWeightedBreakdown,
+  listDormantHearters,
   type DashboardData,
+  type WeightedHeartEntry,
 } from "@timetable/core";
-import { canSeeHostOnly } from "@timetable/shared";
+import {
+  canEditTopic,
+  canSeeComments,
+  canSeeHostHeartTallies,
+  canSeeHostOnly,
+  type Role,
+} from "@timetable/shared";
 
 import { builder } from "./builder";
 import {
@@ -13,11 +22,25 @@ import {
   readTimetable,
   requireUser,
 } from "./guards";
-import { SlotTagType, TimetableType, WeightedHeartType } from "./types";
+import { WeightedHeartType } from "./types";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+
+/** One dormant ❤️ on a retired topic — names and dates, no weights. */
+const DormantHeartType = builder
+  .objectRef<
+    Awaited<ReturnType<typeof listDormantHearters>>[number]
+  >("DormantHeart")
+  .implement({
+    fields: (t) => ({
+      electorId: t.exposeID("electorId"),
+      electorName: t.exposeString("electorName", { nullable: true }),
+      electorImage: t.exposeString("electorImage", { nullable: true }),
+      heartedAt: t.string({ resolve: (h) => h.heartedAt.toISOString() }),
+    }),
+  });
 
 const TopicCountsType = builder
   .objectRef<DashboardData["topicCounts"]>("TopicCounts")
@@ -30,8 +53,19 @@ const TopicCountsType = builder
     }),
   });
 
+/** Leaderboard/host-activity rows carry a per-request flag instead of the
+ * dashboard query returning different shapes: 💙 fields resolve to null
+ * unless the viewer may see host-heart tallies (admins — the dashboard
+ * itself is host-visible, so the gate must be finer than the query's). */
+type GqlLeaderboardEntry = DashboardData["topicLeaderboard"][number] & {
+  showHostHearts: boolean;
+};
+type GqlHostActivity = DashboardData["hostActivity"][number] & {
+  showHostHearts: boolean;
+};
+
 const TopicLeaderboardEntryType = builder
-  .objectRef<DashboardData["topicLeaderboard"][number]>("TopicLeaderboardEntry")
+  .objectRef<GqlLeaderboardEntry>("TopicLeaderboardEntry")
   .implement({
     fields: (t) => ({
       id: t.exposeID("id"),
@@ -50,11 +84,28 @@ const TopicLeaderboardEntryType = builder
       commentL2: t.exposeFloat("commentL2"),
       commentL1: t.exposeFloat("commentL1"),
       commentDevotion: t.exposeFloat("commentDevotion"),
+      // 💙 metrics — admin eyes only (host hearts, 2026-08-04).
+      hostHeartCount: t.int({
+        nullable: true,
+        resolve: (r) => (r.showHostHearts ? r.hostHeartCount : null),
+      }),
+      hostHeartL2: t.float({
+        nullable: true,
+        resolve: (r) => (r.showHostHearts ? r.hostHeartL2 : null),
+      }),
+      hostHeartL1: t.float({
+        nullable: true,
+        resolve: (r) => (r.showHostHearts ? r.hostHeartL1 : null),
+      }),
+      hostHeartDevotion: t.float({
+        nullable: true,
+        resolve: (r) => (r.showHostHearts ? r.hostHeartDevotion : null),
+      }),
     }),
   });
 
 const HostActivityType = builder
-  .objectRef<DashboardData["hostActivity"][number]>("HostActivity")
+  .objectRef<GqlHostActivity>("HostActivity")
   .implement({
     fields: (t) => ({
       hostId: t.exposeID("hostId"),
@@ -63,6 +114,18 @@ const HostActivityType = builder
       hostSlug: t.exposeString("hostSlug", { nullable: true }),
       topicCount: t.exposeInt("topicCount"),
       commentCount: t.exposeInt("commentCount"),
+      /** 💙s this host has given — admin eyes only. */
+      hostHeartCount: t.int({
+        nullable: true,
+        resolve: (r) => (r.showHostHearts ? r.hostHeartCount : null),
+      }),
+      /** The topics behind that count — the row's fold-open sub-table,
+       * same shape as the elector rows' heartedTopics. Admin eyes only. */
+      hostHeartedTopics: t.field({
+        type: [ElectorHeartedTopicType],
+        nullable: true,
+        resolve: (r) => (r.showHostHearts ? r.hostHeartedTopics : null),
+      }),
       latestActivityAt: t.string({
         nullable: true,
         resolve: (h) => h.latestActivityAt?.toISOString() ?? null,
@@ -81,14 +144,25 @@ const UnallocatedTopicType = builder
     }),
   });
 
-const ConflictSlotType = builder
-  .objectRef<DashboardData["conflicts"][number]>("ConflictSlot")
+/** Same entry math as WeightedHeart, renamed for the public surface: these
+ * are hosts, not electors (host hearts, 2026-08-04). */
+const HostHeartBreakdownEntryType = builder
+  .objectRef<WeightedHeartEntry>("HostHeartBreakdownEntry")
   .implement({
     fields: (t) => ({
-      slotId: t.exposeID("slotId"),
-      location: t.exposeString("location"),
-      startsAt: t.string({ resolve: (c) => c.startsAt.toISOString() }),
-      topics: t.field({ type: [SlotTagType], resolve: (c) => c.topics }),
+      hostId: t.id({ resolve: (w) => w.electorId }),
+      hostName: t.string({
+        nullable: true,
+        resolve: (w) => w.electorName,
+      }),
+      hostImage: t.string({
+        nullable: true,
+        resolve: (w) => w.electorImage,
+      }),
+      weight: t.exposeFloat("weight"),
+      l2Weight: t.exposeFloat("l2Weight"),
+      devotionWeight: t.exposeFloat("devotionWeight"),
+      heartedAt: t.string({ resolve: (w) => w.heartedAt.toISOString() }),
     }),
   });
 
@@ -117,7 +191,6 @@ const ElectorActivityType = builder
       electorImage: t.exposeString("electorImage", { nullable: true }),
       heartCount: t.exposeInt("heartCount"),
       commentCount: t.exposeInt("commentCount"),
-      availabilityCount: t.exposeInt("availabilityCount"),
       /** Published topics never seen nor ❤️'d — the queue coverage gap. */
       queueCount: t.exposeInt("queueCount"),
       latestActivityAt: t.string({
@@ -131,31 +204,39 @@ const ElectorActivityType = builder
     }),
   });
 
-const DashboardType = builder.objectRef<DashboardData>("Dashboard").implement({
+type GqlDashboard = DashboardData & {
+  /** Whether this viewer may see 💙 tallies (admins only). */
+  showHostHearts: boolean;
+};
+
+const DashboardType = builder.objectRef<GqlDashboard>("Dashboard").implement({
   fields: (t) => ({
     totalHearts: t.exposeInt("totalHearts"),
     electorCount: t.exposeInt("electorCount"),
     hostCount: t.exposeInt("hostCount"),
-    slotCount: t.exposeInt("slotCount"),
     topicCounts: t.field({
       type: TopicCountsType,
       resolve: (d) => d.topicCounts,
     }),
     topicLeaderboard: t.field({
       type: [TopicLeaderboardEntryType],
-      resolve: (d) => d.topicLeaderboard,
+      resolve: (d) =>
+        d.topicLeaderboard.map((r) => ({
+          ...r,
+          showHostHearts: d.showHostHearts,
+        })),
     }),
     hostActivity: t.field({
       type: [HostActivityType],
-      resolve: (d) => d.hostActivity,
+      resolve: (d) =>
+        d.hostActivity.map((r) => ({
+          ...r,
+          showHostHearts: d.showHostHearts,
+        })),
     }),
     unallocatedTopics: t.field({
       type: [UnallocatedTopicType],
       resolve: (d) => d.unallocatedTopics,
-    }),
-    conflicts: t.field({
-      type: [ConflictSlotType],
-      resolve: (d) => d.conflicts,
     }),
     electorActivity: t.field({
       type: [ElectorActivityType],
@@ -190,20 +271,41 @@ builder.queryFields((t) => ({
       const sinceMs = args.activitySince
         ? Date.parse(args.activitySince)
         : Number.NaN;
-      return getDashboard(readable.timetable.id, {
+      const data = await getDashboard(readable.timetable.id, {
         hostId: args.hostId ?? undefined,
         activityHostId: args.activityHostId ?? undefined,
         electorActivity: parseElectorActivityFilter(args.electorActivity),
         activitySince: Number.isNaN(sinceMs) ? undefined : new Date(sinceMs),
       });
+      return { ...data, showHostHearts: canSeeHostHeartTallies(viewer) };
+    },
+  }),
+
+  /** Per-host 💙 breakdown for one topic — the hosts-instead-of-electors
+   * dropdown when the analysis table sorts by 💙. Admin eyes only. */
+  topicHostHeartBreakdown: t.field({
+    type: [HostHeartBreakdownEntryType],
+    nullable: true,
+    args: {
+      idOrSlug: t.arg.string({ required: true }),
+      topicId: t.arg.string({ required: true }),
+    },
+    resolve: async (_p, args, ctx) => {
+      const readable = await readTimetable(ctx, args.idOrSlug);
+      if (!readable) return null;
+      const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
+      if (!canSeeHostHeartTallies(viewer)) return null;
+      return getHostHeartBreakdown(readable.timetable.id, args.topicId);
     },
   }),
 
   /** Per-elector weights for one topic — fetched lazily by the ❤️-breakdown
-   * disclosures on topic cards and Analysis rows. Any signed-in reader
-   * (QA 2026-07-27; was host/admin only — who-hearts-what is already
-   * reader-visible via person pages, and the weights derive from it. The
-   * one genuinely new datum for electors is each ❤️'s date). */
+   * disclosures on topic cards and Analysis rows. Any signed-in reader on a
+   * public forum, members elsewhere (QA 2026-07-27 opened it to signed-in
+   * readers because who-hearts-what is reader-visible via person pages —
+   * but hosts_only forums deliberately hide the elector membership from
+   * the public, so the audit 2026-08-17 re-scoped it to canSeeComments,
+   * the same "member or public forum" line the rest of the matrix draws). */
   topicWeightedBreakdown: t.field({
     type: [WeightedHeartType],
     nullable: true,
@@ -215,7 +317,34 @@ builder.queryFields((t) => ({
       const readable = await readTimetable(ctx, args.idOrSlug);
       if (!readable) return null;
       if (!ctx.user) return null;
+      const viewer = { userId: ctx.user.id, roles: readable.roles as Role[] };
+      if (!canSeeComments(readable.timetable.privacy, viewer)) return null;
       return getWeightedBreakdown(readable.timetable.id, args.topicId);
+    },
+  }),
+
+  /** Who ❤️'d an unpublished or archived topic — its dormant ❤️s, which
+   * count nowhere until republication (my-topics-heart-row, 2026-09-25).
+   * Owner + admins only: unlike a live topic's breakdown, this is not
+   * public knowledge. Null when unauthorized or the topic is live (a live
+   * topic's ❤️s are `topicWeightedBreakdown`'s). */
+  topicDormantHearters: t.field({
+    type: [DormantHeartType],
+    nullable: true,
+    args: {
+      idOrSlug: t.arg.string({ required: true }),
+      topicId: t.arg.string({ required: true }),
+    },
+    resolve: async (_p, args, ctx) => {
+      if (!ctx.user) return null;
+      const readable = await readTimetable(ctx, args.idOrSlug);
+      if (!readable) return null;
+      const topic = await getTopicById(args.topicId);
+      if (!topic || topic.timetableId !== readable.timetable.id) return null;
+      if (topic.status === "published") return null;
+      const viewer = { userId: ctx.user.id, roles: readable.roles as Role[] };
+      if (!canEditTopic(viewer, topic.hostId)) return null;
+      return listDormantHearters(readable.timetable.id, topic.id);
     },
   }),
 
@@ -225,21 +354,10 @@ builder.queryFields((t) => ({
     nullable: true,
     resolve: async (_p, _a, ctx) => {
       const user = await requireUser(ctx);
+      // Never mint the target's long-lived calendar credential for a
+      // view-as preview — it would keep working after the preview ends.
+      if (ctx.impersonation) return null;
       return getOrCreateIcsToken(user.id);
-    },
-  }),
-
-  /** Resolve a timetable by custom domain (for hostname routing). */
-  forumByDomain: t.field({
-    type: TimetableType,
-    nullable: true,
-    args: { host: t.arg.string({ required: true }) },
-    resolve: async (_p, args, ctx) => {
-      const timetable = await getTimetableByDomain(args.host);
-      if (!timetable) return null;
-      const readable = await readTimetable(ctx, timetable.id);
-      if (!readable) return null;
-      return { ...readable.timetable, viewerRoles: readable.roles as string[] };
     },
   }),
 }));

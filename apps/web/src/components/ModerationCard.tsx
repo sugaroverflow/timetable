@@ -6,6 +6,7 @@ import { AdminCommentsPanel } from "@/components/AdminCommentsPanel";
 import { AdminTopicActions } from "@/components/AdminTopicActions";
 import { Avatar } from "@/components/Avatar";
 import { CollapsibleTopicBody } from "@/components/CollapsibleTopicBody";
+import { PersonChip } from "@/components/PersonChip";
 import { TopicEditScope } from "@/components/TopicEditScope";
 import type { ManagedTopic } from "@/lib/feedTypes";
 import { topicPath } from "@/lib/topicPath";
@@ -13,18 +14,35 @@ import { topicPath } from "@/lib/topicPath";
 /** Header + cover + body — the block the edit form replaces in place. */
 function ModerationContent({
   topic,
+  slug,
   permalink,
   hostLabel,
 }: {
   topic: ManagedTopic;
+  slug: string;
   permalink: string | null;
   hostLabel: string;
 }) {
+  /* Avatar + author name click through to the host's page, like the feed
+   * card (links pass 2026-08-03); hostId is optional on ManagedTopic. */
+  const chip = (children: React.ReactNode) =>
+    topic.hostId ? (
+      <PersonChip slug={slug} userId={topic.hostId}>
+        {children}
+      </PersonChip>
+    ) : (
+      children
+    );
   return (
     <>
       {/* Same header treatment as the feed card: avatar + title + author. */}
       <div className="row" style={{ alignItems: "flex-start" }}>
-        <Avatar name={topic.hostName ?? null} image={topic.hostImage ?? null} />
+        {chip(
+          <Avatar
+            name={topic.hostName ?? null}
+            image={topic.hostImage ?? null}
+          />,
+        )}
         <div>
           <h3 className="topic-title">
             {permalink ? (
@@ -35,10 +53,16 @@ function ModerationContent({
               topic.title
             )}
           </h3>
-          <div className="faint" style={{ fontSize: 12 }}>
-            by {topic.hostName ?? hostLabel}
-          </div>
+          <div className="hint">by {chip(topic.hostName ?? hostLabel)}</div>
         </div>
+        {/* Readiness badge — earns its keep in the "All" view, where ready
+            and still-drafting topics sit together (2026-08-06). */}
+        <span
+          className={`status-badge ${topic.readyAt ? "status-ready" : "status-drafting"}`}
+          style={{ marginLeft: "auto" }}
+        >
+          {topic.readyAt ? "ready to publish" : "still drafting"}
+        </span>
       </div>
       {topic.coverImageUrl ? (
         <div
@@ -62,6 +86,7 @@ export function ModerationCard({
   viewerId = null,
   hostLabel = "Host",
   adminLabel = "Admin",
+  electorLabel,
   hosts = [],
 }: {
   topic: ManagedTopic;
@@ -69,6 +94,7 @@ export function ModerationCard({
   viewerId?: string | null;
   hostLabel?: string;
   adminLabel?: string;
+  electorLabel?: string;
   hosts?: { id: string; name: string | null }[];
 }) {
   const permalink = topicPath(
@@ -77,6 +103,11 @@ export function ModerationCard({
     topic.slug ?? null,
     topic.hostId,
   );
+  const roleLabels = {
+    admin: adminLabel,
+    host: hostLabel,
+    elector: electorLabel,
+  };
 
   return (
     <li className="card stack">
@@ -86,6 +117,7 @@ export function ModerationCard({
         topic={{
           id: topic.id,
           title: topic.title,
+          slug: topic.slug,
           bodyMd: topic.bodyMd,
           coverImageUrl: topic.coverImageUrl,
         }}
@@ -93,6 +125,7 @@ export function ModerationCard({
         content={
           <ModerationContent
             topic={topic}
+            slug={slug}
             permalink={permalink}
             hostLabel={hostLabel}
           />
@@ -105,7 +138,8 @@ export function ModerationCard({
           canModerate={true}
           slug={slug}
           adminLabel={adminLabel}
-          hostLabel={hostLabel}
+          roleLabels={roleLabels}
+          topicHref={permalink}
         />
         <AdminTopicActions
           topic={{
@@ -114,6 +148,7 @@ export function ModerationCard({
             bodyMd: topic.bodyMd,
             coverImageUrl: topic.coverImageUrl,
             status: topic.status,
+            readyAt: topic.readyAt,
           }}
           slug={slug}
           label={adminLabel}

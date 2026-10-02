@@ -1,10 +1,11 @@
 import { GraphQLError } from "graphql";
 
 import {
+  getCanonicalTimetableSlug,
   getFeedLastSeen,
   getLastVisitedTimetableSlug,
   getReadableTimetable,
-  getTimetableByDomain,
+  listTimetableRoutesByHost,
   getViewerRoles,
   listMembershipsForUser,
   logActivity,
@@ -12,41 +13,81 @@ import {
   setHeartsCountFrom,
   updateTimetableProfile,
   updateTimetableSettings,
+  updateTimetableSlug,
 } from "@timetable/core";
 import type { Timetable, TimetableSettings } from "@timetable/db";
 import {
   canEditSettings,
   canModerate,
+  formatVanityAddress,
+  forumSlugSchema,
+  parseVanityAddress,
   PRIVACY_LEVELS,
   type Privacy,
 } from "@timetable/shared";
 
 import { builder } from "./builder";
 import {
+  assertOptionalHttpUrl,
   badRequest,
+  capLength,
   colour,
   forbidden,
   loadTimetableAndViewer,
   notFound,
+  parseCalendarJson,
   parseThemeJson,
   readTimetable,
 } from "./guards";
+import { parseDigestKinds } from "./members";
 import { TimetableType, type GqlTimetable } from "./types";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-type GqlTimetableRoute = Pick<Timetable, "id" | "slug" | "privacy">;
+/** One vanity-address route on a host: the forum and the path prefix it
+ * claims there ("" for the bare hostname). */
+type GqlTimetableRoute = { slug: string; pathPrefix: string };
+
+/** vanity-address arg → what to store: undefined leaves it alone, "" clears
+ * it, otherwise the CANONICAL form (lowercase, no scheme, no trailing
+ * slash — the proxy matches it byte-for-byte against request hosts), after
+ * checking no other forum already holds that exact address (the column is
+ * unique; this turns the constraint error into a sentence). */
+async function resolveVanityAddress(
+  arg: string | null | undefined,
+  ownSlug: string,
+): Promise<string | undefined> {
+  if (arg == null) return undefined;
+  const trimmed = arg.trim();
+  if (!trimmed) return "";
+  const parsed = parseVanityAddress(trimmed);
+  if (!parsed) {
+    throw new GraphQLError(
+      "Vanity address must look like forum.example.org or topic.example.org/2026",
+    );
+  }
+  const address = formatVanityAddress(parsed);
+  const taken = (await listTimetableRoutesByHost(parsed.host)).find(
+    (route) => route.pathPrefix === parsed.pathPrefix && route.slug !== ownSlug,
+  );
+  if (taken) {
+    throw new GraphQLError(
+      `${address} is already the address of another forum`,
+    );
+  }
+  return address;
+}
+
 type GqlMembership = { id: string; roles: string[]; timetable: GqlTimetable };
 
 const TimetableRouteType = builder
   .objectRef<GqlTimetableRoute>("ForumRoute")
   .implement({
     fields: (t) => ({
-      id: t.exposeID("id"),
       slug: t.exposeString("slug"),
-      privacy: t.exposeString("privacy"),
+      pathPrefix: t.exposeString("pathPrefix"),
     }),
   });
 
@@ -74,7 +115,13 @@ builder.queryFields((t) => ({
       // otherwise), and both row-creation paths claim them — sign-in JIT
       // creation (auth/clerk.ts) and admin pre-create (createLocalUser).
       const rows = await listMembershipsForUser(ctx.user.id);
-      return rows.map((r) => ({
+      // Under a view-as preview the identity exists in ONE forum: the
+      // target's other memberships are none of the previewing admin's
+      // business (see context.ts single-forum rule).
+      const visible = ctx.impersonation
+        ? rows.filter((r) => r.timetable.id === ctx.impersonation?.timetableId)
+        : rows;
+      return visible.map((r) => ({
         id: r.membershipId,
         roles: r.roles as string[],
         timetable: { ...r.timetable, viewerRoles: r.roles as string[] },
@@ -122,26 +169,64 @@ builder.queryFields((t) => ({
     },
   }),
 
-  /** Public hostname routing lookup. Returns only route-safe fields. */
-  forumRouteByDomain: t.field({
-    type: TimetableRouteType,
-    nullable: true,
+  /** vanity-address routing lookup for the web proxy: every forum with an
+   * address on this host, with the path prefix each claims. Anonymous by
+   * design (only slugs and prefixes are exposed); the proxy caches per
+   * host and matches paths itself. */
+  forumRoutesByHost: t.field({
+    type: [TimetableRouteType],
     args: { host: t.arg.string({ required: true }) },
-    resolve: async (_p, args) => {
-      const timetable = await getTimetableByDomain(args.host);
-      if (!timetable) return null;
-      return {
-        id: timetable.id,
-        slug: timetable.slug,
-        privacy: timetable.privacy,
-      };
-    },
+    resolve: (_p, args) =>
+      listTimetableRoutesByHost(args.host.trim().toLowerCase()),
+  }),
+
+  /** A current-or-historical slug → the forum's canonical slug (editable
+   * slugs, 2026-08-10). Anonymous by design — the web proxy's stale-slug
+   * 308 must fire for signed-out hits on private forums too. Only the slug
+   * mapping is exposed (same trade as forumRoutesByHost). */
+  forumCanonicalSlug: t.string({
+    nullable: true,
+    args: { slug: t.arg.string({ required: true }) },
+    resolve: (_p, args) => getCanonicalTimetableSlug(args.slug),
   }),
 }));
 
 // ---------------------------------------------------------------------------
 // Mutations
 // ---------------------------------------------------------------------------
+
+/** Editable slugs (2026-08-10): validate + apply a requested slug change.
+ * Returns the fresh row when the slug moved, null on no-op. Format is
+ * checked here, availability in core; the old slug redirects forever via
+ * timetable_slug_history. */
+async function applySlugChange(
+  timetable: Timetable,
+  actorId: string,
+  requestedSlug: string | null | undefined,
+): Promise<Timetable | null> {
+  const slug = requestedSlug?.trim();
+  if (!slug || slug === timetable.slug) return null;
+  const parsed = forumSlugSchema.safeParse(slug);
+  if (!parsed.success) {
+    throw new GraphQLError(
+      "URL can only use lowercase letters, numbers, and hyphens",
+    );
+  }
+  const result = await updateTimetableSlug(timetable.id, parsed.data);
+  if (!result.ok) {
+    if (result.reason === "taken") {
+      throw new GraphQLError("That URL is already taken");
+    }
+    notFound("Forum not found");
+  }
+  await logActivity({
+    timetableId: timetable.id,
+    actorId,
+    action: "forum.slug",
+    note: `/f/${timetable.slug} → /f/${parsed.data}`,
+  });
+  return result.timetable;
+}
 
 builder.mutationFields((t) => ({
   /** Bumps the viewer's feed watermark to now (no-op for non-members). */
@@ -157,7 +242,7 @@ builder.mutationFields((t) => ({
     },
   }),
 
-  /** Admin: update timetable name, visibility, custom domain. */
+  /** Admin: update timetable name, visibility, custom domain, URL slug. */
   updateForumProfile: t.field({
     type: TimetableType,
     args: {
@@ -165,13 +250,19 @@ builder.mutationFields((t) => ({
       name: t.arg.string({ required: false }),
       privacy: t.arg.string({ required: false }),
       customDomain: t.arg.string({ required: false }),
+      slug: t.arg.string({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
+      capLength(args.name, 120, "Name");
       const { user, readable, viewer } = await loadTimetableAndViewer(
         ctx,
         args.idOrSlug,
       );
       if (!canEditSettings(viewer)) forbidden("Admins only");
+      const vanity = await resolveVanityAddress(
+        args.customDomain,
+        readable.timetable.slug,
+      );
 
       let privacy: Privacy | undefined;
       if (args.privacy != null) {
@@ -181,13 +272,20 @@ builder.mutationFields((t) => ({
         privacy = args.privacy as Privacy;
       }
 
-      const updated = await updateTimetableProfile(readable.timetable.id, {
+      let updated = await updateTimetableProfile(readable.timetable.id, {
         name: args.name ?? undefined,
         privacy,
-        customDomain:
-          args.customDomain != null ? args.customDomain.trim() : undefined,
+        customDomain: vanity,
       });
       if (!updated) notFound("Forum not found");
+
+      const renamed = await applySlugChange(
+        readable.timetable,
+        user.id,
+        args.slug,
+      );
+      if (renamed) updated = renamed;
+
       // A privacy change is a distinct, high-signal audit event; a plain
       // name/domain edit is logged as an ordinary settings change.
       const privacyChanged =
@@ -237,6 +335,153 @@ builder.mutationFields((t) => ({
   }),
 }));
 
+/** updateForumSettings' optional args, shared by the per-concern patch
+ * builders below (housekeeping 2026-08-13 — was one 13-branch resolver). */
+type SettingsArgs = {
+  roleLabelAdmin?: string | null;
+  roleLabelHost?: string | null;
+  roleLabelElector?: string | null;
+  themePrimary?: string | null;
+  themeSecondary?: string | null;
+  themeJson?: string | null;
+  coverImageUrl?: string | null;
+  iconUrl?: string | null;
+  iconDarkUrl?: string | null;
+  iconEmoji?: string | null;
+  digestEnabled?: boolean | null;
+  digestKindDefaultsJson?: string | null;
+  calendarJson?: string | null;
+  hostsPublishDirectly?: boolean | null;
+  hostCommentsEnabled?: boolean | null;
+  loungeEnabled?: boolean | null;
+};
+
+/** Each builder owns one settings concern (mirroring the web form that
+ * sends it) and returns the fields it patches — {} when its args are
+ * absent, so the spreads compose. */
+function roleLabelPatch(
+  args: SettingsArgs,
+  current: TimetableSettings,
+): Partial<TimetableSettings> {
+  if (
+    args.roleLabelAdmin == null &&
+    args.roleLabelHost == null &&
+    args.roleLabelElector == null
+  ) {
+    return {};
+  }
+  return {
+    roleLabels: {
+      ...(current.roleLabels ?? {}),
+      ...(args.roleLabelAdmin != null ? { admin: args.roleLabelAdmin } : {}),
+      ...(args.roleLabelHost != null ? { host: args.roleLabelHost } : {}),
+      ...(args.roleLabelElector != null
+        ? { elector: args.roleLabelElector }
+        : {}),
+    },
+  };
+}
+
+/** Legacy individual theme args merge over the stored theme; a full
+ * themeJson (QA #59) wins over both when sent. Both paths validate
+ * through the same HEX_COLOUR gate so an invalid string can't be
+ * persisted and later injected into the SSR theme <style> tag. */
+function themePatch(
+  args: SettingsArgs,
+  current: TimetableSettings,
+): Partial<TimetableSettings> {
+  const patch: Partial<TimetableSettings> = {};
+  const themePrimary = colour(args.themePrimary);
+  const themeSecondary = colour(args.themeSecondary);
+  if (themePrimary != null || themeSecondary != null) {
+    patch.theme = {
+      ...(current.theme ?? {}),
+      ...(themePrimary != null ? { primary: themePrimary } : {}),
+      ...(themeSecondary != null ? { secondary: themeSecondary } : {}),
+    };
+  }
+  if (args.themeJson != null) {
+    const parsed = parseThemeJson(args.themeJson);
+    if (!parsed) badRequest("Invalid theme");
+    patch.theme = parsed;
+  }
+  return patch;
+}
+
+/** Cover, icons, and the emoji icon (a short sequence, capped to guard
+ * against arbitrary payloads). Empty strings clear. URLs must be absolute
+ * http(s) — they land in `<img src>` and CSS `url()` on every page of the
+ * forum (audit 2026-08-17). */
+function brandingPatch(args: SettingsArgs): Partial<TimetableSettings> {
+  const patch: Partial<TimetableSettings> = {};
+  assertOptionalHttpUrl(args.coverImageUrl, "Cover image URL");
+  assertOptionalHttpUrl(args.iconUrl, "Icon URL");
+  assertOptionalHttpUrl(args.iconDarkUrl, "Dark icon URL");
+  if (args.coverImageUrl != null) {
+    patch.coverImageUrl = args.coverImageUrl.trim() || null;
+  }
+  if (args.iconUrl != null) patch.iconUrl = args.iconUrl.trim() || null;
+  if (args.iconDarkUrl != null) {
+    patch.iconDarkUrl = args.iconDarkUrl.trim() || null;
+  }
+  if (args.iconEmoji != null) {
+    patch.iconEmoji = args.iconEmoji.trim().slice(0, 24) || null;
+  }
+  return patch;
+}
+
+/** The forum's digest defaults: the all-or-nothing on/off for new
+ * members (2026-07-29) and the per-kind default set (2026-08-11). */
+function digestPatch(
+  args: SettingsArgs,
+  current: TimetableSettings,
+): Partial<TimetableSettings> {
+  const patch: Partial<TimetableSettings> = {};
+  if (args.digestEnabled != null) {
+    patch.digestDefaults = {
+      ...(current.digestDefaults ?? {}),
+      digestEnabled: args.digestEnabled,
+    };
+  }
+  if (args.digestKindDefaultsJson != null) {
+    const kinds = parseDigestKinds(args.digestKindDefaultsJson);
+    if (!kinds) badRequest("Invalid digest kind defaults");
+    patch.digestKindDefaults = kinds;
+  }
+  return patch;
+}
+
+/** Feature switches: calendar group, hosts-publish-directly, the
+ * host-only comment thread (host hearts, 2026-08-04), and the {host}
+ * Lounge (2026-09-30). */
+function featurePatch(
+  args: SettingsArgs,
+  current: TimetableSettings,
+): Partial<TimetableSettings> {
+  const patch: Partial<TimetableSettings> = {};
+  if (args.calendarJson != null) {
+    const parsed = parseCalendarJson(args.calendarJson);
+    if (!parsed) badRequest("Invalid calendar settings");
+    patch.calendar = { ...(current.calendar ?? {}), ...parsed };
+  }
+  if (args.hostsPublishDirectly != null) {
+    patch.topics = {
+      ...(current.topics ?? {}),
+      hostsPublishDirectly: args.hostsPublishDirectly,
+    };
+  }
+  if (args.hostCommentsEnabled != null) {
+    patch.hostComments = {
+      ...(current.hostComments ?? {}),
+      enabled: args.hostCommentsEnabled,
+    };
+  }
+  if (args.loungeEnabled != null) {
+    patch.lounge = { ...(current.lounge ?? {}), enabled: args.loungeEnabled };
+  }
+  return patch;
+}
+
 builder.mutationFields((t) => ({
   /** Admin: update role labels and theme colors (persisted to settings). */
   updateForumSettings: t.field({
@@ -258,8 +503,21 @@ builder.mutationFields((t) => ({
       /** Digests are all-or-nothing (2026-07-29): the default for new
        * members is just on or off. */
       digestEnabled: t.arg.boolean({ required: false }),
+      /** Forum-level per-kind digest defaults (2026-08-11) as a JSON
+       * {kind: boolean} object — replaces the stored set. */
+      digestKindDefaultsJson: t.arg.string({ required: false }),
+      /** Calendar feature settings (calendar v2) — JSON, validated
+       * server-side, shallow-merged over the stored calendar group. */
+      calendarJson: t.arg.string({ required: false }),
+      /** Hosts publish their own topics without admin review. */
+      hostsPublishDirectly: t.arg.boolean({ required: false }),
+      /** The host-only comment thread (and with it the attributed 💙 row +
+       * 💙s in digests). Default on; off turns 💙s into admin-only
+       * bookmarks (host hearts, 2026-08-04). */
+      hostCommentsEnabled: t.arg.boolean({ required: false }),
+      /** The {host} Lounge — a hosts-only room per forum. Default off. */
+      loungeEnabled: t.arg.boolean({ required: false }),
     },
-    // eslint-disable-next-line complexity, sonarjs/cognitive-complexity -- audit debt (2026-07-22): 13-arg settings-patch assembly; decomposition queued
     resolve: async (_p, args, ctx) => {
       const { user, readable, viewer } = await loadTimetableAndViewer(
         ctx,
@@ -268,68 +526,13 @@ builder.mutationFields((t) => ({
       if (!canEditSettings(viewer)) forbidden("Admins only");
 
       const current = readable.timetable.settings;
-      const patch: Partial<TimetableSettings> = {};
-
-      if (
-        args.roleLabelAdmin != null ||
-        args.roleLabelHost != null ||
-        args.roleLabelElector != null
-      ) {
-        patch.roleLabels = {
-          ...(current.roleLabels ?? {}),
-          ...(args.roleLabelAdmin != null
-            ? { admin: args.roleLabelAdmin }
-            : {}),
-          ...(args.roleLabelHost != null ? { host: args.roleLabelHost } : {}),
-          ...(args.roleLabelElector != null
-            ? { elector: args.roleLabelElector }
-            : {}),
-        };
-      }
-
-      // Legacy individual theme args — validate through the same HEX_COLOUR
-      // gate the themeJson path uses so an invalid string can't be persisted
-      // and later injected into the SSR theme <style> tag. Invalid/absent
-      // values are dropped (mirrors colour() in parseThemeJson).
-      const themePrimary = colour(args.themePrimary);
-      const themeSecondary = colour(args.themeSecondary);
-      if (themePrimary != null || themeSecondary != null) {
-        patch.theme = {
-          ...(current.theme ?? {}),
-          ...(themePrimary != null ? { primary: themePrimary } : {}),
-          ...(themeSecondary != null ? { secondary: themeSecondary } : {}),
-        };
-      }
-
-      if (args.themeJson != null) {
-        const parsed = parseThemeJson(args.themeJson);
-        if (!parsed) badRequest("Invalid theme");
-        patch.theme = parsed;
-      }
-
-      if (args.coverImageUrl != null) {
-        patch.coverImageUrl = args.coverImageUrl.trim() || null;
-      }
-
-      if (args.iconUrl != null) {
-        patch.iconUrl = args.iconUrl.trim() || null;
-      }
-
-      if (args.iconDarkUrl != null) {
-        patch.iconDarkUrl = args.iconDarkUrl.trim() || null;
-      }
-
-      // A short emoji sequence (capped to guard against arbitrary payloads).
-      if (args.iconEmoji != null) {
-        patch.iconEmoji = args.iconEmoji.trim().slice(0, 24) || null;
-      }
-
-      if (args.digestEnabled != null) {
-        patch.digestDefaults = {
-          ...(current.digestDefaults ?? {}),
-          digestEnabled: args.digestEnabled,
-        };
-      }
+      const patch: Partial<TimetableSettings> = {
+        ...roleLabelPatch(args, current),
+        ...themePatch(args, current),
+        ...brandingPatch(args),
+        ...digestPatch(args, current),
+        ...featurePatch(args, current),
+      };
 
       const updated = await updateTimetableSettings(
         readable.timetable.id,

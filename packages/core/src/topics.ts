@@ -2,8 +2,10 @@ import { and, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 
 import {
   comments,
+  commentSeen,
   db,
   hearts,
+  hostHearts,
   timetableMemberships,
   timetables,
   topics,
@@ -14,9 +16,11 @@ import {
   computeElectorHeartCounts,
   computeElectorWeights,
   topicNormScores,
+  type FeedSort,
 } from "@timetable/shared";
 
 import { logActivity } from "./activity";
+import { givenByActiveMember } from "./activeMember";
 import { coerceDate } from "./dates";
 import { ensureTopicSlug } from "./slugs";
 
@@ -107,7 +111,7 @@ export async function updateTopic(
 async function setStatus(
   topicId: string,
   status: TopicStatus,
-  opts: { publishedAt?: Date | null } = {},
+  opts: { publishedAt?: Date | null; readyAt?: Date | null } = {},
 ): Promise<Topic | null> {
   const [updated] = await db
     .update(topics)
@@ -116,6 +120,7 @@ async function setStatus(
       ...(opts.publishedAt !== undefined
         ? { publishedAt: opts.publishedAt }
         : {}),
+      ...(opts.readyAt !== undefined ? { readyAt: opts.readyAt } : {}),
       updatedAt: new Date(),
     })
     .where(eq(topics.id, topicId))
@@ -149,12 +154,16 @@ export async function reassignTopic(
   return updated ?? null;
 }
 
-/** Host submits an unpublished topic (re)back into the moderation queue. */
+/** Host submits an unpublished topic (re)back into the moderation queue.
+ * An explicit resubmit IS the ready signal — the topic arrives marked
+ * ready to publish, unlike a freshly created one (which starts drafting). */
 export async function submitTopic(
   topic: Topic,
   actorId: string,
 ): Promise<Topic | null> {
-  const updated = await setStatus(topic.id, "submitted");
+  const updated = await setStatus(topic.id, "submitted", {
+    readyAt: new Date(),
+  });
   await logActivity({
     timetableId: topic.timetableId,
     actorId,
@@ -164,12 +173,13 @@ export async function submitTopic(
   return updated;
 }
 
-/** Host or admin unpublishes a topic. */
+/** Host or admin unpublishes a topic. Clears the ready signal — a
+ * taken-down topic starts its next round as a draft. */
 export async function unpublishTopic(
   topic: Topic,
   actorId: string,
 ): Promise<Topic | null> {
-  const updated = await setStatus(topic.id, "unpublished");
+  const updated = await setStatus(topic.id, "unpublished", { readyAt: null });
   await logActivity({
     timetableId: topic.timetableId,
     actorId,
@@ -177,6 +187,27 @@ export async function unpublishTopic(
     payload: { topicId: topic.id, title: topic.title },
   });
   return updated;
+}
+
+/** Host (or admin) flips a pending topic's "Ready to publish" switch. The
+ * timestamp is the signal the admin queue's default view filters on. */
+export async function setTopicReady(
+  topic: Topic,
+  actorId: string,
+  ready: boolean,
+): Promise<Topic | null> {
+  const [updated] = await db
+    .update(topics)
+    .set({ readyAt: ready ? new Date() : null, updatedAt: new Date() })
+    .where(eq(topics.id, topic.id))
+    .returning();
+  await logActivity({
+    timetableId: topic.timetableId,
+    actorId,
+    action: ready ? "topic.ready" : "topic.unready",
+    payload: { topicId: topic.id, title: topic.title },
+  });
+  return updated ?? null;
 }
 
 /** Host permanently deletes their own not-yet-published topic (launch QA
@@ -210,6 +241,8 @@ export async function moderateTopic(
   if (action === "publish") {
     const updated = await setStatus(topic.id, "published", {
       publishedAt: topic.publishedAt ?? new Date(),
+      // Leaving the queue: the ready signal has served its purpose.
+      readyAt: null,
     });
     await logActivity({
       timetableId: topic.timetableId,
@@ -220,7 +253,7 @@ export async function moderateTopic(
     return updated;
   }
 
-  const updated = await setStatus(topic.id, "unpublished");
+  const updated = await setStatus(topic.id, "unpublished", { readyAt: null });
   await logActivity({
     timetableId: topic.timetableId,
     actorId,
@@ -324,6 +357,8 @@ export async function loadPublishedHearts(
   const conds = [
     eq(topics.timetableId, timetableId),
     eq(topics.status, "published"),
+    // A deactivated member's ❤️s are hidden forum-wide (active-member-filter).
+    givenByActiveMember(hearts.userId, topics.timetableId),
   ];
   if (opts.userId) conds.push(eq(hearts.userId, opts.userId));
   if (cutoff) conds.push(gte(hearts.createdAt, cutoff));
@@ -350,20 +385,105 @@ export async function countViewerPublishedHearts(
   return viewerHearts.length;
 }
 
+/** Post-cutoff ❤️s from active members on the given topics, WHATEVER
+ * their status. For a published topic this is exactly the feed's
+ * `heartCount` (same cutoff, same active-member-filter); for an
+ * unpublished or archived one it is the DORMANT ❤️s — kept on the row but
+ * counted nowhere (not in weights, not in Analysis) until republication
+ * brings them back. Only the topic's host and admins may see those. */
+async function loadTopicHeartRows(
+  timetableId: string,
+  topicIds: string[],
+): Promise<{ topicId: string; electorId: string; createdAt: Date }[]> {
+  if (topicIds.length === 0) return [];
+  const cutoff = await getHeartsCountFrom(timetableId);
+  const conds = [
+    eq(topics.timetableId, timetableId),
+    inArray(hearts.topicId, topicIds),
+    givenByActiveMember(hearts.userId, topics.timetableId),
+  ];
+  if (cutoff) conds.push(gte(hearts.createdAt, cutoff));
+  return db
+    .select({
+      topicId: hearts.topicId,
+      electorId: hearts.userId,
+      createdAt: hearts.createdAt,
+    })
+    .from(hearts)
+    .innerJoin(topics, eq(topics.id, hearts.topicId))
+    .where(and(...conds));
+}
+
+/** my-topics-heart-row: each topic's ❤️ count and whether the viewer ❤️s
+ * it, batched for the My Topics page (managed-heart-fields). */
+export async function loadTopicHeartSummaries(
+  timetableId: string,
+  topicIds: string[],
+  viewerUserId: string | null,
+): Promise<Map<string, { heartCount: number; viewerHasHearted: boolean }>> {
+  const rows = await loadTopicHeartRows(timetableId, topicIds);
+  const summaries = new Map(
+    topicIds.map((id) => [id, { heartCount: 0, viewerHasHearted: false }]),
+  );
+  for (const row of rows) {
+    const s = summaries.get(row.topicId);
+    if (!s) continue;
+    s.heartCount += 1;
+    if (row.electorId === viewerUserId) s.viewerHasHearted = true;
+  }
+  return summaries;
+}
+
+/** Who ❤️'d a retired topic — its dormant ❤️s, by name and date. No
+ * weights: those exist only among published topics. Caller gates this to
+ * the topic's host and admins. */
+export async function listDormantHearters(
+  timetableId: string,
+  topicId: string,
+): Promise<
+  {
+    electorId: string;
+    electorName: string | null;
+    electorImage: string | null;
+    heartedAt: Date;
+  }[]
+> {
+  const rows = await loadTopicHeartRows(timetableId, [topicId]);
+  if (rows.length === 0) return [];
+  const members = await db
+    .select({
+      id: timetableMemberships.userId,
+      name: timetableMemberships.name,
+      image: timetableMemberships.image,
+    })
+    .from(timetableMemberships)
+    .where(
+      and(
+        eq(timetableMemberships.timetableId, timetableId),
+        inArray(
+          timetableMemberships.userId,
+          rows.map((r) => r.electorId),
+        ),
+      ),
+    );
+  const byId = new Map(members.map((m) => [m.id, m]));
+  return rows
+    .map((r) => ({
+      electorId: r.electorId,
+      electorName: byId.get(r.electorId)?.name ?? null,
+      electorImage: byId.get(r.electorId)?.image ?? null,
+      heartedAt: r.createdAt,
+    }))
+    .sort((a, b) => a.heartedAt.getTime() - b.heartedAt.getTime());
+}
+
 /**
  * Feed ranking. The four normalisations (raw/l2/l1/devotion) mirror the
  * dashboard "Analysis" switcher; "hearts" is kept as a backward-compatible
  * alias for "l1" (the original weighted score). See {@link topicNormScores}.
+ * The sort list itself is canon in @timetable/shared (FEED_SORTS).
  */
-export type FeedSort =
-  | "hearts"
-  | "raw"
-  | "l2"
-  | "l1"
-  | "devotion"
-  | "comments"
-  | "recent"
-  | "random";
+export type { FeedSort } from "@timetable/shared";
 
 export type FeedTopic = {
   id: string;
@@ -390,6 +510,9 @@ export type FeedTopic = {
   viewerHasHearted: boolean;
   commentCount: number;
   latestCommentAt: Date | null;
+  /** The viewer's comments-seen watermark for this topic (teaser "new"
+   * previews) — null when they never engaged with the discussion. */
+  viewerCommentsSeenAt: Date | null;
 };
 
 /** Deterministic per-seed rank for random sort — stable within a seed so
@@ -406,12 +529,17 @@ function seededRank(seed: string, id: string): number {
 
 type FeedComparator = (a: FeedTopic, b: FeedTopic) => number;
 
-/** "Newest" counts content edits, not just publication (QA #59). */
+/** "Latest Updated" counts content edits, not just publication (QA #59);
+ * "Latest Created" (below) is publication order alone (QA 2026-08-10). */
 function recency(t: FeedTopic): number {
   return Math.max(
     t.publishedAt?.getTime() ?? t.createdAt.getTime(),
     t.contentUpdatedAt?.getTime() ?? 0,
   );
+}
+
+function publishedTime(t: FeedTopic): number {
+  return t.publishedAt?.getTime() ?? t.createdAt.getTime();
 }
 
 /** Normalisation sorts share a stable recency tie-break so equal scores
@@ -436,6 +564,7 @@ const FEED_COMPARATORS: Record<FeedSort, (seed: string) => FeedComparator> = {
     if (bt !== at) return bt - at;
     return b.commentCount - a.commentCount;
   },
+  created: () => (a, b) => publishedTime(b) - publishedTime(a),
   recent: () => (a, b) => recency(b) - recency(a),
   random: (seed) => (a, b) => seededRank(seed, a.id) - seededRank(seed, b.id),
 };
@@ -533,6 +662,28 @@ async function loadCommentStats(
   return commentStats;
 }
 
+/** The viewer's per-topic comments-seen watermarks, batch-loaded for a
+ * feed page — and for the My Topics dashboard, whose cards carry the same
+ * comment-teaser (2026-08-16). Empty for signed-out viewers. */
+export async function loadCommentsSeen(
+  viewerUserId: string | null,
+  topicIds: string[],
+): Promise<Map<string, Date>> {
+  const seen = new Map<string, Date>();
+  if (!viewerUserId || topicIds.length === 0) return seen;
+  const rows = await db
+    .select({ topicId: commentSeen.topicId, seenAt: commentSeen.seenAt })
+    .from(commentSeen)
+    .where(
+      and(
+        eq(commentSeen.userId, viewerUserId),
+        inArray(commentSeen.topicId, topicIds),
+      ),
+    );
+  for (const r of rows) seen.set(r.topicId, r.seenAt);
+  return seen;
+}
+
 function toFeedTopic(
   row: {
     topic: Topic;
@@ -544,6 +695,7 @@ function toFeedTopic(
     heartsByTopic: Map<string, string[]>;
     heartCounts: Map<string, number>;
     commentStats: Map<string, CommentStat>;
+    commentsSeen: Map<string, Date>;
     viewerUserId: string | null;
   },
 ): FeedTopic {
@@ -576,6 +728,7 @@ function toFeedTopic(
       : false,
     commentCount: ctx.commentStats.get(topic.id)?.count ?? 0,
     latestCommentAt: ctx.commentStats.get(topic.id)?.latestCommentAt ?? null,
+    viewerCommentsSeenAt: ctx.commentsSeen.get(topic.id) ?? null,
   };
 }
 
@@ -608,6 +761,12 @@ export async function buildFeed(
      * visibility — this widens the host/admin-only breakdown to a per-person
      * hearted list. */
     heartedBy?: string;
+    /** Only topics the viewer currently 💙s (the host's "💙 Topics" page).
+     * 💙s ignore the heartsCountFrom cutoff. */
+    hostHeartedByViewer?: boolean;
+    /** Case-insensitive substring filter over title, body markdown, and
+     * host name (All Topics search box, 2026-08-10). */
+    q?: string;
     sort?: FeedSort;
     /** Shuffle seed for sort=random (QA #59). */
     seed?: string;
@@ -624,19 +783,48 @@ export async function buildFeed(
   const heartsByTopic = groupHeartsByTopic(heartRows);
 
   const rows = await loadDisplayedTopicRows(timetableId, opts);
-  const commentStats = await loadCommentStats(rows.map((r) => r.topic.id));
+  const topicIds = rows.map((r) => r.topic.id);
+  const [commentStats, commentsSeen] = await Promise.all([
+    loadCommentStats(topicIds),
+    loadCommentsSeen(viewerUserId, topicIds),
+  ]);
 
   const feed = rows.map((row) =>
     toFeedTopic(row, {
       heartsByTopic,
       heartCounts,
       commentStats,
+      commentsSeen,
       viewerUserId,
     }),
   );
 
+  const viewerHostHearted =
+    opts.hostHeartedByViewer && viewerUserId
+      ? new Set(
+          (
+            await db
+              .select({ topicId: hostHearts.topicId })
+              .from(hostHearts)
+              .where(eq(hostHearts.userId, viewerUserId))
+          ).map((r) => r.topicId),
+        )
+      : null;
+
+  const needle = opts.q?.trim().toLowerCase();
   const visibleFeed = feed.filter((t) => {
     if (opts.heartedByViewer && viewerUserId && !t.viewerHasHearted) {
+      return false;
+    }
+    if (
+      needle &&
+      !`${t.title}\n${t.bodyMd}\n${t.hostName ?? ""}`
+        .toLowerCase()
+        .includes(needle)
+    ) {
+      return false;
+    }
+    if (viewerHostHearted && !viewerHostHearted.has(t.id)) {
       return false;
     }
     if (

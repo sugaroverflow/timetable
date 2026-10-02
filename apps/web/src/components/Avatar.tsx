@@ -1,23 +1,9 @@
-// The palette lives in tokens.css (--avatar-1…8); the hash picks a slot.
-const COLOR_COUNT = 8;
+import { avatarSlot, initials } from "@timetable/shared";
 
+// The palette lives in tokens.css (--avatar-1…8); the shared hash picks
+// the slot, so email avatars (which index a literal palette) match.
 function colorFor(seed: string): string {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    hash = (hash << 5) - hash + seed.charCodeAt(i);
-    hash |= 0;
-  }
-  return `var(--avatar-${(Math.abs(hash) % COLOR_COUNT) + 1})`;
-}
-
-function initials(name: string): string {
-  return name
-    .split(" ")
-    .map((w) => w[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+  return `var(--avatar-${avatarSlot(seed) + 1})`;
 }
 
 export function Avatar({

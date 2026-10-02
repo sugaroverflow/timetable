@@ -1,7 +1,7 @@
-import type { NextFunction, Request, Response } from "express";
+import type { RequestHandler } from "express";
 import { lte, sql } from "drizzle-orm";
 
-import { getRequestId, logRequestError } from "./request-log";
+import { logRequestError } from "./request-log";
 
 type Bucket = {
   count: number;
@@ -117,11 +117,14 @@ export function rateLimit(opts: {
   max: number;
   keyPrefix?: string;
   store?: RateLimitStore;
-}): (req: Request, res: Response, next: NextFunction) => void {
+}): RequestHandler {
   const store = opts.store ?? createMemoryRateLimitStore(opts.windowMs);
 
   return async (req, res, next) => {
     const now = Date.now();
+    // Always the client IP — never anything the client can vary at will
+    // (an Authorization header, say): a self-chosen key would let a caller
+    // mint a fresh bucket per request and sail past the limit.
     const client = req.ip || req.socket.remoteAddress || "unknown";
     const key = `${opts.keyPrefix ?? "api"}:${client}`;
 
@@ -141,11 +144,13 @@ export function rateLimit(opts: {
 
       next();
     } catch (err) {
-      logRequestError(req, err, { component: "rate-limit" });
-      res.status(503).json({
-        error: "Rate limit unavailable",
-        requestId: getRequestId(req),
-      });
+      // FAIL OPEN, never closed. The limiter fronts both /graphql and /api,
+      // so returning 503 here turned any transient database wobble into a
+      // total outage — the store being unavailable is not a reason to refuse
+      // traffic the app could otherwise serve. Losing rate limiting for the
+      // duration of a blip is strictly the cheaper failure (ops R2).
+      logRequestError(req, err, { component: "rate-limit", failedOpen: true });
+      next();
       return;
     }
   };

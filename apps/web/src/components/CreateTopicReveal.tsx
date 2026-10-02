@@ -3,19 +3,21 @@
 import { Plus } from "lucide-react";
 import { useState } from "react";
 
-/** My Topics (QA 2026-07-29): the new-topic card hides behind one big
- * "Create New Topic" button above the heading; pressing it swaps the
- * button for the card (the app-wide reveal-in-place rule). */
+/** My Topics: the new-topic card hides behind a "Propose New Topic"
+ * button under the heading — same treatment as the calendar's "Propose a
+ * different time" (QA 2026-08-03; was a full-width banner above it);
+ * pressing it swaps the button for the card (reveal-in-place rule). */
 export function CreateTopicReveal({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   if (!open) {
     return (
       <button
         type="button"
-        className="btn btn-primary btn-create"
+        className="btn btn-primary"
+        style={{ alignSelf: "flex-start" }}
         onClick={() => setOpen(true)}
       >
-        <Plus size={20} aria-hidden /> Create New Topic
+        <Plus size={16} aria-hidden /> Propose New Topic
       </button>
     );
   }

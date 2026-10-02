@@ -1,20 +1,52 @@
-import { and, desc, eq, gt, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
-import { alias } from "drizzle-orm/pg-core";
+import {
+  and,
+  desc,
+  eq,
+  gt,
+  inArray,
+  isNotNull,
+  isNull,
+  ne,
+  or,
+  sql,
+} from "drizzle-orm";
+import { alias, type AnyPgColumn } from "drizzle-orm/pg-core";
 
 import {
+  activityEvents,
   commentMentions,
   comments,
   db,
+  hearts,
+  loungeComments,
+  loungeMentions,
   timetableMemberships,
   topics,
 } from "@timetable/db";
 
 /** One entry in the notifications pane (QA #59): a comment on one of the
- * viewer's topics, a reply to one of the viewer's comments, or a comment that
- * @mentions the viewer (product feedback round 1). */
+ * viewer's topics, a reply to one of the viewer's comments, a comment that
+ * @mentions the viewer, — calendar v2 (QA 2026-08-03) — a session
+ * pencilled/confirmed/cleared for a topic the viewer ❤️'d, or (Ed,
+ * 2026-09-08) an admin sending the viewer's ready draft back to drafting.
+ * For the activity-log kinds, `commentId` is the activity-event id; for
+ * sessions `body` carries the slot's startsAt ISO for the pane to
+ * format, for send-backs it is empty. The {host} Lounge kinds (2026-09-30)
+ * — a reply to the viewer's Lounge post, or a Lounge post that @mentions
+ * them — have no topic: their topic fields are empty strings and
+ * `loungeRootId` names the conversation instead. */
 export type NotificationItem = {
   commentId: string;
-  kind: "reply" | "comment" | "mention";
+  kind:
+    | "reply"
+    | "comment"
+    | "mention"
+    | "session_pencilled"
+    | "session_confirmed"
+    | "session_cleared"
+    | "sent_back_to_drafting"
+    | "lounge_reply"
+    | "lounge_mention";
   authorId: string;
   authorName: string | null;
   authorImage: string | null;
@@ -28,16 +60,205 @@ export type NotificationItem = {
   topicTitle: string;
   topicSlug: string | null;
   topicHostSlug: string | null;
+  /** Lounge kinds only: the conversation (its opening post's id). */
+  loungeRootId?: string | null;
 };
 
+const SESSION_ACTIONS = ["slot.pencil", "slot.confirm", "slot.clear"];
+
+const SESSION_KIND: Record<
+  string,
+  "session_pencilled" | "session_confirmed" | "session_cleared"
+> = {
+  "slot.pencil": "session_pencilled",
+  "slot.confirm": "session_confirmed",
+  "slot.clear": "session_cleared",
+};
+
+/** Session lifecycle events (calendar v2) for topics the viewer ❤️'d,
+ * derived from the activity log the slot mutations write. */
+async function listSessionNotifications(
+  timetableId: string,
+  userId: string,
+  limit: number,
+): Promise<NotificationItem[]> {
+  const actorMembers = alias(timetableMemberships, "actor_memberships");
+  const hostMembers = alias(timetableMemberships, "host_memberships");
+
+  const rows = await db
+    .select({
+      id: activityEvents.id,
+      action: activityEvents.action,
+      actorId: activityEvents.actorId,
+      authorName: actorMembers.name,
+      authorRoles: actorMembers.roles,
+      authorImage: actorMembers.image,
+      payload: activityEvents.payload,
+      createdAt: activityEvents.createdAt,
+      topicId: topics.id,
+      topicTitle: topics.title,
+      topicSlug: topics.slug,
+      topicHostSlug: hostMembers.slug,
+    })
+    .from(activityEvents)
+    // payload.topicId is text; topics.id is uuid — compare as text.
+    .innerJoin(
+      topics,
+      sql`${topics.id}::text = ${activityEvents.payload}->>'topicId'`,
+    )
+    .innerJoin(
+      hearts,
+      and(eq(hearts.topicId, topics.id), eq(hearts.userId, userId)),
+    )
+    .leftJoin(
+      actorMembers,
+      and(
+        eq(actorMembers.userId, activityEvents.actorId),
+        eq(actorMembers.timetableId, timetableId),
+      ),
+    )
+    .leftJoin(
+      hostMembers,
+      and(
+        eq(hostMembers.userId, topics.hostId),
+        eq(hostMembers.timetableId, timetableId),
+      ),
+    )
+    .where(
+      and(
+        eq(activityEvents.timetableId, timetableId),
+        inArray(activityEvents.action, SESSION_ACTIONS),
+        or(isNull(activityEvents.actorId), ne(activityEvents.actorId, userId)),
+      ),
+    )
+    .orderBy(desc(activityEvents.createdAt))
+    .limit(limit);
+
+  return rows.map((r) => ({
+    commentId: r.id,
+    kind: SESSION_KIND[r.action] ?? "session_pencilled",
+    authorId: r.actorId ?? "",
+    authorName: r.authorName,
+    authorRoles: (r.authorRoles ?? []) as string[],
+    authorImage: r.authorImage,
+    body: String((r.payload as { startsAt?: string } | null)?.startsAt ?? ""),
+    visibility: "public",
+    createdAt: r.createdAt,
+    topicId: r.topicId,
+    topicTitle: r.topicTitle,
+    topicSlug: r.topicSlug,
+    topicHostSlug: r.topicHostSlug,
+  }));
+}
+
+/** An admin sent one of the viewer's ready drafts back to drafting (Ed,
+ * 2026-09-08) — the `topic.unready` event the admin bar's Back to
+ * drafting writes. The host's own switch writes the same event, hence
+ * the actor exclusion. */
+async function listSentBackNotifications(
+  timetableId: string,
+  userId: string,
+  limit: number,
+): Promise<NotificationItem[]> {
+  const actorMembers = alias(timetableMemberships, "actor_memberships");
+  const hostMembers = alias(timetableMemberships, "host_memberships");
+
+  const rows = await db
+    .select({
+      id: activityEvents.id,
+      actorId: activityEvents.actorId,
+      authorName: actorMembers.name,
+      authorRoles: actorMembers.roles,
+      authorImage: actorMembers.image,
+      createdAt: activityEvents.createdAt,
+      topicId: topics.id,
+      topicTitle: topics.title,
+      topicSlug: topics.slug,
+      topicHostSlug: hostMembers.slug,
+    })
+    .from(activityEvents)
+    .innerJoin(
+      topics,
+      sql`${topics.id}::text = ${activityEvents.payload}->>'topicId'`,
+    )
+    .leftJoin(
+      actorMembers,
+      and(
+        eq(actorMembers.userId, activityEvents.actorId),
+        eq(actorMembers.timetableId, timetableId),
+      ),
+    )
+    .leftJoin(
+      hostMembers,
+      and(
+        eq(hostMembers.userId, topics.hostId),
+        eq(hostMembers.timetableId, timetableId),
+      ),
+    )
+    .where(and(...sentBackConditions(timetableId, userId)))
+    .orderBy(desc(activityEvents.createdAt))
+    .limit(limit);
+
+  return rows.map((r) => ({
+    commentId: r.id,
+    kind: "sent_back_to_drafting" as const,
+    authorId: r.actorId ?? "",
+    authorName: r.authorName,
+    authorRoles: (r.authorRoles ?? []) as string[],
+    authorImage: r.authorImage,
+    body: "",
+    visibility: "admin_only",
+    createdAt: r.createdAt,
+    topicId: r.topicId,
+    topicTitle: r.topicTitle,
+    topicSlug: r.topicSlug,
+    topicHostSlug: r.topicHostSlug,
+  }));
+}
+
+/** Shared by the list and the unread count (the query joins `topics`). */
+function sentBackConditions(timetableId: string, userId: string) {
+  return [
+    eq(activityEvents.timetableId, timetableId),
+    eq(activityEvents.action, "topic.unready"),
+    eq(topics.hostId, userId),
+    ne(activityEvents.actorId, userId),
+  ];
+}
+
 /**
- * Comments on the viewer's topics + replies to the viewer's comments,
- * newest first. The viewer authored neither; hidden comments excluded.
+ * Comments on the viewer's topics + replies to the viewer's comments +
+ * session events on ❤️'d topics + send-backs of the viewer's drafts,
+ * newest first. The viewer authored none of them; hidden comments
+ * excluded.
  */
 export async function listNotifications(
   timetableId: string,
   userId: string,
   limit = 50,
+  /** The viewer may read this forum's {host} Lounge (canUseLounge and the
+   * Lounge switched on) — only then do its replies and mentions show. */
+  opts: { lounge?: boolean } = {},
+): Promise<NotificationItem[]> {
+  const sessions = await listSessionNotifications(timetableId, userId, limit);
+  const sentBack = await listSentBackNotifications(timetableId, userId, limit);
+  const commentItems = await listCommentNotifications(
+    timetableId,
+    userId,
+    limit,
+  );
+  const lounge = opts.lounge
+    ? await listLoungeNotifications(timetableId, userId, limit)
+    : [];
+  return [...commentItems, ...sessions, ...sentBack, ...lounge]
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .slice(0, limit);
+}
+
+async function listCommentNotifications(
+  timetableId: string,
+  userId: string,
+  limit: number,
 ): Promise<NotificationItem[]> {
   const parents = alias(comments, "parent_comments");
   // Per-forum profiles: author and host display fields come from their
@@ -123,10 +344,135 @@ export async function listNotifications(
   }));
 }
 
+/** Lounge replies to the viewer's posts and Lounge posts @mentioning them
+ * (the caller has already checked the viewer may read the Lounge). */
+function loungeNotificationConditions(
+  timetableId: string,
+  userId: string,
+  parentAuthorId: AnyPgColumn,
+  mentionUserId: AnyPgColumn,
+  rootHiddenAt: AnyPgColumn,
+) {
+  return [
+    eq(loungeComments.timetableId, timetableId),
+    ne(loungeComments.authorId, userId),
+    isNull(loungeComments.hiddenAt),
+    isNull(loungeComments.deletedAt),
+    // A reply inside a hidden conversation stays hidden with it.
+    isNull(rootHiddenAt),
+    or(eq(parentAuthorId, userId), isNotNull(mentionUserId)),
+  ];
+}
+
+async function listLoungeNotifications(
+  timetableId: string,
+  userId: string,
+  limit: number,
+): Promise<NotificationItem[]> {
+  const parents = alias(loungeComments, "lounge_parents");
+  const roots = alias(loungeComments, "lounge_roots");
+  const mentions = alias(loungeMentions, "viewer_lounge_mentions");
+  const rows = await db
+    .select({
+      id: loungeComments.id,
+      rootId: loungeComments.rootId,
+      parentAuthorId: parents.authorId,
+      authorId: loungeComments.authorId,
+      authorName: timetableMemberships.name,
+      authorRoles: timetableMemberships.roles,
+      authorImage: timetableMemberships.image,
+      body: loungeComments.body,
+      createdAt: loungeComments.createdAt,
+    })
+    .from(loungeComments)
+    .leftJoin(parents, eq(parents.id, loungeComments.parentId))
+    .leftJoin(roots, eq(roots.id, loungeComments.rootId))
+    .leftJoin(
+      mentions,
+      and(
+        eq(mentions.commentId, loungeComments.id),
+        eq(mentions.userId, userId),
+      ),
+    )
+    .leftJoin(
+      timetableMemberships,
+      and(
+        eq(timetableMemberships.userId, loungeComments.authorId),
+        eq(timetableMemberships.timetableId, timetableId),
+      ),
+    )
+    .where(
+      and(
+        ...loungeNotificationConditions(
+          timetableId,
+          userId,
+          parents.authorId,
+          mentions.userId,
+          roots.hiddenAt,
+        ),
+      ),
+    )
+    .orderBy(desc(loungeComments.createdAt))
+    .limit(limit);
+  return rows.map((r) => ({
+    commentId: r.id,
+    kind: r.parentAuthorId === userId ? "lounge_reply" : "lounge_mention",
+    authorId: r.authorId,
+    authorName: r.authorName,
+    authorRoles: (r.authorRoles ?? []) as string[],
+    authorImage: r.authorImage,
+    body: r.body,
+    visibility: "lounge",
+    createdAt: r.createdAt,
+    topicId: "",
+    topicTitle: "",
+    topicSlug: null,
+    topicHostSlug: null,
+    loungeRootId: r.rootId ?? r.id,
+  }));
+}
+
+/** Unread Lounge replies and mentions — 0 unless the viewer may read the
+ * Lounge. */
+async function countUnreadLounge(
+  timetableId: string,
+  userId: string,
+  seenAt: Date | null,
+  canReadLounge: boolean,
+): Promise<number> {
+  if (!canReadLounge) return 0;
+  const loungeParents = alias(loungeComments, "lounge_parents");
+  const loungeRoots = alias(loungeComments, "lounge_roots");
+  const loungeMentioned = alias(loungeMentions, "viewer_lounge_mentions");
+  const loungeConds = loungeNotificationConditions(
+    timetableId,
+    userId,
+    loungeParents.authorId,
+    loungeMentioned.userId,
+    loungeRoots.hiddenAt,
+  );
+  if (seenAt) loungeConds.push(gt(loungeComments.createdAt, seenAt));
+  const [loungeRow] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(loungeComments)
+    .leftJoin(loungeParents, eq(loungeParents.id, loungeComments.parentId))
+    .leftJoin(loungeRoots, eq(loungeRoots.id, loungeComments.rootId))
+    .leftJoin(
+      loungeMentioned,
+      and(
+        eq(loungeMentioned.commentId, loungeComments.id),
+        eq(loungeMentioned.userId, userId),
+      ),
+    )
+    .where(and(...loungeConds));
+  return loungeRow?.n ?? 0;
+}
+
 /** Unread notifications since the member's watermark (null = all unread). */
 export async function countUnreadNotifications(
   timetableId: string,
   userId: string,
+  opts: { lounge?: boolean } = {},
 ): Promise<number> {
   const [membership] = await db
     .select({ seenAt: timetableMemberships.lastSeenNotificationsAt })
@@ -165,7 +511,53 @@ export async function countUnreadNotifications(
       and(eq(mentions.commentId, comments.id), eq(mentions.userId, userId)),
     )
     .where(and(...conds));
-  return row?.n ?? 0;
+
+  // Session events on ❤️'d topics count too (calendar v2, QA 2026-08-03).
+  const sessionConds = [
+    eq(activityEvents.timetableId, timetableId),
+    inArray(activityEvents.action, SESSION_ACTIONS),
+    or(isNull(activityEvents.actorId), ne(activityEvents.actorId, userId)),
+  ];
+  if (membership.seenAt) {
+    sessionConds.push(gt(activityEvents.createdAt, membership.seenAt));
+  }
+  const [sessionRow] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(activityEvents)
+    .innerJoin(
+      topics,
+      sql`${topics.id}::text = ${activityEvents.payload}->>'topicId'`,
+    )
+    .innerJoin(
+      hearts,
+      and(eq(hearts.topicId, topics.id), eq(hearts.userId, userId)),
+    )
+    .where(and(...sessionConds));
+
+  // Send-backs of the viewer's drafts count too (Ed, 2026-09-08).
+  const sentBackConds = sentBackConditions(timetableId, userId);
+  if (membership.seenAt) {
+    sentBackConds.push(gt(activityEvents.createdAt, membership.seenAt));
+  }
+  const [sentBackRow] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(activityEvents)
+    .innerJoin(
+      topics,
+      sql`${topics.id}::text = ${activityEvents.payload}->>'topicId'`,
+    )
+    .where(and(...sentBackConds));
+
+  const loungeCount = await countUnreadLounge(
+    timetableId,
+    userId,
+    membership.seenAt,
+    opts.lounge === true,
+  );
+
+  return (
+    (row?.n ?? 0) + (sessionRow?.n ?? 0) + (sentBackRow?.n ?? 0) + loungeCount
+  );
 }
 
 /** Reset the unread badge — called when the member opens Notifications. */

@@ -3,13 +3,17 @@
 import { Send } from "lucide-react";
 import { useState } from "react";
 
+import { ComposerRow } from "@/components/ComposerRow";
 import { GrowingTextarea } from "@/components/GrowingTextarea";
 import {
   MentionTextarea,
   type MentionCandidate,
 } from "@/components/MentionTextarea";
 import { clientGql } from "@/lib/clientGraphql";
+import { draftKey, useDraft } from "@/lib/commentDrafts";
 import { useGqlAction } from "@/lib/useGqlAction";
+
+import { useCommentsOpen } from "./CommentsOpenScope";
 
 const MUTATION = `mutation AddComment($id: String!, $body: String!, $visibility: String) {
   addComment(topicId: $id, body: $body, visibility: $visibility) { id }
@@ -29,9 +33,30 @@ function composerCopy(
     placeholder:
       overrides.placeholder ??
       (scopeLabel ? `Add a ${scopeLabel} note…` : "Add a comment…"),
+    /** The @mention-capable public box says so; an override still wins. */
+    mentionPlaceholder:
+      overrides.placeholder ?? "Add a comment… (@ to mention)",
     success:
       overrides.successMessage ??
       (scopeLabel ? `${scopeLabel} note added` : "Comment added"),
+  };
+}
+
+/** `submitOnEnter`'s key handling: Enter posts, Shift+Enter (or any
+ * modifier) starts a line, Escape blurs so the Topic Queue's arrows work
+ * again. On the mention path the picker sees the key first and keeps
+ * Enter for itself while it's open. */
+function enterToPost(post: () => void) {
+  return (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Escape") {
+      e.currentTarget.blur();
+      return;
+    }
+    if (e.key !== "Enter" || e.shiftKey || e.metaKey || e.ctrlKey || e.altKey) {
+      return;
+    }
+    e.preventDefault();
+    post();
   };
 }
 
@@ -46,6 +71,7 @@ export function CommentComposer({
   mentionSlug,
   placeholder,
   successMessage,
+  submitOnEnter,
 }: {
   topicId: string;
   visibility?: "public" | "host_only" | "admin_only";
@@ -58,9 +84,19 @@ export function CommentComposer({
   placeholder?: string;
   /** Override the scope-derived success toast. */
   successMessage?: string;
+  /** queue-keys (2026-09-07): make the box a keyboard stop — Enter posts,
+   * Shift+Enter starts a line, Escape blurs so the Topic Queue's arrows
+   * work again. Off everywhere else: on a feed card the composer is one
+   * of many, and Enter-to-post costs you a half-written paragraph. */
+  submitOnEnter?: boolean;
 }) {
   const { run, busy } = useGqlAction();
-  const [body, setBody] = useState("");
+  // Posting unfolds the card's comment-teaser so the new comment is
+  // visible in its thread (QA 2026-08-13); no-op without a teaser.
+  const { requestOpen } = useCommentsOpen();
+  const [body, setBody, clearBody] = useDraft(
+    draftKey.comment(topicId, visibility),
+  );
   const mentionsEnabled = visibility === "public" && Boolean(mentionSlug);
   const [candidates, setCandidates] = useState<MentionCandidate[]>([]);
   const [loadedCandidates, setLoadedCandidates] = useState(false);
@@ -86,8 +122,7 @@ export function CommentComposer({
         : null;
   const copy = composerCopy(scopeLabel, { placeholder, successMessage });
 
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
+  function post() {
     const text = body.trim();
     if (!text) return;
     void run(
@@ -96,42 +131,65 @@ export function CommentComposer({
       {
         success: copy.success,
         errorFallback: "Could not post comment",
-        onSuccess: () => setBody(""),
+        onSuccess: () => {
+          clearBody();
+          requestOpen();
+          // queue-keys: once Enter has posted, the box gives the arrows
+          // back by itself — the round continues with → rather than an
+          // Escape first (adopted from #346, 2026-09-10).
+          if (submitOnEnter && document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+          }
+        },
       },
     );
   }
 
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    post();
+  }
+
+  const keyHandler = submitOnEnter ? enterToPost(post) : undefined;
+
   return (
-    <form onSubmit={submit} className="inline-form" style={{ marginTop: 4 }}>
-      {mentionsEnabled ? (
-        <div style={{ flex: 1 }} onFocus={loadCandidates}>
-          <MentionTextarea
+    // No own margin — the surrounding stack/thread-stack gap spaces it
+    // (card spacing spec, 2026-08-05). The viewer's avatar sits left so
+    // the composer aligns with posted comments (QA 2026-08-10).
+    <ComposerRow>
+      <form onSubmit={submit} className="inline-form">
+        {mentionsEnabled ? (
+          <div style={{ flex: 1 }} onFocus={loadCandidates}>
+            <MentionTextarea
+              value={body}
+              onChange={setBody}
+              candidates={candidates}
+              placeholder={copy.mentionPlaceholder}
+              ariaLabel="Comment"
+              dataTopicComposer={topicId}
+              onUnhandledKeyDown={keyHandler}
+            />
+          </div>
+        ) : (
+          <GrowingTextarea
             value={body}
-            onChange={setBody}
-            candidates={candidates}
-            placeholder="Add a comment… (@ to mention)"
-            ariaLabel="Comment"
-            dataTopicComposer={topicId}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder={copy.placeholder}
+            aria-label={scopeLabel ? `${scopeLabel} comment` : "Comment"}
+            data-topic-composer={scopeLabel ? undefined : topicId}
+            onKeyDown={keyHandler}
           />
-        </div>
-      ) : (
-        <GrowingTextarea
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          placeholder={copy.placeholder}
-          aria-label={scopeLabel ? `${scopeLabel} comment` : "Comment"}
-          data-topic-composer={scopeLabel ? undefined : topicId}
-        />
-      )}
-      <button
-        className="btn btn-primary btn-send"
-        type="submit"
-        disabled={busy}
-        aria-label={scopeLabel ? `Post ${scopeLabel} note` : "Post comment"}
-        title="Post"
-      >
-        <Send size={16} aria-hidden />
-      </button>
-    </form>
+        )}
+        <button
+          className="btn btn-primary btn-send"
+          type="submit"
+          disabled={busy}
+          aria-label={scopeLabel ? `Post ${scopeLabel} note` : "Post comment"}
+          title="Post"
+        >
+          <Send size={16} aria-hidden />
+        </button>
+      </form>
+    </ComposerRow>
   );
 }

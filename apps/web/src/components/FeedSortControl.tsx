@@ -9,7 +9,6 @@ export function FeedSortControl({ value }: { value: string }) {
 
   function change(next: string) {
     setParam("sort", next, {
-      resetPage: true,
       // Random sort gets a fresh shuffle seed per selection; the seed rides
       // in the URL so infinite-scroll pages stay consistent (QA #59).
       mutate: (params) => {
@@ -29,9 +28,10 @@ export function FeedSortControl({ value }: { value: string }) {
       value={value}
       onChange={(e) => change(e.target.value)}
     >
-      <option value="random">Shuffle</option>
-      <option value="recent">Newest</option>
-      <option value="comments">Latest comments</option>
+      <option value="random">🔀 Shuffle</option>
+      <option value="created">📚 Latest Created</option>
+      <option value="recent">✏️ Latest Updated</option>
+      <option value="comments">💬 Latest Comments</option>
       <optgroup label="By ❤️">
         {NORM_MODES.map((mode) => (
           <option key={mode.key} value={mode.key} title={mode.description}>

@@ -33,6 +33,11 @@ export const topics = pgTable(
     coverImageUrl: text(),
     status: topicStatusEnum().notNull().default("submitted"),
     publishedAt: timestamp({ withTimezone: true }),
+    // Host's "Ready to publish" signal (2026-08-06): null = still drafting.
+    // Only meaningful while status is "submitted" — the admin Pending queue
+    // filters on it; publish/unpublish clear it. A timestamp (not a bool) so
+    // the queue can show how long a topic has been waiting.
+    readyAt: timestamp({ withTimezone: true }),
     // Bumped only by host/admin edits to title/body/cover — never by status
     // churn. Drives "newest" sorting and the new-since-last-visit highlight
     // (QA #59: an edited topic counts as new; no email is triggered).
@@ -65,6 +70,59 @@ export const hearts = pgTable(
   ],
 );
 
+/** Host 💙s (2026-08-04): the parallel gesture for host-non-elector
+ * members, mirroring `hearts` in its own table so the elector-heart
+ * pipelines (weights, feed, analytics) stay untouched. Never enters
+ * elector weighting; unaffected by the heartsCountFrom cutoff (a 💙 is
+ * interest, not a ballot). */
+export const hostHearts = pgTable(
+  "host_hearts",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    topicId: uuid()
+      .notNull()
+      .references(() => topics.id, { onDelete: "cascade" }),
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("host_hearts_topic_user_uq").on(t.topicId, t.userId),
+    index("host_hearts_user_idx").on(t.userId),
+  ],
+);
+
+/** Append-only ❤️/💙 ledger (2026-08-05): one row per gesture event, never
+ * updated or deleted by the app. The `hearts`/`host_hearts` tables stay the
+ * mutable current state (toggles delete rows; a cutoff revival bumps
+ * `createdAt`) — this table is what lets history be reconstructed across
+ * un-hearts and termly cutoff resets. Backfilled at migration time from the
+ * then-current heart rows. */
+export const heartEvents = pgTable(
+  "heart_events",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    timetableId: uuid()
+      .notNull()
+      .references(() => timetables.id, { onDelete: "cascade" }),
+    topicId: uuid()
+      .notNull()
+      .references(() => topics.id, { onDelete: "cascade" }),
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** Which gesture: an elector ❤️ or a host 💙. */
+    kind: text().$type<"heart" | "host_heart">().notNull(),
+    action: text().$type<"add" | "remove">().notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("heart_events_timetable_idx").on(t.timetableId, t.createdAt),
+    index("heart_events_topic_idx").on(t.topicId),
+  ],
+);
+
 /** Topic Queue exposure record (2026-07-28): one row per (topic, user)
  * the user has been shown in the queue — or hearted anywhere (a heart
  * implies having seen it). `seenAt` is bumped on each showing; "seen this
@@ -84,6 +142,28 @@ export const topicSeen = pgTable(
   (t) => [
     uniqueIndex("topic_seen_topic_user_uq").on(t.topicId, t.userId),
     index("topic_seen_user_idx").on(t.userId),
+  ],
+);
+
+/** Per-(user, topic) comments-seen watermark (dialogue-first threading,
+ * 2026-08-13): bumped when the viewer ENGAGES with a topic's discussion —
+ * expands the card's comment teaser or opens the permalink — never by
+ * merely loading a feed page (that blanket signal is the membership's
+ * lastSeenFeedAt). Drives the teaser's "new" comment previews. */
+export const commentSeen = pgTable(
+  "comment_seen",
+  {
+    topicId: uuid()
+      .notNull()
+      .references(() => topics.id, { onDelete: "cascade" }),
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    seenAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("comment_seen_topic_user_uq").on(t.topicId, t.userId),
+    index("comment_seen_user_idx").on(t.userId),
   ],
 );
 
@@ -111,12 +191,19 @@ export const comments = pgTable(
     /** Set on author edits only — updatedAt also moves on hide/unhide, so
      * it can't drive the "(edited)" marker. */
     editedAt: timestamp({ withTimezone: true }),
+    /** Pinned by the topic's author (#258, 2026-08-17): top-level comments
+     * only, sorted to the top of the thread — earliest pin first, so the
+     * author curates the order by pinning sequence. */
+    pinnedAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     index("comments_topic_idx").on(t.topicId),
     index("comments_parent_idx").on(t.parentId),
+    // The digest cron resolves each recipient's chain scope by author
+    // (loadChainScope) — without this it full-scans comments per user.
+    index("comments_author_idx").on(t.authorId),
   ],
 );
 
@@ -171,6 +258,26 @@ export const topicsRelations = relations(topics, ({ one, many }) => ({
 export const heartsRelations = relations(hearts, ({ one }) => ({
   topic: one(topics, { fields: [hearts.topicId], references: [topics.id] }),
   user: one(users, { fields: [hearts.userId], references: [users.id] }),
+}));
+
+export const heartEventsRelations = relations(heartEvents, ({ one }) => ({
+  timetable: one(timetables, {
+    fields: [heartEvents.timetableId],
+    references: [timetables.id],
+  }),
+  topic: one(topics, {
+    fields: [heartEvents.topicId],
+    references: [topics.id],
+  }),
+  user: one(users, { fields: [heartEvents.userId], references: [users.id] }),
+}));
+
+export const hostHeartsRelations = relations(hostHearts, ({ one }) => ({
+  topic: one(topics, {
+    fields: [hostHearts.topicId],
+    references: [topics.id],
+  }),
+  user: one(users, { fields: [hostHearts.userId], references: [users.id] }),
 }));
 
 export const commentsRelations = relations(comments, ({ one, many }) => ({

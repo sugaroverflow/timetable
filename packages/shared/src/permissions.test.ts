@@ -2,15 +2,26 @@ import { describe, expect, it } from "vitest";
 
 import {
   ANONYMOUS,
+  calendarConfirmPolicy,
   canComment,
+  canConfirmSession,
+  canDiscussSlots,
   canEditSettings,
   canEditTopic,
   canHeart,
+  canHostHeart,
   canModerate,
+  canProposeSession,
+  canPublishTopicDirectly,
   canReadTimetable,
   canSeeComments,
+  canSeeHostHeartTallies,
+  canSeeContactDetails,
   canSeePersonProfile,
+  canTouchSlotSession,
   canUseQueue,
+  isCalendarEnabled,
+  isProfilePublic,
   ownsTopicAsHost,
   type Viewer,
 } from "./permissions";
@@ -48,6 +59,37 @@ describe("canSeePersonProfile", () => {
   });
 });
 
+describe("canSeeContactDetails", () => {
+  it("members see contact details; the public never does", () => {
+    expect(canSeeContactDetails(MEMBER)).toBe(true);
+    expect(canSeeContactDetails({ userId: "h", roles: ["host"] })).toBe(true);
+    expect(canSeeContactDetails(ANONYMOUS)).toBe(false);
+    expect(canSeeContactDetails(SIGNED_IN_GUEST)).toBe(false);
+  });
+
+  it("a deactivated member (no effective roles) loses sight", () => {
+    expect(canSeeContactDetails({ userId: "u1", roles: [] })).toBe(false);
+  });
+});
+
+describe("isProfilePublic", () => {
+  it("is public on public and no_comments forums", () => {
+    expect(isProfilePublic("public", ["elector"])).toBe(true);
+    expect(isProfilePublic("no_comments", ["elector"])).toBe(true);
+  });
+
+  it("hosts_only: hosts and admins are public, electors are not", () => {
+    expect(isProfilePublic("hosts_only", ["host"])).toBe(true);
+    expect(isProfilePublic("hosts_only", ["admin"])).toBe(true);
+    expect(isProfilePublic("hosts_only", ["elector"])).toBe(false);
+  });
+
+  it("is never public on private or deactivated forums", () => {
+    expect(isProfilePublic("private", ["host"])).toBe(false);
+    expect(isProfilePublic("deactivated", ["admin"])).toBe(false);
+  });
+});
+
 describe("sysadmin oversight (read-only)", () => {
   const SYSADMIN: Viewer = { userId: "op", roles: [], sysadmin: true };
 
@@ -81,6 +123,60 @@ describe("canUseQueue", () => {
   });
 });
 
+describe("canDiscussSlots (open slot threads, 2026-08-14)", () => {
+  it("every member role may read and post in slot threads", () => {
+    expect(canDiscussSlots({ userId: "u", roles: ["elector"] })).toBe(true);
+    expect(canDiscussSlots({ userId: "u", roles: ["host"] })).toBe(true);
+    expect(canDiscussSlots({ userId: "u", roles: ["admin"] })).toBe(true);
+  });
+
+  it("guests, anonymous, and sysadmin oversight may not", () => {
+    expect(canDiscussSlots(SIGNED_IN_GUEST)).toBe(false);
+    expect(canDiscussSlots(ANONYMOUS)).toBe(false);
+    expect(canDiscussSlots({ userId: "op", roles: [], sysadmin: true })).toBe(
+      false,
+    );
+  });
+});
+
+describe("canHostHeart (host 💙s)", () => {
+  it("hosts who are NOT electors may 💙", () => {
+    expect(canHostHeart({ userId: "u", roles: ["host"] })).toBe(true);
+  });
+
+  it("a dual-role member's ❤️ is their gesture — no 💙 for them", () => {
+    expect(canHostHeart({ userId: "u", roles: ["host", "elector"] })).toBe(
+      false,
+    );
+  });
+
+  it("electors, admins-without-host, guests, and anonymous may not", () => {
+    expect(canHostHeart({ userId: "u", roles: ["elector"] })).toBe(false);
+    expect(canHostHeart({ userId: "u", roles: ["admin"] })).toBe(false);
+    expect(canHostHeart(SIGNED_IN_GUEST)).toBe(false);
+    expect(canHostHeart(ANONYMOUS)).toBe(false);
+  });
+
+  it("an admin who also hosts (but doesn't vote) may 💙", () => {
+    expect(canHostHeart({ userId: "u", roles: ["admin", "host"] })).toBe(true);
+  });
+
+  it("💙 tallies are admin eyes only — hosts never see counts", () => {
+    expect(canSeeHostHeartTallies({ userId: "u", roles: ["admin"] })).toBe(
+      true,
+    );
+    expect(
+      canSeeHostHeartTallies({ userId: "u", roles: ["owner", "admin"] }),
+    ).toBe(true);
+    expect(canSeeHostHeartTallies({ userId: "u", roles: ["host"] })).toBe(
+      false,
+    );
+    expect(canSeeHostHeartTallies({ userId: "u", roles: ["elector"] })).toBe(
+      false,
+    );
+  });
+});
+
 describe("canEditTopic", () => {
   const HOST: Viewer = { userId: "h1", roles: ["host"] };
   const ADMIN: Viewer = { userId: "a1", roles: ["admin"] };
@@ -107,5 +203,60 @@ describe("canEditTopic", () => {
   it("ownsTopicAsHost is false for admin overrides (they get logged)", () => {
     expect(ownsTopicAsHost(ADMIN, "h1")).toBe(false);
     expect(ownsTopicAsHost(HOST, "h1")).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Calendar v2: settings-dependent permissions
+// ---------------------------------------------------------------------------
+
+describe("calendar session permissions", () => {
+  const ADMIN: Viewer = { userId: "a1", roles: ["admin"] };
+  const HOST: Viewer = { userId: "h1", roles: ["host"] };
+  const ELECTOR: Viewer = { userId: "e1", roles: ["elector"] };
+
+  it("isCalendarEnabled defaults off and follows the flag", () => {
+    expect(isCalendarEnabled({})).toBe(false);
+    expect(isCalendarEnabled({ calendar: {} })).toBe(false);
+    expect(isCalendarEnabled({ calendar: { enabled: true } })).toBe(true);
+    expect(isCalendarEnabled({ calendar: { enabled: false } })).toBe(false);
+  });
+
+  it("confirm policy defaults to hosts_propose", () => {
+    expect(calendarConfirmPolicy({})).toBe("hosts_propose");
+    expect(
+      calendarConfirmPolicy({ calendar: { confirmPolicy: "admins" } }),
+    ).toBe("admins");
+  });
+
+  it("proposing follows the policy ladder; admins always may", () => {
+    expect(canProposeSession(ADMIN, "admins")).toBe(true);
+    expect(canProposeSession(HOST, "admins")).toBe(false);
+    expect(canProposeSession(HOST, "hosts_propose")).toBe(true);
+    expect(canProposeSession(HOST, "hosts_confirm")).toBe(true);
+    expect(canProposeSession(ELECTOR, "hosts_confirm")).toBe(false);
+  });
+
+  it("confirming needs hosts_confirm for hosts; admins always may", () => {
+    expect(canConfirmSession(ADMIN, "admins")).toBe(true);
+    expect(canConfirmSession(HOST, "hosts_propose")).toBe(false);
+    expect(canConfirmSession(HOST, "hosts_confirm")).toBe(true);
+    expect(canConfirmSession(ELECTOR, "hosts_confirm")).toBe(false);
+  });
+
+  it("never-displace: hosts touch only open slots or their own session", () => {
+    expect(canTouchSlotSession(HOST, null)).toBe(true);
+    expect(canTouchSlotSession(HOST, "h1")).toBe(true);
+    expect(canTouchSlotSession(HOST, "other-host")).toBe(false);
+    expect(canTouchSlotSession(ADMIN, "other-host")).toBe(true);
+  });
+
+  it("direct topic publishing needs the forum opt-in AND ownership", () => {
+    const on = { topics: { hostsPublishDirectly: true } };
+    expect(canPublishTopicDirectly(HOST, on, "h1")).toBe(true);
+    expect(canPublishTopicDirectly(HOST, on, "other")).toBe(false);
+    expect(canPublishTopicDirectly(HOST, {}, "h1")).toBe(false);
+    // Admins go through canModerate instead — this helper is host-only.
+    expect(canPublishTopicDirectly(ADMIN, on, "someone")).toBe(false);
   });
 });

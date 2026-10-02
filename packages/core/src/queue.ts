@@ -39,6 +39,14 @@ export type TopicQueueState = {
    * this ignores round restarts, so it only ever shrinks (to zero, where
    * the badge hides) until the cutoff moves. */
   neverSeenCount: number;
+  /** queue-back (Ed, 2026-08-21): the topics already reviewed this round,
+   * in the order they were SHOWN — oldest first, so the last entry is the
+   * one you just passed. Sorted by the same comparator as `remaining`,
+   * which is what makes it the shown order; ordering by `seenAt` instead
+   * would reshuffle the history under you the moment you re-❤️ an older
+   * topic (hearting bumps the seen mark). Stepping back through these
+   * never un-reviews anything. */
+  historyIds: string[];
 };
 
 /** Per-user deterministic shuffle: order by md5(userId:topicId). Stable
@@ -89,6 +97,7 @@ export async function getTopicQueue(
       remainingNew: 0,
       roundSize: 0,
       neverSeenCount: 0,
+      historyIds: [],
     };
   }
 
@@ -121,17 +130,27 @@ export async function getTopicQueue(
   const isNew = (t: { publishedAt: Date | null }): boolean =>
     roundStart !== null && t.publishedAt !== null && t.publishedAt > roundStart;
 
+  // Just-published topics jump the queue; within each group the per-user
+  // shuffle order holds. This is THE queue order: applied to what's left
+  // it gives what comes next, and applied to what's done it reconstructs
+  // the order those were shown in (queue-back).
+  const inQueueOrder = (
+    a: { id: string; publishedAt: Date | null },
+    b: { id: string; publishedAt: Date | null },
+  ): number => {
+    const newDiff = Number(isNew(b)) - Number(isNew(a));
+    if (newDiff !== 0) return newDiff;
+    return queueOrderKey(userId, a.id).localeCompare(
+      queueOrderKey(userId, b.id),
+    );
+  };
+
   const remaining = published
     .filter((t) => !reviewedThisRound.has(t.id))
-    .sort((a, b) => {
-      // Just-published topics jump the queue; within each group the
-      // per-user shuffle order holds.
-      const newDiff = Number(isNew(b)) - Number(isNew(a));
-      if (newDiff !== 0) return newDiff;
-      return queueOrderKey(userId, a.id).localeCompare(
-        queueOrderKey(userId, b.id),
-      );
-    });
+    .sort(inQueueOrder);
+  const history = published
+    .filter((t) => reviewedThisRound.has(t.id))
+    .sort(inQueueOrder);
 
   return {
     currentTopicId: remaining[0]?.id ?? null,
@@ -140,6 +159,7 @@ export async function getTopicQueue(
     roundSize: published.length,
     neverSeenCount: published.filter((t) => !reviewedSinceCutoff.has(t.id))
       .length,
+    historyIds: history.map((t) => t.id),
   };
 }
 

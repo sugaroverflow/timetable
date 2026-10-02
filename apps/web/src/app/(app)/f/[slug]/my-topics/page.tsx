@@ -1,11 +1,19 @@
-import { isAdmin, isHost, type Role } from "@timetable/shared";
+import {
+  isAdmin,
+  isElector,
+  isHost,
+  isHostCommentsEnabled,
+  type Role,
+} from "@timetable/shared";
 
 import { CreateTopicForm } from "@/components/CreateTopicForm";
 import { CreateTopicReveal } from "@/components/CreateTopicReveal";
 import { ListSortControl } from "@/components/ListSortControl";
+import { PageTopicToc } from "@/components/PageTopicToc";
 import { TopicManager } from "@/components/TopicManager";
+import { buildWorkbenchCalendar } from "@/lib/calendarPerms";
 import type { ManagedTopic } from "@/lib/feedTypes";
-import { commentTree } from "@/lib/gqlFragments";
+import { commentTree, MANAGED_TOPIC_FIELDS } from "@/lib/gqlFragments";
 import { gqlFetch } from "@/lib/graphql";
 import {
   MY_TOPICS_SORTS,
@@ -16,7 +24,11 @@ import { displayRolesFromCookies } from "@/lib/previewRoles.server";
 import { parseTimetableSettings, roleLabel } from "@/lib/timetableSettings";
 
 type Data = {
-  timetable: { viewerRoles: string[]; settings: string } | null;
+  timetable: {
+    viewerRoles: string[];
+    settings: string;
+    viewerHeartedPublishedCount: number | null;
+  } | null;
   me: { id: string } | null;
   timetableHosts: { id: string; name: string | null }[];
   hostDashboard: ManagedTopic[];
@@ -24,11 +36,17 @@ type Data = {
 
 const QUERY = `
   query HostDashboard($s: String!) {
-    timetable: forum(idOrSlug: $s) { viewerRoles settings }
+    timetable: forum(idOrSlug: $s) {
+      viewerRoles settings viewerHeartedPublishedCount
+    }
     me { id }
     timetableHosts: forumHosts(idOrSlug: $s) { id name }
     hostDashboard(idOrSlug: $s) {
-      id title slug hostId hostSlug status bodyMd bodyHtml coverImageUrl updatedAt
+      ${MANAGED_TOPIC_FIELDS}
+      viewerCommentsSeenAt
+      heartCount
+      viewerHasHearted
+      hostHearters { userId name image slug }
       ${commentTree()}
       ${commentTree("hostOnlyComments")}
       ${commentTree("adminComments")}
@@ -54,6 +72,11 @@ export default async function MyTopicsPage({
   const hostLabel = roleLabel(settings.roleLabels, "host");
   const adminLabel = roleLabel(settings.roleLabels, "admin");
   const admin = isAdmin(roles);
+  const workbenchCalendar = buildWorkbenchCalendar(
+    settings,
+    roles,
+    data.me?.id ?? null,
+  );
 
   if (!isHost(roles) && !admin) {
     return (
@@ -69,17 +92,31 @@ export default async function MyTopicsPage({
     ? data.timetableHosts.filter((h) => h.id !== data.me?.id)
     : undefined;
 
-  return (
-    <div className="grid grid-2">
-      {/* Hidden behind the big button until pressed (QA 2026-07-29). */}
-      <CreateTopicReveal>
-        <CreateTopicForm slug={slug} hosts={otherHosts} hostLabel={hostLabel} />
-      </CreateTopicReveal>
+  const sorted = sortManagedTopics(data.hostDashboard, sort);
 
+  return (
+    <div className="grid">
       <div className="stack">
         <div className="page-head">
           <h2 className="page-title">My Topics</h2>
         </div>
+        {/* page-topic-toc: jump links to the cards below, in list order. */}
+        <PageTopicToc
+          items={sorted.map((t) => ({
+            id: t.id,
+            title: t.title,
+            href: `#topic-${t.id}`,
+          }))}
+        />
+        {/* Hidden behind the button until pressed; under the heading, same
+            treatment as the calendar's propose button (QA 2026-08-03). */}
+        <CreateTopicReveal>
+          <CreateTopicForm
+            slug={slug}
+            hosts={otherHosts}
+            hostLabel={hostLabel}
+          />
+        </CreateTopicReveal>
         {data.hostDashboard.length > 1 ? (
           <div className="toolbar feed-toolbar">
             <ListSortControl value={sort} options={MY_TOPICS_SORTS} />
@@ -89,7 +126,7 @@ export default async function MyTopicsPage({
           <div className="notice">No topics yet — create your first one.</div>
         ) : (
           <ul className="list">
-            {sortManagedTopics(data.hostDashboard, sort).map((topic) => (
+            {sorted.map((topic) => (
               <TopicManager
                 key={topic.id}
                 topic={topic}
@@ -97,12 +134,28 @@ export default async function MyTopicsPage({
                 viewerId={data.me?.id ?? null}
                 hostLabel={hostLabel}
                 adminLabel={adminLabel}
+                electorLabel={roleLabel(settings.roleLabels, "elector")}
                 isAdmin={admin}
                 hosts={admin ? data.timetableHosts : []}
+                canPublishDirectly={Boolean(
+                  settings.topics?.hostsPublishDirectly,
+                )}
+                calendar={workbenchCalendar}
+                hostCommentsEnabled={isHostCommentsEnabled(settings)}
+                canHeart={isElector(roles)}
+                viewerHeartCount={
+                  data.timetable?.viewerHeartedPublishedCount ?? null
+                }
               />
             ))}
           </ul>
         )}
+        {/* Blank scroll room so the TOC's jump links can put even the
+            LAST card's heading at the viewport top (Ed, 2026-08-17).
+            Only when the TOC itself renders (2+ topics). */}
+        {sorted.length > 1 ? (
+          <div className="toc-jump-slack" aria-hidden />
+        ) : null}
       </div>
     </div>
   );

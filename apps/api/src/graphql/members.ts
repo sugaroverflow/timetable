@@ -6,13 +6,17 @@ import {
   listPeople,
   logActivity,
   updateMemberProfile,
+  updateMembershipDigestSettings,
   updateUserNotificationSettings,
   type Person,
 } from "@timetable/core";
 import {
   canManageMembers,
   canModerate,
+  canSeeContactDetails,
   canSeePersonProfile,
+  DIGEST_KINDS,
+  type DigestKinds,
   type Privacy,
   type Role as SharedRole,
   type Viewer,
@@ -23,6 +27,8 @@ import { renderMarkdown } from "../markdown";
 import { isSysadmin } from "../auth/sysadmin";
 import { builder } from "./builder";
 import {
+  assertOptionalHttpUrl,
+  capLength,
   forbidden,
   loadTimetableAndViewer,
   notFound,
@@ -30,6 +36,12 @@ import {
   requireAdminTimetable,
   requireUser,
 } from "./guards";
+
+/** Max bio length, shared by the self-edit and admin-edit mutations so the two
+ * can't drift apart. Storage hygiene only — the column is unbounded `text`. */
+const BIO_MAX_LENGTH = 8000;
+/** Contact Details are a few lines of addresses and handles, not an essay. */
+const CONTACT_DETAILS_MAX_LENGTH = 1000;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -39,6 +51,7 @@ type GqlMember = {
   membershipId: string;
   roles: string[];
   inviteSentAt: Date | null;
+  deactivatedAt: Date | null;
   user: {
     id: string;
     name: string | null;
@@ -70,6 +83,11 @@ const MemberType = builder.objectRef<GqlMember>("Member").implement({
       nullable: true,
       resolve: (m) => m.inviteSentAt?.toISOString() ?? null,
     }),
+    /** Set while deactivated (member-deactivation, 2026-09-10). */
+    deactivatedAt: t.string({
+      nullable: true,
+      resolve: (m) => m.deactivatedAt?.toISOString() ?? null,
+    }),
     userId: t.id({ resolve: (m) => m.user.id }),
     name: t.string({ nullable: true, resolve: (m) => m.user.name }),
     email: t.string({ nullable: true, resolve: (m) => m.user.email }),
@@ -100,6 +118,21 @@ const PersonType = builder.objectRef<Person>("Person").implement({
       resolve: (p) => (p.bio ? renderMarkdown(p.bio) : null),
     }),
     bio: t.exposeString("bio", { nullable: true }),
+    /** Members-only Markdown (2026-09-30). Already null for anyone who
+     * fails canSeeContactDetails — stripped in personForViewer. */
+    contactDetailsHtml: t.string({
+      nullable: true,
+      resolve: (p) =>
+        p.contactDetails ? renderMarkdown(p.contactDetails) : null,
+    }),
+    contactDetails: t.exposeString("contactDetails", { nullable: true }),
+    /** Set while deactivated (member-deactivation, 2026-09-10). Only
+     * admin viewers ever receive a deactivated person, so exposing the
+     * stamp adds nothing for the public. */
+    deactivatedAt: t.string({
+      nullable: true,
+      resolve: (p) => p.deactivatedAt?.toISOString() ?? null,
+    }),
     /** Published topics this person hosts (QA #59 — People page cards). */
     publishedTopics: t.field({
       type: [PersonTopicType],
@@ -118,6 +151,26 @@ function withPublicRoles(person: Person, viewer: Viewer): Person {
     ...person,
     roles: person.roles.filter((r) => r !== "owner"),
   };
+}
+
+/** A person as this viewer may see them, or null if not at all: the
+ * privacy-level profile rule, then member-deactivation (2026-09-10) —
+ * deactivated members are admin-eyes-only, listed apart on the People
+ * page for admins and simply gone for everyone else — then the
+ * members-only Contact Details strip (2026-09-30), then the owner strip. The one gate for both `forumPeople` and `person`. */
+function personForViewer(
+  person: Person,
+  privacy: Privacy,
+  viewer: Viewer,
+): Person | null {
+  if (!canSeePersonProfile(privacy, viewer, person.roles as SharedRole[])) {
+    return null;
+  }
+  if (person.deactivatedAt && !canModerate(viewer)) return null;
+  const visible = canSeeContactDetails(viewer)
+    ? person
+    : { ...person, contactDetails: null };
+  return withPublicRoles(visible, viewer);
 }
 
 // ---------------------------------------------------------------------------
@@ -141,15 +194,8 @@ builder.queryFields((t) => ({
       if (!readable) return [];
       const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
       const people = await listPeople(readable.timetable.id);
-      return people
-        .filter((p) =>
-          canSeePersonProfile(
-            readable.timetable.privacy as Privacy,
-            viewer,
-            p.roles as SharedRole[],
-          ),
-        )
-        .map((p) => withPublicRoles(p, viewer));
+      const privacy = readable.timetable.privacy as Privacy;
+      return people.flatMap((p) => personForViewer(p, privacy, viewer) ?? []);
     },
   }),
 
@@ -174,17 +220,12 @@ builder.queryFields((t) => ({
         : args.userSlug
           ? await getPersonBySlug(readable.timetable.id, args.userSlug)
           : null;
-      if (
-        person &&
-        !canSeePersonProfile(
-          readable.timetable.privacy as Privacy,
-          viewer,
-          person.roles as SharedRole[],
-        )
-      ) {
-        return null;
-      }
-      return person ? withPublicRoles(person, viewer) : null;
+      if (!person) return null;
+      return personForViewer(
+        person,
+        readable.timetable.privacy as Privacy,
+        viewer,
+      );
     },
   }),
 
@@ -199,6 +240,7 @@ builder.queryFields((t) => ({
         membershipId: m.membershipId,
         roles: m.roles as string[],
         inviteSentAt: m.inviteSentAt,
+        deactivatedAt: m.deactivatedAt,
         user: m.user,
       }));
     },
@@ -223,6 +265,29 @@ function validDigestWeekday(
     ? value
     : undefined;
 }
+/** Per-forum digest switches (2026-08-11): a JSON {kind: boolean} object.
+ * The parsed object REPLACES the stored set (the form always sends every
+ * switch); unknown kinds are dropped, malformed JSON yields undefined. */
+export function parseDigestKinds(
+  raw: string | null | undefined,
+): DigestKinds | undefined {
+  if (!raw) return undefined;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return undefined;
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return undefined;
+  }
+  const kinds: DigestKinds = {};
+  for (const kind of DIGEST_KINDS) {
+    const value = (parsed as Record<string, unknown>)[kind];
+    if (typeof value === "boolean") kinds[kind] = value;
+  }
+  return kinds;
+}
 
 builder.mutationFields((t) => ({
   /** Audit trail for the view-as-user preview (QA #59 round 3): called
@@ -245,7 +310,13 @@ builder.mutationFields((t) => ({
         timetableId: readable.timetable.id,
         actorId: user.id,
         action: "member.impersonate",
-        payload: { targetUserId: target.userId, targetName: target.name },
+        payload: {
+          targetUserId: target.userId,
+          targetName: target.name,
+          // Roles at preview time — the log line reads "previewed the
+          // forum as <name> <role>" (Ed, 2026-08-17).
+          targetRoles: target.roles,
+        },
       });
       return true;
     },
@@ -275,9 +346,19 @@ builder.mutationFields((t) => ({
       idOrSlug: t.arg.string({ required: true }),
       name: t.arg.string({ required: false }),
       bio: t.arg.string({ required: false }),
+      /** Omit to leave unchanged; empty string clears. */
+      contactDetails: t.arg.string({ required: false }),
       image: t.arg.string({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
+      capLength(args.name, 120, "Name");
+      capLength(args.bio, BIO_MAX_LENGTH, "Bio");
+      capLength(
+        args.contactDetails,
+        CONTACT_DETAILS_MAX_LENGTH,
+        "Contact Details",
+      );
+      assertOptionalHttpUrl(args.image, "Image URL");
       const { user, readable } = await loadTimetableAndViewer(
         ctx,
         args.idOrSlug,
@@ -288,6 +369,10 @@ builder.mutationFields((t) => ({
         {
           name: args.name ?? undefined,
           bio: args.bio ?? undefined,
+          contactDetails:
+            args.contactDetails != null
+              ? args.contactDetails.trim() || null
+              : undefined,
           image: args.image != null ? args.image.trim() || null : undefined,
         },
       );
@@ -305,8 +390,7 @@ builder.mutationFields((t) => ({
   updateMyNotificationSettings: t.field({
     type: UserType,
     args: {
-      /** Digests are all-or-nothing (2026-07-29) — every section is
-       * always included, this just switches them on or off. */
+      /** The master switch — off means no digest at all. */
       digestEnabled: t.arg.boolean({ required: false }),
       /** "daily" or "weekly" (digest v2, 2026-07-29). */
       digestFrequency: t.arg.string({ required: false }),
@@ -339,10 +423,46 @@ builder.mutationFields((t) => ({
       };
     },
   }),
+}));
 
-  /** Admin: edit any member's bio (QA #42 — bios are editable from the
-   * Members section in Settings) and profile image (production QA).
-   * Logged to the activity feed. */
+builder.mutationFields((t) => ({
+  /** Update the viewer's PER-FORUM digest settings (2026-08-11) — the
+   * digest is one email per forum, so on/off, cadence, AND the kind
+   * switches are all membership settings. Absent args leave their stored
+   * value; kindsJson (a {kind: boolean} object) replaces the stored set. */
+  updateMyForumDigestSettings: t.field({
+    type: "Boolean",
+    args: {
+      idOrSlug: t.arg.string({ required: true }),
+      enabled: t.arg.boolean({ required: false }),
+      /** "daily" or "weekly". */
+      frequency: t.arg.string({ required: false }),
+      /** Weekly send day, 0 = Sunday … 6 = Saturday (UTC). */
+      weekday: t.arg.int({ required: false }),
+      kindsJson: t.arg.string({ required: false }),
+    },
+    resolve: async (_p, args, ctx) => {
+      const { user, readable } = await loadTimetableAndViewer(
+        ctx,
+        args.idOrSlug,
+      );
+      const frequency = validDigestFrequency(args.frequency);
+      const weekday = validDigestWeekday(args.weekday);
+      const kinds = parseDigestKinds(args.kindsJson);
+      return updateMembershipDigestSettings(readable.timetable.id, user.id, {
+        ...(args.enabled != null ? { enabled: args.enabled } : {}),
+        ...(frequency ? { frequency } : {}),
+        ...(weekday != null ? { weekday } : {}),
+        ...(kinds ? { kinds } : {}),
+      });
+    },
+  }),
+
+  /** Admin: edit any member's per-forum profile — bio (QA #42 — bios are
+   * editable from the Members section in Settings), profile image
+   * (production QA) and name (2026-08-27). Same fields the member's own
+   * updateMyProfile edits. Logged to the activity feed.
+   * (Mutation name kept for compatibility.) */
   updateMemberBio: t.field({
     type: PersonType,
     nullable: true,
@@ -351,24 +471,44 @@ builder.mutationFields((t) => ({
       userId: t.arg.string({ required: true }),
       bio: t.arg.string({ required: true }),
       /** Omit to leave unchanged; empty string clears. */
+      contactDetails: t.arg.string({ required: false }),
+      /** Omit to leave unchanged; empty string clears. */
       image: t.arg.string({ required: false }),
+      /** Omit (or blank) to leave unchanged — a member can be renamed, but
+       * not renamed to nothing. Renaming re-derives their member slug. */
+      name: t.arg.string({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
+      capLength(args.bio, BIO_MAX_LENGTH, "Bio");
+      capLength(
+        args.contactDetails,
+        CONTACT_DETAILS_MAX_LENGTH,
+        "Contact Details",
+      );
+      capLength(args.name, 120, "Name");
+      assertOptionalHttpUrl(args.image, "Image URL");
       const { user, readable } = await requireAdminTimetable(
         ctx,
         args.idOrSlug,
       );
       const target = await getPerson(readable.timetable.id, args.userId);
       if (!target) notFound("Member not found");
+      const name = args.name?.trim() || undefined;
       await updateMemberProfile(readable.timetable.id, args.userId, {
         bio: args.bio.trim() || null,
+        ...(args.contactDetails != null
+          ? { contactDetails: args.contactDetails.trim() || null }
+          : {}),
         ...(args.image != null ? { image: args.image.trim() || null } : {}),
+        ...(name != null ? { name } : {}),
       });
       await logActivity({
         timetableId: readable.timetable.id,
         actorId: user.id,
         action: "member.bio_edit",
-        payload: { userId: args.userId, name: target.name },
+        // The name AFTER the edit — the timeline chip should read as the
+        // person you'd look for today, not their old name.
+        payload: { userId: args.userId, name: name ?? target.name },
       });
       return getPerson(readable.timetable.id, args.userId);
     },

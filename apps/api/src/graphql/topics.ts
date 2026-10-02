@@ -3,6 +3,7 @@ import { GraphQLError } from "graphql";
 import {
   buildFeed,
   type FeedSort,
+  countTopicSessionSlots,
   createTopic,
   deleteTopic,
   getPerson,
@@ -15,31 +16,44 @@ import {
   listHostTopics,
   listSubmittedTopics,
   listTimetableHosts,
+  loadCommentsSeen,
+  loadTopicHeartSummaries,
   logActivity,
   markTopicSeen,
   moderateTopic,
   reassignTopic,
+  listTopicHostHearters,
+  listViewerHostHeartedTopicIds,
   restartQueueRound,
+  setTopicReady,
   submitTopic,
   toggleHeart,
+  toggleHostHeart,
   unpublishTopic,
   updateTopic,
   type CommentNode,
   type FeedTopic,
+  type HostHearter,
   type TopicQueueState,
 } from "@timetable/core";
 import type { Topic } from "@timetable/db";
 import {
   canEditTopic,
   canHeart,
+  canHostHeart,
   canUseQueue,
   canModerate,
   canProposeTopics,
+  canPublishTopicDirectly,
   canSeeComments,
   canSeeHostOnly,
   isAdmin,
+  isCalendarEnabled,
+  isFeedSort,
+  isHostCommentsEnabled,
   ownsTopicAsHost,
   type Privacy,
+  type Viewer,
 } from "@timetable/shared";
 
 import { assertActionLimit } from "../http/action-limits";
@@ -47,6 +61,8 @@ import { renderMarkdown } from "../markdown";
 import { builder } from "./builder";
 import {
   assertCanOwnTopic,
+  assertOptionalHttpUrl,
+  capLength,
   forbidden,
   loadTimetableAndViewer,
   loadTopicAndViewer,
@@ -64,19 +80,53 @@ type GqlTopic = FeedTopic & {
   canSeeHostOnly: boolean;
   canModerate: boolean;
   canSeeComments: boolean;
+  /** Host 💙s (2026-08-04): the forum's host-only-thread option, and the
+   * viewer's own 💙 state (prefetched in one batched query per page).
+   * Unset means false — anonymous/elector viewers never load them. */
+  hostCommentsEnabled?: boolean;
+  viewerHasHostHearted?: boolean;
   /** Comment trees prefetched in one batched query by list resolvers
    * (topicFeed); single-topic paths leave it unset and the field resolver
    * falls back to a per-topic query. */
   prefetchedComments?: CommentNode[];
+  /** The drafting thread, batch-prefetched the same way for the viewers
+   * entitled to it (their own topics, or all of them for an admin) — the
+   * topic-tabs Admins tab now rides every card, so the per-topic fallback
+   * would be an N+1 across a feed page (2026-08-15). Unset = fall back. */
+  prefetchedAdminComments?: CommentNode[];
+  /** Future slots where this topic is pencilled/confirmed (sessions tab,
+   * 2026-08-14) — batch-attached like viewerHasHostHearted; unset (feeds
+   * that never attach it, calendar off) serves as 0. */
+  sessionSlotCount?: number;
 };
 
 /** ManagedTopic rows with the three comment threads optionally prefetched
  * (hostDashboard batches them; other paths fall back per topic). */
 type GqlManagedTopic = Topic & {
+  /** The viewer's comments-seen watermark, for the card's comment-teaser
+   * (My Topics matches the feed, 2026-08-16). */
+  viewerCommentsSeenAt?: Date | null;
   prefetchedComments?: CommentNode[];
   prefetchedHostOnlyComments?: CommentNode[];
   prefetchedAdminComments?: CommentNode[];
+  /** managed-heart-fields, batched by hostDashboard. */
+  prefetchedHearts?: { heartCount: number; viewerHasHearted: boolean };
 };
+
+/** The ❤️ summary for one managed topic — the batch when the list
+ * resolver attached one, else a single-topic lookup. */
+async function managedHearts(
+  tp: GqlManagedTopic,
+  viewerUserId: string | null,
+): Promise<{ heartCount: number; viewerHasHearted: boolean }> {
+  if (tp.prefetchedHearts) return tp.prefetchedHearts;
+  const summaries = await loadTopicHeartSummaries(
+    tp.timetableId,
+    [tp.id],
+    viewerUserId,
+  );
+  return summaries.get(tp.id) ?? { heartCount: 0, viewerHasHearted: false };
+}
 
 const HostOptionType = builder
   .objectRef<{ id: string; name: string | null }>("HostOption")
@@ -84,6 +134,19 @@ const HostOptionType = builder
     fields: (t) => ({
       id: t.exposeID("id"),
       name: t.exposeString("name", { nullable: true }),
+    }),
+  });
+
+/** One attributed 💙 in the host-only thread's "💙 Sarah, Amir" row. */
+const HostHearterType = builder
+  .objectRef<HostHearter>("HostHearter")
+  .implement({
+    fields: (t) => ({
+      userId: t.exposeID("userId"),
+      name: t.exposeString("name", { nullable: true }),
+      image: t.exposeString("image", { nullable: true }),
+      slug: t.exposeString("slug", { nullable: true }),
+      heartedAt: t.string({ resolve: (h) => h.heartedAt.toISOString() }),
     }),
   });
 
@@ -103,8 +166,35 @@ const TopicType = builder.objectRef<GqlTopic>("Topic").implement({
     status: t.exposeString("status"),
     heartCount: t.exposeInt("heartCount"),
     viewerHasHearted: t.exposeBoolean("viewerHasHearted"),
+    /** The viewer's own 💙 (host-non-electors only; false otherwise). */
+    viewerHasHostHearted: t.boolean({
+      resolve: (tp) => tp.viewerHasHostHearted ?? false,
+    }),
+    /** Attributed 💙s for the host-only thread row — hosts/admins only,
+     * and only while the forum's host-only thread is switched on (with it
+     * off, 💙s are admin-analysis-only bookmarks). */
+    hostHearters: t.field({
+      type: [HostHearterType],
+      nullable: true,
+      resolve: (tp) => {
+        if (!tp.canSeeHostOnly || !(tp.hostCommentsEnabled ?? false)) {
+          return null;
+        }
+        return listTopicHostHearters(tp.timetableId, tp.id);
+      },
+    }),
     commentCount: t.int({
       resolve: (tp) => (tp.canSeeComments ? tp.commentCount : 0),
+    }),
+    /** Count of this topic's sessions on future slots — gates the card's
+     * sessions tab without fetching rows. 0 while the calendar is off. */
+    sessionSlotCount: t.int({ resolve: (tp) => tp.sessionSlotCount ?? 0 }),
+    /** The viewer's comments-seen watermark for this topic — set on
+     * engagement (teaser expand / permalink view), drives the teaser's
+     * "new" previews. Null = never engaged (or signed out). */
+    viewerCommentsSeenAt: t.string({
+      nullable: true,
+      resolve: (tp) => tp.viewerCommentsSeenAt?.toISOString() ?? null,
     }),
     publishedAt: t.string({
       nullable: true,
@@ -129,13 +219,16 @@ const TopicType = builder.objectRef<GqlTopic>("Topic").implement({
       nullable: true,
       resolve: (tp) => (tp.canSeeHostOnly ? tp.devotionScore : null),
     }),
-    // Per-elector breakdown — any signed-in viewer, matching the
-    // topicWeightedBreakdown query (QA 2026-07-27).
+    // Per-elector breakdown — signed-in viewers who pass the forum's
+    // comment-visibility line (member, or public forum), matching the
+    // topicWeightedBreakdown query. hosts_only forums hide the elector
+    // membership from the public, so mere sign-in is not enough
+    // (audit 2026-08-17; canSeeComments draws exactly that line).
     weightedBreakdown: t.field({
       type: [WeightedHeartType],
       nullable: true,
       resolve: async (tp, _args, ctx) => {
-        if (!ctx.user) return null;
+        if (!ctx.user || !tp.canSeeComments) return null;
         return getWeightedBreakdown(tp.timetableId, tp.id);
       },
     }),
@@ -146,7 +239,8 @@ const TopicType = builder.objectRef<GqlTopic>("Topic").implement({
         return (
           tp.prefetchedComments ??
           listCommentTree(tp.id, {
-            includeHostOnly: tp.canSeeHostOnly,
+            includeHostOnly:
+              tp.canSeeHostOnly && (tp.hostCommentsEnabled ?? false),
             includeHidden: tp.canModerate,
           })
         );
@@ -160,6 +254,7 @@ const TopicType = builder.objectRef<GqlTopic>("Topic").implement({
       type: [CommentType],
       resolve: async (tp, _args, ctx) => {
         if (!(tp.canModerate || ctx.user?.id === tp.hostId)) return [];
+        if (tp.prefetchedAdminComments) return tp.prefetchedAdminComments;
         const tree = await listCommentTree(tp.id, {
           includeHostOnly: false,
           includeAdminOnly: true,
@@ -176,9 +271,12 @@ const TopicType = builder.objectRef<GqlTopic>("Topic").implement({
  * the same root-visibility filters as the per-field fallbacks below. */
 async function attachManagedCommentTrees(
   rows: Topic[],
+  /** Present for My Topics, whose cards tease the public thread against
+   * the viewer's own watermark; the moderation queue passes none. */
+  viewerUserId?: string,
 ): Promise<GqlManagedTopic[]> {
   const ids = rows.map((tp) => tp.id);
-  const [publicTrees, hostTrees, adminTrees] = await Promise.all([
+  const [publicTrees, hostTrees, adminTrees, seen] = await Promise.all([
     listCommentTreesForTopics(ids, {
       includeHostOnly: false,
       includeHidden: false,
@@ -192,9 +290,11 @@ async function attachManagedCommentTrees(
       includeAdminOnly: true,
       includeHidden: false,
     }),
+    loadCommentsSeen(viewerUserId ?? null, ids),
   ]);
   return rows.map((tp) => ({
     ...tp,
+    viewerCommentsSeenAt: seen.get(tp.id) ?? null,
     prefetchedComments: publicTrees.get(tp.id) ?? [],
     prefetchedHostOnlyComments: (hostTrees.get(tp.id) ?? []).filter(
       (c) => c.visibility === "host_only",
@@ -223,6 +323,11 @@ const ManagedTopicType = builder
       bodyHtml: t.string({ resolve: (tp) => renderMarkdown(tp.bodyMd) }),
       status: t.exposeString("status"),
       updatedAt: t.string({ resolve: (tp) => tp.updatedAt.toISOString() }),
+      /** Host's "Ready to publish" signal — null while still drafting. */
+      readyAt: t.string({
+        nullable: true,
+        resolve: (tp) => tp.readyAt?.toISOString() ?? null,
+      }),
       hostName: t.string({
         nullable: true,
         resolve: async (tp) =>
@@ -232,6 +337,26 @@ const ManagedTopicType = builder
         nullable: true,
         resolve: async (tp) =>
           (await getPerson(tp.timetableId, tp.hostId))?.image ?? null,
+      }),
+      /** The viewer's own comments-seen watermark — the teaser's "new
+       * since you last engaged" line (2026-08-16). Unset (the moderation
+       * queue, which doesn't tease) reads as never engaged. */
+      viewerCommentsSeenAt: t.string({
+        nullable: true,
+        resolve: (tp) => tp.viewerCommentsSeenAt?.toISOString() ?? null,
+      }),
+      /** managed-heart-fields (my-topics-heart-row, 2026-09-25). On a
+       * published topic, the feed's own count; on an unpublished or
+       * archived one, its DORMANT ❤️s — counted nowhere until it is
+       * republished. ManagedTopic is served only to the owning host and
+       * admins, who are the people entitled to see that. */
+      heartCount: t.int({
+        resolve: async (tp, _a, ctx) =>
+          (await managedHearts(tp, ctx.user?.id ?? null)).heartCount,
+      }),
+      viewerHasHearted: t.boolean({
+        resolve: async (tp, _a, ctx) =>
+          (await managedHearts(tp, ctx.user?.id ?? null)).viewerHasHearted,
       }),
       /** Public comment thread — lets My Topics render feed-identical cards
        * (QA #59). */
@@ -244,11 +369,30 @@ const ManagedTopicType = builder
             includeHidden: false,
           }),
       }),
+      /** Attributed 💙s for the host-only box on My Topics — the
+       * recipient's view of who 💙'd their topic (host hearts, QA
+       * 2026-08-04). Null while the forum's host-only thread is off. */
+      hostHearters: t.field({
+        type: [HostHearterType],
+        nullable: true,
+        resolve: async (tp) => {
+          const timetable = await getTimetableById(tp.timetableId);
+          if (timetable && !isHostCommentsEnabled(timetable.settings)) {
+            return null;
+          }
+          return listTopicHostHearters(tp.timetableId, tp.id);
+        },
+      }),
       /** Host-only thread. ManagedTopic is only ever served to the owning
-       * host or admins, so this is safe. */
+       * host or admins, so this is safe. Empty when the forum has switched
+       * the host-only thread off (hide, never delete). */
       hostOnlyComments: t.field({
         type: [CommentType],
         resolve: async (tp) => {
+          const timetable = await getTimetableById(tp.timetableId);
+          if (timetable && !isHostCommentsEnabled(timetable.settings)) {
+            return [];
+          }
           if (tp.prefetchedHostOnlyComments)
             return tp.prefetchedHostOnlyComments;
           const tree = await listCommentTree(tp.id, {
@@ -286,6 +430,175 @@ const HeartResult = builder
     }),
   });
 
+/** The viewer's 💙'd subset of `topicIds` — empty unless they're an
+ * eligible host (host-non-elector), so elector/anonymous pages never pay
+ * the extra query. */
+async function viewerHostHeartedSet(
+  userId: string | null,
+  viewer: Viewer,
+  topicIds: string[],
+): Promise<Set<string>> {
+  if (!userId || !canHostHeart(viewer)) return new Set();
+  return listViewerHostHeartedTopicIds(userId, topicIds);
+}
+
+/** The four per-viewer visibility flags every Topic payload carries —
+ * derived identically by the feed, permalink, and queue resolvers
+ * (housekeeping 2026-08-13: was four hand-kept copies). */
+type TopicViewFlags = {
+  canSeeHostOnly: boolean;
+  canModerate: boolean;
+  canSeeComments: boolean;
+  hostCommentsEnabled: boolean;
+  /** Skips the sessions-tab count query while the calendar is off. */
+  calendarEnabled: boolean;
+};
+
+function topicViewFlags(
+  timetable: {
+    privacy: string;
+    settings: Parameters<typeof isHostCommentsEnabled>[0];
+  },
+  viewer: Viewer,
+): TopicViewFlags {
+  return {
+    canSeeHostOnly: canSeeHostOnly(viewer),
+    canModerate: canModerate(viewer),
+    canSeeComments: canSeeComments(timetable.privacy as Privacy, viewer),
+    hostCommentsEnabled: isHostCommentsEnabled(timetable.settings),
+    calendarEnabled: isCalendarEnabled(timetable.settings),
+  };
+}
+
+/** Attach the view flags, the viewer's 💙 state, and ONE batched
+ * comment-tree prefetch to a page of feed topics — the Topic.comments
+ * resolver serves the prefetch instead of querying per topic. Shared by
+ * topicFeed and the published permalink. */
+async function decorateFeedTopics(
+  feed: Awaited<ReturnType<typeof buildFeed>>,
+  viewerUserId: string | null,
+  viewer: Viewer,
+  flags: TopicViewFlags,
+) {
+  const topicIds = feed.map((tp) => tp.id);
+  const commentTrees = flags.canSeeComments
+    ? await listCommentTreesForTopics(topicIds, {
+        includeHostOnly: flags.canSeeHostOnly && flags.hostCommentsEnabled,
+        includeHidden: flags.canModerate,
+      })
+    : new Map<string, CommentNode[]>();
+  // The drafting thread rides every card as a tab now (2026-08-15), so
+  // prefetch it in the same batched shape — but only when the viewer is
+  // entitled to any of it: an admin, or a host with topics on this page.
+  const adminThreadIds = new Set(
+    flags.canModerate
+      ? topicIds
+      : feed.filter((tp) => tp.hostId === viewerUserId).map((tp) => tp.id),
+  );
+  const adminTrees =
+    adminThreadIds.size > 0
+      ? await listCommentTreesForTopics([...adminThreadIds], {
+          includeHostOnly: false,
+          includeAdminOnly: true,
+          includeHidden: false,
+        })
+      : new Map<string, CommentNode[]>();
+  const viewerHostHearted = await viewerHostHeartedSet(
+    viewerUserId,
+    viewer,
+    topicIds,
+  );
+  const sessionSlotCounts = flags.calendarEnabled
+    ? await countTopicSessionSlots(topicIds)
+    : new Map<string, number>();
+  return feed.map((tp) => ({
+    ...tp,
+    ...flags,
+    viewerHasHostHearted: viewerHostHearted.has(tp.id),
+    prefetchedComments: commentTrees.get(tp.id) ?? [],
+    // Only for the topics this viewer may see it on — everyone else keeps
+    // it unset, and the field resolver's own gate returns [] anyway.
+    prefetchedAdminComments: adminThreadIds.has(tp.id)
+      ? (adminTrees.get(tp.id) ?? []).filter(
+          (c) => c.visibility === "admin_only",
+        )
+      : undefined,
+    sessionSlotCount: sessionSlotCounts.get(tp.id) ?? 0,
+  }));
+}
+
+/** Map the topicFeed GraphQL args onto buildFeed's options (defaults
+ * applied; unknown sorts fall back to the legacy "hearts" alias). */
+function feedOptionsFromArgs(args: {
+  hostId?: string | null;
+  heartedByMe?: boolean | null;
+  hostHeartedByMe?: boolean | null;
+  heartedBy?: string | null;
+  q?: string | null;
+  sort?: string | null;
+  seed?: string | null;
+  limit?: number | null;
+  offset?: number | null;
+}) {
+  const sort: FeedSort =
+    args.sort && isFeedSort(args.sort) ? args.sort : "hearts";
+  return {
+    hostId: args.hostId ?? undefined,
+    heartedByViewer: Boolean(args.heartedByMe),
+    hostHeartedByViewer: Boolean(args.hostHeartedByMe),
+    heartedBy: args.heartedBy ?? undefined,
+    q: args.q ?? undefined,
+    sort,
+    seed: args.seed ?? undefined,
+    limit: args.limit ?? 50,
+    offset: args.offset ?? undefined,
+  };
+}
+
+/** Zeroed heart/comment fields for the unpublished-permalink shape — one
+ * literal, so a new metric column can't be forgotten in one of the two
+ * Topic constructions. */
+const EMPTY_TOPIC_METRICS = {
+  heartCount: 0,
+  weightedScore: 0,
+  l2Score: 0,
+  devotionScore: 0,
+  viewerHasHearted: false,
+  commentCount: 0,
+  latestCommentAt: null,
+  viewerCommentsSeenAt: null,
+} as const;
+
+/** The unpublished-permalink shape: owner or admin only, zeroed heart
+ * data (nothing is voted on before publication). */
+async function unpublishedPermalinkTopic(
+  topic: NonNullable<Awaited<ReturnType<typeof getTopicBySlug>>>,
+  viewerUserId: string | null,
+  flags: TopicViewFlags,
+) {
+  const isOwner = viewerUserId === topic.hostId;
+  if (!isOwner && !flags.canModerate) return null;
+  const host = await getPerson(topic.timetableId, topic.hostId);
+  return {
+    id: topic.id,
+    timetableId: topic.timetableId,
+    hostId: topic.hostId,
+    hostName: host?.name ?? null,
+    hostImage: host?.image ?? null,
+    hostSlug: host?.slug ?? null,
+    title: topic.title,
+    slug: topic.slug,
+    bodyMd: topic.bodyMd,
+    coverImageUrl: topic.coverImageUrl,
+    status: topic.status,
+    publishedAt: topic.publishedAt,
+    contentUpdatedAt: topic.contentUpdatedAt,
+    createdAt: topic.createdAt,
+    ...EMPTY_TOPIC_METRICS,
+    ...flags,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Queries
 // ---------------------------------------------------------------------------
@@ -298,66 +611,26 @@ builder.queryFields((t) => ({
       idOrSlug: t.arg.string({ required: true }),
       hostId: t.arg.string({ required: false }),
       heartedByMe: t.arg.boolean({ required: false }),
+      hostHeartedByMe: t.arg.boolean({ required: false }),
       heartedBy: t.arg.string({ required: false }),
+      q: t.arg.string({ required: false }),
       sort: t.arg.string({ required: false }),
       seed: t.arg.string({ required: false }),
       limit: t.arg.int({ required: false }),
       offset: t.arg.int({ required: false }),
     },
-    // eslint-disable-next-line complexity -- audit debt (2026-07-22): sort validation + permission flags in one pass; decomposition queued
     resolve: async (_p, args, ctx) => {
       const readable = await readTimetable(ctx, args.idOrSlug);
       if (!readable) return [];
-      const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
-      const hostOnly = canSeeHostOnly(viewer);
-      const moderate = canModerate(viewer);
-      const seeComments = canSeeComments(
-        readable.timetable.privacy as Privacy,
-        viewer,
-      );
-      const validSorts = new Set<FeedSort>([
-        "hearts",
-        "raw",
-        "l2",
-        "l1",
-        "devotion",
-        "comments",
-        "recent",
-        "random",
-      ]);
-      const sort = (
-        args.sort && validSorts.has(args.sort as FeedSort)
-          ? args.sort
-          : "hearts"
-      ) as FeedSort;
+      const viewerUserId = ctx.user?.id ?? null;
+      const viewer = { userId: viewerUserId, roles: readable.roles };
+      const flags = topicViewFlags(readable.timetable, viewer);
       const feed = await buildFeed(
         readable.timetable.id,
-        ctx.user?.id ?? null,
-        {
-          hostId: args.hostId ?? undefined,
-          heartedByViewer: Boolean(args.heartedByMe),
-          heartedBy: args.heartedBy ?? undefined,
-          sort,
-          seed: args.seed ?? undefined,
-          limit: args.limit ?? 50,
-          offset: args.offset ?? undefined,
-        },
+        viewerUserId,
+        feedOptionsFromArgs(args),
       );
-      // Batch the page's comment trees into one query instead of one per
-      // topic; the Topic.comments resolver serves them from the prefetch.
-      const commentTrees = seeComments
-        ? await listCommentTreesForTopics(
-            feed.map((tp) => tp.id),
-            { includeHostOnly: hostOnly, includeHidden: moderate },
-          )
-        : new Map<string, CommentNode[]>();
-      return feed.map((tp) => ({
-        ...tp,
-        canSeeHostOnly: hostOnly,
-        canModerate: moderate,
-        canSeeComments: seeComments,
-        prefetchedComments: commentTrees.get(tp.id) ?? [],
-      }));
+      return decorateFeedTopics(feed, viewerUserId, viewer, flags);
     },
   }),
 
@@ -370,7 +643,18 @@ builder.queryFields((t) => ({
       const readable = await readTimetable(ctx, args.idOrSlug);
       if (!readable) return [];
       const rows = await listHostTopics(readable.timetable.id, ctx.user.id);
-      return attachManagedCommentTrees(rows);
+      const [managed, hearts] = await Promise.all([
+        attachManagedCommentTrees(rows, ctx.user.id),
+        loadTopicHeartSummaries(
+          readable.timetable.id,
+          rows.map((tp) => tp.id),
+          ctx.user.id,
+        ),
+      ]);
+      return managed.map((tp) => ({
+        ...tp,
+        prefetchedHearts: hearts.get(tp.id),
+      }));
     },
   }),
 
@@ -399,65 +683,29 @@ builder.queryFields((t) => ({
       idOrSlug: t.arg.string({ required: true }),
       topicSlug: t.arg.string({ required: true }),
     },
-    // eslint-disable-next-line complexity -- audit debt (2026-07-22): the published/unpublished dual path; decomposition queued
     resolve: async (_p, args, ctx) => {
       const readable = await readTimetable(ctx, args.idOrSlug);
       if (!readable) return null;
       const topic = await getTopicBySlug(readable.timetable.id, args.topicSlug);
       if (!topic) return null;
-      const viewer = { userId: ctx.user?.id ?? null, roles: readable.roles };
-      const hostOnly = canSeeHostOnly(viewer);
-      const moderate = canModerate(viewer);
-      const seeComments = canSeeComments(
-        readable.timetable.privacy as Privacy,
-        viewer,
-      );
+      const viewerUserId = ctx.user?.id ?? null;
+      const viewer = { userId: viewerUserId, roles: readable.roles };
+      const flags = topicViewFlags(readable.timetable, viewer);
 
-      if (topic.status === "published") {
-        const [feedTopic] = await buildFeed(
-          readable.timetable.id,
-          ctx.user?.id ?? null,
-          { topicId: topic.id },
-        );
-        if (!feedTopic) return null;
-        return {
-          ...feedTopic,
-          canSeeHostOnly: hostOnly,
-          canModerate: moderate,
-          canSeeComments: seeComments,
-        };
+      if (topic.status !== "published") {
+        return unpublishedPermalinkTopic(topic, viewerUserId, flags);
       }
-
-      // Not published: owner or admin only, with empty heart data.
-      const isOwner = ctx.user?.id === topic.hostId;
-      if (!isOwner && !moderate) return null;
-      const host = await getPerson(topic.timetableId, topic.hostId);
-      return {
-        id: topic.id,
-        timetableId: topic.timetableId,
-        hostId: topic.hostId,
-        hostName: host?.name ?? null,
-        hostImage: host?.image ?? null,
-        hostSlug: host?.slug ?? null,
-        title: topic.title,
-        slug: topic.slug,
-        bodyMd: topic.bodyMd,
-        coverImageUrl: topic.coverImageUrl,
-        status: topic.status,
-        publishedAt: topic.publishedAt,
-        contentUpdatedAt: topic.contentUpdatedAt,
-        createdAt: topic.createdAt,
-        heartCount: 0,
-        weightedScore: 0,
-        l2Score: 0,
-        devotionScore: 0,
-        viewerHasHearted: false,
-        commentCount: 0,
-        latestCommentAt: null,
-        canSeeHostOnly: hostOnly,
-        canModerate: moderate,
-        canSeeComments: seeComments,
-      };
+      const [feedTopic] = await buildFeed(readable.timetable.id, viewerUserId, {
+        topicId: topic.id,
+      });
+      if (!feedTopic) return null;
+      const [decorated] = await decorateFeedTopics(
+        [feedTopic],
+        viewerUserId,
+        viewer,
+        flags,
+      );
+      return decorated ?? null;
     },
   }),
 
@@ -490,6 +738,9 @@ builder.mutationFields((t) => ({
       hostId: t.arg.string({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
+      capLength(args.title, 200, "Title");
+      capLength(args.bodyMd, 100_000, "Body");
+      assertOptionalHttpUrl(args.coverImageUrl, "Cover image URL");
       const { user, readable, viewer } = await loadTimetableAndViewer(
         ctx,
         args.idOrSlug,
@@ -545,6 +796,9 @@ builder.mutationFields((t) => ({
       coverImageUrl: t.arg.string({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
+      capLength(args.title, 200, "Title");
+      capLength(args.bodyMd, 100_000, "Body");
+      assertOptionalHttpUrl(args.coverImageUrl, "Cover image URL");
       const user = await requireUser(ctx);
       const { topic, viewer } = await loadTopicAndViewer(ctx, args.topicId);
       if (!canEditTopic(viewer, topic.hostId)) forbidden();
@@ -618,6 +872,27 @@ builder.mutationFields((t) => ({
     },
   }),
 
+  /** Host (or admin) flips a pending topic's "Ready to publish" switch —
+   * the signal the admin Pending queue's default view filters on. */
+  setTopicReady: t.field({
+    type: ManagedTopicType,
+    args: {
+      topicId: t.arg.string({ required: true }),
+      ready: t.arg.boolean({ required: true }),
+    },
+    resolve: async (_p, args, ctx) => {
+      const user = await requireUser(ctx);
+      const { topic, viewer } = await loadTopicAndViewer(ctx, args.topicId);
+      if (!canEditTopic(viewer, topic.hostId)) forbidden();
+      if (topic.status !== "submitted") {
+        throw new GraphQLError("Only a pending topic can be marked ready");
+      }
+      const updated = await setTopicReady(topic, user.id, args.ready);
+      if (!updated) notFound("Topic not found");
+      return updated;
+    },
+  }),
+
   /** Host permanently deletes their own not-yet-published topic (launch QA
    * 2026-07-29). Owner-only — admins reject/unpublish instead. Published
    * and archived topics refuse: unpublish first, so nothing with public
@@ -646,10 +921,20 @@ builder.mutationFields((t) => ({
     resolve: async (_p, args, ctx) => {
       const user = await requireUser(ctx);
       const { topic, viewer } = await loadTopicAndViewer(ctx, args.topicId);
-      if (!canModerate(viewer)) forbidden("Admins only");
       const action = args.action;
       if (action !== "publish" && action !== "reject") {
         throw new GraphQLError("Invalid review action");
+      }
+      if (!canModerate(viewer)) {
+        // Hosts may publish (never reject) their own topic directly when
+        // the forum opted in — admin review becomes after-the-fact
+        // oversight; the publish is still activity-logged.
+        const timetable = await getTimetableById(topic.timetableId);
+        const direct =
+          action === "publish" &&
+          timetable &&
+          canPublishTopicDirectly(viewer, timetable.settings, topic.hostId);
+        if (!direct) forbidden("Admins only");
       }
       const updated = await moderateTopic(
         topic,
@@ -669,7 +954,24 @@ builder.mutationFields((t) => ({
       const user = await requireUser(ctx);
       const { topic, viewer } = await loadTopicAndViewer(ctx, args.topicId);
       if (!canHeart(viewer)) forbidden("Electors only");
+      await assertActionLimit(user.id, "heart");
       const { hearted } = await toggleHeart(topic.id, user.id);
+      return { topicId: topic.id, hearted };
+    },
+  }),
+
+  /** Toggle the viewer's 💙 (host hearts, 2026-08-04). Host-non-electors
+   * only — a dual-role member's ❤️ is their gesture. Works in every forum
+   * (with the host-only thread off it's a private bookmark). */
+  hostHeartTopic: t.field({
+    type: HeartResult,
+    args: { topicId: t.arg.string({ required: true }) },
+    resolve: async (_p, args, ctx) => {
+      const user = await requireUser(ctx);
+      const { topic, viewer } = await loadTopicAndViewer(ctx, args.topicId);
+      if (!canHostHeart(viewer)) forbidden("Hosts who aren't electors only");
+      await assertActionLimit(user.id, "heart");
+      const { hearted } = await toggleHostHeart(topic.id, user.id);
       return { topicId: topic.id, hearted };
     },
   }),
@@ -694,6 +996,9 @@ const TopicQueueType = builder
       roundSize: t.exposeInt("roundSize"),
       /** Published topics never seen nor ❤️'d (the sidebar badge). */
       neverSeenCount: t.exposeInt("neverSeenCount"),
+      /** queue-back: how many already-reviewed topics the viewer can step
+       * back through this round. */
+      historyCount: t.int({ resolve: (q) => q.historyIds.length }),
       current: t.field({
         type: TopicType,
         nullable: true,
@@ -709,7 +1014,14 @@ builder.queryFields((t) => ({
   topicQueue: t.field({
     type: TopicQueueType,
     nullable: true,
-    args: { idOrSlug: t.arg.string({ required: true }) },
+    args: {
+      idOrSlug: t.arg.string({ required: true }),
+      /** queue-back (Ed, 2026-08-21): serve the topic `back` steps behind
+       * the live one instead — 1 is the topic just passed. Read-only: a
+       * step back never un-reviews anything, so `remaining` and the round
+       * counter don't move. Out-of-range values clamp to the live topic. */
+      back: t.arg.int({ required: false }),
+    },
     resolve: async (_p, args, ctx) => {
       if (!ctx.user) return null;
       const readable = await readTimetable(ctx, args.idOrSlug);
@@ -722,20 +1034,34 @@ builder.queryFields((t) => ({
         ctx.user.id,
         readable.timetable.heartsCountFrom,
       );
+      const back = Math.max(
+        0,
+        Math.min(args.back ?? 0, state.historyIds.length),
+      );
+      const showId =
+        back > 0
+          ? state.historyIds[state.historyIds.length - back]!
+          : state.currentTopicId;
       let current: GqlTopic | null = null;
-      if (state.currentTopicId) {
+      if (showId) {
         const [topic] = await buildFeed(readable.timetable.id, ctx.user.id, {
-          topicId: state.currentTopicId,
+          topicId: showId,
         });
         if (topic) {
+          const flags = topicViewFlags(readable.timetable, viewer);
+          const viewerHostHearted = await viewerHostHeartedSet(
+            ctx.user.id,
+            viewer,
+            [topic.id],
+          );
+          const sessionSlotCounts = flags.calendarEnabled
+            ? await countTopicSessionSlots([topic.id])
+            : new Map<string, number>();
           current = {
             ...topic,
-            canSeeHostOnly: canSeeHostOnly(viewer),
-            canModerate: canModerate(viewer),
-            canSeeComments: canSeeComments(
-              readable.timetable.privacy as Privacy,
-              viewer,
-            ),
+            ...flags,
+            viewerHasHostHearted: viewerHostHearted.has(topic.id),
+            sessionSlotCount: sessionSlotCounts.get(topic.id) ?? 0,
           };
         }
       }

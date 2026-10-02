@@ -13,6 +13,7 @@ import type { Role } from "@timetable/shared";
 
 import { logActivity } from "./activity";
 import { ensureMemberSlug } from "./slugs";
+import { unpublishTopic } from "./topics";
 
 /** Create a membership with its per-forum profile seeded from the account's
  * (Clerk-synced) defaults. Every membership-creation path goes through this
@@ -28,14 +29,22 @@ export async function createMembershipWithProfile(args: {
     .where(eq(users.id, args.userId))
     .limit(1);
   const slug = await ensureMemberSlug(args.timetableId, account?.name ?? null);
-  await db.insert(timetableMemberships).values({
-    userId: args.userId,
-    timetableId: args.timetableId,
-    roles: args.roles,
-    name: account?.name ?? null,
-    image: account?.image ?? null,
-    slug,
-  });
+  // Concurrent first-sign-in paths (JIT claim + REST claim) can race to
+  // create the same membership; the (userId, timetableId) unique makes the
+  // loser a no-op instead of a 500 (audit 2026-08-17).
+  await db
+    .insert(timetableMemberships)
+    .values({
+      userId: args.userId,
+      timetableId: args.timetableId,
+      roles: args.roles,
+      name: account?.name ?? null,
+      image: account?.image ?? null,
+      slug,
+    })
+    .onConflictDoNothing({
+      target: [timetableMemberships.userId, timetableMemberships.timetableId],
+    });
 }
 
 export async function getMembershipById(
@@ -94,6 +103,8 @@ export type MemberWithUser = {
   roles: Role[];
   /** When the invite email was last sent; null = never invited (round 2). */
   inviteSentAt: Date | null;
+  /** Set while deactivated (member-deactivation, 2026-09-10). */
+  deactivatedAt: Date | null;
   user: {
     id: string;
     name: string | null;
@@ -106,10 +117,13 @@ export async function listTimetableHosts(
   timetableId: string,
 ): Promise<{ id: string; name: string | null }[]> {
   const members = await listMembers(timetableId);
-  return members
-    .filter((m) => m.roles.includes("host"))
-    .map((m) => ({ id: m.user.id, name: m.user.name }))
-    .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
+  return (
+    members
+      // Deactivated hosts aren't offered as topic owners.
+      .filter((m) => m.roles.includes("host") && !m.deactivatedAt)
+      .map((m) => ({ id: m.user.id, name: m.user.name }))
+      .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""))
+  );
 }
 
 export async function listMembers(
@@ -120,6 +134,7 @@ export async function listMembers(
       membershipId: timetableMemberships.id,
       roles: timetableMemberships.roles,
       inviteSentAt: timetableMemberships.inviteSentAt,
+      deactivatedAt: timetableMemberships.deactivatedAt,
       userId: users.id,
       name: timetableMemberships.name,
       email: users.email,
@@ -133,6 +148,7 @@ export async function listMembers(
     membershipId: r.membershipId,
     roles: r.roles,
     inviteSentAt: r.inviteSentAt,
+    deactivatedAt: r.deactivatedAt,
     user: { id: r.userId, name: r.name, email: r.email, image: r.image },
   }));
 }
@@ -192,6 +208,88 @@ export async function removeMembership(
   });
 }
 
+/** Deactivate a member (member-deactivation — Ed, 2026-09-10): the
+ * reversible alternative to removal for someone who has left. The
+ * membership row stays, so their comments keep their byline and their
+ * topics their host profile; what changes is that their roles resolve as
+ * none (getViewerRoles), they leave the People page and the host picker,
+ * their digests pause, and every topic of theirs that is currently live
+ * comes down through the ordinary unpublish path — one `topic.unpublish`
+ * line per topic in the log, under the admin's name, so each takedown is
+ * as visible as a manual one. Drafts and already-unpublished topics are
+ * left alone. Idempotent: a second call on a deactivated member does
+ * nothing. The caller guards admin permission, owner and self. */
+export async function deactivateMembership(
+  membership: TimetableMembership,
+  actorId: string,
+): Promise<{ unpublishedCount: number }> {
+  if (membership.deactivatedAt) return { unpublishedCount: 0 };
+
+  const live = await db
+    .select()
+    .from(topics)
+    .where(
+      and(
+        eq(topics.timetableId, membership.timetableId),
+        eq(topics.hostId, membership.userId),
+        eq(topics.status, "published"),
+      ),
+    );
+  for (const topic of live) {
+    await unpublishTopic(topic, actorId);
+  }
+
+  await db
+    .update(timetableMemberships)
+    .set({ deactivatedAt: new Date(), updatedAt: new Date() })
+    .where(eq(timetableMemberships.id, membership.id));
+  await logActivity({
+    timetableId: membership.timetableId,
+    actorId,
+    action: "member.deactivate",
+    payload: {
+      targetUserId: membership.userId,
+      targetName: membership.name ?? null,
+      targetRoles: membership.roles,
+      unpublishedTopicIds: live.map((t) => t.id),
+    },
+    note:
+      live.length > 0
+        ? `${live.length} published ${live.length === 1 ? "topic" : "topics"} unpublished`
+        : null,
+  });
+  return { unpublishedCount: live.length };
+}
+
+/** Reactivate a deactivated member: their stored roles come back into
+ * force and they return to the People page. Topics are NOT republished —
+ * whether a topic that was live when they left should be live again is an
+ * editorial call, and Publish exists for it. The digest watermark is
+ * stamped to now so their first digest back covers what happened since
+ * they returned, not the whole absence (a paused membership's watermark
+ * never advanced). Idempotent on an active member. */
+export async function reactivateMembership(
+  membership: TimetableMembership,
+  actorId: string,
+): Promise<void> {
+  if (!membership.deactivatedAt) return;
+  const now = new Date();
+  await db
+    .update(timetableMemberships)
+    .set({ deactivatedAt: null, lastDigestAt: now, updatedAt: now })
+    .where(eq(timetableMemberships.id, membership.id));
+  await logActivity({
+    timetableId: membership.timetableId,
+    actorId,
+    action: "member.reactivate",
+    payload: {
+      targetUserId: membership.userId,
+      targetName: membership.name ?? null,
+      targetRoles: membership.roles,
+    },
+  });
+}
+
 export type PersonTopic = {
   id: string;
   title: string;
@@ -204,7 +302,15 @@ export type Person = {
   image: string | null;
   slug: string | null;
   bio: string | null;
+  /** Members-only (2026-09-30): callers MUST strip it for viewers who fail
+   * shared `canSeeContactDetails` before it leaves the API. */
+  contactDetails: string | null;
   roles: Role[];
+  /** Set while deactivated (member-deactivation, 2026-09-10). The API
+   * hides deactivated people from non-admin viewers; admins get them with
+   * the stamp so the People page can list them apart and offer
+   * reactivation. */
+  deactivatedAt: Date | null;
   publishedTopics?: PersonTopic[];
 };
 
@@ -220,7 +326,9 @@ export async function listPeople(timetableId: string): Promise<Person[]> {
       image: timetableMemberships.image,
       slug: timetableMemberships.slug,
       bio: timetableMemberships.bio,
+      contactDetails: timetableMemberships.contactDetails,
       roles: timetableMemberships.roles,
+      deactivatedAt: timetableMemberships.deactivatedAt,
     })
     .from(timetableMemberships)
     .innerJoin(users, eq(users.id, timetableMemberships.userId))
@@ -279,7 +387,9 @@ async function getPersonWhere(
       image: timetableMemberships.image,
       slug: timetableMemberships.slug,
       bio: timetableMemberships.bio,
+      contactDetails: timetableMemberships.contactDetails,
       roles: timetableMemberships.roles,
+      deactivatedAt: timetableMemberships.deactivatedAt,
     })
     .from(timetableMemberships)
     .innerJoin(users, eq(users.id, timetableMemberships.userId))

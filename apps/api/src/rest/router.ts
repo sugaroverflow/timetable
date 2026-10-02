@@ -1,3 +1,5 @@
+import { createHash, timingSafeEqual } from "node:crypto";
+
 import {
   Router,
   type NextFunction,
@@ -15,6 +17,7 @@ import {
   getMembership,
   getUsersByEmails,
   logActivity,
+  deactivateMembership,
   getMembershipById,
   getPerson,
   getReadableTimetable,
@@ -23,12 +26,13 @@ import {
   getUserById,
   getUserByIcsToken,
   inviteEmails,
-  digestWindowDays,
-  isDigestDue,
   listDigestRecipients,
   listHostTopics,
-  markDigestSent,
+  markForumDigestsSent,
   markInviteSent,
+  pruneDigestSends,
+  reactivateMembership,
+  recordDigestSend,
   removeMembership,
   setMemberRoles,
   updateUserEmail,
@@ -41,10 +45,14 @@ import {
   canProposeTopics,
   createTimetableSchema,
   inviteSchema,
+  isCalendarEnabled,
+  isLoungeEnabled,
   normalizeEmail,
+  officeHoursLabel,
   updateMemberEmailSchema,
   updateMemberRolesSchema,
   type Role,
+  type TimetableSettings,
 } from "@timetable/shared";
 
 import { buildAtomFeed } from "../atom";
@@ -53,16 +61,18 @@ import {
   getOrCreateClerkUser,
   replaceClerkEmail,
 } from "../auth/clerk";
-import { isSysadmin } from "../auth/sysadmin";
+import { isSysadmin, isSysadminEmail } from "../auth/sysadmin";
 import { buildContext, type ApiContext } from "../context";
 import {
   linkBase,
   renderDigest,
-  sampleDigest,
   renderInvite,
   renderNewForum,
   sendEmail,
+  stampDigestLinks,
+  wrapLinksWithSignInTicket,
 } from "../email";
+import { sampleDigest } from "../email-sample";
 import { env } from "../env";
 import { enforceActionLimit } from "../http/action-limits";
 import {
@@ -91,6 +101,10 @@ function h(
   };
 }
 
+/** REST acts as the signed-in session only. Do NOT pass `allowApiToken` here:
+ * personal-token scopes are enforced by a GraphQL plugin that never sees a
+ * REST request, so accepting a token on this surface would hand any token the
+ * whole admin API (invites, roles, uploads, export) unscoped. */
 function contextFromRequest(req: Request) {
   return buildContext({
     authHeader: req.headers.authorization,
@@ -150,6 +164,28 @@ function parseBody<T>(
 }
 
 /**
+ * Operator status is derived from users.email (auth/sysadmin.ts), so no
+ * admin-writable path may create or re-point an account at a
+ * SYSADMIN_EMAILS address — combined with a held sign-in ticket that would
+ * be a forum-admin → sysadmin escalation. True = refused (403 sent).
+ */
+function refuseSysadminAddress(res: Response, email: string): boolean {
+  if (isSysadminEmail(email, env.sysadminEmails)) {
+    res.status(403).json({ error: "This address is reserved" });
+    return true;
+  }
+  return false;
+}
+
+/** Constant-time secret comparison; hashing first makes the lengths equal
+ * so timingSafeEqual is usable (and leaks nothing about the length). */
+function secretsEqual(presented: string, expected: string): boolean {
+  const a = createHash("sha256").update(presented).digest();
+  const b = createHash("sha256").update(expected).digest();
+  return timingSafeEqual(a, b);
+}
+
+/**
  * POST /api/forums
  * Create a timetable; the creator becomes owner + admin.
  */
@@ -162,6 +198,7 @@ restRouter.post(
 
     const input = parseBody(createTimetableSchema, req, res);
     if (!input) return;
+    if (!(await enforceActionLimit(res, user.id, "forum"))) return;
 
     const timetable = await createTimetable(user.id, input);
     // Notify opted-in sysadmins — fire-and-forget so an email hiccup can
@@ -314,6 +351,7 @@ restRouter.post(
     const input = parseBody(addPersonSchema, req, res);
     if (!input) return;
     if (!(await enforceActionLimit(res, user.id, "invite"))) return;
+    if (refuseSysadminAddress(res, input.email)) return;
 
     const email = normalizeEmail(input.email);
     const clerkUser = await getOrCreateClerkUser(email, input.name ?? null);
@@ -362,6 +400,7 @@ restRouter.patch(
     if (!admin) return;
     const input = parseBody(updateMemberEmailSchema, req, res);
     if (!input) return;
+    if (refuseSysadminAddress(res, input.email)) return;
 
     const { membership } = admin;
     try {
@@ -387,7 +426,10 @@ restRouter.patch(
       timetableId: membership.timetableId,
       actorId: user.id,
       action: "member.email_change",
-      payload: { targetUserId: membership.userId },
+      payload: {
+        targetUserId: membership.userId,
+        targetName: membership.name ?? null,
+      },
       note: `Login email changed to ${normalizeEmail(input.email)}`,
     });
     res.json({ email: normalizeEmail(input.email) });
@@ -500,6 +542,7 @@ restRouter.patch(
         action: "member.role_change",
         payload: {
           targetUserId: membership.userId,
+          targetName: membership.name ?? null,
           from: membership.roles,
           to: roles,
         },
@@ -541,19 +584,86 @@ restRouter.delete(
   }),
 );
 
+/**
+ * POST /api/memberships/:id/deactivate
+ * Admin-only member deactivation (member-deactivation — Ed, 2026-09-10):
+ * the reversible alternative to removal. Roles are suspended, the member
+ * leaves the People page, their live topics are unpublished and their
+ * digests pause; their comments stay. The owner can't be deactivated, and
+ * neither can the acting admin — suspending your own roles would lock
+ * you out of undoing it.
+ */
+restRouter.post(
+  "/memberships/:id/deactivate",
+  h(async (req, res) => {
+    const ctx = await contextFromRequest(req);
+    const user = requireUserCtx(ctx, res);
+    if (!user) return;
+
+    const admin = await requireAdminMembership(
+      ctx,
+      req.params.id as string,
+      res,
+    );
+    if (!admin) return;
+    const { membership } = admin;
+
+    const timetable = await getTimetableById(membership.timetableId);
+    if (timetable && membership.userId === timetable.ownerId) {
+      res.status(400).json({ error: "The owner can't be deactivated" });
+      return;
+    }
+    if (membership.userId === user.id) {
+      res.status(400).json({ error: "You can't deactivate yourself" });
+      return;
+    }
+
+    const { unpublishedCount } = await deactivateMembership(
+      membership,
+      user.id,
+    );
+    res.json({ deactivated: true, unpublishedCount });
+  }),
+);
+
+/**
+ * POST /api/memberships/:id/reactivate
+ * Undoes deactivation: roles come back into force, the member returns to
+ * the People page and their digests resume. Nothing is republished.
+ */
+restRouter.post(
+  "/memberships/:id/reactivate",
+  h(async (req, res) => {
+    const ctx = await contextFromRequest(req);
+    const user = requireUserCtx(ctx, res);
+    if (!user) return;
+
+    const admin = await requireAdminMembership(
+      ctx,
+      req.params.id as string,
+      res,
+    );
+    if (!admin) return;
+
+    await reactivateMembership(admin.membership, user.id);
+    res.json({ reactivated: true });
+  }),
+);
+
 type UploadAuth =
   | { ok: true; timetableId?: string }
   | { ok: false; status: number; error: string };
 
-/** Cover uploads target a timetable: resolve it and check the viewer's
- * role there (hosts for topic covers, admins for the timetable cover).
- * Other purposes need no timetable. */
+/** Forum-branding uploads target a timetable: resolve it and check the
+ * viewer's role there (hosts for topic covers and post images, admins for the timetable
+ * cover AND icon — the icon was un-gated until the 2026-08-17 audit).
+ * Only profile images need no timetable. */
 async function authorizeUpload(
   userId: string,
   purpose: UploadPurpose,
   timetableIdOrSlug: unknown,
 ): Promise<UploadAuth> {
-  if (purpose !== "topic-cover" && purpose !== "timetable-cover") {
+  if (purpose === "profile-image") {
     return { ok: true };
   }
 
@@ -566,13 +676,18 @@ async function authorizeUpload(
   }
 
   const viewer = { userId, roles: readable.roles };
+  // Topic covers and images inside posts (topic bodies, the {host}
+  // Lounge): whoever may write those — hosts and admins.
   if (
-    purpose === "topic-cover" &&
+    (purpose === "topic-cover" || purpose === "post-image") &&
     !(canProposeTopics(viewer) || canModerate(viewer))
   ) {
     return { ok: false, status: 403, error: "Hosts only" };
   }
-  if (purpose === "timetable-cover" && !canEditSettings(viewer)) {
+  if (
+    (purpose === "timetable-cover" || purpose === "timetable-icon") &&
+    !canEditSettings(viewer)
+  ) {
     return { ok: false, status: 403, error: "Admins only" };
   }
   return { ok: true, timetableId: readable.timetable.id };
@@ -624,6 +739,7 @@ restRouter.post(
       res.status(400).json({ error: "Invalid upload purpose" });
       return;
     }
+    if (!(await enforceActionLimit(res, user.id, "upload"))) return;
 
     const auth = await authorizeUpload(
       user.id,
@@ -645,6 +761,31 @@ restRouter.post(
     });
   }),
 );
+
+/** The showcase digest for the test send: the real renderer over sample
+ * data, filtered by the forum's configured kind defaults so the admin
+ * previews exactly what a default member's digest carries. */
+function buildTestDigest(
+  user: { email: string; name: string | null },
+  timetable: {
+    id: string;
+    name: string;
+    slug: string;
+    settings: TimetableSettings | null;
+  },
+): ReturnType<typeof sampleDigest> {
+  return sampleDigest({
+    email: user.email,
+    name: user.name,
+    forumId: timetable.id,
+    forumName: timetable.name,
+    forumSlug: timetable.slug,
+    accent: timetable.settings?.theme?.primary ?? null,
+    kindDefaults: timetable.settings?.digestKindDefaults ?? {},
+    hostLabel: timetable.settings?.roleLabels?.host ?? "Host",
+    loungeEnabled: isLoungeEnabled(timetable.settings ?? {}),
+  });
+}
 
 /**
  * POST /api/forums/:idOrSlug/digest-test
@@ -677,19 +818,20 @@ restRouter.post(
     }
     if (!(await enforceActionLimit(res, user.id, "invite"))) return;
 
-    const digest = sampleDigest({
-      email: user.email,
-      name: user.name,
-      forumId: readable.timetable.id,
-      forumName: readable.timetable.name,
-      forumSlug: readable.timetable.slug,
-      accent:
-        (readable.timetable.settings as { theme?: { primary?: string } } | null)
-          ?.theme?.primary ?? null,
-    });
+    const digest = buildTestDigest(
+      { email: user.email, name: user.name },
+      readable.timetable,
+    );
     const { subject, html } = renderDigest(digest);
+    // Test digests get the ticket treatment too, so "Send test digest" QAs
+    // the one-click sign-in links exactly as recipients receive them.
+    const ticket = await createSignInTicket(user.id);
     try {
-      await sendEmail({ to: user.email, subject: `[Test] ${subject}`, html });
+      await sendEmail({
+        to: user.email,
+        subject: `[Test] ${subject}`,
+        html: ticket ? wrapLinksWithSignInTicket(html, ticket) : html,
+      });
     } catch (err) {
       logRequestError(req, err, { component: "digest-test-email" });
       const detail =
@@ -711,57 +853,122 @@ restRouter.post(
 restRouter.post(
   "/jobs/digests",
   h(async (req, res) => {
-    const secret = process.env.CRON_SECRET;
+    const secret = env.cronSecret;
     if (!secret) {
       res
         .status(503)
         .json({ error: "Digests not configured (CRON_SECRET unset)" });
       return;
     }
-    if (req.headers["x-cron-secret"] !== secret) {
+    const presented = req.headers["x-cron-secret"];
+    if (typeof presented !== "string" || !secretsEqual(presented, secret)) {
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
 
     const now = new Date();
-    const dayMs = 24 * 60 * 60 * 1000;
-    // Weekly recipients are only due on their chosen weekday; skipping
-    // leaves lastDigestAt untouched so their window keeps accumulating.
-    const recipients = (await listDigestRecipients()).filter((r) =>
-      isDigestDue(r.notificationSettings, now),
-    );
+    // Per-forum digests (2026-08-11): which forums are enabled, due today,
+    // and how far back each window reaches all resolve per MEMBERSHIP
+    // inside computeUserForumDigests. A skipped (not-due) forum keeps its
+    // watermark untouched so its window keeps accumulating.
+    const recipients = await listDigestRecipients();
     let sent = 0;
+    let processed = 0;
+    let failed = 0;
 
-    // Recipients are independent, so process them in concurrent chunks of
-    // 10. Failure semantics match the old sequential loop as closely as
-    // chunking allows: one recipient's compute/send throwing still aborts
-    // the whole run (previously everything after it; now its chunk).
+    // Recipients are independent, so process them in concurrent chunks of 10.
+    //
+    // Each recipient is ISOLATED (ops R4): a compute or send failure is
+    // logged, counted and stepped over. It used to abort the entire run —
+    // and the likeliest trigger was never a bad address but Resend's 2/sec
+    // rate limit against ten concurrent unthrottled sends, so the first run
+    // against a real cohort would have taken everyone's digest down with it.
+    // Sends are paced in email.ts now; this is the second line of defence.
+    //
+    // A skipped recipient loses nothing: per-forum watermarks only advance
+    // once an email is actually out, so the next run recomputes their window
+    // and picks up exactly where this one gave up.
+    /** Returns emails sent, or null when this recipient had nothing due. */
+    const sendRecipientDigests = async (
+      recipient: (typeof recipients)[number],
+    ): Promise<number | null> => {
+      // One email per forum with news.
+      const { digests, dueForumIds } = await computeUserForumDigests(
+        recipient,
+        now,
+      );
+      if (dueForumIds.length === 0) return null;
+      let didSend = 0;
+      const sentForumIds = new Set<string>();
+      for (const digest of digests) {
+        if (!digest.email) continue;
+        const { subject, html } = renderDigest(digest);
+        // Read tracking (2026-08-13): every link carries the send row's
+        // id — one click marks the digest's shown threads seen.
+        const sendId = await recordDigestSend(digest, now);
+        const stamped = stampDigestLinks(html, sendId);
+        // One single-use ticket per email; null (Clerk hiccup) degrades
+        // to plain links, never blocks the send.
+        const ticket = await createSignInTicket(digest.userId);
+        await sendEmail({
+          to: digest.email,
+          subject,
+          html: ticket ? wrapLinksWithSignInTicket(stamped, ticket) : stamped,
+        });
+        didSend += 1;
+        // Advance THIS forum's watermark the moment its email is out:
+        // with one end-of-loop mark, an early success followed by a
+        // later forum's send failure re-sent the successful email on
+        // the next run (audit 2026-08-17).
+        await markForumDigestsSent(recipient.id, [digest.forumId], now);
+        sentForumIds.add(digest.forumId);
+      }
+      // Quiet-but-due forums advance too — an empty window must never
+      // re-accumulate. Marked last: if a send above threw, the quiet
+      // forums simply recompute (still quiet) next run.
+      const quiet = dueForumIds.filter((id) => !sentForumIds.has(id));
+      if (quiet.length > 0) {
+        await markForumDigestsSent(recipient.id, quiet, now);
+      }
+      return didSend;
+    };
+
     const chunkSize = 10;
     for (let i = 0; i < recipients.length; i += chunkSize) {
       const chunk = recipients.slice(i, i + chunkSize);
       const results = await Promise.all(
         chunk.map(async (recipient) => {
-          const windowMs =
-            digestWindowDays(recipient.notificationSettings) * dayMs;
-          const since =
-            recipient.lastDigestAt ?? new Date(now.getTime() - windowMs);
-          // Digest v2: one email per forum with news.
-          const digests = await computeUserForumDigests(recipient, since);
-          let didSend = 0;
-          for (const digest of digests) {
-            if (!digest.email) continue;
-            const { subject, html } = renderDigest(digest);
-            await sendEmail({ to: digest.email, subject, html });
-            didSend += 1;
+          try {
+            return await sendRecipientDigests(recipient);
+          } catch (err) {
+            logRequestError(req, err, {
+              component: "digests",
+              recipientId: recipient.id,
+            });
+            return "failed" as const;
           }
-          await markDigestSent(recipient.id, now);
-          return didSend;
         }),
       );
-      sent += results.reduce((a, b) => a + b, 0);
+      for (const result of results) {
+        if (result === "failed") {
+          failed += 1;
+          continue;
+        }
+        if (result === null) continue;
+        processed += 1;
+        sent += result;
+      }
     }
 
-    res.json({ processed: recipients.length, sent });
+    // Retention: click-to-read links older than a year are dead; the cron
+    // prunes the send log behind itself (audit 2026-08-17).
+    const pruned = await pruneDigestSends(
+      new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000),
+    );
+
+    // `failed` is the signal the cron caller checks (ops R4): the run always
+    // completes now, so a silent 200 would hide a cohort-wide send failure.
+    res.json({ processed, sent, failed, pruned });
   }),
 );
 
@@ -837,9 +1044,19 @@ restRouter.get(
       res.status(404).json({ error: "Not found" });
       return;
     }
+    // The whole calendar feature sits behind the forum-level flag; a feed
+    // for a switched-off calendar 404s (toggling back on restores it).
+    if (!isCalendarEnabled(readable.timetable.settings)) {
+      res.status(404).json({ error: "Calendar not enabled" });
+      return;
+    }
 
     const slots = await getSlotsForIcs(readable.timetable.id);
-    const ics = buildIcs(readable.timetable.name, slots);
+    const ics = buildIcs(
+      readable.timetable.name,
+      slots,
+      officeHoursLabel(readable.timetable.settings),
+    );
     res.setHeader("Content-Type", "text/calendar; charset=utf-8");
     res.setHeader(
       "Content-Disposition",

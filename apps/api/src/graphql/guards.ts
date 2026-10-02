@@ -12,11 +12,14 @@ import {
 import type { TimetableSettings } from "@timetable/db";
 import {
   BRAND_FONT_KEYS,
+  calendarSettingsSchema,
   canManageMembers,
   canModerate,
+  HEX_COLOUR,
   isAdmin,
   isHost,
   THEME_FONT_KEYS,
+  type CalendarSettings,
 } from "@timetable/shared";
 
 import type { SessionUser } from "../auth/clerk";
@@ -110,10 +113,11 @@ export async function loadSlotAndViewer(ctx: ApiContext, slotId: string) {
   if (!slot) notFound("Timeslot not found");
   const viewer = await ctx.getViewer(slot.timetableId);
   const timetable = await getTimetableById(slot.timetableId);
-  if (timetable?.privacy === "deactivated" && !canModerate(viewer)) {
+  if (!timetable) notFound("Forum not found");
+  if (timetable.privacy === "deactivated" && !canModerate(viewer)) {
     forbidden("Forum is deactivated");
   }
-  return { slot, viewer };
+  return { slot, viewer, timetable };
 }
 
 // ---------------------------------------------------------------------------
@@ -159,13 +163,80 @@ export function parseElectorActivityFilter(
 // web's pickers can't drift (they did: this Set used to be hand-kept).
 const THEME_FONTS = new Set<string>(THEME_FONT_KEYS);
 const BRAND_FONTS = new Set<string>(BRAND_FONT_KEYS);
-const HEX_COLOUR = /^#[0-9a-fA-F]{6}$/;
 
 /** A validated #rrggbb hex, or undefined. Shared by the themeJson parser and
  * the legacy themePrimary/themeSecondary args so no unvalidated colour is ever
  * stored (and later injected into the SSR theme <style> tag). */
 export const colour = (v: unknown): string | undefined =>
   typeof v === "string" && HEX_COLOUR.test(v) ? v : undefined;
+
+// ---------------------------------------------------------------------------
+// Free-string input caps (audit 2026-08-17). REST bodies go through zod;
+// these are the equivalents for raw GraphQL string args — storage/DoS
+// hygiene, not XSS (bodies are sanitised at render).
+// ---------------------------------------------------------------------------
+
+/** Throw unless the arg is at most `max` characters. */
+export function capLength(
+  value: string | null | undefined,
+  max: number,
+  label: string,
+): void {
+  if (value != null && value.length > max) {
+    throw new GraphQLError(`${label} is too long (max ${max} characters)`);
+  }
+}
+
+/** Throw unless the arg is empty/omitted (both mean "clear"/"unchanged" per
+ * the null-vs-"" mutation convention) or an absolute http(s) URL. */
+export function assertOptionalHttpUrl(
+  value: string | null | undefined,
+  label: string,
+): void {
+  const trimmed = value?.trim();
+  if (!trimmed) return;
+  capLength(trimmed, 2000, label);
+  let parsed: URL | null = null;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    parsed = null;
+  }
+  if (
+    !parsed ||
+    (parsed.protocol !== "http:" && parsed.protocol !== "https:")
+  ) {
+    throw new GraphQLError(`${label} must be an absolute http(s) URL`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Calendar settings validation (calendar v2)
+// ---------------------------------------------------------------------------
+
+/** Validate a client-sent calendar settings object (schema lives in
+ * @timetable/shared): known keys only, policy from the canonical list,
+ * capped collections. Returns null when invalid. */
+export function parseCalendarJson(raw: string): CalendarSettings | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  const result = calendarSettingsSchema.safeParse(parsed);
+  if (!result.success) return null;
+  const settings: CalendarSettings = { ...result.data };
+  if (settings.locations) {
+    settings.locations = settings.locations
+      .map((l) => l.trim())
+      .filter(Boolean);
+  }
+  if (settings.terms) {
+    settings.terms = settings.terms.map((t) => ({ ...t, name: t.name.trim() }));
+  }
+  return settings;
+}
 
 /** Validate a client-sent theme (QA #59): known keys only, colours must be
  * #rrggbb, font from the curated list. Returns null when invalid. */

@@ -12,10 +12,10 @@ import {
 function comment(createdAt: string, replies: FeedComment[] = []): FeedComment {
   return {
     id: `c-${createdAt}`,
-    parentId: null,
     authorId: "u1",
     authorName: null,
     authorImage: null,
+    authorRoles: [],
     body: "hi",
     visibility: "public",
     hidden: false,

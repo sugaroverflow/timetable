@@ -1,17 +1,22 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { useState } from "react";
 
+import { draftKey, hasDraft } from "@/lib/commentDrafts";
+import { useCommentThread } from "@/lib/commentThreadAdapter";
 import type { FeedComment } from "@/lib/feedTypes";
+import { COMMENT_TREE_DEPTH } from "@/lib/gqlFragments";
+import { relativeTime } from "@/lib/relativeTime";
+import type { RoleLabels } from "@/lib/timetableSettings";
 
 import { Avatar } from "./Avatar";
+import { ChainTailComposer } from "./ChainTailComposer";
 import { CommentActions } from "./CommentActions";
 import { CommentBody } from "./CommentBody";
 import { CommentEditForm } from "./CommentEditForm";
 import { PersonChip } from "./PersonChip";
-
-const VISIBLE_TOP_LEVEL = 3;
+import { PrimaryRolePill } from "./RolePills";
 
 /** Restricted-visibility badge next to the author name. */
 const VISIBILITY_PILLS: Record<string, { className: string; label: string }> = {
@@ -19,17 +24,66 @@ const VISIBILITY_PILLS: Record<string, { className: string; label: string }> = {
   admin_only: { className: "pill pill-admin", label: "admins" },
 };
 
-function countNested(comments: FeedComment[]): number {
-  return comments.reduce((sum, c) => sum + 1 + countNested(c.replies ?? []), 0);
+/** Faint relative timestamp on every comment — a permalink to the
+ * comment's anchor on the topic page when the thread knows its topic's URL
+ * (#259). The `#comment-<id>` anchors carry scroll-margin past the topbar
+ * and a :target highlight ring (activity-log overhaul, 2026-08-17), so the
+ * link lands the reader right on the comment. */
+function CommentTime({
+  comment,
+  topicHref,
+}: {
+  comment: FeedComment;
+  topicHref?: string | null;
+}) {
+  // Server and client render moments differ, so both the relative label
+  // and the timezone-dependent title can mismatch at hydration — harmless,
+  // suppressed.
+  const label = relativeTime(comment.createdAt);
+  const exact = new Date(comment.createdAt).toLocaleString("en-GB");
+  if (!topicHref) {
+    return (
+      <span className="c-time" title={exact} suppressHydrationWarning>
+        {label}
+      </span>
+    );
+  }
+  return (
+    <Link
+      className="c-time"
+      href={`${topicHref}#comment-${comment.id}`}
+      title={exact}
+      suppressHydrationWarning
+    >
+      {label}
+    </Link>
+  );
 }
 
-/** True when the deep-linked comment lives in this subtree — collapsed
- * threads auto-expand so ?reply= targets are visible (QA #59 round 3). */
-function subtreeContains(comments: FeedComment[], id: string | null): boolean {
-  if (!id) return false;
-  return comments.some(
-    (c) => c.id === id || subtreeContains(c.replies ?? [], id),
-  );
+/** The comment's text, or its editor while editing — a thread adapter
+ * (the Lounge) may swap in its own of either. */
+function CommentText({
+  comment,
+  editing,
+  onEditDone,
+}: {
+  comment: FeedComment;
+  editing: boolean;
+  onEditDone(): void;
+}) {
+  const thread = useCommentThread();
+  if (editing) {
+    return (
+      thread.renderEditor?.(comment, onEditDone) ?? (
+        <CommentEditForm
+          commentId={comment.id}
+          initialBody={comment.body}
+          onDone={onEditDone}
+        />
+      )
+    );
+  }
+  return thread.renderBody?.(comment) ?? <CommentBody body={comment.body} />;
 }
 
 /** The name row + body for a live (non-deleted) comment; the body swaps
@@ -37,15 +91,20 @@ function subtreeContains(comments: FeedComment[], id: string | null): boolean {
 function CommentBubble({
   comment,
   slug,
+  roleLabels,
   editing,
   onEditDone,
+  topicHref,
 }: {
   comment: FeedComment;
   slug?: string;
+  roleLabels?: RoleLabels;
   editing: boolean;
   onEditDone(): void;
+  topicHref?: string | null;
 }) {
   const visibilityPill = VISIBILITY_PILLS[comment.visibility];
+  const { pinTitle } = useCommentThread();
   return (
     <div className="c-bubble">
       <span className="c-name">
@@ -57,6 +116,15 @@ function CommentBubble({
           (comment.authorName ?? "Someone")
         )}
       </span>
+      {/* Who's talking, at a glance: the author's role in this forum
+          (mixed host/elector threads read ambiguously without it). */}
+      <PrimaryRolePill roles={comment.authorRoles} labels={roleLabels} />
+      <CommentTime comment={comment} topicHref={topicHref} />
+      {comment.pinnedAt ? (
+        <span style={{ marginLeft: 6, fontSize: 11 }} title={pinTitle}>
+          📌
+        </span>
+      ) : null}
       {visibilityPill ? (
         <span
           className={visibilityPill.className}
@@ -80,52 +148,148 @@ function CommentBubble({
         </span>
       ) : null}
       <div className="c-text">
-        {editing ? (
-          <CommentEditForm
-            commentId={comment.id}
-            initialBody={comment.body}
-            onDone={onEditDone}
-          />
-        ) : (
-          <CommentBody body={comment.body} />
-        )}
+        <CommentText
+          comment={comment}
+          editing={editing}
+          onEditDone={onEditDone}
+        />
       </div>
     </div>
   );
 }
 
+/** The comment's author avatar — clicks through to the author's page like
+ * the name (mobile+links pass 2026-08-03); tombstones have no author. */
+function CommentAvatar({
+  comment,
+  slug,
+}: {
+  comment: FeedComment;
+  slug?: string;
+}) {
+  if (slug && !comment.deleted) {
+    return (
+      <PersonChip slug={slug} userId={comment.authorId}>
+        <Avatar name={comment.authorName} image={comment.authorImage} small />
+      </PersonChip>
+    );
+  }
+  return (
+    <Avatar
+      name={comment.deleted ? null : comment.authorName}
+      image={comment.authorImage}
+      small
+    />
+  );
+}
+
+/** A comment's chain: its children as a linear dialogue (oldest first),
+ * ending in the chain-tail-composer. New messages attach to the PARENT
+ * comment (root-attach), so chains don't deepen; the tail only exists
+ * where the reply-depth-guard allows the next message to be fetched. */
+function ChainBlock({
+  comment,
+  replies,
+  canReply,
+  canModerate,
+  viewerId,
+  slug,
+  roleLabels,
+  depth,
+  topicHref,
+}: {
+  comment: FeedComment;
+  replies: FeedComment[];
+  canReply: boolean;
+  canModerate: boolean;
+  viewerId: string | null;
+  slug?: string;
+  roleLabels?: RoleLabels;
+  depth: number;
+  topicHref?: string | null;
+}) {
+  // Chain parents: every top-level comment, and any forked comment whose
+  // sub-chain has started.
+  const showTail =
+    canReply &&
+    (depth === 1 || replies.length > 0) &&
+    depth < COMMENT_TREE_DEPTH;
+  if (replies.length === 0 && !showTail) return null;
+  // ?reply= deep links (digest emails) land on the chain's tail: the chain
+  // parent's own id, plus its childless messages (a message with a
+  // sub-chain is answered by its own tail instead).
+  const tailFocusIds = [
+    comment.id,
+    ...replies.filter((r) => (r.replies ?? []).length === 0).map((r) => r.id),
+  ];
+  return (
+    <div className="replies">
+      {replies.map((r) => (
+        <CommentItem
+          key={r.id}
+          comment={r}
+          canReply={canReply}
+          canModerate={canModerate}
+          viewerId={viewerId}
+          slug={slug}
+          roleLabels={roleLabels}
+          depth={depth + 1}
+          topicHref={topicHref}
+        />
+      ))}
+      {showTail ? (
+        <ChainTailComposer parentId={comment.id} focusIds={tailFocusIds} />
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Dialogue-first threading (2026-08-13): a comment's children render as a
+ * linear chain (oldest first) ending in a chain-tail-composer that
+ * continues the dialogue — new messages attach to THIS comment
+ * (root-attach), so chains don't deepen. Reply on a chain message is the
+ * rarer fork gesture, opening a sub-chain beside the main line.
+ */
 function CommentItem({
   comment,
   canReply,
   canModerate,
   viewerId,
   slug,
+  roleLabels,
+  depth,
+  topicHref,
+  canPin = false,
 }: {
   comment: FeedComment;
   canReply: boolean;
   canModerate: boolean;
   viewerId: string | null;
   slug?: string;
+  roleLabels?: RoleLabels;
+  /** 1-based nesting level, counted from the thread roots. */
+  depth: number;
+  topicHref?: string | null;
+  /** The viewer authored the topic: Pin/Unpin on top-level comments
+   * (#258). */
+  canPin?: boolean;
 }) {
   const replies = comment.replies ?? [];
-  const searchParams = useSearchParams();
-  const [showReplies, setShowReplies] = useState(() =>
-    subtreeContains(replies, searchParams.get("reply")),
+  // Reopen the inline editor for an edit interrupted by a tab switch —
+  // the draft outlives the unmount, the open/closed state doesn't.
+  const [editing, setEditing] = useState(() =>
+    hasDraft(draftKey.edit(comment.id)),
   );
-  const [editing, setEditing] = useState(false);
-  const replyCount = countNested(replies);
   const isOwn = viewerId != null && viewerId === comment.authorId;
+  const thread = useCommentThread();
 
   return (
     <div
       id={`comment-${comment.id}`}
       className={`comment ${comment.hidden ? "hidden" : ""}`}
     >
-      <Avatar
-        name={comment.deleted ? null : comment.authorName}
-        image={comment.authorImage}
-        small
-      />
+      <CommentAvatar comment={comment} slug={slug} />
       <div className="comment-main">
         {comment.deleted ? (
           // Author-deleted tombstone: only present at all because replies
@@ -139,47 +303,66 @@ function CommentItem({
           <CommentBubble
             comment={comment}
             slug={slug}
+            roleLabels={roleLabels}
             editing={editing}
             onEditDone={() => setEditing(false)}
+            topicHref={topicHref}
           />
         )}
+        {comment.deleted ? null : thread.renderFooter?.(comment)}
         {comment.deleted ? null : (
           <CommentActions
             commentId={comment.id}
-            canReply={canReply}
+            // Reply = fork a sub-chain off a chain message; top-level
+            // comments continue through their tail composer instead.
+            canReply={canReply && depth >= 2 && depth < COMMENT_TREE_DEPTH}
             canModerate={canModerate}
             hidden={comment.hidden}
             isOwn={isOwn}
             onEdit={() => setEditing(true)}
+            // Pin = the topic author's curation gesture, roots only (#258).
+            canPin={canPin && depth === 1}
+            pinned={comment.pinnedAt != null}
           />
         )}
-        {replies.length > 0 ? (
-          showReplies ? (
-            <div className="replies">
-              {replies.map((r) => (
-                <CommentItem
-                  key={r.id}
-                  comment={r}
-                  canReply={canReply}
-                  canModerate={canModerate}
-                  viewerId={viewerId}
-                  slug={slug}
-                />
-              ))}
-            </div>
-          ) : (
-            <button
-              type="button"
-              className="thread-toggle"
-              onClick={() => setShowReplies(true)}
-            >
-              View {replyCount} {replyCount === 1 ? "reply" : "replies"}
-            </button>
-          )
-        ) : null}
+        <ChainBlock
+          comment={comment}
+          replies={replies}
+          canReply={canReply}
+          canModerate={canModerate}
+          viewerId={viewerId}
+          slug={slug}
+          roleLabels={roleLabels}
+          depth={depth}
+          topicHref={topicHref}
+        />
       </div>
     </div>
   );
+}
+
+/** The full thread, always open — newest chain first (the server orders
+ * roots newest-first to match the top-composer above the stack); feed
+ * surfaces collapse the whole section behind CommentTeaser instead of
+ * folding here. */
+/** Pinned-first thread order (#258). The server keeps roots newest-first
+ * (teasers and digests read "latest" off that order), so pinning is purely
+ * a render-time re-sort: pins on top (earliest pin first — the author
+ * curates by pinning sequence), then everyone else newest-first. The one
+ * exception (Ed's spec, 2026-08-17): a comment that arrived AFTER this
+ * list mounted stays ABOVE the pins until the next full page load —
+ * whoever just posted it did so at the top-composer, and watching it drop
+ * below the pins would read as the comment disappearing. */
+function orderRoots(
+  comments: FeedComment[],
+  initialIds: Set<string>,
+): FeedComment[] {
+  const pinned = comments.filter((c) => c.pinnedAt);
+  if (pinned.length === 0) return comments;
+  pinned.sort((a, b) => Date.parse(a.pinnedAt!) - Date.parse(b.pinnedAt!));
+  const fresh = comments.filter((c) => !c.pinnedAt && !initialIds.has(c.id));
+  const rest = comments.filter((c) => !c.pinnedAt && initialIds.has(c.id));
+  return [...fresh, ...pinned, ...rest];
 }
 
 export function CommentList({
@@ -188,6 +371,10 @@ export function CommentList({
   canModerate,
   viewerId = null,
   slug,
+  roleLabels,
+  topicHref,
+  topicHostId = null,
+  canPin: canPinOverride,
 }: {
   comments: FeedComment[];
   canReply: boolean;
@@ -195,25 +382,26 @@ export function CommentList({
   /** Enables Edit/Delete on the viewer's own comments (QA 2026-07-29). */
   viewerId?: string | null;
   slug?: string;
+  /** The forum's role labels, for the author role pills. */
+  roleLabels?: RoleLabels;
+  /** The topic page's path — turns each comment's timestamp into a
+   * permalink to its anchor there (#259); plain text when absent. */
+  topicHref?: string | null;
+  /** The topic's owner — a viewer who matches gets Pin/Unpin on top-level
+   * comments (#258). Omit on threads where pinning shouldn't offer. */
+  topicHostId?: string | null;
+  /** Overrides the topic-author pin rule (the Lounge: admins pin). */
+  canPin?: boolean;
 }) {
-  const searchParams = useSearchParams();
-  const [showAll, setShowAll] = useState(() =>
-    subtreeContains(
-      comments.slice(VISIBLE_TOP_LEVEL),
-      searchParams.get("reply"),
-    ),
-  );
+  // Snapshot of the roots present at mount, for the fresh-above-pins rule.
+  const [initialIds] = useState(() => new Set(comments.map((c) => c.id)));
   if (!comments.length) return null;
-
-  const visible =
-    showAll || comments.length <= VISIBLE_TOP_LEVEL + 1
-      ? comments
-      : comments.slice(0, VISIBLE_TOP_LEVEL);
-  const hiddenCount = comments.length - visible.length;
+  const canPin =
+    canPinOverride ?? (viewerId != null && viewerId === topicHostId);
 
   return (
     <div className="comments">
-      {visible.map((c) => (
+      {orderRoots(comments, initialIds).map((c) => (
         <CommentItem
           key={c.id}
           comment={c}
@@ -221,17 +409,12 @@ export function CommentList({
           canModerate={canModerate}
           viewerId={viewerId}
           slug={slug}
+          roleLabels={roleLabels}
+          depth={1}
+          topicHref={topicHref}
+          canPin={canPin}
         />
       ))}
-      {hiddenCount > 0 ? (
-        <button
-          type="button"
-          className="thread-toggle"
-          onClick={() => setShowAll(true)}
-        >
-          View all {comments.length} comments
-        </button>
-      ) : null}
     </div>
   );
 }

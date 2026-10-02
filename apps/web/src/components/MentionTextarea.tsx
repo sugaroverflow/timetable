@@ -22,6 +22,7 @@ export function MentionTextarea({
   placeholder,
   ariaLabel,
   dataTopicComposer,
+  onUnhandledKeyDown,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -29,6 +30,10 @@ export function MentionTextarea({
   placeholder?: string;
   ariaLabel?: string;
   dataTopicComposer?: string;
+  /** Keys the mention picker did not take, for the composer around this
+   * box (queue-keys: Enter posts, Escape leaves). While the picker is
+   * open it keeps Enter/Tab/Escape and the ↑/↓ that walk it. */
+  onUnhandledKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const [query, setQuery] = useState<string | null>(null);
@@ -80,7 +85,10 @@ export function MentionTextarea({
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (query === null || matches.length === 0) return;
+    if (query === null || matches.length === 0) {
+      onUnhandledKeyDown?.(e);
+      return;
+    }
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setActive((a) => (a + 1) % matches.length);

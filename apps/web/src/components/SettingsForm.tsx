@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { ImageUploadField } from "@/components/ImageUploadField";
+import type { DigestKinds } from "@timetable/shared";
+
 import {
   BRAND_FONTS,
   DEFAULT_THEME_DARK,
@@ -14,6 +17,7 @@ import {
   type ThemeSettings,
 } from "@/lib/timetableSettings";
 import { useGqlAction } from "@/lib/useGqlAction";
+import { useSavedSnapshot } from "@/lib/useSavedSnapshot";
 
 const MUTATION = `mutation Theme($s: String!, $theme: String, $cover: String, $icon: String, $iconDark: String, $emoji: String) {
   updateTimetableSettings: updateForumSettings(
@@ -63,6 +67,8 @@ export type SettingsValues = {
   iconDarkUrl?: string | null;
   iconEmoji?: string | null;
   digestDefaults?: DigestSettings;
+  /** Forum-level per-kind digest defaults (2026-08-11). */
+  digestKindDefaults?: DigestKinds;
 };
 
 type ThemeState = {
@@ -273,7 +279,7 @@ function EmojiPicker({
   return (
     <div className="field" style={{ marginTop: 12 }}>
       <label>Or pick an emoji icon</label>
-      <p className="faint" style={{ marginTop: 0, fontSize: 12 }}>
+      <p className="hint" style={{ marginTop: 0 }}>
         An emoji is used instead of an uploaded image.
       </p>
       <div className="emoji-grid" role="group" aria-label="Icon emoji">
@@ -375,9 +381,9 @@ export function SettingsForm({
   current: SettingsValues;
 }) {
   const { run, busy } = useGqlAction();
-  const [saved, setSaved] = useState(false);
   const initial = initialState(current);
   const [state, setState] = useState<ThemeState>(initial);
+  const { saved, markSaved } = useSavedSnapshot(state);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [uploadingIcon, setUploadingIcon] = useState(false);
 
@@ -466,12 +472,10 @@ export function SettingsForm({
     // Reset: drop the inline overrides so the page falls back to the saved
     // theme rendered by the SSR <style> tag.
     clearPreview();
-    setSaved(false);
   }
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    setSaved(false);
     void run(
       MUTATION,
       {
@@ -487,61 +491,63 @@ export function SettingsForm({
       {
         success: "Theme saved",
         errorFallback: "Could not save theme",
-        onSuccess: () => setSaved(true),
+        onSuccess: markSaved,
       },
     );
   }
 
   return (
     <form onSubmit={submit} className="card">
-      <h2 className="section-title" style={{ marginBottom: 10 }}>
-        Theme
-      </h2>
-      <p className="faint" style={{ marginTop: 0, fontSize: 12 }}>
-        Colours preview live — Save to keep them, Discard to revert.
-      </p>
+      <CollapsibleSection title="Theme">
+        <p className="hint" style={{ marginTop: 0 }}>
+          Colours preview live — Save to keep them, Discard to revert.
+        </p>
 
-      <FontsBlock state={state} onChange={setThemeField} />
+        <FontsBlock state={state} onChange={setThemeField} />
 
-      <PresetPicker onApply={applyPreset} />
+        <PresetPicker onApply={applyPreset} />
 
-      <h3 style={{ fontSize: "var(--text-md)", margin: "14px 0 2px" }}>
-        Light palette
-      </h3>
-      <ColourGroup
-        fields={LIGHT_COLOUR_FIELDS}
-        state={state}
-        onChange={setThemeField}
-      />
+        <h3 style={{ fontSize: "var(--text-md)", margin: "14px 0 2px" }}>
+          Light palette
+        </h3>
+        <ColourGroup
+          fields={LIGHT_COLOUR_FIELDS}
+          state={state}
+          onChange={setThemeField}
+        />
 
-      <h3 style={{ fontSize: "var(--text-md)", margin: "18px 0 2px" }}>
-        Dark mode palette
-      </h3>
-      <p className="faint" style={{ marginTop: 0, fontSize: "var(--text-xs)" }}>
-        Used when a member switches to dark mode (sidebar toggle).
-      </p>
-      <ColourGroup
-        fields={DARK_COLOUR_FIELDS}
-        state={state}
-        onChange={setThemeField}
-      />
+        <h3 style={{ fontSize: "var(--text-md)", margin: "18px 0 2px" }}>
+          Dark mode palette
+        </h3>
+        <p
+          className="faint"
+          style={{ marginTop: 0, fontSize: "var(--text-xs)" }}
+        >
+          Used when a member switches to dark mode (sidebar toggle).
+        </p>
+        <ColourGroup
+          fields={DARK_COLOUR_FIELDS}
+          state={state}
+          onChange={setThemeField}
+        />
 
-      <MediaBlock
-        slug={slug}
-        state={state}
-        onField={setField}
-        onIcon={handleIconChange}
-        onEmoji={chooseEmoji}
-        setUploadingCover={setUploadingCover}
-        setUploadingIcon={setUploadingIcon}
-      />
+        <MediaBlock
+          slug={slug}
+          state={state}
+          onField={setField}
+          onIcon={handleIconChange}
+          onEmoji={chooseEmoji}
+          setUploadingCover={setUploadingCover}
+          setUploadingIcon={setUploadingIcon}
+        />
 
-      <FormFooter
-        busy={busy}
-        saved={saved}
-        uploading={uploadingCover || uploadingIcon}
-        onDiscard={discard}
-      />
+        <FormFooter
+          busy={busy}
+          saved={saved}
+          uploading={uploadingCover || uploadingIcon}
+          onDiscard={discard}
+        />
+      </CollapsibleSection>
     </form>
   );
 }

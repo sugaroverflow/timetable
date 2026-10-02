@@ -1,16 +1,21 @@
 import { notFound } from "next/navigation";
 
-import { isAdmin, type Role } from "@timetable/shared";
+import { isAdmin, isLoungeEnabled, type Role } from "@timetable/shared";
 
 import Link from "next/link";
 
+import { CalendarSettingsForm } from "@/components/CalendarSettingsForm";
+import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { EmailDigestForm } from "@/components/EmailDigestForm";
 import { HeartsCutoffForm } from "@/components/HeartsCutoffForm";
+import { HostCommentsForm } from "@/components/HostCommentsForm";
 import { InviteForm } from "@/components/InviteForm";
+import { LoungeSettingsForm } from "@/components/LoungeSettingsForm";
 import { SettingsForm, type SettingsValues } from "@/components/SettingsForm";
 import { TimetableProfileForm } from "@/components/TimetableProfileForm";
 import { gqlFetch } from "@/lib/graphql";
 import { displayRolesFromCookies } from "@/lib/previewRoles.server";
+import { roleLabel, type TimetableSettings } from "@/lib/timetableSettings";
 
 export default async function SettingsPage({
   params,
@@ -53,7 +58,7 @@ export default async function SettingsPage({
 
   return (
     <div className="stack">
-      <div className="grid grid-2">
+      <div className="grid">
         <TimetableProfileForm
           slug={slug}
           name={first.timetable.name}
@@ -64,11 +69,63 @@ export default async function SettingsPage({
         <SettingsForm slug={slug} current={settings} />
       </div>
 
-      <HeartsCutoffForm slug={slug} current={first.timetable.heartsCountFrom} />
+      {/* One "Forum settings" card (QA 2026-08-03): hearts cutoff,
+          calendar, and digest defaults as fold-up subsections. */}
+      <div className="card">
+        <CollapsibleSection title="Forum settings">
+          <div className="stack" style={{ gap: 16 }}>
+            <HeartsCutoffForm
+              slug={slug}
+              current={first.timetable.heartsCountFrom}
+            />
 
-      <EmailDigestForm slug={slug} digestDefaults={settings.digestDefaults} />
+            <hr className="settings-divider" />
 
-      <div className="grid grid-2">
+            <CalendarSettingsForm
+              slug={slug}
+              current={(settings as TimetableSettings).calendar ?? {}}
+              hostsPublishDirectly={Boolean(
+                (settings as TimetableSettings).topics?.hostsPublishDirectly,
+              )}
+              hostLabel={roleLabel(settings.roleLabels, "host")}
+              adminLabel={roleLabel(settings.roleLabels, "admin")}
+            />
+
+            <hr className="settings-divider" />
+
+            <HostCommentsForm
+              slug={slug}
+              enabled={
+                (settings as TimetableSettings).hostComments?.enabled ?? true
+              }
+              hostLabel={roleLabel(settings.roleLabels, "host")}
+              electorLabel={roleLabel(settings.roleLabels, "elector")}
+              adminLabel={roleLabel(settings.roleLabels, "admin")}
+            />
+
+            <hr className="settings-divider" />
+
+            <LoungeSettingsForm
+              slug={slug}
+              enabled={isLoungeEnabled(settings as TimetableSettings)}
+              hostLabel={roleLabel(settings.roleLabels, "host")}
+              electorLabel={roleLabel(settings.roleLabels, "elector")}
+              adminLabel={roleLabel(settings.roleLabels, "admin")}
+            />
+
+            <hr className="settings-divider" />
+
+            <EmailDigestForm
+              slug={slug}
+              digestDefaults={settings.digestDefaults}
+              digestKindDefaults={settings.digestKindDefaults}
+              roleLabels={settings.roleLabels}
+            />
+          </div>
+        </CollapsibleSection>
+      </div>
+
+      <div className="grid">
         <InviteForm timetableId={first.timetable.id} />
 
         <div className="stack">

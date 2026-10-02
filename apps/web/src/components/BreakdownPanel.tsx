@@ -46,44 +46,176 @@ export function BreakdownPanelBody({
   }, [slug, topicId]);
 
   if (failed) {
-    return (
-      <div className="faint" style={{ fontSize: 12 }}>
-        Couldn&rsquo;t load the breakdown.
-      </div>
-    );
+    return <div className="hint">Couldn&rsquo;t load the breakdown.</div>;
   }
   if (rows === null) {
-    return (
-      <div className="faint" style={{ fontSize: 12 }}>
-        Loading…
-      </div>
-    );
+    return <div className="hint">Loading…</div>;
   }
   if (rows.length === 0) {
-    return (
-      <div className="faint" style={{ fontSize: 12 }}>
-        No ❤️ yet.
-      </div>
-    );
+    return <div className="hint">No ❤️ yet.</div>;
   }
   return <BreakdownTable slug={slug} rows={rows} electorLabel={electorLabel} />;
 }
 
-/** The triangle that opens a ❤️ breakdown — one look everywhere. */
+const DORMANT_QUERY = `query DormantHearters($s: String!, $t: String!) {
+  topicDormantHearters(idOrSlug: $s, topicId: $t) {
+    electorId electorName electorImage heartedAt
+  }
+}`;
+
+/** A retired topic's dormant ❤️s (my-topics-heart-row, 2026-09-25): who
+ * ❤️'d it and when, no weights — those exist only among published topics.
+ * Owner + admins only (the query answers null to anyone else). */
+export function DormantBreakdownBody({
+  slug,
+  topicId,
+  electorLabel = "Elector",
+}: {
+  slug: string;
+  topicId: string;
+  electorLabel?: string;
+}) {
+  const [rows, setRows] = useState<WeightedHeart[] | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    clientGql<{
+      topicDormantHearters:
+        | Pick<
+            WeightedHeart,
+            "electorId" | "electorName" | "electorImage" | "heartedAt"
+          >[]
+        | null;
+    }>(DORMANT_QUERY, { s: slug, t: topicId })
+      .then((data) => {
+        if (cancelled) return;
+        setRows(
+          (data.topicDormantHearters ?? []).map((h) => ({
+            ...h,
+            weight: 0,
+            l2Weight: 0,
+            devotionWeight: 0,
+          })),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [slug, topicId]);
+
+  if (failed) {
+    return <div className="hint">Couldn&rsquo;t load the breakdown.</div>;
+  }
+  if (rows === null) {
+    return <div className="hint">Loading…</div>;
+  }
+  if (rows.length === 0) {
+    return <div className="hint">No ❤️ yet.</div>;
+  }
+  return (
+    <BreakdownTable
+      slug={slug}
+      rows={rows}
+      electorLabel={electorLabel}
+      weights={false}
+    />
+  );
+}
+
+const HOST_HEART_QUERY = `query HostHeartBreakdown($s: String!, $t: String!) {
+  topicHostHeartBreakdown(idOrSlug: $s, topicId: $t) {
+    hostId hostName hostImage weight l2Weight devotionWeight heartedAt
+  }
+}`;
+
+type HostHeartBreakdownRow = {
+  hostId: string;
+  hostName: string | null;
+  hostImage: string | null;
+  weight: number;
+  l2Weight: number;
+  devotionWeight: number;
+  heartedAt: string;
+};
+
+/** The per-host 💙 breakdown (host hearts, 2026-08-04) — the Analysis
+ * table's dropdown when sorting by 💙. Admin eyes only (the API returns
+ * null for anyone else). Reuses BreakdownTable by mapping hosts into its
+ * elector-shaped rows. */
+export function HostHeartBreakdownPanelBody({
+  slug,
+  topicId,
+  hostLabel = "Host",
+}: {
+  slug: string;
+  topicId: string;
+  hostLabel?: string;
+}) {
+  const [rows, setRows] = useState<WeightedHeart[] | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    clientGql<{ topicHostHeartBreakdown: HostHeartBreakdownRow[] | null }>(
+      HOST_HEART_QUERY,
+      { s: slug, t: topicId },
+    )
+      .then((data) => {
+        if (cancelled) return;
+        setRows(
+          (data.topicHostHeartBreakdown ?? []).map((r) => ({
+            electorId: r.hostId,
+            electorName: r.hostName,
+            electorImage: r.hostImage,
+            weight: r.weight,
+            l2Weight: r.l2Weight,
+            devotionWeight: r.devotionWeight,
+            heartedAt: r.heartedAt,
+          })),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [slug, topicId]);
+
+  if (failed) {
+    return <div className="hint">Couldn&rsquo;t load the breakdown.</div>;
+  }
+  if (rows === null) {
+    return <div className="hint">Loading…</div>;
+  }
+  if (rows.length === 0) {
+    return <div className="hint">No 💙 yet.</div>;
+  }
+  return <BreakdownTable slug={slug} rows={rows} electorLabel={hostLabel} />;
+}
+
+/** The triangle that opens a ❤️ breakdown — one look everywhere. `label`
+ * covers the 💙 variants (host hearts, 2026-08-04). */
 export function BreakdownCaret({
   open,
   onToggle,
+  label = "❤️ breakdown",
 }: {
   open: boolean;
   onToggle: () => void;
+  label?: string;
 }) {
   return (
     <button
       type="button"
       className="breakdown-caret"
       aria-expanded={open}
-      aria-label={open ? "Hide ❤️ breakdown" : "Show ❤️ breakdown"}
-      title={open ? "Hide ❤️ breakdown" : "Show ❤️ breakdown"}
+      aria-label={open ? `Hide ${label}` : `Show ${label}`}
+      title={open ? `Hide ${label}` : `Show ${label}`}
       onClick={onToggle}
     >
       {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}

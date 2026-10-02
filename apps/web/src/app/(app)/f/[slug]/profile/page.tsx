@@ -9,13 +9,17 @@ type Data = {
   person: {
     name: string | null;
     bio: string | null;
+    contactDetails: string | null;
     image: string | null;
+    roles: string[];
   } | null;
+  timetable: { privacy: string } | null;
 };
 
 const QUERY = `query Profile($s: String!) {
   me { email }
-  person(idOrSlug: $s) { name bio image }
+  person(idOrSlug: $s) { name bio contactDetails image roles }
+  timetable: forum(idOrSlug: $s) { privacy }
 }`;
 
 /** Profile inside the timetable shell (QA #59 round 3). Name/photo/bio are
@@ -35,6 +39,11 @@ export default async function TimetableProfilePage({
   if (!data.me) redirect("/sign-in");
 
   return (
-    <ProfilePanel email={data.me.email} slug={slug} profile={data.person} />
+    <ProfilePanel
+      email={data.me.email}
+      slug={slug}
+      profile={data.person}
+      privacy={data.timetable?.privacy ?? "private"}
+    />
   );
 }

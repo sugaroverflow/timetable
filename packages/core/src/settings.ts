@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import {
   db,
@@ -7,22 +7,21 @@ import {
   type TimetableSettings,
 } from "@timetable/db";
 
-/** Shallow-merge a partial settings patch into a timetable's settings JSON. */
+/** Shallow-merge a partial settings patch into a timetable's settings JSON.
+ * The merge happens IN the database (`jsonb ||`), not read-modify-write:
+ * two admins saving different settings cards concurrently used to race,
+ * with the loser's card silently reverted (audit 2026-08-17). Same
+ * shallow semantics as `{ ...current, ...patch }`. */
 export async function updateTimetableSettings(
   timetableId: string,
   patch: Partial<TimetableSettings>,
 ): Promise<Timetable | null> {
-  const [current] = await db
-    .select({ settings: timetables.settings })
-    .from(timetables)
-    .where(eq(timetables.id, timetableId))
-    .limit(1);
-
-  const merged: TimetableSettings = { ...(current?.settings ?? {}), ...patch };
-
   const [updated] = await db
     .update(timetables)
-    .set({ settings: merged, updatedAt: new Date() })
+    .set({
+      settings: sql`coalesce(${timetables.settings}, '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb`,
+      updatedAt: new Date(),
+    })
     .where(eq(timetables.id, timetableId))
     .returning();
   return updated ?? null;

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, gt, isNull, or } from "drizzle-orm";
 
 import {
   db,
@@ -48,7 +48,13 @@ async function getDigestDefaults(
     .where(eq(timetables.id, timetableId))
     .limit(1);
   const defaults = tt?.settings?.digestDefaults;
-  if (!defaults || !Object.values(defaults).some(Boolean)) return null;
+  // Digests default ON for new members (QA 2026-08-10): a forum whose
+  // admin never touched the Email digest card seeds digestEnabled; only
+  // an explicitly saved "off" keeps new members unsubscribed.
+  if (!defaults || Object.keys(defaults).length === 0) {
+    return { digestEnabled: true };
+  }
+  if (!Object.values(defaults).some(Boolean)) return null;
   return defaults;
 }
 
@@ -193,6 +199,13 @@ export async function claimInvitesForUser(
       and(
         eq(timetableInvites.email, normalized),
         eq(timetableInvites.status, "pending"),
+        // Expiry was written since day one but never enforced — a
+        // months-old invite must not still grant its original roles
+        // (audit 2026-08-17). Null = legacy rows without a TTL.
+        or(
+          isNull(timetableInvites.expiresAt),
+          gt(timetableInvites.expiresAt, new Date()),
+        ),
       ),
     );
 
@@ -233,21 +246,35 @@ export async function claimInvitesForUser(
       }
       const defaults = defaultsByTimetable.get(invite.timetableId);
       if (defaults) await seedDigestDefaults(userId, defaults);
-      // Claiming an invite is the user's first sign-in here (QA #59 —
-      // "logged in for the first time" on the activity log).
-      await logActivity({
-        timetableId: invite.timetableId,
-        actorId: userId,
-        action: "member.first_login",
-        payload: { invitedEmail: normalized },
-      });
     }
 
-    await db
+    // The pending-status guard makes concurrent claims idempotent: only
+    // the request that actually flips the row counts it — and only that
+    // request logs first_login, so admin digests can't show a member
+    // joining twice.
+    const accepted = await db
       .update(timetableInvites)
       .set({ status: "accepted", acceptedByUserId: userId })
-      .where(eq(timetableInvites.id, invite.id));
-    claimed += 1;
+      .where(
+        and(
+          eq(timetableInvites.id, invite.id),
+          eq(timetableInvites.status, "pending"),
+        ),
+      )
+      .returning({ id: timetableInvites.id });
+    if (accepted.length > 0) {
+      claimed += 1;
+      if (!membership) {
+        // Claiming an invite is the user's first sign-in here (QA #59 —
+        // "logged in for the first time" on the activity log).
+        await logActivity({
+          timetableId: invite.timetableId,
+          actorId: userId,
+          action: "member.first_login",
+          payload: { invitedEmail: normalized },
+        });
+      }
+    }
   }
 
   return claimed;

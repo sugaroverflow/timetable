@@ -11,14 +11,20 @@ import { VIEW_AS_COOKIE, viewAsCookieValue } from "@/lib/userPreview";
 const START = `mutation($s: String!, $u: String!){ startUserPreview(idOrSlug: $s, userId: $u) }`;
 const STOP = `mutation($s: String!, $u: String!){ stopUserPreview(idOrSlug: $s, userId: $u) }`;
 
+/** Cookie hygiene (audit 2026-08-17): the value grants nothing by itself
+ * (the API re-verifies admin rights per request), but it shouldn't ride
+ * cross-site requests or plain-http hops. `secure` is fine on
+ * http://localhost — browsers treat localhost as trustworthy. */
+const COOKIE_FLAGS = "samesite=lax; secure";
+
 function setCookie(slug: string, userId: string) {
   document.cookie = `${VIEW_AS_COOKIE}=${encodeURIComponent(
     viewAsCookieValue(slug, userId),
-  )}; path=/f/${slug}`;
+  )}; path=/f/${slug}; ${COOKIE_FLAGS}`;
 }
 
 function clearCookie(slug: string) {
-  document.cookie = `${VIEW_AS_COOKIE}=; path=/f/${slug}; max-age=0`;
+  document.cookie = `${VIEW_AS_COOKIE}=; path=/f/${slug}; max-age=0; ${COOKIE_FLAGS}`;
 }
 
 /** "View timetable as [username]" on a People card (admins only, QA #59

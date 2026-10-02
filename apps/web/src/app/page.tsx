@@ -1,10 +1,11 @@
 import { auth } from "@clerk/nextjs/server";
+
+import { e2eTestMode } from "@/env";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 export default async function HomePage() {
-  const { userId } =
-    process.env.E2E_TEST_MODE === "1" ? { userId: null } : await auth();
+  const { userId } = e2eTestMode ? { userId: null } : await auth();
   if (userId) redirect("/timetables");
 
   return (

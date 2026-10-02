@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { Lock } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -15,12 +16,14 @@ import { RichTextEditor } from "@/components/RichTextEditor";
 import { useToast } from "@/components/Toast";
 import { clientApi } from "@/lib/clientApi";
 import { clientGql } from "@/lib/clientGraphql";
+import { CONTACT_DETAILS_AUDIENCE } from "@/lib/profileLabels";
 import { roleLabel } from "@/lib/timetableSettings";
 import { useGqlAction } from "@/lib/useGqlAction";
+import { useSavedSnapshot } from "@/lib/useSavedSnapshot";
 
-const PERSON_BIO = `query($s: String!, $u: String!) { person(idOrSlug: $s, userId: $u) { bio image } }`;
-const UPDATE_BIO = `mutation($s: String!, $u: String!, $bio: String!, $image: String!) {
-  updateMemberBio(idOrSlug: $s, userId: $u, bio: $bio, image: $image) { userId }
+const PERSON_BIO = `query($s: String!, $u: String!) { person(idOrSlug: $s, userId: $u) { name bio contactDetails image } }`;
+const UPDATE_BIO = `mutation($s: String!, $u: String!, $name: String!, $bio: String!, $contactDetails: String!, $image: String!) {
+  updateMemberBio(idOrSlug: $s, userId: $u, name: $name, bio: $bio, contactDetails: $contactDetails, image: $image) { userId }
 }`;
 
 const PILL_CLASS: Record<AssignableRole, string> = {
@@ -29,96 +32,151 @@ const PILL_CLASS: Record<AssignableRole, string> = {
   elector: "pill-elector",
 };
 
-/** Admins can edit any member's bio (markdown, QA #42) and profile picture
- * (production QA). Fetched lazily on first open so the People page doesn't
- * load every profile up front. */
-function BioEditor({ slug, userId }: { slug: string; userId: string }) {
+/** Admins can edit any member's per-forum Contact Details (2026-09-30),
+ * name (2026-08-27), bio (markdown, QA #42) and profile picture
+ * (production QA) — the same fields, in the same order (Name, Contact
+ * Details, About), as the member's own profile page.
+ *
+ * Fetched on mount rather than behind a second "Edit bio & photo" click
+ * (Ed, 2026-08-27: the People card's Edit should BE the profile editor).
+ * Still lazy per card — this only mounts once an admin opens that card's
+ * panel, so the People page never loads every profile up front. */
+function MemberProfileFields({
+  slug,
+  userId,
+}: {
+  slug: string;
+  userId: string;
+}) {
   const { run, busy: bioBusy } = useGqlAction();
+  const [name, setName] = useState("");
   const [bio, setBio] = useState<string | null>(null);
+  const [contactDetails, setContactDetails] = useState("");
   const [image, setImage] = useState("");
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [bioOpen, setBioOpen] = useState(false);
+  const { saved, markSaved } = useSavedSnapshot([
+    name,
+    bio,
+    contactDetails,
+    image.trim(),
+  ]);
 
-  async function openBio() {
-    setBioOpen(true);
-    if (bio !== null) return;
-    try {
-      const d = await clientGql<{
-        person: { bio: string | null; image: string | null } | null;
-      }>(PERSON_BIO, { s: slug, u: userId });
-      setBio(d.person?.bio ?? "");
-      setImage(d.person?.image ?? "");
-    } catch {
-      setBio("");
-    }
-  }
+  useEffect(() => {
+    let live = true;
+    clientGql<{
+      person: {
+        name: string | null;
+        bio: string | null;
+        contactDetails: string | null;
+        image: string | null;
+      };
+    }>(PERSON_BIO, { s: slug, u: userId })
+      .then((d) => {
+        if (!live) return;
+        setName(d.person?.name ?? "");
+        setContactDetails(d.person?.contactDetails ?? "");
+        setBio(d.person?.bio ?? "");
+        setImage(d.person?.image ?? "");
+      })
+      .catch(() => {
+        if (live) setBio("");
+      });
+    return () => {
+      live = false;
+    };
+  }, [slug, userId]);
 
-  function saveBio() {
+  function saveProfile() {
     void run(
       UPDATE_BIO,
       // Image sends "" (not null) when cleared — the API reads an omitted/
-      // null image as "leave unchanged" and "" as "remove".
-      { s: slug, u: userId, bio: bio ?? "", image: image.trim() },
+      // null image as "leave unchanged" and "" as "remove". A blank name is
+      // "leave unchanged" there: nobody gets renamed to nothing.
+      {
+        s: slug,
+        u: userId,
+        name: name.trim(),
+        bio: bio ?? "",
+        contactDetails,
+        image: image.trim(),
+      },
       {
         success: "Profile updated",
         errorFallback: "Could not save profile",
-        onSuccess: () => setBioOpen(false),
+        onSuccess: markSaved,
       },
     );
   }
 
   return (
     <div className="stack" style={{ marginTop: 12, gap: 8 }}>
-      {bioOpen ? (
-        <>
-          {bio === null ? (
-            <div className="rte" style={{ minHeight: 420 }} aria-busy="true" />
-          ) : (
-            // Same editor as the topic composers and the profile About
-            // field (launch QA 2026-07-27); markdown stays underneath.
-            <RichTextEditor
-              value={bio}
-              onChange={setBio}
-              placeholder="Member bio"
-            />
-          )}
-          <ImageUploadField
-            id={`member-image-${userId}`}
-            label="Profile image"
-            hint="Square works best — shown as a small round avatar. 256×256px is plenty; up to 5 MB."
-            value={image}
-            onChange={setImage}
-            purpose="profile-image"
-            onUploadingChange={setUploadingImage}
+      <h3 className="section-title">Profile</h3>
+      <div className="field" style={{ marginBottom: 0 }}>
+        <label htmlFor={`member-name-${userId}`}>Name</label>
+        <input
+          id={`member-name-${userId}`}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          // Renaming re-derives their member slug, so their profile URL
+          // follows — old links to it stop resolving.
+          placeholder="Their name in this forum"
+        />
+      </div>
+      <div className="field" style={{ marginBottom: 0 }}>
+        <label>Contact Details</label>
+        <p className="hint profile-audience">
+          <Lock size={12} aria-hidden /> {CONTACT_DETAILS_AUDIENCE}
+        </p>
+        {bio === null ? (
+          <div className="rte" style={{ minHeight: 140 }} aria-busy="true" />
+        ) : (
+          <RichTextEditor
+            value={contactDetails}
+            onChange={setContactDetails}
+            minHeight={140}
+            placeholder="How members can reach them"
           />
-          <div className="row">
-            <button
-              className="btn btn-primary"
-              type="button"
-              onClick={saveBio}
-              disabled={bioBusy || bio === null || uploadingImage}
-            >
-              {uploadingImage ? "Uploading…" : bioBusy ? "Saving…" : "Save"}
-            </button>
-            <button
-              className="btn btn-ghost"
-              type="button"
-              onClick={() => setBioOpen(false)}
-            >
-              Cancel
-            </button>
-          </div>
-        </>
-      ) : (
+        )}
+      </div>
+      <div className="field" style={{ marginBottom: 0 }}>
+        <label>About</label>
+        {bio === null ? (
+          <div className="rte" style={{ minHeight: 420 }} aria-busy="true" />
+        ) : (
+          // Same editor as the topic composers and the profile About
+          // field (launch QA 2026-07-27); markdown stays underneath.
+          <RichTextEditor
+            value={bio}
+            onChange={setBio}
+            placeholder="Member bio"
+          />
+        )}
+      </div>
+      <ImageUploadField
+        id={`member-image-${userId}`}
+        label="Profile image"
+        hint="Square works best — shown as a small round avatar. 256×256px is plenty; up to 5 MB."
+        value={image}
+        onChange={setImage}
+        purpose="profile-image"
+        onUploadingChange={setUploadingImage}
+      />
+      <div className="row">
         <button
-          className="btn btn-ghost"
+          className="btn btn-primary"
           type="button"
-          style={{ alignSelf: "flex-start" }}
-          onClick={openBio}
+          onClick={saveProfile}
+          disabled={bioBusy || bio === null || uploadingImage}
         >
-          Edit bio & photo
+          {uploadingImage
+            ? "Uploading…"
+            : bioBusy
+              ? "Saving…"
+              : saved
+                ? "Saved"
+                : "Save"}
         </button>
-      )}
+      </div>
     </div>
   );
 }
@@ -145,10 +203,9 @@ export function MemberRolesEditor({
   const isOwner = hasOwnerRole(initialRoles as Role[]);
   const [roles, setRoles] = useState<string[]>(initialRoles);
   const [busy, setBusy] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const { saved, markSaved } = useSavedSnapshot(roles);
 
   function toggleRole(role: string) {
-    setSaved(false);
     setRoles((prev) =>
       prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role],
     );
@@ -156,7 +213,6 @@ export function MemberRolesEditor({
 
   async function save() {
     setBusy(true);
-    setSaved(false);
     const res = await clientApi(`/api/memberships/${membershipId}/roles`, {
       method: "PATCH",
       body: JSON.stringify({
@@ -165,7 +221,7 @@ export function MemberRolesEditor({
     });
     setBusy(false);
     if (res.ok) {
-      setSaved(true);
+      markSaved();
       toast("Roles updated");
       router.refresh();
     } else {
@@ -179,11 +235,7 @@ export function MemberRolesEditor({
       <div className="row wrap" style={{ justifyContent: "space-between" }}>
         <div>
           <strong>{name ?? email ?? "Unknown user"}</strong>
-          {email ? (
-            <div className="faint" style={{ fontSize: 12 }}>
-              {email}
-            </div>
-          ) : null}
+          {email ? <div className="hint">{email}</div> : null}
         </div>
         {isOwner ? <span className="pill pill-owner">Owner</span> : null}
       </div>
@@ -222,7 +274,7 @@ export function MemberRolesEditor({
         </button>
       </div>
 
-      <BioEditor slug={slug} userId={userId} />
+      <MemberProfileFields slug={slug} userId={userId} />
     </div>
   );
 }

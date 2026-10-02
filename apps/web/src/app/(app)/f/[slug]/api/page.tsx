@@ -1,5 +1,13 @@
+import { auth } from "@clerk/nextjs/server";
+
+import { ApiTokenPanel, type ApiTokenRow } from "@/components/ApiTokenPanel";
 import { ExportDownloadButton } from "@/components/ExportDownloadButton";
 import { env } from "@/env";
+import { gqlFetch } from "@/lib/graphql";
+
+const TOKENS_QUERY = `query {
+  myApiTokens { id name prefix scopes createdAt lastUsedAt expiresAt revokedAt }
+}`;
 
 export default async function ApiPage({
   params,
@@ -7,6 +15,14 @@ export default async function ApiPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  // Signed-out visitors read this page too (public forums) — they get the
+  // docs without the token panel's data. Don't fire the query for them
+  // (myApiTokens would only refuse), and don't swallow real errors for
+  // signed-in members into a bogus "sign in" prompt.
+  const { userId } = await auth();
+  const myApiTokens = userId
+    ? (await gqlFetch<{ myApiTokens: ApiTokenRow[] }>(TOKENS_QUERY)).myApiTokens
+    : null;
 
   return (
     <div className="stack">
@@ -25,9 +41,12 @@ export default async function ApiPage({
           topics with their body markdown, comments, heart counts, weighted
           scores, and the user ids currently hearting each topic; and member
           profiles. Hosts additionally receive their own topics in every status
-          with comment threads. Admins additionally receive the pending
-          (submitted) queue. The file&rsquo;s <code>readme</code> field
-          describes its structure.
+          with comment threads. Admins additionally receive the pending (draft)
+          queue. When the forum&rsquo;s calendar is on, the export also carries
+          every timeslot with its sessions; members additionally get each
+          slot&rsquo;s discussion and their own availability answer, and hosts
+          and admins the elector availability tallies. The file&rsquo;s{" "}
+          <code>readme</code> field describes its structure.
         </p>
         <ExportDownloadButton slug={slug} />
       </section>
@@ -37,10 +56,40 @@ export default async function ApiPage({
         <p>
           The endpoint is <code>{env.graphqlUrl}</code>. Read queries return the
           same role-filtered data as the app. The schema is discoverable via
-          introspection. Requests authenticate with the signed-in
-          session&rsquo;s bearer token. Forums with public privacy are readable
-          without authentication.
+          introspection. Forums with public privacy are readable without
+          authentication.
         </p>
+        <p>
+          Requests authenticate with a bearer token: either the signed-in
+          session&rsquo;s (what the app itself uses, refreshed every minute) or
+          a personal token from the section below, which is what scripts and
+          other clients want.
+        </p>
+      </section>
+
+      <section className="stack">
+        <h3 className="section-title">Personal tokens</h3>
+        <p>
+          A personal token is a long-lived credential that acts as you. Send it
+          as <code>Authorization: Bearer tpk_…</code> to the GraphQL endpoint.
+          Tokens are <strong>account-wide</strong> — a token carries your roles
+          in every forum you belong to, not just this one.
+        </p>
+        <p>
+          Every token can read whatever you can read. Writing is opt-in per
+          token, and a token can only ever do a subset of what you can do in the
+          app — the same role checks apply. Some things are off limits to every
+          token no matter what you tick, and no matter your role: moderating or
+          publishing topics, forum settings, member management and invites, and
+          creating or revoking tokens. Those need a signed-in session. The REST
+          endpoints (uploads, invites, the export above) do not accept personal
+          tokens at all.
+        </p>
+        {myApiTokens ? (
+          <ApiTokenPanel tokens={myApiTokens} />
+        ) : (
+          <p className="faint">Sign in to create a token.</p>
+        )}
       </section>
 
       <section className="stack">
@@ -55,9 +104,19 @@ export default async function ApiPage({
       </section>
 
       <section className="stack">
+        <h3 className="section-title">Calendar feed (ICS)</h3>
+        <p>
+          Forums with the calendar enabled serve it as an ICS feed at{" "}
+          <code>{`${env.apiUrl}/api/forums/${slug}/calendar.ics`}</code> — paste
+          it into any calendar app to subscribe. Public forums need no
+          authentication; on a private forum the calendar page&rsquo;s
+          &ldquo;Subscribe (ICS)&rdquo; button carries your personal feed token.
+        </p>
+      </section>
+
+      <section className="stack">
         <h3 className="section-title">Planned</h3>
         <ul className="list">
-          <li>Personal API tokens (read-only).</li>
           <li>An MCP server.</li>
         </ul>
       </section>

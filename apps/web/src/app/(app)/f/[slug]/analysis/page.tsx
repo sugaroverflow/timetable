@@ -1,5 +1,6 @@
 import { isAdmin, isHost, type Role } from "@timetable/shared";
 
+import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { ElectorActivityTable } from "@/components/ElectorActivityTable";
 import { HostActivityTable } from "@/components/HostActivityTable";
 import { HostFilter } from "@/components/HostFilter";
@@ -33,6 +34,10 @@ type Dashboard = {
     commentL2: number;
     commentL1: number;
     commentDevotion: number;
+    hostHeartCount: number | null;
+    hostHeartL2: number | null;
+    hostHeartL1: number | null;
+    hostHeartDevotion: number | null;
   }[];
   hostActivity: {
     hostId: string;
@@ -41,6 +46,18 @@ type Dashboard = {
     hostSlug: string | null;
     topicCount: number;
     commentCount: number;
+    hostHeartCount: number | null;
+    hostHeartedTopics:
+      | {
+          topicId: string;
+          title: string;
+          slug: string | null;
+          hostId: string;
+          hostName: string | null;
+          hostSlug: string | null;
+          commentCount: number;
+        }[]
+      | null;
     latestActivityAt: string | null;
   }[];
   electorActivity: {
@@ -78,8 +95,12 @@ const QUERY = `
     timetableHosts: forumHosts(idOrSlug: $s) { id name }
     dashboard(idOrSlug: $s, hostId: $host, activityHostId: $activityHost) {
       totalHearts electorCount hostCount
-      topicLeaderboard { id title slug hostId hostName hostImage hostSlug weightedScore l2Score devotionScore heartCount commentTotal commenterCount commentL2 commentL1 commentDevotion }
-      hostActivity { hostId hostName hostImage hostSlug topicCount commentCount latestActivityAt }
+      topicLeaderboard { id title slug hostId hostName hostImage hostSlug weightedScore l2Score devotionScore heartCount commentTotal commenterCount commentL2 commentL1 commentDevotion hostHeartCount hostHeartL2 hostHeartL1 hostHeartDevotion }
+      hostActivity {
+        hostId hostName hostImage hostSlug topicCount commentCount hostHeartCount
+        latestActivityAt
+        hostHeartedTopics { topicId title slug hostId hostName hostSlug commentCount }
+      }
       electorActivity {
         electorId electorName electorImage heartCount commentCount queueCount
         latestActivityAt
@@ -104,32 +125,31 @@ function ElectorActivityCard({
 }) {
   return (
     <div className="card">
-      <div
-        className="row wrap"
-        style={{ justifyContent: "space-between", marginBottom: 12 }}
-      >
-        <h3 className="section-title">{electorLabel} activity</h3>
-        {/* This table's own host filter: counts only activity on the
-            chosen host's topics (independent of the topics table's). */}
-        <span className="row wrap" style={{ gap: 10, alignItems: "center" }}>
-          {hostFilter}
-          <span className="faint" style={{ fontSize: 12 }}>
-            {rows.length} shown
+      <CollapsibleSection title={`${electorLabel} activity`}>
+        <div
+          className="row wrap"
+          style={{ justifyContent: "flex-end", marginBottom: 12 }}
+        >
+          {/* This table's own host filter: counts only activity on the
+              chosen host's topics (independent of the topics table's). */}
+          <span className="row wrap" style={{ gap: 10, alignItems: "center" }}>
+            {hostFilter}
+            <span className="hint">{rows.length} shown</span>
           </span>
-        </span>
-      </div>
-      {rows.length === 0 ? (
-        <p className="faint" style={{ fontSize: 13 }}>
-          No {pluralLabel(electorLabel).toLowerCase()} yet.
-        </p>
-      ) : (
-        <ElectorActivityTable
-          slug={slug}
-          electorLabel={electorLabel}
-          hostLabel={hostLabel}
-          rows={rows}
-        />
-      )}
+        </div>
+        {rows.length === 0 ? (
+          <p className="faint" style={{ fontSize: 13 }}>
+            No {pluralLabel(electorLabel).toLowerCase()} yet.
+          </p>
+        ) : (
+          <ElectorActivityTable
+            slug={slug}
+            electorLabel={electorLabel}
+            hostLabel={hostLabel}
+            rows={rows}
+          />
+        )}
+      </CollapsibleSection>
     </div>
   );
 }
@@ -149,27 +169,24 @@ function HostActivityCard({
 }) {
   return (
     <div className="card">
-      <div
-        className="row wrap"
-        style={{ justifyContent: "space-between", marginBottom: 12 }}
-      >
-        <div>
-          <h3 className="section-title">{hostLabel} activity</h3>
-          <p className="faint" style={{ margin: "2px 0 0", fontSize: 12 }}>
+      <CollapsibleSection title={`${hostLabel} activity`}>
+        <div
+          className="row wrap"
+          style={{ justifyContent: "space-between", marginBottom: 12 }}
+        >
+          <p className="hint" style={{ margin: 0 }}>
             Only visible to {adminsPlural.toLowerCase()}
           </p>
+          <span className="hint">{rows.length} shown</span>
         </div>
-        <span className="faint" style={{ fontSize: 12 }}>
-          {rows.length} shown
-        </span>
-      </div>
-      {rows.length === 0 ? (
-        <p className="faint" style={{ fontSize: 13 }}>
-          No {hostsPlural.toLowerCase()} yet.
-        </p>
-      ) : (
-        <HostActivityTable slug={slug} hostLabel={hostLabel} rows={rows} />
-      )}
+        {rows.length === 0 ? (
+          <p className="faint" style={{ fontSize: 13 }}>
+            No {hostsPlural.toLowerCase()} yet.
+          </p>
+        ) : (
+          <HostActivityTable slug={slug} hostLabel={hostLabel} rows={rows} />
+        )}
+      </CollapsibleSection>
     </div>
   );
 }
@@ -220,6 +237,7 @@ export default async function DashboardPage({
         hostCount={d.hostCount}
         electorCount={d.electorCount}
         electorLabel={electorLabel}
+        showHostHearts={viewerIsAdmin}
         hostFilter={
           <HostFilter
             value={host}

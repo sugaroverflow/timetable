@@ -1,16 +1,24 @@
 import { Pencil } from "lucide-react";
 import Link from "next/link";
 
-import { isAdmin, primaryRole, type Role } from "@timetable/shared";
+import {
+  isAdmin,
+  primaryRole,
+  type Privacy,
+  type Role,
+} from "@timetable/shared";
 
 import { AddPersonForm } from "@/components/AddPersonForm";
 import { Avatar } from "@/components/Avatar";
 import { CollapsibleTopicBody } from "@/components/CollapsibleTopicBody";
+import { ContactDetails } from "@/components/ContactDetails";
 import { EmptyState } from "@/components/EmptyState";
 import { InviteSendButton } from "@/components/InviteSendButton";
 import { PersonAdminPanel } from "@/components/PersonAdminPanel";
+import { PersonChip } from "@/components/PersonChip";
 import { RolePills } from "@/components/RolePills";
 import { UserPreviewStart } from "@/components/UserPreview";
+import { formatShortDate } from "@/lib/dates";
 import { gqlFetch } from "@/lib/graphql";
 import { displayRolesFromCookies } from "@/lib/previewRoles.server";
 import {
@@ -28,21 +36,31 @@ type Person = {
   slug: string | null;
   roles: string[];
   bioHtml: string | null;
+  /** Members-only (2026-09-30): null for the public, and when unset. */
+  contactDetailsHtml: string | null;
+  /** Set while deactivated (member-deactivation, 2026-09-10) — only admin
+   * viewers ever receive such a person; they're listed apart below. */
+  deactivatedAt: string | null;
   publishedTopics: { id: string; title: string; slug: string | null }[];
 };
 
 type Data = {
-  timetable: { id: string; settings: string; viewerRoles: string[] } | null;
+  timetable: {
+    id: string;
+    settings: string;
+    viewerRoles: string[];
+    privacy: Privacy;
+  } | null;
   me: { id: string } | null;
   timetablePeople: Person[];
 };
 
 const QUERY = `
   query People($s: String!) {
-    timetable: forum(idOrSlug: $s) { id settings viewerRoles }
+    timetable: forum(idOrSlug: $s) { id settings viewerRoles privacy }
     me { id }
     timetablePeople: forumPeople(idOrSlug: $s) {
-      userId name image slug roles bioHtml
+      userId name image slug roles bioHtml contactDetailsHtml deactivatedAt
       publishedTopics { id title slug }
     }
   }
@@ -55,23 +73,73 @@ type Member = {
   name: string | null;
   email: string | null;
   inviteSentAt: string | null;
+  deactivatedAt: string | null;
 };
 
 const MEMBERS_QUERY = `
   query Members($timetableId: String!) {
     timetableMembers: forumMembers(forumId: $timetableId) {
-      membershipId userId roles name email inviteSentAt
+      membershipId userId roles name email inviteSentAt deactivatedAt
     }
   }
 `;
+
+function personAnchor(userId: string): string {
+  return `person-${userId}`;
+}
+
+type Section = { role: Role; heading: string; people: Person[] };
+
+/**
+ * The page's table of contents (QA 2026-08-16): every person, under their
+ * role, in the order the sections below list them — a forum can carry a
+ * lot of people, and jump links to three headings only told you where the
+ * sections started. Role headings stack down the page with their people
+ * flowing across and wrapping underneath (Ed's layout, 2026-08-16). The
+ * heading still jumps to its section; each name jumps to that person's
+ * card. Avatars ride along because a face is faster to find than a name.
+ *
+ * These are `Link`s, not bare `<a href="#…">`, and that is load-bearing
+ * (2026-08-28): a raw fragment link makes the BROWSER push the history
+ * entry, and such an entry carries `history.state === null`. Next's
+ * popstate handler ignores any entry it did not create, so pressing Back
+ * onto one is a no-op — you would return to this page's URL with the
+ * previous page still rendered, and a second Back would then land on the
+ * un-anchored entry, i.e. the top of People. `Link` routes the jump
+ * through the router (its `onlyHashChange` path scrolls to the fragment),
+ * so the entry is the router's and Back comes home to the person.
+ */
+function PeopleContents({ sections }: { sections: Section[] }) {
+  return (
+    <nav className="people-toc card" aria-label="People on this page">
+      {sections.map((section) => (
+        <div key={section.role} className="people-toc-group">
+          <Link className="people-toc-heading" href={`#people-${section.role}`}>
+            {section.heading}
+          </Link>
+          <div className="people-toc-people">
+            {section.people.map((person) => (
+              <Link
+                key={person.userId}
+                className="people-toc-person"
+                href={`#${personAnchor(person.userId)}`}
+              >
+                <Avatar name={person.name} image={person.image} small />
+                {person.name ?? "Member"}
+              </Link>
+            ))}
+          </div>
+        </div>
+      ))}
+    </nav>
+  );
+}
 
 function PersonTopics({ slug, person }: { slug: string; person: Person }) {
   if (person.publishedTopics.length === 0) return null;
   return (
     <div className="person-topics">
-      <div className="faint" style={{ fontSize: 12 }}>
-        Topics
-      </div>
+      <div className="hint">Topics</div>
       <ul>
         {person.publishedTopics.map((topic) => {
           const href = topicPath(slug, person.slug, topic.slug);
@@ -113,7 +181,8 @@ function PersonCardActions({
           name={person.name}
         />
       ) : null}
-      {canManage && person.userId !== meId ? (
+      {/* No invites to a deactivated member — reactivate first. */}
+      {canManage && person.userId !== meId && !person.deactivatedAt ? (
         <InviteSendButton
           membershipId={member!.membershipId}
           email={member!.email}
@@ -129,6 +198,9 @@ function PersonCardActions({
           email={member!.email}
           roles={member!.roles}
           roleLabels={roleLabels}
+          deactivatedAt={person.deactivatedAt}
+          publishedTopicCount={person.publishedTopics.length}
+          isSelf={person.userId === meId}
         />
       ) : null}
     </div>
@@ -142,6 +214,7 @@ function PersonCard({
   meId,
   canEdit,
   roleLabels,
+  privacy,
 }: {
   slug: string;
   person: Person;
@@ -149,14 +222,31 @@ function PersonCard({
   meId: string | undefined;
   canEdit: boolean;
   roleLabels?: RoleLabels;
+  /** Decides the Contact Details "Members only" note. */
+  privacy: Privacy | undefined;
 }) {
-  const hasTopics = person.publishedTopics.length > 0;
   const canPreview = canEdit && person.userId !== meId;
   const canManage = canEdit && member != null;
   return (
-    <li className="card stack">
+    // The anchor every table-of-contents entry points at.
+    <li
+      className={`card stack people-card${person.deactivatedAt ? " people-card-deactivated" : ""}`}
+      id={personAnchor(person.userId)}
+    >
+      {person.deactivatedAt ? (
+        <div className="hint">
+          Deactivated {formatShortDate(person.deactivatedAt)} — hidden from
+          everyone but admins; their topics are unpublished and their digests
+          paused.
+        </div>
+      ) : null}
       <div className="person-head">
-        <Avatar name={person.name} image={person.image} xlarge />
+        {/* Photo and name both click through to the person's page (links
+            pass 2026-08-03 — the name used to go to their filtered feed,
+            and only when they had topics). */}
+        <PersonChip slug={slug} userId={person.userId}>
+          <Avatar name={person.name} image={person.image} xlarge />
+        </PersonChip>
         {person.userId === meId ? (
           // The viewer's own card: straight to the profile editor
           // (QA 2026-07-29).
@@ -170,19 +260,17 @@ function PersonCard({
         {/* Name with its role pills on the same line, to the right
             (QA 2026-07-30). */}
         <div className="person-head-titles">
-          {hasTopics ? (
-            <Link
-              className="person-name-link"
-              href={`/f/${slug}/topics?host=${person.userId}`}
-            >
-              <strong>{person.name ?? "Member"}</strong>
-            </Link>
-          ) : (
+          <PersonChip slug={slug} userId={person.userId}>
             <strong>{person.name ?? "Member"}</strong>
-          )}
+          </PersonChip>
           <RolePills roles={person.roles} labels={roleLabels} />
         </div>
       </div>
+      <ContactDetails
+        html={person.contactDetailsHtml}
+        privacy={privacy}
+        roles={person.roles}
+      />
       {person.bioHtml ? <CollapsibleTopicBody html={person.bioHtml} /> : null}
       <PersonTopics slug={slug} person={person} />
       <PersonCardActions
@@ -222,17 +310,35 @@ export default async function PeoplePage({
     membersByUser = new Map(members.timetableMembers.map((m) => [m.userId, m]));
   }
 
-  const sections = (["admin", "host", "elector"] as const).map((role) => ({
-    role,
-    heading: pluralLabel(roleLabel(settings.roleLabels, role)),
-    people: data.timetablePeople
+  // Deactivated members (admin viewers only — the API drops them for
+  // everyone else) sit in their own section at the foot of the page, out
+  // of the role sections and the contents, so the active roster reads as
+  // it always did.
+  const activePeople = data.timetablePeople.filter((p) => !p.deactivatedAt);
+  const deactivatedPeople = data.timetablePeople
+    .filter((p) => p.deactivatedAt)
+    .sort((a, b) =>
+      (a.name ?? "Member").localeCompare(b.name ?? "Member", undefined, {
+        sensitivity: "base",
+      }),
+    );
+
+  const sections = (["admin", "host", "elector"] as const).map((role) => {
+    const people = activePeople
       .filter((p) => primaryRole(p.roles as Role[]) === role)
       .sort((a, b) =>
         (a.name ?? "Member").localeCompare(b.name ?? "Member", undefined, {
           sensitivity: "base",
         }),
-      ),
-  }));
+      );
+    const label = roleLabel(settings.roleLabels, role);
+    // A section of one wears the singular (Ed, 2026-08-18).
+    return {
+      role,
+      heading: people.length === 1 ? label : pluralLabel(label),
+      people,
+    };
+  });
   const visibleSections = sections.filter((s) => s.people.length > 0);
 
   return (
@@ -246,7 +352,7 @@ export default async function PeoplePage({
           roleLabels={settings.roleLabels}
         />
       ) : null}
-      {data.timetablePeople.length === 0 ? (
+      {activePeople.length === 0 ? (
         <EmptyState
           icon="◎"
           title="No members yet"
@@ -254,19 +360,9 @@ export default async function PeoplePage({
         />
       ) : (
         <>
-          {visibleSections.length > 1 ? (
-            <nav className="people-toc" aria-label="Jump to section">
-              {visibleSections.map((section) => (
-                <a
-                  key={section.role}
-                  className="people-toc-link"
-                  href={`#people-${section.role}`}
-                >
-                  {section.heading}
-                  <span className="faint">{section.people.length}</span>
-                </a>
-              ))}
-            </nav>
+          {/* Below four people the page is its own contents. */}
+          {activePeople.length > 3 ? (
+            <PeopleContents sections={visibleSections} />
           ) : null}
           {visibleSections.map((section) => (
             <section
@@ -285,6 +381,7 @@ export default async function PeoplePage({
                     meId={data.me?.id}
                     canEdit={canEdit}
                     roleLabels={settings.roleLabels}
+                    privacy={data.timetable?.privacy}
                   />
                 ))}
               </ul>
@@ -292,6 +389,29 @@ export default async function PeoplePage({
           ))}
         </>
       )}
+      {deactivatedPeople.length > 0 ? (
+        <section
+          id="people-deactivated"
+          className="stack people-section"
+          aria-label="Deactivated members"
+        >
+          <h3 className="section-title">Deactivated</h3>
+          <ul className="list">
+            {deactivatedPeople.map((person) => (
+              <PersonCard
+                key={person.userId}
+                slug={slug}
+                person={person}
+                member={membersByUser.get(person.userId)}
+                meId={data.me?.id}
+                canEdit={canEdit}
+                roleLabels={settings.roleLabels}
+                privacy={data.timetable?.privacy}
+              />
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </div>
   );
 }

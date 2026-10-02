@@ -1,14 +1,12 @@
 "use client";
 
 import { Send } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
 import { GrowingTextarea } from "@/components/GrowingTextarea";
+import { draftKey, useDraft } from "@/lib/commentDrafts";
+import { nounTitle, useCommentThread } from "@/lib/commentThreadAdapter";
 import { useGqlAction } from "@/lib/useGqlAction";
-
-const EDIT = `mutation Edit($id: String!, $body: String!) {
-  editComment(commentId: $id, body: $body) { id }
-}`;
 
 /** Inline comment editor (QA 2026-07-29). Swapped in PLACE of the comment
  * text — edit affordances replace the content they edit, never stack a
@@ -23,8 +21,21 @@ export function CommentEditForm({
   onDone(): void;
 }) {
   const { run, busy } = useGqlAction();
-  const [body, setBody] = useState(initialBody);
+  const thread = useCommentThread();
+  // An interrupted edit keeps its text (comment-draft-store, 2026-08-21);
+  // typing back to the original body drops the draft, so an untouched
+  // editor never counts as one.
+  const [body, setBody, clearBody] = useDraft(
+    draftKey.edit(commentId),
+    initialBody,
+  );
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  /** Saved or cancelled — either way the edit is over. */
+  function done() {
+    clearBody();
+    onDone();
+  }
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -39,29 +50,33 @@ export function CommentEditForm({
     const text = body.trim();
     if (!text) return;
     void run(
-      EDIT,
+      thread.edit,
       { id: commentId, body: text },
       {
-        success: "Comment updated",
-        errorFallback: "Could not update comment",
-        onSuccess: onDone,
+        success: `${nounTitle(thread)} updated`,
+        errorFallback: `Could not update ${thread.noun}`,
+        refresh: thread.routerRefresh,
+        onSuccess: () => {
+          done();
+          thread.onChanged?.();
+        },
       },
     );
   }
 
   return (
-    <form onSubmit={save} className="inline-form" style={{ marginTop: 4 }}>
+    <form onSubmit={save} className="inline-form inline-form-nested">
       <GrowingTextarea
         ref={textareaRef}
         value={body}
         onChange={(e) => setBody(e.target.value)}
-        aria-label="Edit comment"
+        aria-label={`Edit ${thread.noun}`}
       />
       <button
         className="btn btn-primary btn-send"
         type="submit"
         disabled={busy}
-        aria-label="Save comment"
+        aria-label={`Save ${thread.noun}`}
         title="Save"
       >
         <Send size={16} aria-hidden />
@@ -69,7 +84,7 @@ export function CommentEditForm({
       <button
         type="button"
         className="btn btn-ghost btn-sm"
-        onClick={onDone}
+        onClick={done}
         disabled={busy}
       >
         Cancel

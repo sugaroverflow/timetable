@@ -6,6 +6,29 @@ const config: NextConfig = {
   transpilePackages: ["@timetable/shared"],
   output: "standalone",
   outputFileTracingRoot: path.join(__dirname, "../../"),
+  // Baseline security headers (audit 2026-08-17). No CSP yet — the theme
+  // <style> and the pre-hydration theme <script> are inline, so a real CSP
+  // needs nonce propagation through the proxy; tracked separately.
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          // The app offers no legitimate embedding; authenticated pages
+          // (settings, admin) must not be frameable.
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          // Ignored over plain http (local dev); binding on the hosted
+          // https origins.
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=31536000; includeSubDomains",
+          },
+        ],
+      },
+    ];
+  },
   // Forum URLs moved /t/ → /f/ and the browsing page /feed → /topics
   // (2026-07 de-social-media renaming). Old links — including those in
   // already-sent digest/invite emails — redirect permanently. Order
