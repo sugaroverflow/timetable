@@ -302,6 +302,9 @@ export type Person = {
   image: string | null;
   slug: string | null;
   bio: string | null;
+  /** Members-only (2026-09-30): callers MUST strip it for viewers who fail
+   * shared `canSeeContactDetails` before it leaves the API. */
+  contactDetails: string | null;
   roles: Role[];
   /** Set while deactivated (member-deactivation, 2026-09-10). The API
    * hides deactivated people from non-admin viewers; admins get them with
@@ -323,6 +326,7 @@ export async function listPeople(timetableId: string): Promise<Person[]> {
       image: timetableMemberships.image,
       slug: timetableMemberships.slug,
       bio: timetableMemberships.bio,
+      contactDetails: timetableMemberships.contactDetails,
       roles: timetableMemberships.roles,
       deactivatedAt: timetableMemberships.deactivatedAt,
     })
@@ -383,6 +387,7 @@ async function getPersonWhere(
       image: timetableMemberships.image,
       slug: timetableMemberships.slug,
       bio: timetableMemberships.bio,
+      contactDetails: timetableMemberships.contactDetails,
       roles: timetableMemberships.roles,
       deactivatedAt: timetableMemberships.deactivatedAt,
     })

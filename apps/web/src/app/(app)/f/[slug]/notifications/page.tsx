@@ -27,7 +27,9 @@ type Notification = {
     | "session_pencilled"
     | "session_confirmed"
     | "session_cleared"
-    | "sent_back_to_drafting";
+    | "sent_back_to_drafting"
+    | "lounge_reply"
+    | "lounge_mention";
   authorId: string;
   authorName: string | null;
   authorImage: string | null;
@@ -39,6 +41,8 @@ type Notification = {
   topicTitle: string;
   topicSlug: string | null;
   topicHostSlug: string | null;
+  /** {host} Lounge kinds: the conversation (their topic fields are empty). */
+  loungeRootId: string | null;
 };
 
 type Data = {
@@ -58,6 +62,7 @@ const QUERY = `
     notifications(idOrSlug: $s) {
       commentId kind authorId authorName authorImage authorRoles body
       visibility createdAt topicId topicTitle topicSlug topicHostSlug
+      loungeRootId
     }
   }
 `;
@@ -65,6 +70,9 @@ const QUERY = `
 const KIND_VERBS: Record<Notification["kind"], string> = {
   reply: "replied to your comment on",
   mention: "mentioned you on",
+  // The {host} Lounge (2026-09-30) — the "title" is the room's name.
+  lounge_reply: "replied to your post in",
+  lounge_mention: "mentioned you in",
   comment: "commented on",
   // Calendar v2 (QA 2026-08-03): session events for topics you ❤️'d.
   session_pencilled: "pencilled in a session for",
@@ -115,6 +123,15 @@ function cardLinks(
   if (isSessionKind(n.kind)) {
     return { href: `/f/${slug}/calendar`, replyHref: null };
   }
+  if (n.kind === "lounge_reply" || n.kind === "lounge_mention") {
+    // The conversation named, so an older one still loads (?c=), and the
+    // chain-tail composer answers ?reply= as it does on a topic.
+    const base = `/f/${slug}/lounge?c=${n.loungeRootId ?? n.commentId}`;
+    return {
+      href: `${base}#comment-${n.commentId}`,
+      replyHref: `${base}&reply=${n.commentId}#comment-${n.commentId}`,
+    };
+  }
   if (n.kind === "sent_back_to_drafting") {
     // Your card on My Topics, drafting tab open — where the admin's
     // reason lives and where your Ready switch is. The tab must be
@@ -144,12 +161,16 @@ function NotificationCard({
   n,
   slug,
   viewerIsAdmin,
+  loungeTitle,
 }: {
   n: Notification;
   slug: string;
   viewerIsAdmin: boolean;
+  /** "{host} Lounge" — what Lounge kinds link as their title. */
+  loungeTitle: string;
 }) {
   const { href, replyHref } = cardLinks(n, slug, viewerIsAdmin);
+  const title = n.kind.startsWith("lounge_") ? loungeTitle : n.topicTitle;
   const detail = isSessionKind(n.kind)
     ? sessionWhen(n.body)
     : n.body
@@ -167,7 +188,7 @@ function NotificationCard({
               <b>{n.authorName ?? "Someone"}</b>
             </PersonChip>{" "}
             {KIND_VERBS[n.kind]}{" "}
-            {href ? <Link href={href}>{n.topicTitle}</Link> : n.topicTitle}
+            {href ? <Link href={href}>{title}</Link> : title}
           </div>
           {detail ? (
             <div
@@ -297,6 +318,7 @@ export default async function NotificationsPage({
               n={n}
               slug={slug}
               viewerIsAdmin={viewerIsAdmin}
+              loungeTitle={`${roleLabel(settings.roleLabels, "host")} Lounge`}
             />
           ))}
         </ul>

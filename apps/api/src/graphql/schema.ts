@@ -17,6 +17,7 @@ import "./types";
 import "./api-tokens";
 import "./topics";
 import "./comments";
+import "./lounge";
 import "./members";
 import "./timetables";
 import "./activity";

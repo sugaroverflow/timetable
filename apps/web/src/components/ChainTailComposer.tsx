@@ -8,11 +8,8 @@ import { ComposerRow } from "@/components/ComposerRow";
 import { GrowingTextarea } from "@/components/GrowingTextarea";
 import { ForumMentionTextarea } from "@/components/MentionTextarea";
 import { draftKey, useDraft } from "@/lib/commentDrafts";
+import { useCommentThread } from "@/lib/commentThreadAdapter";
 import { useGqlAction } from "@/lib/useGqlAction";
-
-const REPLY = `mutation ContinueThread($id: String!, $body: String!) {
-  replyToComment(commentId: $id, body: $body) { id }
-}`;
 
 /**
  * The chain-tail composer (dialogue-first threading, 2026-08-13): a slim
@@ -38,6 +35,7 @@ export function ChainTailComposer({
   mentionSlug?: string;
 }) {
   const { run, busy } = useGqlAction();
+  const thread = useCommentThread();
   const searchParams = useSearchParams();
   const replyTarget = searchParams.get("reply");
   const deepLinked = replyTarget != null && focusIds.includes(replyTarget);
@@ -55,12 +53,16 @@ export function ChainTailComposer({
     const text = body.trim();
     if (!text) return;
     void run(
-      REPLY,
+      thread.reply,
       { id: parentId, body: text },
       {
         success: "Reply posted",
         errorFallback: "Could not reply",
-        onSuccess: clearBody,
+        refresh: thread.routerRefresh,
+        onSuccess: () => {
+          clearBody();
+          thread.onChanged?.();
+        },
       },
     );
   }

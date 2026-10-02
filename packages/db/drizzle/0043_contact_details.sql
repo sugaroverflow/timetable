@@ -1,0 +1,1 @@
+ALTER TABLE "timetable_memberships" ADD COLUMN "contact_details" text;

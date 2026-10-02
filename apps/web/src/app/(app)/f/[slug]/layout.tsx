@@ -5,7 +5,13 @@ import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 
-import { isAdmin, isElector, isHost, type Role } from "@timetable/shared";
+import {
+  isAdmin,
+  isElector,
+  isHost,
+  isLoungeEnabled,
+  type Role,
+} from "@timetable/shared";
 
 import { NavLink } from "@/components/NavLink";
 import { Sidebar } from "@/components/Sidebar";
@@ -23,6 +29,7 @@ import {
   buildThemeCss,
   parseTimetableSettings,
   privacyDescription,
+  roleLabel,
 } from "@/lib/timetableSettings";
 import { parseViewAs, VIEW_AS_COOKIE } from "@/lib/userPreview";
 
@@ -101,6 +108,7 @@ const UNREAD_QUERY = `
     notificationsUnread(idOrSlug: $s)
     topicQueue(idOrSlug: $s) { neverSeenCount }
     moderationQueue(idOrSlug: $s) { id readyAt }
+    loungeUnread(idOrSlug: $s)
   }
 `;
 
@@ -131,9 +139,16 @@ async function loadSwitcherAndUnread(
   unread: number;
   queueNeverSeen: number;
   pendingCount: number;
+  loungeUnread: boolean;
 }> {
   if (!isAuthed)
-    return { switcherItems: [], unread: 0, queueNeverSeen: 0, pendingCount: 0 };
+    return {
+      switcherItems: [],
+      unread: 0,
+      queueNeverSeen: 0,
+      pendingCount: 0,
+      loungeUnread: false,
+    };
   const [mine, unreadData] = await Promise.all([
     getMyTimetables(),
     isMember
@@ -141,11 +156,13 @@ async function loadSwitcherAndUnread(
           notificationsUnread: number;
           topicQueue: { neverSeenCount: number } | null;
           moderationQueue: { id: string; readyAt: string | null }[];
+          loungeUnread: boolean;
         }>(UNREAD_QUERY, { s: slug })
       : Promise.resolve({
           notificationsUnread: 0,
           topicQueue: null,
           moderationQueue: [],
+          loungeUnread: false,
         }),
   ]);
   const switcherItems = mine.map((t) => {
@@ -167,6 +184,7 @@ async function loadSwitcherAndUnread(
     // the Pending page's default view shows (2026-08-06).
     pendingCount:
       unreadData.moderationQueue?.filter((t) => t.readyAt).length ?? 0,
+    loungeUnread: unreadData.loungeUnread ?? false,
   };
 }
 
@@ -203,6 +221,39 @@ function BadgeNavLink({
         <span className={`nav-badge${quiet ? " nav-badge-quiet" : ""}`}>
           {count > 999 ? "999+" : count}
         </span>
+      ) : null}
+    </NavLink>
+  );
+}
+
+/** "{host} Lounge" when the viewer can enter it (the forum has it on and
+ * they're a host or admin), else null — no link. */
+function loungeNavLabel(
+  settings: ReturnType<typeof parseTimetableSettings>,
+  roles: Role[],
+): string | null {
+  if (!isLoungeEnabled(settings)) return null;
+  if (!isHost(roles) && !isAdmin(roles)) return null;
+  return `${roleLabel(settings.roleLabels, "host")} Lounge`;
+}
+
+/** The {host} Lounge link, with a dot while there are posts the viewer
+ * hasn't seen. */
+function LoungeNavLink({
+  base,
+  label,
+  unread,
+}: {
+  base: string;
+  label: string | null;
+  unread: boolean;
+}) {
+  if (!label) return null;
+  return (
+    <NavLink href={`${base}/lounge`}>
+      {label}
+      {unread ? (
+        <span className="nav-dot" role="img" aria-label="new posts" />
       ) : null}
     </NavLink>
   );
@@ -246,6 +297,8 @@ function SideNav({
   hostOrAdmin,
   admin,
   calendarOn,
+  loungeLabel,
+  loungeUnread,
   unread,
   queueNeverSeen,
   pendingCount,
@@ -259,6 +312,10 @@ function SideNav({
   hostOrAdmin: boolean;
   admin: boolean;
   calendarOn: boolean;
+  /** "{host} Lounge" when the viewer can enter it; null hides the link. */
+  loungeLabel: string | null;
+  /** A Lounge post by someone else since the viewer's last visit. */
+  loungeUnread: boolean;
   unread: number;
   queueNeverSeen: number;
   pendingCount: number;
@@ -288,6 +345,10 @@ function SideNav({
       {/* Calendar v2 (closes #55): the link exists only when the forum has
           switched the feature on. */}
       {calendarOn && <NavLink href={`${base}/calendar`}>Calendar</NavLink>}
+      {/* The {host} Lounge (2026-09-30): hosts and admins, once an admin
+          has switched it on. A dot, not a count — new posts are an
+          invitation to look, not a backlog to clear. */}
+      <LoungeNavLink base={base} label={loungeLabel} unread={loungeUnread} />
       {isMember && (
         <BadgeNavLink
           href={`${base}/notifications`}
@@ -342,7 +403,7 @@ export default async function TimetableLayout({
   const { previewUserId, previewName } = await loadPreview(slug);
   const settings = parseTimetableSettings(timetable.settings);
   const base = `/f/${slug}`;
-  const { switcherItems, unread, queueNeverSeen, pendingCount } =
+  const { switcherItems, unread, queueNeverSeen, pendingCount, loungeUnread } =
     await loadSwitcherAndUnread(isAuthed, isMember, slug);
 
   const themeCss = buildThemeCss(settings);
@@ -381,6 +442,8 @@ export default async function TimetableLayout({
               roles,
               timetable.calendarHasSlots,
             )}
+            loungeLabel={loungeNavLabel(settings, roles)}
+            loungeUnread={loungeUnread}
             unread={unread}
             queueNeverSeen={queueNeverSeen}
             pendingCount={pendingCount}

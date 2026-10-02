@@ -160,6 +160,9 @@ const SLOT_UPDATED_TIME = hoursAgo(3);
 const RESET_DATABASE_TABLES = [
   "api_rate_limit_buckets",
   "activity_events",
+  "lounge_reactions",
+  "lounge_mentions",
+  "lounge_comments",
   "slot_comments",
   "availability",
   "availability_patterns",

@@ -33,6 +33,13 @@ export const ACTION_LABELS: Record<string, string> = {
   "hostheart.remove": "took back their 💙 from a topic",
   "comment.add": "commented on a topic",
   "comment.reply": "replied to a comment",
+  // The {host} Lounge (2026-09-30).
+  "lounge.post": "started a Lounge conversation",
+  "lounge.reply": "replied in the Lounge",
+  "lounge.hide": "hid a Lounge post",
+  "lounge.unhide": "un-hid a Lounge post",
+  "lounge.pin": "pinned a Lounge conversation",
+  "lounge.unpin": "unpinned a Lounge conversation",
   "member.email_change": "changed a member's login email",
   "member.role_change": "changed a member's roles",
   "member.invite": "invited someone",

@@ -46,7 +46,12 @@ export async function getUserByIcsToken(token: string): Promise<User | null> {
 export async function updateMemberProfile(
   timetableId: string,
   userId: string,
-  patch: { name?: string; bio?: string | null; image?: string | null },
+  patch: {
+    name?: string;
+    bio?: string | null;
+    contactDetails?: string | null;
+    image?: string | null;
+  },
 ): Promise<TimetableMembership | null> {
   const [membership] = await db
     .select({ id: timetableMemberships.id })
@@ -72,6 +77,9 @@ export async function updateMemberProfile(
       ...(patch.name !== undefined ? { name: patch.name } : {}),
       ...(slug !== undefined ? { slug } : {}),
       ...(patch.bio !== undefined ? { bio: patch.bio } : {}),
+      ...(patch.contactDetails !== undefined
+        ? { contactDetails: patch.contactDetails }
+        : {}),
       ...(patch.image !== undefined ? { image: patch.image } : {}),
       updatedAt: new Date(),
     })

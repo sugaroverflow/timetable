@@ -12,3 +12,9 @@ test-results/
 *.md
 prototype.html
 *.local-backup
+
+# vendored emoji data for the Lounge picker
+apps/web/public/emojibase/
+
+# copied from edsaperia/dev-ops; refreshed from there, never hand-formatted
+.claude/skills/

@@ -13,6 +13,7 @@ import {
 import {
   canManageMembers,
   canModerate,
+  canSeeContactDetails,
   canSeePersonProfile,
   DIGEST_KINDS,
   type DigestKinds,
@@ -39,6 +40,8 @@ import {
 /** Max bio length, shared by the self-edit and admin-edit mutations so the two
  * can't drift apart. Storage hygiene only — the column is unbounded `text`. */
 const BIO_MAX_LENGTH = 8000;
+/** Contact Details are a few lines of addresses and handles, not an essay. */
+const CONTACT_DETAILS_MAX_LENGTH = 1000;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -115,6 +118,14 @@ const PersonType = builder.objectRef<Person>("Person").implement({
       resolve: (p) => (p.bio ? renderMarkdown(p.bio) : null),
     }),
     bio: t.exposeString("bio", { nullable: true }),
+    /** Members-only Markdown (2026-09-30). Already null for anyone who
+     * fails canSeeContactDetails — stripped in personForViewer. */
+    contactDetailsHtml: t.string({
+      nullable: true,
+      resolve: (p) =>
+        p.contactDetails ? renderMarkdown(p.contactDetails) : null,
+    }),
+    contactDetails: t.exposeString("contactDetails", { nullable: true }),
     /** Set while deactivated (member-deactivation, 2026-09-10). Only
      * admin viewers ever receive a deactivated person, so exposing the
      * stamp adds nothing for the public. */
@@ -145,8 +156,8 @@ function withPublicRoles(person: Person, viewer: Viewer): Person {
 /** A person as this viewer may see them, or null if not at all: the
  * privacy-level profile rule, then member-deactivation (2026-09-10) —
  * deactivated members are admin-eyes-only, listed apart on the People
- * page for admins and simply gone for everyone else — then the owner
- * strip. The one gate for both `forumPeople` and `person`. */
+ * page for admins and simply gone for everyone else — then the
+ * members-only Contact Details strip (2026-09-30), then the owner strip. The one gate for both `forumPeople` and `person`. */
 function personForViewer(
   person: Person,
   privacy: Privacy,
@@ -156,7 +167,10 @@ function personForViewer(
     return null;
   }
   if (person.deactivatedAt && !canModerate(viewer)) return null;
-  return withPublicRoles(person, viewer);
+  const visible = canSeeContactDetails(viewer)
+    ? person
+    : { ...person, contactDetails: null };
+  return withPublicRoles(visible, viewer);
 }
 
 // ---------------------------------------------------------------------------
@@ -332,11 +346,18 @@ builder.mutationFields((t) => ({
       idOrSlug: t.arg.string({ required: true }),
       name: t.arg.string({ required: false }),
       bio: t.arg.string({ required: false }),
+      /** Omit to leave unchanged; empty string clears. */
+      contactDetails: t.arg.string({ required: false }),
       image: t.arg.string({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
       capLength(args.name, 120, "Name");
       capLength(args.bio, BIO_MAX_LENGTH, "Bio");
+      capLength(
+        args.contactDetails,
+        CONTACT_DETAILS_MAX_LENGTH,
+        "Contact Details",
+      );
       assertOptionalHttpUrl(args.image, "Image URL");
       const { user, readable } = await loadTimetableAndViewer(
         ctx,
@@ -348,6 +369,10 @@ builder.mutationFields((t) => ({
         {
           name: args.name ?? undefined,
           bio: args.bio ?? undefined,
+          contactDetails:
+            args.contactDetails != null
+              ? args.contactDetails.trim() || null
+              : undefined,
           image: args.image != null ? args.image.trim() || null : undefined,
         },
       );
@@ -446,6 +471,8 @@ builder.mutationFields((t) => ({
       userId: t.arg.string({ required: true }),
       bio: t.arg.string({ required: true }),
       /** Omit to leave unchanged; empty string clears. */
+      contactDetails: t.arg.string({ required: false }),
+      /** Omit to leave unchanged; empty string clears. */
       image: t.arg.string({ required: false }),
       /** Omit (or blank) to leave unchanged — a member can be renamed, but
        * not renamed to nothing. Renaming re-derives their member slug. */
@@ -453,6 +480,11 @@ builder.mutationFields((t) => ({
     },
     resolve: async (_p, args, ctx) => {
       capLength(args.bio, BIO_MAX_LENGTH, "Bio");
+      capLength(
+        args.contactDetails,
+        CONTACT_DETAILS_MAX_LENGTH,
+        "Contact Details",
+      );
       capLength(args.name, 120, "Name");
       assertOptionalHttpUrl(args.image, "Image URL");
       const { user, readable } = await requireAdminTimetable(
@@ -464,6 +496,9 @@ builder.mutationFields((t) => ({
       const name = args.name?.trim() || undefined;
       await updateMemberProfile(readable.timetable.id, args.userId, {
         bio: args.bio.trim() || null,
+        ...(args.contactDetails != null
+          ? { contactDetails: args.contactDetails.trim() || null }
+          : {}),
         ...(args.image != null ? { image: args.image.trim() || null } : {}),
         ...(name != null ? { name } : {}),
       });

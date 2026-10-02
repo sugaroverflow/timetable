@@ -76,6 +76,10 @@ export const timetableMemberships = pgTable(
     name: text(),
     image: text(),
     bio: text(),
+    /** Contact Details (2026-09-30): Markdown shown above the profile to
+     * forum MEMBERS only — never the public, never the export. Gated by
+     * shared `canSeeContactDetails`. */
+    contactDetails: text(),
     /** URL slug, unique per timetable (person pages /f/[slug]/[userSlug]
      * and the cosmetic host segment in topic permalinks). */
     slug: text(),
@@ -113,6 +117,11 @@ export const timetableMemberships = pgTable(
      * the People page, their digests don't send, and the forum leaves
      * their switcher. Reactivation clears it. */
     deactivatedAt: timestamp({ withTimezone: true }),
+    /** {host} Lounge read watermark (2026-09-30): Lounge posts after it
+     * are unread (the nav dot) and still news for the digest. Moved by
+     * visiting the Lounge or clicking a digest that showed it. Null =
+     * never visited. */
+    loungeSeenAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
@@ -169,6 +178,11 @@ export const digestSends = pgTable(
       .references(() => timetables.id, { onDelete: "cascade" }),
     /** Topics whose card showed comment/reply threads in this email. */
     commentTopicIds: jsonb().$type<string[]>().notNull().default([]),
+    /** The newest {host} Lounge post the email's Lounge card showed (null
+     * = no card). A click moves the membership's loungeSeenAt up to it —
+     * never to the send time, which would mark read posts the card left
+     * out. */
+    loungeShownUntil: timestamp({ withTimezone: true }),
     sentAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("digest_sends_user_idx").on(t.userId)],

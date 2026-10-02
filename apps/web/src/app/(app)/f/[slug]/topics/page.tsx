@@ -2,7 +2,7 @@ import { Heart } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { topicPath } from "@timetable/shared";
+import { topicPath, type Privacy } from "@timetable/shared";
 
 import { EmptyState } from "@/components/EmptyState";
 import { FeedSearch } from "@/components/FeedSearch";
@@ -28,7 +28,9 @@ import { pluralLabel, roleLabel } from "@/lib/timetableSettings";
 
 import { loadMoreFeed } from "./actions";
 
-type HostCard = ProfileCardPerson | null;
+/** The host-filtered view's profile header, plus the forum privacy that
+ * decides its Contact Details "Members only" note. */
+type HostCard = { person: ProfileCardPerson; privacy: Privacy } | null;
 
 /** page-topic-toc data for the ❤️/💙 pages: the viewer's WHOLE hearted
  * list (the feed below paginates at 20, so the TOC can't be read off the
@@ -75,7 +77,10 @@ async function loadHeartedToc(args: {
 
 const HOST_CARD_QUERY = `
   query FeedHostCard($s: String!, $u: String!) {
-    person(idOrSlug: $s, userId: $u) { userId name image slug roles bioHtml }
+    person(idOrSlug: $s, userId: $u) {
+      userId name image slug roles bioHtml contactDetailsHtml
+    }
+    timetable: forum(idOrSlug: $s) { privacy }
   }
 `;
 
@@ -97,11 +102,12 @@ function redirectWithFreshSeed(
 
 async function loadHostCard(slug: string, host: string): Promise<HostCard> {
   if (!host) return null;
-  const data = await gqlFetch<{ person: HostCard }>(HOST_CARD_QUERY, {
-    s: slug,
-    u: host,
-  });
-  return data.person;
+  const data = await gqlFetch<{
+    person: ProfileCardPerson | null;
+    timetable: { privacy: Privacy } | null;
+  }>(HOST_CARD_QUERY, { s: slug, u: host });
+  if (!data.person || !data.timetable) return null;
+  return { person: data.person, privacy: data.timetable.privacy };
 }
 
 /** Page head for the two own-gesture views (❤️ Topics / 💙 Topics); the
@@ -281,9 +287,10 @@ export default async function FeedPage({
       {hostCard ? (
         <PersonProfileCard
           slug={slug}
-          person={hostCard}
+          person={hostCard.person}
+          privacy={hostCard.privacy}
           labels={page.settings.roleLabels}
-          isSelf={page.viewerId === hostCard.userId}
+          isSelf={page.viewerId === hostCard.person.userId}
         />
       ) : null}
 

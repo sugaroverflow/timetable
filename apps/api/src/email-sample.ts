@@ -9,6 +9,7 @@
 import type {
   DigestActivity,
   DigestComment,
+  DigestLoungeCard,
   DigestPerson,
   DigestTopicCard,
   ForumDigest,
@@ -567,6 +568,10 @@ export function sampleDigest(args: {
   forumSlug: string;
   accent?: string | null;
   kindDefaults?: DigestKinds;
+  /** The forum's host label ("Faculty") — names the Lounge card. */
+  hostLabel?: string;
+  /** Show the {host} Lounge card (only where the forum has it on). */
+  loungeEnabled?: boolean;
 }): ForumDigest {
   const me = sWho(args.name ?? "You", "sample-you");
   const p: SamplePath = (host, topic) =>
@@ -581,7 +586,7 @@ export function sampleDigest(args: {
     forumName: args.forumName,
     forumSlug: args.forumSlug,
     accent: args.accent ?? null,
-    hostLabel: "Host",
+    hostLabel: args.hostLabel ?? "Host",
     adminLabel: "Admin",
     topics: assembleSampleCards(
       [
@@ -647,5 +652,59 @@ export function sampleDigest(args: {
           sWho("Grace Adeyemi", "sample-grace"),
         ]
       : [],
+    lounge:
+      args.loungeEnabled && allowed("lounge")
+        ? sampleLounge(me, args.forumSlug)
+        : null,
+  };
+}
+
+/** The {host} Lounge card: a new conversation, and a reply in one you
+ * started (with the post it answers as context). */
+function sampleLounge(me: DigestPerson, forumSlug: string): DigestLoungeCard {
+  const amara = sWho("Amara Okafor", "sample-amara");
+  const tom = sWho("Tom Reyes", "sample-tom");
+  return {
+    path: `/f/${forumSlug}/lounge`,
+    shownUntil: new Date("2026-07-30T12:00:00Z"),
+    conversations: [
+      {
+        rootId: "sample-lounge-1",
+        posts: [
+          {
+            comment: sC(
+              "sample-lounge-1",
+              null,
+              amara,
+              "## Reading list for next term\n\nI've been pulling together **readings** people keep recommending in sessions — what should be on it? I'll collate before we next meet.",
+            ),
+            isNew: true,
+          },
+        ],
+      },
+      {
+        rootId: "sample-lounge-2",
+        posts: [
+          {
+            comment: sC(
+              "sample-lounge-2",
+              null,
+              me,
+              "Could we swap the Thursday evening slots around half-term?",
+            ),
+            isNew: false,
+          },
+          {
+            comment: sC(
+              "sample-lounge-3",
+              "sample-lounge-2",
+              tom,
+              "Happy to swap — I'm away the 23rd anyway.",
+            ),
+            isNew: true,
+          },
+        ],
+      },
+    ],
   };
 }

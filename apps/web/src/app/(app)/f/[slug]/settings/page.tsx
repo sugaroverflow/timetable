@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { isAdmin, type Role } from "@timetable/shared";
+import { isAdmin, isLoungeEnabled, type Role } from "@timetable/shared";
 
 import Link from "next/link";
 
@@ -10,6 +10,7 @@ import { EmailDigestForm } from "@/components/EmailDigestForm";
 import { HeartsCutoffForm } from "@/components/HeartsCutoffForm";
 import { HostCommentsForm } from "@/components/HostCommentsForm";
 import { InviteForm } from "@/components/InviteForm";
+import { LoungeSettingsForm } from "@/components/LoungeSettingsForm";
 import { SettingsForm, type SettingsValues } from "@/components/SettingsForm";
 import { TimetableProfileForm } from "@/components/TimetableProfileForm";
 import { gqlFetch } from "@/lib/graphql";
@@ -97,6 +98,16 @@ export default async function SettingsPage({
               enabled={
                 (settings as TimetableSettings).hostComments?.enabled ?? true
               }
+              hostLabel={roleLabel(settings.roleLabels, "host")}
+              electorLabel={roleLabel(settings.roleLabels, "elector")}
+              adminLabel={roleLabel(settings.roleLabels, "admin")}
+            />
+
+            <hr className="settings-divider" />
+
+            <LoungeSettingsForm
+              slug={slug}
+              enabled={isLoungeEnabled(settings as TimetableSettings)}
               hostLabel={roleLabel(settings.roleLabels, "host")}
               electorLabel={roleLabel(settings.roleLabels, "elector")}
               adminLabel={roleLabel(settings.roleLabels, "admin")}

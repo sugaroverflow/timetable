@@ -30,6 +30,14 @@ vi.mock("@timetable/core", async (importOriginal) => {
   return {
     ...actual,
     addSlotComment: vi.fn(),
+    listLoungePage: vi.fn(),
+    getLoungeComment: vi.fn(),
+    startLoungeConversation: vi.fn(),
+    replyInLounge: vi.fn(),
+    setLoungeReaction: vi.fn(),
+    setLoungeCommentPinned: vi.fn(),
+    hasUnreadLounge: vi.fn(),
+    markLoungeSeen: vi.fn(),
     addSlotSession: vi.fn(),
     buildCalendar: vi.fn(),
     confirmedLocationTaken: vi.fn(),
@@ -244,6 +252,7 @@ function membershipFixture(
     name: null,
     image: null,
     bio: null,
+    contactDetails: null,
     slug: null,
     lastSeenFeedAt: null,
     lastSeenNotificationsAt: null,
@@ -252,6 +261,7 @@ function membershipFixture(
     digestSettings: {},
     lastDigestAt: null,
     deactivatedAt: null,
+    loungeSeenAt: null,
     createdAt: new Date("2026-01-01T00:00:00.000Z"),
     updatedAt: new Date("2026-01-01T00:00:00.000Z"),
     ...patch,
@@ -1152,6 +1162,42 @@ describe("createApiApp", () => {
       );
       expect(body.publicUrl).toContain(
         "/test-uploads/timetable-cover/timetables/",
+      );
+    });
+  });
+
+  it("signs post images for hosts and refuses electors", async () => {
+    configureStorageEnv();
+    const sign = (baseUrl: string) =>
+      fetch(`${baseUrl}/api/uploads`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          purpose: "post-image",
+          timetableIdOrSlug: "public-calendar",
+          filename: "photo.webp",
+          contentType: "image/webp",
+          size: 100,
+        }),
+      });
+    await withTestServer(async (baseUrl) => {
+      mockSession("elector-1", ["elector"]);
+      vi.mocked(core.getReadableTimetable).mockResolvedValue({
+        timetable: timetableFixture(),
+        roles: ["elector"],
+      });
+      expect((await sign(baseUrl)).status).toBe(403);
+
+      mockSession("host-1", ["host"]);
+      vi.mocked(core.getReadableTimetable).mockResolvedValue({
+        timetable: timetableFixture(),
+        roles: ["host"],
+      });
+      const res = await sign(baseUrl);
+      const body = (await res.json()) as { key: string };
+      expect(res.status).toBe(200);
+      expect(body.key).toMatch(
+        /^test-uploads\/post-image\/timetables\/11111111-1111-1111-1111-111111111111\/host-1\/[0-9a-f-]+\.webp$/,
       );
     });
   });
@@ -3479,6 +3525,300 @@ describe("createApiApp", () => {
           });
         });
       }
+    });
+  });
+});
+
+describe("Contact Details (members only)", () => {
+  const PERSON_QUERY = `query($s: String!, $u: String){
+    person(idOrSlug: $s, userId: $u) { name contactDetails contactDetailsHtml }
+  }`;
+
+  function mockPublicForum(viewerRoles: Role[]) {
+    vi.mocked(core.getReadableTimetable).mockResolvedValue({
+      timetable: timetableFixture({ privacy: "public" }),
+      roles: viewerRoles,
+    });
+    vi.mocked(core.getPerson).mockResolvedValue({
+      userId: "member-1",
+      name: "Ada",
+      image: null,
+      slug: "ada",
+      bio: "Public bio",
+      contactDetails: "ada@example.com",
+      roles: ["host"],
+      deactivatedAt: null,
+    });
+  }
+
+  async function readPerson(baseUrl: string) {
+    const res = await fetch(`${baseUrl}/graphql`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query: PERSON_QUERY,
+        variables: { s: "public-calendar", u: "member-1" },
+      }),
+    });
+    return (await res.json()) as {
+      data?: { person: Record<string, unknown> | null } | null;
+      errors?: unknown;
+    };
+  }
+
+  it("hides them from anonymous visitors to a public forum", async () => {
+    mockPublicForum([]);
+    await withTestServer(async (baseUrl) => {
+      const body = await readPerson(baseUrl);
+      expect(body.errors).toBeUndefined();
+      expect(body.data?.person).toEqual({
+        name: "Ada",
+        contactDetails: null,
+        contactDetailsHtml: null,
+      });
+    });
+  });
+
+  it("hides them from signed-in non-members", async () => {
+    mockSession("stranger-1", []);
+    mockPublicForum([]);
+    await withTestServer(async (baseUrl) => {
+      const body = await readPerson(baseUrl);
+      expect(body.data?.person?.contactDetails).toBeNull();
+    });
+  });
+
+  it("shows them to forum members", async () => {
+    mockSession("elector-1", ["elector"]);
+    mockPublicForum(["elector"]);
+    await withTestServer(async (baseUrl) => {
+      const body = await readPerson(baseUrl);
+      expect(body.data?.person?.contactDetails).toBe("ada@example.com");
+      expect(body.data?.person?.contactDetailsHtml).toContain(
+        "ada@example.com",
+      );
+    });
+  });
+});
+
+describe("{host} Lounge (hosts and admins only, off by default)", () => {
+  const LOUNGE = `query($s: String!){
+    lounge(idOrSlug: $s) { nextCursor conversations { id } }
+    loungeUnread(idOrSlug: $s)
+  }`;
+  const lounge = (on: boolean) =>
+    timetableFixture({ settings: on ? { lounge: { enabled: true } } : {} });
+
+  async function gql(
+    baseUrl: string,
+    query: string,
+    variables: Record<string, unknown> = { s: "public-calendar" },
+  ) {
+    const res = await fetch(`${baseUrl}/graphql`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, variables }),
+    });
+    return (await res.json()) as {
+      data?: Record<string, unknown> | null;
+      errors?: { message: string }[];
+    };
+  }
+
+  function forum(on: boolean, roles: Role[]) {
+    vi.mocked(core.getReadableTimetable).mockResolvedValue({
+      timetable: lounge(on),
+      roles,
+    });
+    vi.mocked(core.listLoungePage).mockResolvedValue({
+      pinned: [],
+      conversations: [],
+      nextCursor: null,
+    });
+    vi.mocked(core.hasUnreadLounge).mockResolvedValue(true);
+  }
+
+  it("is invisible to electors", async () => {
+    mockSession("elector-1", ["elector"]);
+    forum(true, ["elector"]);
+    await withTestServer(async (baseUrl) => {
+      const body = await gql(baseUrl, LOUNGE);
+      expect(body.data).toEqual({ lounge: null, loungeUnread: false });
+      expect(core.listLoungePage).not.toHaveBeenCalled();
+    });
+  });
+
+  it("is invisible to hosts while the forum has it switched off", async () => {
+    mockSession("host-1", ["host"]);
+    forum(false, ["host"]);
+    await withTestServer(async (baseUrl) => {
+      const body = await gql(baseUrl, LOUNGE);
+      expect(body.data).toEqual({ lounge: null, loungeUnread: false });
+    });
+  });
+
+  it("opens to hosts once switched on", async () => {
+    mockSession("host-1", ["host"]);
+    forum(true, ["host"]);
+    await withTestServer(async (baseUrl) => {
+      const body = await gql(baseUrl, LOUNGE);
+      expect(body.errors).toBeUndefined();
+      expect(body.data).toEqual({
+        lounge: { nextCursor: null, conversations: [] },
+        loungeUnread: true,
+      });
+    });
+  });
+
+  it("refuses an elector's post, and ❤️ as a react", async () => {
+    const post = {
+      id: "33333333-3333-3333-3333-333333333333",
+      timetableId: "11111111-1111-1111-1111-111111111111",
+      parentId: null,
+      rootId: null,
+      authorId: "host-1",
+      body: "hello",
+      lastActivityAt: new Date(),
+      hiddenAt: null,
+      hiddenByUserId: null,
+      deletedAt: null,
+      editedAt: null,
+      pinnedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    vi.mocked(core.getLoungeComment).mockResolvedValue(post);
+    vi.mocked(core.getTimetableById).mockResolvedValue(lounge(true));
+    await withTestServer(async (baseUrl) => {
+      mockSession("elector-1", ["elector"]);
+      forum(true, ["elector"]);
+      const started = await gql(
+        baseUrl,
+        `mutation($s: String!){ startLoungeConversation(idOrSlug: $s, body: "hi") }`,
+      );
+      expect(started.errors?.length).toBeGreaterThan(0);
+      expect(core.startLoungeConversation).not.toHaveBeenCalled();
+
+      mockSession("host-1", ["host"]);
+      const react = (emoji: string) =>
+        gql(
+          baseUrl,
+          `mutation($e: String!){ setLoungeReaction(commentId: "${post.id}", emoji: $e, on: true) }`,
+          { e: emoji },
+        );
+      expect((await react("❤️")).errors?.length).toBeGreaterThan(0);
+      expect(core.setLoungeReaction).not.toHaveBeenCalled();
+      expect((await react("👍")).errors).toBeUndefined();
+      expect(core.setLoungeReaction).toHaveBeenCalledWith(
+        post.id,
+        "host-1",
+        "👍",
+        true,
+      );
+    });
+  });
+
+  it("lets only admins pin", async () => {
+    const post = {
+      id: "33333333-3333-3333-3333-333333333333",
+      timetableId: "11111111-1111-1111-1111-111111111111",
+      parentId: null,
+      rootId: null,
+      authorId: "host-1",
+      body: "hello",
+      lastActivityAt: new Date(),
+      hiddenAt: null,
+      hiddenByUserId: null,
+      deletedAt: null,
+      editedAt: null,
+      pinnedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    vi.mocked(core.getLoungeComment).mockResolvedValue(post);
+    vi.mocked(core.getTimetableById).mockResolvedValue(lounge(true));
+    const PIN = `mutation { pinLoungeConversation(commentId: "${post.id}", pinned: true) }`;
+    await withTestServer(async (baseUrl) => {
+      mockSession("host-1", ["host"]);
+      expect((await gql(baseUrl, PIN)).errors?.length).toBeGreaterThan(0);
+      expect(core.setLoungeCommentPinned).not.toHaveBeenCalled();
+      mockSession("admin-1", ["admin"]);
+      expect((await gql(baseUrl, PIN)).errors).toBeUndefined();
+      expect(core.setLoungeCommentPinned).toHaveBeenCalledWith(
+        post.id,
+        true,
+        "admin-1",
+      );
+    });
+  });
+});
+
+describe("{host} Lounge — hidden and deleted posts", () => {
+  const settings = { lounge: { enabled: true } };
+  const base = {
+    id: "33333333-3333-3333-3333-333333333333",
+    timetableId: "11111111-1111-1111-1111-111111111111",
+    parentId: null,
+    rootId: null,
+    authorId: "host-1",
+    body: "hello",
+    lastActivityAt: new Date(),
+    hiddenAt: null as Date | null,
+    hiddenByUserId: null,
+    deletedAt: null as Date | null,
+    editedAt: null,
+    pinnedAt: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+  const post = async (baseUrl: string, query: string) =>
+    (await (
+      await fetch(`${baseUrl}/graphql`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query }),
+      })
+    ).json()) as { errors?: unknown[] };
+  const REACT = `mutation { setLoungeReaction(commentId: "${base.id}", emoji: "👍", on: true) }`;
+  const REPLY = `mutation { replyInLounge(commentId: "${base.id}", body: "still here") }`;
+
+  it("puts a hidden post out of reach for everyone but admins", async () => {
+    vi.mocked(core.setLoungeReaction).mockClear();
+    vi.mocked(core.getTimetableById).mockResolvedValue(
+      timetableFixture({ settings }),
+    );
+    vi.mocked(core.getLoungeComment).mockResolvedValue({
+      ...base,
+      hiddenAt: new Date(),
+    });
+    await withTestServer(async (baseUrl) => {
+      mockSession("host-1", ["host"]);
+      expect((await post(baseUrl, REACT)).errors?.length).toBeGreaterThan(0);
+      expect(core.setLoungeReaction).not.toHaveBeenCalled();
+      mockSession("admin-1", ["admin"]);
+      expect((await post(baseUrl, REACT)).errors).toBeUndefined();
+    });
+  });
+
+  it("keeps a deleted post's chain open while replies hang off it", async () => {
+    vi.mocked(core.replyInLounge).mockClear();
+    vi.mocked(core.getTimetableById).mockResolvedValue(
+      timetableFixture({ settings }),
+    );
+    vi.mocked(core.getLoungeComment).mockResolvedValue({
+      ...base,
+      deletedAt: new Date(),
+    });
+    vi.mocked(core.replyInLounge).mockResolvedValue({
+      ...base,
+      id: "44444444-4444-4444-4444-444444444444",
+      parentId: base.id,
+      rootId: base.id,
+    });
+    await withTestServer(async (baseUrl) => {
+      mockSession("host-2", ["host"]);
+      expect((await post(baseUrl, REPLY)).errors).toBeUndefined();
+      expect(core.replyInLounge).toHaveBeenCalled();
     });
   });
 });

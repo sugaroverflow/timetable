@@ -7,23 +7,8 @@ import { ComposerRow } from "@/components/ComposerRow";
 import { GrowingTextarea } from "@/components/GrowingTextarea";
 import { ForumMentionTextarea } from "@/components/MentionTextarea";
 import { draftKey, hasDraft, useDraft } from "@/lib/commentDrafts";
+import { nounTitle, useCommentThread } from "@/lib/commentThreadAdapter";
 import { useGqlAction } from "@/lib/useGqlAction";
-
-const REPLY = `mutation Reply($id: String!, $body: String!) {
-  replyToComment(commentId: $id, body: $body) { id }
-}`;
-
-const HIDE = `mutation Hide($id: String!, $hidden: Boolean!) {
-  hideComment(commentId: $id, hidden: $hidden) { id }
-}`;
-
-const DELETE = `mutation Delete($id: String!) {
-  deleteComment(commentId: $id)
-}`;
-
-const PIN = `mutation Pin($id: String!, $pinned: Boolean!) {
-  pinComment(commentId: $id, pinned: $pinned) { id }
-}`;
 
 function ReplyTextarea({
   body,
@@ -83,6 +68,13 @@ export function CommentActions({
   // ?reply= deep links focus a chain-tail composer (dialogue-first
   // threading, 2026-08-13) — this composer only opens from its button.
   const { run, busy } = useGqlAction();
+  // Topic comments by default; the Lounge swaps in its own mutations.
+  const thread = useCommentThread();
+  const Noun = nounTitle(thread);
+  const after = {
+    refresh: thread.routerRefresh,
+    onSuccess: () => thread.onChanged?.(),
+  };
   // The box only exists while it is open, so an unsent draft has to be
   // able to reopen it — otherwise the text survives the tab switch but
   // stays out of reach (comment-draft-store, 2026-08-21).
@@ -102,14 +94,16 @@ export function CommentActions({
     const text = body.trim();
     if (!text) return;
     void run(
-      REPLY,
+      thread.reply,
       { id: commentId, body: text },
       {
         success: "Reply posted",
         errorFallback: "Could not reply",
+        refresh: thread.routerRefresh,
         onSuccess: () => {
           clearBody();
           setOpen(false);
+          thread.onChanged?.();
         },
       },
     );
@@ -117,34 +111,39 @@ export function CommentActions({
 
   function toggleHidden() {
     void run(
-      HIDE,
+      thread.hide,
       { id: commentId, hidden: !hidden },
       {
-        success: hidden ? "Comment unhidden" : "Comment hidden",
-        errorFallback: "Could not update comment",
+        success: hidden ? `${Noun} unhidden` : `${Noun} hidden`,
+        errorFallback: `Could not update ${thread.noun}`,
+        ...after,
       },
     );
   }
 
   function togglePinned() {
     void run(
-      PIN,
+      thread.pin,
       { id: commentId, pinned: !pinned },
       {
-        success: pinned ? "Comment unpinned" : "Comment pinned",
-        errorFallback: "Could not update comment",
+        success: pinned ? `${Noun} unpinned` : `${Noun} pinned`,
+        errorFallback: `Could not update ${thread.noun}`,
+        ...after,
       },
     );
   }
 
   function remove() {
-    if (!confirm("Delete this comment? This can't be undone.")) return;
+    if (!confirm(`Delete this ${thread.noun}? This can't be undone.`)) {
+      return;
+    }
     void run(
-      DELETE,
+      thread.remove,
       { id: commentId },
       {
-        success: "Comment deleted",
-        errorFallback: "Could not delete comment",
+        success: `${Noun} deleted`,
+        errorFallback: `Could not delete ${thread.noun}`,
+        ...after,
       },
     );
   }

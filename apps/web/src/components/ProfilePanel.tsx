@@ -9,6 +9,7 @@ export function ProfilePanel({
   email,
   slug,
   profile,
+  privacy,
 }: {
   email: string | null;
   /** Forum context; null on the standalone account page. */
@@ -17,8 +18,13 @@ export function ProfilePanel({
   profile: {
     name: string | null;
     bio: string | null;
+    contactDetails: string | null;
     image: string | null;
+    roles: string[];
   } | null;
+  /** The forum's privacy — the profile's heading and audience line say
+   * who can actually see it there. Absent on the standalone page. */
+  privacy?: string;
 }) {
   return (
     <div className="stack">
@@ -31,7 +37,10 @@ export function ProfilePanel({
           slug={slug}
           name={profile.name}
           bio={profile.bio}
+          contactDetails={profile.contactDetails}
           image={profile.image}
+          privacy={privacy ?? "private"}
+          roles={profile.roles}
         />
       ) : (
         <div className="card">

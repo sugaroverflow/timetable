@@ -8,6 +8,8 @@ import {
   comments,
   db,
   heartEvents,
+  loungeComments,
+  loungeReactions,
   slotComments,
   slotSessions,
   timeslots,
@@ -29,9 +31,9 @@ import { coerceDate } from "./dates";
  * ledger (adds AND removes — the ledger, not the `hearts` table, whose
  * `createdAt` a cutoff revival bumps without anyone acting), comments and
  * slot-chat messages in any thread (posted or edited), availability,
- * pencils they created. Reading: Topic Queue showings, comment threads
- * read (which a digest click also stamps), All Topics and notifications
- * visits.
+ * pencils they created, {host} Lounge posts and reacts. Reading: Topic Queue showings, comment threads
+ * read (which a digest click also stamps), All Topics, notifications
+ * and Lounge visits.
  *
  * Deliberately NOT windowed by the hearts cutoff: a date speaks for
  * itself, and a member last seen before term start should say so, not
@@ -84,6 +86,26 @@ export async function loadLastActivitySignals(
       .groupBy(slotComments.authorId),
     db
       .select({
+        userId: loungeComments.authorId,
+        at: latestOf(loungeComments.editedAt, loungeComments.createdAt),
+      })
+      .from(loungeComments)
+      .where(eq(loungeComments.timetableId, timetableId))
+      .groupBy(loungeComments.authorId),
+    db
+      .select({
+        userId: loungeReactions.userId,
+        at: sql<Date | null>`max(${loungeReactions.createdAt})`,
+      })
+      .from(loungeReactions)
+      .innerJoin(
+        loungeComments,
+        eq(loungeComments.id, loungeReactions.commentId),
+      )
+      .where(eq(loungeComments.timetableId, timetableId))
+      .groupBy(loungeReactions.userId),
+    db
+      .select({
         userId: availability.userId,
         at: sql<Date | null>`max(${availability.updatedAt})`,
       })
@@ -130,7 +152,7 @@ export async function loadLastActivitySignals(
       .select({
         userId: timetableMemberships.userId,
         // greatest() skips nulls in Postgres.
-        at: sql<Date | null>`greatest(${timetableMemberships.lastSeenFeedAt}, ${timetableMemberships.lastSeenNotificationsAt})`,
+        at: sql<Date | null>`greatest(${timetableMemberships.lastSeenFeedAt}, ${timetableMemberships.lastSeenNotificationsAt}, ${timetableMemberships.loungeSeenAt})`,
       })
       .from(timetableMemberships)
       .where(eq(timetableMemberships.timetableId, timetableId)),

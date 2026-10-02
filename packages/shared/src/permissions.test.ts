@@ -16,10 +16,12 @@ import {
   canReadTimetable,
   canSeeComments,
   canSeeHostHeartTallies,
+  canSeeContactDetails,
   canSeePersonProfile,
   canTouchSlotSession,
   canUseQueue,
   isCalendarEnabled,
+  isProfilePublic,
   ownsTopicAsHost,
   type Viewer,
 } from "./permissions";
@@ -54,6 +56,37 @@ describe("canSeePersonProfile", () => {
     expect(
       canSeePersonProfile("hosts_only", SIGNED_IN_GUEST, ["elector"]),
     ).toBe(false);
+  });
+});
+
+describe("canSeeContactDetails", () => {
+  it("members see contact details; the public never does", () => {
+    expect(canSeeContactDetails(MEMBER)).toBe(true);
+    expect(canSeeContactDetails({ userId: "h", roles: ["host"] })).toBe(true);
+    expect(canSeeContactDetails(ANONYMOUS)).toBe(false);
+    expect(canSeeContactDetails(SIGNED_IN_GUEST)).toBe(false);
+  });
+
+  it("a deactivated member (no effective roles) loses sight", () => {
+    expect(canSeeContactDetails({ userId: "u1", roles: [] })).toBe(false);
+  });
+});
+
+describe("isProfilePublic", () => {
+  it("is public on public and no_comments forums", () => {
+    expect(isProfilePublic("public", ["elector"])).toBe(true);
+    expect(isProfilePublic("no_comments", ["elector"])).toBe(true);
+  });
+
+  it("hosts_only: hosts and admins are public, electors are not", () => {
+    expect(isProfilePublic("hosts_only", ["host"])).toBe(true);
+    expect(isProfilePublic("hosts_only", ["admin"])).toBe(true);
+    expect(isProfilePublic("hosts_only", ["elector"])).toBe(false);
+  });
+
+  it("is never public on private or deactivated forums", () => {
+    expect(isProfilePublic("private", ["host"])).toBe(false);
+    expect(isProfilePublic("deactivated", ["admin"])).toBe(false);
   });
 });
 

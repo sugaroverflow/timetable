@@ -77,6 +77,27 @@ export function canSeePersonProfile(
   return true;
 }
 
+/** Contact Details (2026-09-30): forum members only, whatever the privacy
+ * level — the whole point is the part of a profile the public never sees.
+ * A deactivated member resolves to no roles, so they lose sight too. */
+export function canSeeContactDetails(viewer: Viewer): boolean {
+  if (viewer.sysadmin) return true;
+  return isMember(viewer.roles);
+}
+
+/** Whether this person's profile is open to the internet (2026-09-30) —
+ * decides the editor's who-reads-your-About line and the readers'
+ * "Members only" note on Contact Details. */
+export function isProfilePublic(
+  privacy: Privacy,
+  personRoles: readonly Role[],
+): boolean {
+  return (
+    canReadTimetable(privacy, ANONYMOUS) &&
+    canSeePersonProfile(privacy, ANONYMOUS, personRoles)
+  );
+}
+
 /** Only logged-in electors can heart topics. */
 export function canHeart(viewer: Viewer): boolean {
   return isAuthenticated(viewer) && isElector(viewer.roles);
@@ -121,6 +142,16 @@ export function canComment(viewer: Viewer): boolean {
 /** Host-only comment threads and weighted-heart breakdowns. */
 export function canSeeHostOnly(viewer: Viewer): boolean {
   return isHost(viewer.roles) || isAdmin(viewer.roles);
+}
+
+/** The {host} Lounge (docs/host-lounge-plan.md, 2026-09-30): owner, admins
+ * and hosts. Electors never; deactivated members resolve to no roles, so
+ * they fall out for free. Whether the forum has the Lounge switched on is
+ * a separate check (isLoungeEnabled). */
+export function canUseLounge(viewer: Viewer): boolean {
+  return (
+    isAuthenticated(viewer) && (isHost(viewer.roles) || isAdmin(viewer.roles))
+  );
 }
 
 /** Per-slot discussion threads on the calendar (2026-08-14): open to every

@@ -1,6 +1,7 @@
 import type {
   DigestActivity,
   DigestComment,
+  DigestLoungeCard,
   DigestPerson,
   DigestSessionLine,
   DigestSlotRelease,
@@ -747,6 +748,74 @@ function renderNewMembersCard(
   );
 }
 
+/** The {host} Lounge card (2026-09-30): ONE card, rendered after every
+ * topic card. Each conversation opens with its opening post (excerpted —
+ * it's Markdown) and then the posts that are news, threaded under the
+ * posts they answer; a Reply link on each new post lands on its chain-tail
+ * composer, like a topic thread's. Ends with a link to the whole room. */
+function renderLoungeCard(
+  card: DigestLoungeCard,
+  hostLabel: string,
+  accent: string,
+): string {
+  if (card.conversations.length === 0) return "";
+  const title = `${hostLabel} Lounge`;
+  const blocks = card.conversations.map((conv) => {
+    const nodes = new Map<string, ThreadNode>();
+    for (const post of conv.posts) {
+      const isRoot = post.comment.parentId === null;
+      nodes.set(post.comment.id, {
+        comment: isRoot
+          ? { ...post.comment, body: loungeExcerpt(post.comment.body) }
+          : post.comment,
+        isNew: post.isNew,
+      });
+    }
+    const children = new Map<string, string[]>();
+    const roots: string[] = [];
+    for (const [id, { comment }] of nodes) {
+      const parent =
+        comment.parentId && nodes.has(comment.parentId)
+          ? comment.parentId
+          : // A reply whose parent isn't shown still belongs under the
+            // opening post, never beside it.
+            comment.parentId
+            ? conv.rootId
+            : null;
+      if (parent && parent !== id) {
+        children.set(parent, [...(children.get(parent) ?? []), id]);
+      } else roots.push(id);
+    }
+    const lines: string[] = [];
+    const aim = `c=${encodeURIComponent(conv.rootId)}`;
+    const walk = (id: string, depth: number): void => {
+      const node = nodes.get(id);
+      if (!node) return;
+      lines.push(threadLine(node, depth, card.path, accent, aim));
+      for (const child of children.get(id) ?? []) walk(child, depth + 1);
+    };
+    for (const root of roots) walk(root, 0);
+    return lines.join("");
+  });
+  const open = `<div style="margin-top:10px;"><a href="${esc(`${linkBase}${card.path}`)}" style="color:${accent};font-weight:600;text-decoration:none;">Open the ${esc(title)} →</a></div>`;
+  return (
+    `<div class="em-card" style="background:${E.card};border:1px solid ${E.line};border-radius:12px;padding:16px 18px;margin:0 0 12px;">` +
+    `<div style="font-size:17px;font-weight:700;line-height:1.3;">${esc(title)}</div>` +
+    `<div style="margin-top:8px;">${blocks.join(divider)}</div>` +
+    open +
+    `</div>`
+  );
+}
+
+/** A Lounge opening post as one short line of plain text. */
+function loungeExcerpt(markdown: string): string {
+  const text = stripMarkdown(markdown).replace(/\n+/g, " ");
+  if (text.length <= 200) return text;
+  const cut = text.slice(0, 200);
+  const space = cut.lastIndexOf(" ");
+  return `${space > 140 ? cut.slice(0, space) : cut}…`;
+}
+
 /** Digest v3 (2026-07-30): per-forum, forum-branded — one card per topic,
  * ordered your-content first. The wordmark is "{Forum} Topics", the subject
  * "{Forum} Topics Digest", links wear the forum's accent, the footer points
@@ -778,6 +847,11 @@ export function renderDigest(digest: ForumDigest): {
         digest.adminLabel,
       ),
     ),
+    // Always last, and never in the subject line (digestSummary reads
+    // topic cards, asks, dates and members only).
+    digest.lounge
+      ? renderLoungeCard(digest.lounge, digest.hostLabel, accent)
+      : "",
   ]
     .filter(Boolean)
     .join("\n");

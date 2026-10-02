@@ -1,11 +1,17 @@
 import { Pencil } from "lucide-react";
 import Link from "next/link";
 
-import { isAdmin, primaryRole, type Role } from "@timetable/shared";
+import {
+  isAdmin,
+  primaryRole,
+  type Privacy,
+  type Role,
+} from "@timetable/shared";
 
 import { AddPersonForm } from "@/components/AddPersonForm";
 import { Avatar } from "@/components/Avatar";
 import { CollapsibleTopicBody } from "@/components/CollapsibleTopicBody";
+import { ContactDetails } from "@/components/ContactDetails";
 import { EmptyState } from "@/components/EmptyState";
 import { InviteSendButton } from "@/components/InviteSendButton";
 import { PersonAdminPanel } from "@/components/PersonAdminPanel";
@@ -30,6 +36,8 @@ type Person = {
   slug: string | null;
   roles: string[];
   bioHtml: string | null;
+  /** Members-only (2026-09-30): null for the public, and when unset. */
+  contactDetailsHtml: string | null;
   /** Set while deactivated (member-deactivation, 2026-09-10) — only admin
    * viewers ever receive such a person; they're listed apart below. */
   deactivatedAt: string | null;
@@ -37,17 +45,22 @@ type Person = {
 };
 
 type Data = {
-  timetable: { id: string; settings: string; viewerRoles: string[] } | null;
+  timetable: {
+    id: string;
+    settings: string;
+    viewerRoles: string[];
+    privacy: Privacy;
+  } | null;
   me: { id: string } | null;
   timetablePeople: Person[];
 };
 
 const QUERY = `
   query People($s: String!) {
-    timetable: forum(idOrSlug: $s) { id settings viewerRoles }
+    timetable: forum(idOrSlug: $s) { id settings viewerRoles privacy }
     me { id }
     timetablePeople: forumPeople(idOrSlug: $s) {
-      userId name image slug roles bioHtml deactivatedAt
+      userId name image slug roles bioHtml contactDetailsHtml deactivatedAt
       publishedTopics { id title slug }
     }
   }
@@ -201,6 +214,7 @@ function PersonCard({
   meId,
   canEdit,
   roleLabels,
+  privacy,
 }: {
   slug: string;
   person: Person;
@@ -208,6 +222,8 @@ function PersonCard({
   meId: string | undefined;
   canEdit: boolean;
   roleLabels?: RoleLabels;
+  /** Decides the Contact Details "Members only" note. */
+  privacy: Privacy | undefined;
 }) {
   const canPreview = canEdit && person.userId !== meId;
   const canManage = canEdit && member != null;
@@ -250,6 +266,11 @@ function PersonCard({
           <RolePills roles={person.roles} labels={roleLabels} />
         </div>
       </div>
+      <ContactDetails
+        html={person.contactDetailsHtml}
+        privacy={privacy}
+        roles={person.roles}
+      />
       {person.bioHtml ? <CollapsibleTopicBody html={person.bioHtml} /> : null}
       <PersonTopics slug={slug} person={person} />
       <PersonCardActions
@@ -360,6 +381,7 @@ export default async function PeoplePage({
                     meId={data.me?.id}
                     canEdit={canEdit}
                     roleLabels={settings.roleLabels}
+                    privacy={data.timetable?.privacy}
                   />
                 ))}
               </ul>
@@ -384,6 +406,7 @@ export default async function PeoplePage({
                 meId={data.me?.id}
                 canEdit={canEdit}
                 roleLabels={settings.roleLabels}
+                privacy={data.timetable?.privacy}
               />
             ))}
           </ul>
