@@ -9,6 +9,8 @@ import {
 
 import {
   buildDataExport,
+  managePush,
+  deliverPush,
   computeUserForumDigests,
   createLocalUser,
   createTimetable,
@@ -89,6 +91,8 @@ import {
   UploadValidationError,
   type UploadPurpose,
 } from "../uploads/storage";
+
+import { pushConfig, sendPush, validPushEndpoint } from "../push-transport";
 
 export const restRouter: Router = Router();
 
@@ -1079,6 +1083,53 @@ for (const suffix of ["feed.atom", "calendar.ics"]) {
     );
   });
 }
+
+// Browser integration handshake; endpoint travels only in the body, never a URL.
+restRouter.post(
+  "/forums/:slug/push-subscriptions",
+  h(async (req, res) => {
+    const ctx = await contextFromRequest(req);
+    const user = requireUserCtx(ctx, res);
+    if (!user) return;
+    const { endpoint, action } = req.body ?? {};
+    if (
+      !validPushEndpoint(endpoint) ||
+      !["enable", "disable"].includes(action)
+    ) {
+      res.status(400).json({ error: "Invalid push subscription" });
+      return;
+    }
+    if (action === "enable" && !pushConfig()) {
+      res.status(503).json({ error: "Push is not configured" });
+      return;
+    }
+    const result = await managePush(
+      user.id,
+      String(req.params.slug),
+      endpoint,
+      action,
+    );
+    res.setHeader("Cache-Control", "no-store");
+    res.status(result.status).json({ enabled: result.enabled });
+  }),
+);
+
+restRouter.post(
+  "/jobs/push",
+  h(async (req, res) => {
+    const secret = env.cronSecret;
+    if (!secret || !pushConfig()) {
+      res.status(503).json({ error: "Push is not configured" });
+      return;
+    }
+    const presented = req.headers["x-cron-secret"];
+    if (typeof presented !== "string" || !secretsEqual(presented, secret)) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+    res.json(await deliverPush(sendPush));
+  }),
+);
 
 restRouter.use(
   (err: unknown, req: Request, res: Response, _next: NextFunction) => {

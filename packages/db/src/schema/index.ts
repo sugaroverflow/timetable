@@ -63,6 +63,7 @@ export type NewAvailabilityPattern = typeof availabilityPatterns.$inferInsert;
 
 export type SlotComment = typeof slotComments.$inferSelect;
 export type NewSlotComment = typeof slotComments.$inferInsert;
+export * from "./push";
 
 export type LoungeComment = typeof loungeComments.$inferSelect;
 export type NewLoungeComment = typeof loungeComments.$inferInsert;

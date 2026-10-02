@@ -52,3 +52,16 @@ export function buildWorkbenchCalendar(
     officeHoursLabel: officeHoursLabel(settings),
   };
 }
+
+/** Non-admins see the Calendar link only once slots exist (QA 2026-08-03)
+ * — admins need it regardless, to set the schedule up. Shared by the
+ * sidebar and the How it works page, which must never point at a page the
+ * sidebar hides. */
+export function calendarNavVisible(
+  settings: TimetableSettings,
+  roles: readonly Role[],
+  hasSlots: boolean,
+): boolean {
+  if (!isCalendarEnabled(settings)) return false;
+  return isAdmin(roles) || hasSlots;
+}

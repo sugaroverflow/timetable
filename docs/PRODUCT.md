@@ -341,6 +341,17 @@ light/dark/auto toggle (the forum's theme defines both palettes). New users
 with no forum land on the create screen; returning users land on the feed of
 the forum they last engaged with.
 
+Every forum has a **How it works** page, the last sidebar link, for
+anyone who can read the forum. It is written for whoever is reading it:
+a one-paragraph summary of what the forum is for, then a few numbered
+steps for each role the reader holds (a visitor sees how membership
+works instead), then where notifications and profiles live. It uses the
+forum's own role names, mentions only features the forum has switched on
+(calendar, host-only thread, hosts publishing directly, the calendar
+policy), and each step links to the page it describes. It is a map, not
+a manual: no tour, no dismissible popups, nothing to keep in sync beyond
+`apps/web/src/lib/forumGuide.ts`.
+
 Profile images, topic covers, icons, and forum covers can be pasted as image
 URLs or uploaded through the app to object storage.
 
@@ -370,6 +381,12 @@ In-app: each forum has a Notifications pane listing comments on the member's
 topics, replies to their comments, @mentions of them, and session changes on
 topics they ❤️'d, each linking through; an unread badge in the sidebar
 clears when the pane is opened.
+
+Optional device push is configured separately on each forum’s Notifications page.
+Alerts contain generic text only and open a signed-in forum notification chooser.
+The initial slice covers public-thread comments and session events on published
+topics, requires operator VAPID/scheduler setup, and supports installed iOS/iPadOS
+Home Screen apps from version 16.4. See [Web Push](WEB_PUSH.md).
 
 For email, digests are configured **per forum** on the Notifications page:
 on/off, daily or weekly cadence, and sixteen per-kind switches (comments on
@@ -423,8 +440,8 @@ and the git log — this document describes the present.
 - Custom-domain hostname routing is wired in the web proxy, but per-forum
   DNS/Clerk setup is not productised — the settings field is labelled
   "coming soon".
-- Email digest is the only email channel; Slack, push, and others are not
-  started. No immediate email on topic reassignment yet (#57).
+- Email digest is the only email channel; Slack and other channels are not
+  started. Push has a minimal opt-in slice, with no durable delivery queue. No immediate email on topic reassignment yet (#57).
 - The digest and invite email templates are provisional — the product's
   emails have not been designed yet.
 - The in-app notifications pane has no per-item read state or mark-all-read.

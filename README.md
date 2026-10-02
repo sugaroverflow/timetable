@@ -89,6 +89,7 @@ to map a sample person to a real Clerk account, are in
   current status and gaps.
 - [Architecture](docs/ARCHITECTURE.md): apps, packages, API surfaces, auth
   flow, data model, and runtime boundaries.
+- [Web Push](docs/WEB_PUSH.md): opt-in device notifications, VAPID setup, scheduler, and browser limitations.
 - [Deployment](docs/DEPLOYMENT.md): local/dev/prod environments, Clerk,
   DigitalOcean, GitHub Actions, secrets, and cron.
 - [docs/execution-journal](docs/execution-journal/): one entry per notable

@@ -12,3 +12,4 @@ export * from "./slotPlan";
 export * from "./slug";
 export * from "./validation";
 export * from "./vanityAddress";
+export * from "./push";

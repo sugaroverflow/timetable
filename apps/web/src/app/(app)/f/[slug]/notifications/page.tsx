@@ -1,10 +1,13 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
+import { parseViewAs, VIEW_AS_COOKIE } from "@/lib/userPreview";
 
 import { isAdmin, type Role } from "@timetable/shared";
 
 import { ActivityRoleFilter } from "@/components/ActivityRoleFilter";
 import { ActorFilter } from "@/components/ActorFilter";
 import { Avatar } from "@/components/Avatar";
+import { PushSettings } from "@/components/PushSettings";
 import { DigestSettingsForm } from "@/components/DigestSettingsForm";
 import { EmptyState } from "@/components/EmptyState";
 import { MarkNotificationsSeen } from "@/components/MarkNotificationsSeen";
@@ -240,6 +243,14 @@ function DigestCard({ slug, data }: { slug: string; data: Data }) {
   );
 }
 
+async function DevicePushSettings({ slug }: { slug: string }) {
+  const preview = parseViewAs(
+    (await cookies()).get(VIEW_AS_COOKIE)?.value,
+    slug,
+  );
+  return preview ? null : <PushSettings slug={slug} />;
+}
+
 /** Notifications pane (QA #59; sectioned 2026-07-29): a "Settings" section
  * holding the email-digest card, then "Notifications" with user and role
  * filters (same controls as the activity log). Opening the page clears the
@@ -292,6 +303,7 @@ export default async function NotificationsPage({
       {/* Email digest preferences live with the notifications they gate
           (QA 2026-07-28 — moved off the profile page). */}
       <DigestCard slug={slug} data={data} />
+      <DevicePushSettings slug={slug} />
 
       <h3 className="section-title">Notifications</h3>
       {data.notifications.length > 0 ? (

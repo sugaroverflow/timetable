@@ -142,6 +142,11 @@ Codex/agent workflows are separate from the app runtime.
   per-row topic folds, admin-only host activity table
 - per-forum API page (`/f/[slug]/api`): the JSON export download, personal
   API token management, GraphQL endpoint docs, and the Atom/ICS feed URLs
+- How it works page (`/f/[slug]/guide`, last sidebar link, every viewer):
+  a short role-aware guide built by `buildForumGuide` in
+  `apps/web/src/lib/forumGuide.ts` from the viewer's roles, the forum's
+  role labels, and its feature settings — each step links to the page it
+  describes (forum-guide, 2026-09-30)
 - `/admin` sysadmin dashboard (SYSADMIN_EMAILS-gated forum overview/delete)
 - `/timetables` resolver → last-engaged timetable's feed, or the create screen
 - social preview (Open Graph) cards for the app, forums, topics, and people
@@ -499,3 +504,21 @@ kept (empty) so Next.js serves any future static files from the site root.
   database-side relief and search cost grows linearly with forum size;
   fine at current sizes, revisit for very large timetables (audit
   2026-08-17).
+
+## Web Push (2026-09-30)
+
+The web manifest and root `public/sw.js` provide install metadata and data-less
+push/click handling, with no offline cache. Per-forum `PushSettings` uses GraphQL
+`pushPublicKey` / `myPushEnabled` reads and the session-only REST
+`POST /api/forums/:slug/push-subscriptions` for enable/disable. Endpoints remain
+in request bodies, not URLs. `push_subscriptions` references membership IDs and
+cascades on deletion; there is no implicit opt-in from email preferences.
+
+`POST /api/jobs/push` uses the existing cron-secret boundary. Core rechecks active
+membership, readable forum and published topics before asking the API's VAPID
+transport to send an empty push. It coalesces existing public-thread notification
+activity, preserving the cursor on transient failures. The worker's fixed text
+links to `/notifications`; that server-rendered chooser fetches current forum
+memberships over GraphQL. Setup, provider allowlisting and best-effort delivery
+limits are in [WEB_PUSH.md](WEB_PUSH.md). Scheduler/infrastructure are not installed
+by this change.

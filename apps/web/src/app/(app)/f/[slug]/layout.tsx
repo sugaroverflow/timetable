@@ -22,6 +22,7 @@ import {
 } from "@/components/TimetableSwitcher";
 import { UserPreviewExit } from "@/components/UserPreview";
 import { env } from "@/env";
+import { calendarNavVisible } from "@/lib/calendarPerms";
 import { emojiFavicon } from "@/lib/favicon";
 import { gqlFetch } from "@/lib/graphql";
 import { getMyTimetables } from "@/lib/myTimetables";
@@ -186,17 +187,6 @@ async function loadSwitcherAndUnread(
       unreadData.moderationQueue?.filter((t) => t.readyAt).length ?? 0,
     loungeUnread: unreadData.loungeUnread ?? false,
   };
-}
-
-/** Non-admins see the Calendar link only once slots exist (QA 2026-08-03)
- * — admins need it regardless, to set the schedule up. */
-function calendarNavVisible(
-  settings: ReturnType<typeof parseTimetableSettings>,
-  roles: Role[],
-  hasSlots: boolean,
-): boolean {
-  if (!settings.calendar?.enabled) return false;
-  return isAdmin(roles) || hasSlots;
 }
 
 /** A nav link with a count badge — hidden at zero, clamped at 999+.
@@ -374,6 +364,10 @@ function SideNav({
       {admin && <NavLink href={`${base}/log`}>Activity Log</NavLink>}
       {admin && <NavLink href={`${base}/settings`}>Forum Settings</NavLink>}
       {isMember && <NavLink href={`${base}/api`}>API</NavLink>}
+      {/* forum-guide (2026-09-30): everyone, visitors included — it's
+          written for whoever is reading. Last, so it never pushes the
+          working links down. */}
+      <NavLink href={`${base}/guide`}>How it works</NavLink>
     </nav>
   );
 }
@@ -478,6 +472,14 @@ export default async function TimetableLayout({
               rel="noopener noreferrer"
             >
               <Flag size={14} aria-hidden /> Report a bug
+            </a>
+            <a
+              className="sidebar-bug-link faint"
+              href="https://github.com/AndreasThinks/timetable"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Source code
             </a>
           </div>
         </Sidebar>

@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   // Config-based (not app/icon.tsx) so forum layouts can override the
   // favicon with the forum's own icon — file-convention icons always win
   // over nested metadata.
-  icons: { icon: emojiFavicon("📚") },
+  icons: { icon: emojiFavicon("📚"), apple: "/icon-192.png" },
 };
 
 // Clerk's prebuilt UI (sign-in/sign-up cards, the account modal) themed to

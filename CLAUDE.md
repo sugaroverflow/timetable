@@ -525,6 +525,18 @@ Stable names for feature pieces, so instructions can reference them precisely.
   still runs first, so a deep restore briefly shows the top and then
   jumps; fixing that would mean owning `scrollRestoration` app-wide.
 
+- **forum-guide** — the **How it works** page (`/f/[slug]/guide`, last
+  sidebar link, visitors included; 2026-09-30): `buildForumGuide` in
+  `apps/web/src/lib/forumGuide.ts` returns a summary plus numbered steps
+  per role the viewer holds, in the forum's role labels, gated on the
+  same settings the product uses (calendar via the shared
+  `calendarNavVisible` in `lib/calendarPerms.ts`, so it never links to a
+  page the sidebar hides). Each step names the real control and links to
+  its page. **When you rename a control, add a feature switch, or move a
+  gesture, update the guide's copy** — `forumGuide.test.ts` pins the
+  gating, and bans "heart"/"feed" in its copy. A ❤️ implying "I'd
+  attend" stays unstated here too.
+
 ## Gotchas (learned the hard way)
 
 - **In-page jump links must be `next/link`, never a bare `<a href="#…">`**

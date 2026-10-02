@@ -2,6 +2,7 @@ import { GraphQLError } from "graphql";
 
 import {
   getCanonicalTimetableSlug,
+  managePush,
   getFeedLastSeen,
   getLastVisitedTimetableSlug,
   getReadableTimetable,
@@ -26,6 +27,7 @@ import {
   type Privacy,
 } from "@timetable/shared";
 
+import { pushConfig, validPushEndpoint } from "../push-transport";
 import { builder } from "./builder";
 import {
   assertOptionalHttpUrl,
@@ -106,6 +108,33 @@ const MembershipType = builder
 // ---------------------------------------------------------------------------
 
 builder.queryFields((t) => ({
+  pushPublicKey: t.string({
+    nullable: true,
+    resolve: (_p, _a, ctx) =>
+      ctx.user && !ctx.impersonation ? (pushConfig()?.publicKey ?? null) : null,
+  }),
+  myPushEnabled: t.boolean({
+    args: {
+      idOrSlug: t.arg.string({ required: true }),
+      endpoint: t.arg.string({ required: true }),
+    },
+    resolve: async (_p, args, ctx) => {
+      if (
+        !ctx.user ||
+        ctx.impersonation ||
+        ctx.apiToken ||
+        !validPushEndpoint(args.endpoint)
+      )
+        return false;
+      const result = await managePush(
+        ctx.user.id,
+        args.idOrSlug,
+        args.endpoint,
+        "status",
+      );
+      return result.enabled;
+    },
+  }),
   myForums: t.field({
     type: [MembershipType],
     resolve: async (_p, _a, ctx) => {
