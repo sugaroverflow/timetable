@@ -3118,6 +3118,21 @@ a.queue-btn-back:hover {
   margin: 0;
   line-height: 1.55;
 }
+/* The opening post's Markdown sits inside .c-text, whose pre-wrap is for
+   plain-text replies. On server HTML it turned the newline markdown-it
+   writes after every block ("<p>…</p>\n") into a blank line — under the
+   last paragraph, and between paragraphs (Ed, QA 2026-10-02: the gap
+   under the top post). Markdown spaces itself, so collapse whitespace
+   back to normal and let the last block's margin go, leaving the action
+   row's own 6px. Only when the body is alone: a long body's Show
+   more/less pill pulls itself up into that margin (margin-top: -8px), so
+   there it stays, folded or expanded. */
+.lounge-conversation .lounge-opening {
+  white-space: normal;
+}
+.lounge-conversation .lounge-opening .topic-body:only-child > :last-child {
+  margin-bottom: 0;
+}
 
 /* Replies are quieter: 24px avatar, 13px name, 14px body. */
 .lounge-conversation .lq-reply-item > .avatar,
@@ -3168,6 +3183,14 @@ a.queue-btn-back:hover {
 }
 .lounge-conversation .lq-actions .lounge-reactions {
   margin: 0;
+}
+/* With no chips the row opens on the ghost add-react button, whose icon
+   sits inside the button's 6px padding — so the row looked indented next
+   to a chip, which has a visible edge at the text column. Hang that
+   padding into the gutter so the icon lines up with the text (Ed, QA
+   2026-10-02). */
+.lounge-conversation .lq-actions > .lq-tools:first-child {
+  margin-left: -6px;
 }
 .lounge-conversation .lq-tools {
   display: inline-flex;
@@ -3239,6 +3262,7 @@ a.queue-btn-back:hover {
     position: absolute;
     top: -14px;
     right: 8px;
+    margin-left: 0;
     gap: 2px;
     padding: 2px;
     background: var(--card);
