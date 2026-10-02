@@ -1,7 +1,9 @@
 "use client";
 
-import { Send } from "lucide-react";
-import { useState } from "react";
+import { Menu } from "@base-ui/react/menu";
+import { MoreHorizontal, Reply, Send } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { ComposerRow } from "@/components/ComposerRow";
 import { GrowingTextarea } from "@/components/GrowingTextarea";
@@ -18,6 +20,9 @@ export function CommentActions({
   onEdit,
   canPin = false,
   pinned = false,
+  chips,
+  react,
+  onReply,
 }: {
   commentId: string;
   canReply: boolean;
@@ -30,6 +35,14 @@ export function CommentActions({
    * shows Pin/Unpin (#258). */
   canPin?: boolean;
   pinned?: boolean;
+  /** Quiet variant only (the Lounge): the reaction chips, which lead the
+   * action row and stay in view on replies without hover. */
+  chips?: ReactNode;
+  /** Quiet variant only: the add-reaction button, first in the toolbar. */
+  react?: ReactNode;
+  /** Replaces opening the inline box — an opening post's Reply focuses
+   * the conversation's foot composer instead. */
+  onReply?: () => void;
 }) {
   // ?reply= deep links focus a chain-tail composer (dialogue-first
   // threading, 2026-08-13) — this composer only opens from its button.
@@ -47,6 +60,16 @@ export function CommentActions({
   const key = draftKey.reply(commentId);
   const [open, setOpen] = useState(() => hasDraft(key));
   const [body, setBody, clearBody] = useDraft(key);
+  const replyBox = useRef<HTMLTextAreaElement>(null);
+  // Quiet threads have no chain tails, so a Reply box opened on purpose
+  // (button or deep link) takes the focus a tail would have had.
+  const [focusOnOpen, setFocusOnOpen] = useState(false);
+  useEffect(() => {
+    if (!open || !focusOnOpen) return;
+    replyBox.current?.focus();
+    replyBox.current?.scrollIntoView({ block: "center" });
+    setFocusOnOpen(false);
+  }, [open, focusOnOpen]);
 
   /** Collapsing the box is a discard: it drops the draft, so "a draft
    * exists" always means live unsent text. */
@@ -114,6 +137,113 @@ export function CommentActions({
     );
   }
 
+  const replyForm = open ? (
+    <ComposerRow className="inline-form-nested">
+      <form onSubmit={reply} className="inline-form">
+        <GrowingTextarea
+          ref={replyBox}
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          placeholder="Write a reply…"
+          aria-label="Reply"
+        />
+        <button
+          className="btn btn-primary btn-send"
+          type="submit"
+          disabled={busy}
+          aria-label="Post reply"
+          title="Reply"
+        >
+          <Send size={16} aria-hidden />
+        </button>
+      </form>
+    </ComposerRow>
+  ) : null;
+
+  if (thread.variant === "quiet") {
+    // ONE row (Ed's quiet thread, 2026-10-02): reacts, Reply, and the
+    // rest behind ⋯ — the same permissions as the topic row's words.
+    const items: { label: string; act: () => void }[] = [];
+    if (isOwn && onEdit) items.push({ label: "Edit", act: onEdit });
+    if (isOwn) items.push({ label: "Delete", act: remove });
+    if (canModerate) {
+      items.push({ label: hidden ? "Unhide" : "Hide", act: toggleHidden });
+    }
+    if (canPin) {
+      items.push({ label: pinned ? "Unpin" : "Pin", act: togglePinned });
+    }
+    return (
+      <>
+        <div className="lq-actions">
+          {chips}
+          <span className="lq-tools">
+            {react}
+            {canReply ? (
+              <button
+                type="button"
+                className="lq-reply"
+                aria-label="Reply"
+                aria-expanded={onReply ? undefined : open}
+                onClick={
+                  onReply ??
+                  (() => {
+                    if (!open) setFocusOnOpen(true);
+                    toggleReply();
+                  })
+                }
+              >
+                <Reply size={16} aria-hidden className="lq-reply-icon" />
+                <span className="lq-reply-label">Reply</span>
+              </button>
+            ) : null}
+            {items.length > 0 ? (
+              <Menu.Root>
+                <Menu.Trigger
+                  className="lq-more"
+                  aria-label="More actions"
+                  title="More actions"
+                  disabled={busy}
+                >
+                  <MoreHorizontal size={16} aria-hidden />
+                </Menu.Trigger>
+                <Menu.Portal>
+                  <Menu.Positioner
+                    className="tt-switcher-positioner"
+                    side="bottom"
+                    align="end"
+                    sideOffset={4}
+                  >
+                    <Menu.Popup className="tt-switcher-list lq-menu">
+                      {items.map((item) => (
+                        <Menu.Item
+                          key={item.label}
+                          className="tt-menu-item"
+                          onClick={item.act}
+                        >
+                          {item.label}
+                        </Menu.Item>
+                      ))}
+                    </Menu.Popup>
+                  </Menu.Positioner>
+                </Menu.Portal>
+              </Menu.Root>
+            ) : null}
+          </span>
+        </div>
+        {replyForm}
+        {thread.footComposer && canReply && !onReply ? (
+          <ReplyDeepLink
+            commentId={commentId}
+            onHit={() => {
+              setFocusOnOpen(true);
+              setOpen(true);
+            }}
+          />
+        ) : null}
+      </>
+    );
+  }
+
   return (
     <>
       <div className="comment-actions">
@@ -143,27 +273,26 @@ export function CommentActions({
           </button>
         ) : null}
       </div>
-      {open ? (
-        <ComposerRow className="inline-form-nested">
-          <form onSubmit={reply} className="inline-form">
-            <GrowingTextarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              placeholder="Write a reply…"
-              aria-label="Reply"
-            />
-            <button
-              className="btn btn-primary btn-send"
-              type="submit"
-              disabled={busy}
-              aria-label="Post reply"
-              title="Reply"
-            >
-              <Send size={16} aria-hidden />
-            </button>
-          </form>
-        </ComposerRow>
-      ) : null}
+      {replyForm}
     </>
   );
+}
+
+/** A `?reply=<id>` deep link (digest Reply →, notifications) aimed at
+ * this message, in a thread without chain tails: open its inline box. */
+function ReplyDeepLink({
+  commentId,
+  onHit,
+}: {
+  commentId: string;
+  onHit: () => void;
+}) {
+  const hit = useSearchParams().get("reply") === commentId;
+  const fired = useRef(false);
+  useEffect(() => {
+    if (!hit || fired.current) return;
+    fired.current = true;
+    onHit();
+  }, [hit, onHit]);
+  return null;
 }

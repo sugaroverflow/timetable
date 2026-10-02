@@ -11,7 +11,11 @@ import { relativeTime } from "@/lib/relativeTime";
 import type { RoleLabels } from "@/lib/timetableSettings";
 
 import { Avatar } from "./Avatar";
-import { ChainTailComposer } from "./ChainTailComposer";
+import { primaryRole, type Role } from "@timetable/shared";
+
+import { roleLabel } from "@/lib/timetableSettings";
+
+import { ChainTailComposer, footComposerId } from "./ChainTailComposer";
 import { CommentActions } from "./CommentActions";
 import { CommentBody } from "./CommentBody";
 import { CommentEditForm } from "./CommentEditForm";
@@ -86,6 +90,61 @@ function CommentText({
   return thread.renderBody?.(comment) ?? <CommentBody body={comment.body} />;
 }
 
+/** The quiet variant's name row (the Lounge, Ed 2026-10-02): no bubble
+ * and no role pill — name, then the role and time as plain muted text
+ * ("Faculty · 9h"), the time still the permalink. */
+function QuietHeader({
+  comment,
+  slug,
+  roleLabels,
+  editing,
+  topicHref,
+}: {
+  comment: FeedComment;
+  slug?: string;
+  roleLabels?: RoleLabels;
+  editing: boolean;
+  topicHref?: string | null;
+}) {
+  const { pinTitle } = useCommentThread();
+  const role =
+    comment.authorRoles.length > 0
+      ? roleLabel(
+          roleLabels,
+          primaryRole(comment.authorRoles as readonly Role[]),
+        )
+      : null;
+  return (
+    <div className="lq-head">
+      <span className="c-name">
+        {slug ? (
+          <PersonChip slug={slug} userId={comment.authorId}>
+            {comment.authorName ?? "Someone"}
+          </PersonChip>
+        ) : (
+          (comment.authorName ?? "Someone")
+        )}
+      </span>
+      <span className="lq-meta">
+        {role ? <span className="lq-role">{role} · </span> : null}
+        <CommentTime comment={comment} topicHref={topicHref} />
+        {comment.editedAt && !editing ? (
+          <span title={new Date(comment.editedAt).toLocaleString()}>
+            {" "}
+            · edited
+          </span>
+        ) : null}
+        {comment.hidden ? <span> · hidden</span> : null}
+      </span>
+      {comment.pinnedAt ? (
+        <span className="lq-pin" title={pinTitle}>
+          📌
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 /** The name row + body for a live (non-deleted) comment; the body swaps
  * for the inline editor while editing (edit-in-place, QA 2026-07-29). */
 function CommentBubble({
@@ -104,7 +163,27 @@ function CommentBubble({
   topicHref?: string | null;
 }) {
   const visibilityPill = VISIBILITY_PILLS[comment.visibility];
-  const { pinTitle } = useCommentThread();
+  const { pinTitle, variant } = useCommentThread();
+  if (variant === "quiet") {
+    return (
+      <div className="c-bubble lq-body">
+        <QuietHeader
+          comment={comment}
+          slug={slug}
+          roleLabels={roleLabels}
+          editing={editing}
+          topicHref={topicHref}
+        />
+        <div className="c-text">
+          <CommentText
+            comment={comment}
+            editing={editing}
+            onEditDone={onEditDone}
+          />
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="c-bubble">
       <span className="c-name">
@@ -208,6 +287,37 @@ function ChainBlock({
   depth: number;
   topicHref?: string | null;
 }) {
+  const thread = useCommentThread();
+  if (thread.footComposer) {
+    return depth === 1 ? (
+      <FootBlock
+        comment={comment}
+        replies={replies}
+        canReply={canReply}
+        canModerate={canModerate}
+        viewerId={viewerId}
+        slug={slug}
+        roleLabels={roleLabels}
+        topicHref={topicHref}
+      />
+    ) : replies.length > 0 ? (
+      <div className="replies">
+        {replies.map((r) => (
+          <CommentItem
+            key={r.id}
+            comment={r}
+            canReply={canReply}
+            canModerate={canModerate}
+            viewerId={viewerId}
+            slug={slug}
+            roleLabels={roleLabels}
+            depth={depth + 1}
+            topicHref={topicHref}
+          />
+        ))}
+      </div>
+    ) : null;
+  }
   // Chain parents: every top-level comment, and any forked comment whose
   // sub-chain has started.
   const showTail =
@@ -239,6 +349,80 @@ function ChainBlock({
       ))}
       {showTail ? (
         <ChainTailComposer parentId={comment.id} focusIds={tailFocusIds} />
+      ) : null}
+    </div>
+  );
+}
+
+/** Live (non-deleted) messages under a comment, at any depth. */
+function countReplies(comment: FeedComment): number {
+  return (comment.replies ?? []).reduce(
+    (n, r) => n + (r.deleted ? 0 : 1) + countReplies(r),
+    0,
+  );
+}
+
+/** Messages with no Reply of their own (a tombstone, or past the
+ * reply-depth-guard): their ?reply= deep links focus the foot box. */
+function footFocusIds(comment: FeedComment, depth: number): string[] {
+  return (comment.replies ?? []).flatMap((r) => [
+    ...(r.deleted || depth + 1 >= COMMENT_TREE_DEPTH ? [r.id] : []),
+    ...footFocusIds(r, depth + 1),
+  ]);
+}
+
+/** A thread without chain tails (the adapter's `footComposer` — the
+ * Lounge's quiet thread, Ed 2026-10-02): the root's replies under an
+ * "n replies" head, nested as deep as they go (the ordinary reply-indent
+ * per level), and ONE foot composer answering the root — instead of a
+ * chain-tail composer ending every chain. */
+function FootBlock({
+  comment,
+  replies,
+  canReply,
+  canModerate,
+  viewerId,
+  slug,
+  roleLabels,
+  topicHref,
+}: {
+  comment: FeedComment;
+  replies: FeedComment[];
+  canReply: boolean;
+  canModerate: boolean;
+  viewerId: string | null;
+  slug?: string;
+  roleLabels?: RoleLabels;
+  topicHref?: string | null;
+}) {
+  if (replies.length === 0 && !canReply) return null;
+  const n = countReplies(comment);
+  return (
+    <div className="lq-replies">
+      {n > 0 ? (
+        <div className="lq-count">
+          {n} {n === 1 ? "reply" : "replies"}
+        </div>
+      ) : null}
+      {replies.map((r) => (
+        <CommentItem
+          key={r.id}
+          comment={r}
+          canReply={canReply}
+          canModerate={canModerate}
+          viewerId={viewerId}
+          slug={slug}
+          roleLabels={roleLabels}
+          depth={2}
+          topicHref={topicHref}
+        />
+      ))}
+      {canReply ? (
+        <ChainTailComposer
+          foot
+          parentId={comment.id}
+          focusIds={[comment.id, ...footFocusIds(comment, 1)]}
+        />
       ) : null}
     </div>
   );
@@ -283,6 +467,75 @@ function CommentItem({
   );
   const isOwn = viewerId != null && viewerId === comment.authorId;
   const thread = useCommentThread();
+
+  if (thread.variant === "quiet") {
+    // One action row instead of bubble + react row + action words (Ed's
+    // quiet thread, 2026-10-02). Reply nests under any message the
+    // reply-depth-guard allows; with a foot composer the opening post's
+    // Reply goes to it rather than opening a second box for the same post.
+    const toFoot = thread.footComposer === true && depth === 1;
+    return (
+      <div
+        id={`comment-${comment.id}`}
+        className={`comment ${depth === 1 ? "lq-root" : "lq-reply-item"}${comment.hidden ? " hidden" : ""}`}
+      >
+        <CommentAvatar comment={comment} slug={slug} />
+        <div className="comment-main">
+          <div className="lq-msg">
+            {comment.deleted ? (
+              <div className="c-bubble lq-body">
+                <span className="c-text faint" style={{ fontStyle: "italic" }}>
+                  This comment was deleted by its author.
+                </span>
+              </div>
+            ) : (
+              <CommentBubble
+                comment={comment}
+                slug={slug}
+                roleLabels={roleLabels}
+                editing={editing}
+                onEditDone={() => setEditing(false)}
+                topicHref={topicHref}
+              />
+            )}
+            {comment.deleted ? null : (
+              <CommentActions
+                commentId={comment.id}
+                canReply={
+                  canReply &&
+                  (toFoot || (depth >= 2 && depth < COMMENT_TREE_DEPTH))
+                }
+                canModerate={canModerate}
+                hidden={comment.hidden}
+                isOwn={isOwn}
+                onEdit={() => setEditing(true)}
+                canPin={canPin && depth === 1}
+                pinned={comment.pinnedAt != null}
+                chips={thread.renderFooter?.(comment, "chips")}
+                react={thread.renderFooter?.(comment, "add")}
+                onReply={
+                  toFoot
+                    ? () => document.getElementById(footComposerId(comment.id))?.focus()
+                    : undefined
+                }
+              />
+            )}
+          </div>
+          <ChainBlock
+            comment={comment}
+            replies={replies}
+            canReply={canReply}
+            canModerate={canModerate}
+            viewerId={viewerId}
+            slug={slug}
+            roleLabels={roleLabels}
+            depth={depth}
+            topicHref={topicHref}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

@@ -31,8 +31,23 @@ export type CommentThreadAdapter = {
   renderBody?: (comment: FeedComment) => ReactNode | undefined;
   /** Replaces the inline plain-text editor. */
   renderEditor?: (comment: FeedComment, onDone: () => void) => ReactNode;
-  /** Under the bubble, above the actions (the Lounge's reacts). */
-  renderFooter?: (comment: FeedComment) => ReactNode;
+  /** Under the bubble, above the actions (the Lounge's reacts). In the
+   * quiet variant, `part` splits it: "chips" sit under the text, "add"
+   * (the add-reaction button) leads the action row / hover toolbar. */
+  renderFooter?: (
+    comment: FeedComment,
+    part?: "chips" | "add",
+  ) => ReactNode;
+  /** "quiet" (the Lounge, Ed 2026-10-02): no bubbles or role pills, the
+   * role and time as muted text, ONE action row (reacts · Reply · ⋯
+   * menu) that floats as a hover toolbar on replies, and an "n replies"
+   * head over the opening post's replies. Topic threads leave it unset. */
+  variant?: "quiet";
+  /** true: no chain-tail composers anywhere in the thread. Instead ONE
+   * foot composer ("Reply…") ends each root's replies and answers the
+   * root, Reply on any message opens its inline box (so replies nest),
+   * and `?reply=` deep links open that box or focus the foot. */
+  footComposer?: boolean;
 };
 
 export const TOPIC_COMMENTS: CommentThreadAdapter = {

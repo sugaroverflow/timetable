@@ -20,15 +20,22 @@ import { useGqlAction } from "@/lib/useGqlAction";
  * Digest emails deep-link replies as `?reply=<comment id>`; `focusIds`
  * holds the ids this tail answers for (the chain parent + its childless
  * messages), so those links land here, focused, continuing the chain.
+ *
+ * `foot` (the Lounge's quiet thread, 2026-10-02): the same composer as
+ * the ONE "Reply…" box at the foot of a conversation, answering the
+ * opening post — a pill-shaped input; same draft key, same deep links.
  */
 export function ChainTailComposer({
   parentId,
   focusIds,
+  foot = false,
 }: {
   /** The comment new messages attach to (the chain's parent). */
   parentId: string;
   /** Comment ids whose ?reply= deep links should focus this composer. */
   focusIds: string[];
+  /** Render as the conversation's foot "Reply…" box (the Lounge). */
+  foot?: boolean;
 }) {
   const { run, busy } = useGqlAction();
   const thread = useCommentThread();
@@ -64,14 +71,19 @@ export function ChainTailComposer({
   }
 
   return (
-    <ComposerRow className="inline-form-nested tail-composer">
+    <ComposerRow
+      className={
+        foot ? "foot-composer" : "inline-form-nested tail-composer"
+      }
+    >
       <form onSubmit={submit} className="inline-form">
         <GrowingTextarea
           ref={textareaRef}
+          id={foot ? footComposerId(parentId) : undefined}
           value={body}
           onChange={(e) => setBody(e.target.value)}
-          placeholder="Continue this thread…"
-          aria-label="Continue this thread"
+          placeholder={foot ? "Reply…" : "Continue this thread…"}
+          aria-label={foot ? "Reply to this conversation" : "Continue this thread"}
         />
         <button
           className="btn btn-primary btn-send"
@@ -85,4 +97,10 @@ export function ChainTailComposer({
       </form>
     </ComposerRow>
   );
+}
+
+/** The foot composer's textarea id — "Reply" on an opening post focuses
+ * it rather than opening a second box that answers the same post. */
+export function footComposerId(parentId: string): string {
+  return `thread-foot-${parentId}`;
 }
