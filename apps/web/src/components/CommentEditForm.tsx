@@ -6,6 +6,7 @@ import { useEffect, useRef } from "react";
 import { GrowingTextarea } from "@/components/GrowingTextarea";
 import { draftKey, useDraft } from "@/lib/commentDrafts";
 import { nounTitle, useCommentThread } from "@/lib/commentThreadAdapter";
+import { SUBMIT_SHORTCUT_ARIA } from "@/lib/submitShortcut";
 import { useGqlAction } from "@/lib/useGqlAction";
 
 /** Inline comment editor (QA 2026-07-29). Swapped in PLACE of the comment
@@ -74,6 +75,7 @@ export function CommentEditForm({
       />
       <button
         className="btn btn-primary btn-send"
+        aria-keyshortcuts={SUBMIT_SHORTCUT_ARIA}
         type="submit"
         disabled={busy}
         aria-label={`Save ${thread.noun}`}

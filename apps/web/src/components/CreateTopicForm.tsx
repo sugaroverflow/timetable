@@ -6,6 +6,7 @@ import { DraftRestoredNotice } from "@/components/DraftRestoredNotice";
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { RichTextEditor } from "@/components/RichTextEditor";
 import { useStoredDraft } from "@/lib/formDrafts";
+import { SUBMIT_SHORTCUT_ARIA } from "@/lib/submitShortcut";
 import { useGqlAction } from "@/lib/useGqlAction";
 
 const MUTATION = `mutation Create($s: String!, $title: String!, $body: String, $cover: String, $host: String) {
@@ -82,6 +83,7 @@ export function CreateTopicForm({
       <div className="field" style={{ marginTop: 12 }}>
         <label htmlFor="topic-body">Description</label>
         <RichTextEditor
+          submitOnShortcut
           value={body}
           onChange={(next) => patch({ body: next })}
           placeholder="What is this session about?"
@@ -108,6 +110,7 @@ export function CreateTopicForm({
       <button
         className="btn btn-primary"
         type="submit"
+        aria-keyshortcuts={SUBMIT_SHORTCUT_ARIA}
         disabled={busy || uploadingCover}
       >
         {uploadingCover ? "Uploading…" : busy ? "Creating…" : "Create topic"}

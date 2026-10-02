@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 import { GrowingTextarea } from "@/components/GrowingTextarea";
 import { clientGql } from "@/lib/clientGraphql";
 import { useCommentThread } from "@/lib/commentThreadAdapter";
+import { isSubmitShortcut } from "@/lib/submitShortcut";
 
 export type MentionCandidate = { name: string | null; slug: string | null };
 
@@ -116,6 +117,14 @@ export function MentionTextarea({
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    // submit-shortcut (#361): Ctrl/⌘+Enter posts even with the picker
+    // open — it closes the list and the text goes as typed, a half-typed
+    // @handle included (never auto-completed). GrowingTextarea posts.
+    if (isSubmitShortcut(e)) {
+      setQuery(null);
+      onUnhandledKeyDown?.(e);
+      return;
+    }
     if (query === null || matches.length === 0) {
       onUnhandledKeyDown?.(e);
       return;

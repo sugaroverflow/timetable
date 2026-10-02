@@ -10,6 +10,7 @@ import { GrowingTextarea } from "@/components/GrowingTextarea";
 import { ForumMentionTextarea } from "@/components/MentionTextarea";
 import { draftKey, hasDraft, useDraft } from "@/lib/commentDrafts";
 import { nounTitle, useCommentThread } from "@/lib/commentThreadAdapter";
+import { SUBMIT_SHORTCUT_ARIA } from "@/lib/submitShortcut";
 import { useGqlAction } from "@/lib/useGqlAction";
 
 function ReplyTextarea({
@@ -218,6 +219,7 @@ function ReplyForm({
         />
         <button
           className="btn btn-primary btn-send"
+          aria-keyshortcuts={SUBMIT_SHORTCUT_ARIA}
           type="submit"
           disabled={state.busy}
           aria-label="Post reply"

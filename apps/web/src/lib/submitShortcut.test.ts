@@ -16,9 +16,9 @@ describe("submit-shortcut", () => {
     expect(
       isSubmitShortcut({ key: "Enter", ctrlKey: true, shiftKey: true }),
     ).toBe(false);
-    expect(isSubmitShortcut({ key: "Enter", metaKey: true, altKey: true })).toBe(
-      false,
-    );
+    expect(
+      isSubmitShortcut({ key: "Enter", metaKey: true, altKey: true }),
+    ).toBe(false);
   });
 
   it("ignores other keys with Ctrl/⌘", () => {
@@ -38,8 +38,8 @@ describe("submit-shortcut", () => {
         nativeEvent: { isComposing: true },
       }),
     ).toBe(false);
-    expect(isSubmitShortcut({ key: "Enter", ctrlKey: true, keyCode: 229 })).toBe(
-      false,
-    );
+    expect(
+      isSubmitShortcut({ key: "Enter", ctrlKey: true, keyCode: 229 }),
+    ).toBe(false);
   });
 });

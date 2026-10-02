@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { DraftRestoredNotice } from "@/components/DraftRestoredNotice";
 import { RichTextEditor } from "@/components/RichTextEditor";
 import { useStoredDraft } from "@/lib/formDrafts";
+import { SUBMIT_SHORTCUT_ARIA } from "@/lib/submitShortcut";
 import { useGqlAction } from "@/lib/useGqlAction";
 
 const START = `mutation Start($s: String!, $body: String!) {
@@ -107,6 +108,7 @@ export function LoungeComposer({
       </div>
       {restored ? <DraftRestoredNotice onDiscard={discard} /> : null}
       <RichTextEditor
+        submitOnShortcut
         value={values.body}
         onChange={(body) => patch({ body })}
         placeholder={`Share something with the ${hostLabel} Lounge…`}
@@ -121,6 +123,7 @@ export function LoungeComposer({
         <button
           className="btn btn-primary"
           type="submit"
+          aria-keyshortcuts={SUBMIT_SHORTCUT_ARIA}
           disabled={busy || isBlank(values.body)}
         >
           {busy ? "Posting…" : "Post"}
@@ -184,6 +187,7 @@ export function LoungeOpeningEditor({
   return (
     <form onSubmit={save} className="stack" style={{ gap: 8 }}>
       <RichTextEditor
+        submitOnShortcut
         value={values.body}
         onChange={(body) => patch({ body })}
         minHeight={140}
@@ -193,6 +197,7 @@ export function LoungeOpeningEditor({
         <button
           className="btn btn-primary btn-sm"
           type="submit"
+          aria-keyshortcuts={SUBMIT_SHORTCUT_ARIA}
           disabled={busy || isBlank(values.body)}
         >
           {busy ? "Saving…" : "Save"}

@@ -9,6 +9,7 @@ import { GrowingTextarea } from "@/components/GrowingTextarea";
 import { ForumMentionTextarea } from "@/components/MentionTextarea";
 import { draftKey, useDraft } from "@/lib/commentDrafts";
 import { useCommentThread } from "@/lib/commentThreadAdapter";
+import { SUBMIT_SHORTCUT_ARIA } from "@/lib/submitShortcut";
 import { useGqlAction } from "@/lib/useGqlAction";
 
 /**
@@ -111,6 +112,7 @@ export function ChainTailComposer({
         )}
         <button
           className="btn btn-primary btn-send"
+          aria-keyshortcuts={SUBMIT_SHORTCUT_ARIA}
           type="submit"
           disabled={busy}
           aria-label="Post reply"

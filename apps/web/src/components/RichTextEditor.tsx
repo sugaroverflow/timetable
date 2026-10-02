@@ -26,6 +26,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Markdown } from "tiptap-markdown";
 
 import { useToast } from "@/components/Toast";
+import { isSubmitShortcut, submitFormFrom } from "@/lib/submitShortcut";
 import {
   ACCEPTED_IMAGE_TYPES,
   imageFiles,
@@ -89,6 +90,7 @@ export function RichTextEditor({
   placeholder = "Write…",
   minHeight = 420,
   uploadForum,
+  submitOnShortcut = false,
 }: {
   value: string;
   onChange: (markdown: string) => void;
@@ -98,7 +100,17 @@ export function RichTextEditor({
    * the image button uploads, and pasting or dropping an image does too.
    * Without it the button asks for an image's web address. */
   uploadForum?: string;
+  /** submit-shortcut (#361): Ctrl/⌘+Enter presses the surrounding form's
+   * one send button (TipTap's own Mod-Enter hard break gives way; Shift+
+   * Enter still breaks a line). For forms with a single obvious action —
+   * the topic and Lounge-post composers. */
+  submitOnShortcut?: boolean;
 }) {
+  // Key handlers are fixed when the editor is created: read the flag live.
+  const submitShortcut = useRef(submitOnShortcut);
+  useEffect(() => {
+    submitShortcut.current = submitOnShortcut;
+  }, [submitOnShortcut]);
   // Paste/drop handlers are fixed when the editor is created, so they call
   // through a ref that ImageControl keeps pointed at the live uploader.
   const upload = useRef<((file: File) => void) | null>(null);
@@ -125,6 +137,13 @@ export function RichTextEditor({
     immediatelyRender: false,
     editorProps: {
       clipboardTextParser: parsePastedText,
+      // View props run before extension keymaps, so this outranks HardBreak.
+      handleKeyDown: (view, event) => {
+        if (!submitShortcut.current || !isSubmitShortcut(event)) return false;
+        event.preventDefault();
+        submitFormFrom(view.dom);
+        return true;
+      },
       handlePaste: (_view, event) => {
         const files = imageFiles(event.clipboardData);
         if (files.length === 0 || !upload.current) return false;

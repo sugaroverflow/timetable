@@ -324,6 +324,22 @@ Stable names for feature pieces, so instructions can reference them precisely.
   page doesn't scroll under the card, which is the one thing this costs.
   Covered by `QueueControls.test.tsx` — the web workspace's first jsdom
   component test.
+- **submit-shortcut** — `apps/web/src/lib/submitShortcut.ts` (#361,
+  King-Mob; 2026-10-02): **Ctrl+Enter / ⌘+Enter** presses a composer's
+  send button, Gmail/GitHub-style. `isSubmitShortcut` (pure; never Shift/
+  Alt, never mid-IME) + `submitFormFrom` (`requestSubmit` on the form's
+  ONE enabled submit button — same handler, same empty check, nothing
+  while `busy` disables it, nothing if the form has several submits).
+  Wired once in `GrowingTextarea`, so every plain-text comment composer
+  has it (top-composer, chain-tail incl. the Lounge foot box, Reply box,
+  inline edit, slot chat); `MentionTextarea` lets it through with the
+  picker open (closes the list, posts the text as typed — no
+  auto-complete); `RichTextEditor`'s opt-in `submitOnShortcut` (topic
+  create/edit, Lounge opening post start/edit) outranks TipTap's
+  Mod-Enter hard break. Plain Enter is unchanged (queue-keys'
+  `submitOnEnter` still posts on it). Send buttons carry
+  `aria-keyshortcuts={SUBMIT_SHORTCUT_ARIA}`. A new composer gets it by
+  using `GrowingTextarea` in a form with one submit button.
 - **page-topic-toc** — `PageTopicToc.tsx` (Ed, 2026-08-17): the little
   table of contents under the My Topics and ❤️/💙 Topics page titles —
   the People-page profile-card topic-list look (`person-topics` styles),

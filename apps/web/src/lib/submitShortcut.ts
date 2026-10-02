@@ -59,7 +59,10 @@ export function submitFormFrom(el: Element | null): boolean {
 /** A keydown handler's whole job: on the shortcut, swallow the key and
  * submit the surrounding form. Returns whether it was the shortcut. */
 export function handleSubmitShortcut(
-  e: SubmitKeyLike & { currentTarget: EventTarget | null; preventDefault(): void },
+  e: SubmitKeyLike & {
+    currentTarget: EventTarget | null;
+    preventDefault(): void;
+  },
 ): boolean {
   if (!isSubmitShortcut(e)) return false;
   e.preventDefault();
