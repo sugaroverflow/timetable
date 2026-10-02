@@ -12,7 +12,10 @@ import {
   LoungeComposer,
   LoungeOpeningEditor,
 } from "@/components/LoungeComposer";
-import { LoungeReactions } from "@/components/LoungeReactions";
+import {
+  LoungeReactionAdd,
+  LoungeReactionChips,
+} from "@/components/LoungeReactions";
 import { useToast } from "@/components/Toast";
 import { clientGql } from "@/lib/clientGraphql";
 import {
@@ -27,7 +30,7 @@ import {
   type LoungePageData,
   type LoungePost,
 } from "@/lib/loungeThread";
-import type { RoleLabels } from "@/lib/timetableSettings";
+import { pluralLabel, type RoleLabels } from "@/lib/timetableSettings";
 
 const MUTATIONS = {
   reply: `mutation Reply($id: String!, $body: String!) {
@@ -263,15 +266,22 @@ function useLoungeAdapter(
           />
         );
       },
-      renderFooter: (c) => {
+      // Ed's quiet thread (2026-10-02): no bubbles, one action row, and
+      // one foot "Reply…" box per conversation instead of chain tails.
+      variant: "quiet",
+      footComposer: true,
+      renderFooter: (c, part) => {
         const post = posts.get(c.id);
         if (!post) return null;
-        return (
-          <LoungeReactions
-            postId={post.id}
-            reactions={post.reactions}
-            onChanged={reload}
-          />
+        const props = {
+          postId: post.id,
+          reactions: post.reactions,
+          onChanged: reload,
+        };
+        return part === "add" ? (
+          <LoungeReactionAdd {...props} className="lq-react" />
+        ) : (
+          <LoungeReactionChips {...props} />
         );
       },
     }),
@@ -292,6 +302,7 @@ export function LoungeRoom({
   initial,
   focusId,
   hostLabel,
+  adminLabel,
   viewerId,
   isAdmin,
   roleLabels,
@@ -300,6 +311,7 @@ export function LoungeRoom({
   initial: LoungePageData;
   focusId: string | null;
   hostLabel: string;
+  adminLabel: string;
   viewerId: string;
   isAdmin: boolean;
   roleLabels?: RoleLabels;
@@ -339,16 +351,24 @@ export function LoungeRoom({
     <CommentThreadProvider adapter={adapter}>
       <div className={`stack lounge${composing ? " composing" : ""}`}>
         <div className="page-head lounge-head">
-          <h2 className="page-title">{title}</h2>
+          <div className="lounge-title">
+            <h2 className="page-title">{title}</h2>
+            {/* Who can read this room, in the forum's own words — the
+                same labels the Forum Settings switch uses. */}
+            <p className="lounge-who">
+              {pluralLabel(hostLabel)} and{" "}
+              {pluralLabel(adminLabel.toLowerCase())} only
+            </p>
+          </div>
           {composing ? null : (
             <button
               type="button"
               className="lounge-new"
               onClick={() => setComposing(true)}
-              aria-label="Start a conversation"
               title="Start a conversation"
             >
-              <Plus size={20} aria-hidden />
+              <Plus size={16} aria-hidden />
+              New conversation
             </button>
           )}
         </div>

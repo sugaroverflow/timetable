@@ -490,9 +490,19 @@ Stable names for feature pieces, so instructions can reference them precisely.
   above — admins pin), but **nothing moves while you read**:
   `stableOrder` in `lib/loungeThread.ts` keeps the order the page first
   showed, fresh conversations go on top, "Show older" appends below.
-  Edits, reacts and moderation never bump. The round "+" sits beside the
-  heading on desktop and floats bottom-right under 640px, where the
-  composer becomes a full-screen sheet. Emoji reacts (the first in Topic)
+  Edits, reacts and moderation never bump. **The quiet thread** (Ed's
+  option A with the nesting kept, 2026-10-02 — Lounge ONLY, through the
+  adapter's `variant: "quiet"` + `footComposer`): no bubbles or role
+  pills (role and time as muted text, "Faculty · 9h"), ONE action row
+  (reacts · Reply · ⋯ menu with Edit/Delete/Hide/Pin) that floats as a
+  hover/focus toolbar on replies on hover devices, replies nested as
+  before under an "n replies" head, and NO chain-tail composers — one
+  "Reply…" foot box per conversation answers the opening post, Reply on
+  a reply opens its inline box, `?reply=` lands on the one or the other.
+  A muted "{hosts} and {admins} only" line sits under the title; the
+  "+ New conversation" pill sits beside the heading on desktop and the
+  round "+" floats bottom-right under 640px, where the composer becomes a
+  full-screen sheet. Emoji reacts (the first in Topic)
   via Frimousse with same-origin data in `public/emojibase` (the CSP
   blocks its CDN); ❤️/💙 refused — they are votes here. Digest: ONE card,
   always LAST, never in the subject line (`loadLoungeDigestCard`: new
@@ -520,7 +530,15 @@ Stable names for feature pieces, so instructions can reference them precisely.
   / footer render hooks) from. Topic comments are the default; the
   Lounge provides its own. One thread implementation for both surfaces —
   add a new comment surface the same way, never by copying CommentList
-  (SlotDiscussion's copy is the cautionary tale).
+  (SlotDiscussion's copy is the cautionary tale). Presentation options
+  (2026-10-02, only the Lounge sets them): `variant: "quiet"` swaps the
+  bubbles + action words for the quiet thread (`QuietCommentItem` /
+  `QuietActions`; topic threads take `BubbleCommentItem` /
+  `ActionWords`, unchanged); `footComposer: true` drops every chain-tail
+  composer for ONE foot box at the root (`ChainTailComposer foot`, same
+  draft key and deep links) and opens a reply's inline box on its
+  `?reply=`; `renderFooter(comment, part)` gets `"chips"` / `"add"` in
+  the quiet variant; `mentionRoles` limits the @ picker.
 
 - **feed-position-store** — `lib/feedPosition.ts` (Ed's "going back feels
   fragile", 2026-08-28): remembers, per feed view, how many pages the

@@ -3,15 +3,17 @@
 import Link from "next/link";
 import { useState } from "react";
 
+import { primaryRole, type Role } from "@timetable/shared";
+
 import { draftKey, hasDraft } from "@/lib/commentDrafts";
 import { useCommentThread } from "@/lib/commentThreadAdapter";
 import type { FeedComment } from "@/lib/feedTypes";
 import { COMMENT_TREE_DEPTH } from "@/lib/gqlFragments";
-import { relativeTime } from "@/lib/relativeTime";
-import type { RoleLabels } from "@/lib/timetableSettings";
+import { relativeTime, shortRelativeTime } from "@/lib/relativeTime";
+import { roleLabel, type RoleLabels } from "@/lib/timetableSettings";
 
 import { Avatar } from "./Avatar";
-import { ChainTailComposer } from "./ChainTailComposer";
+import { ChainTailComposer, footComposerId } from "./ChainTailComposer";
 import { CommentActions } from "./CommentActions";
 import { CommentBody } from "./CommentBody";
 import { CommentEditForm } from "./CommentEditForm";
@@ -32,14 +34,17 @@ const VISIBILITY_PILLS: Record<string, { className: string; label: string }> = {
 function CommentTime({
   comment,
   topicHref,
+  short = false,
 }: {
   comment: FeedComment;
   topicHref?: string | null;
+  /** "9h" rather than "9 hours ago" (the quiet variant). */
+  short?: boolean;
 }) {
   // Server and client render moments differ, so both the relative label
   // and the timezone-dependent title can mismatch at hydration — harmless,
   // suppressed.
-  const label = relativeTime(comment.createdAt);
+  const label = (short ? shortRelativeTime : relativeTime)(comment.createdAt);
   const exact = new Date(comment.createdAt).toLocaleString("en-GB");
   if (!topicHref) {
     return (
@@ -86,6 +91,61 @@ function CommentText({
   return thread.renderBody?.(comment) ?? <CommentBody body={comment.body} />;
 }
 
+/** The quiet variant's name row (the Lounge, Ed 2026-10-02): no bubble
+ * and no role pill — name, then the role and time as plain muted text
+ * ("Faculty · 9h"), the time still the permalink. */
+function QuietHeader({
+  comment,
+  slug,
+  roleLabels,
+  editing,
+  topicHref,
+}: {
+  comment: FeedComment;
+  slug?: string;
+  roleLabels?: RoleLabels;
+  editing: boolean;
+  topicHref?: string | null;
+}) {
+  const { pinTitle } = useCommentThread();
+  const role =
+    comment.authorRoles.length > 0
+      ? roleLabel(
+          roleLabels,
+          primaryRole(comment.authorRoles as readonly Role[]),
+        )
+      : null;
+  return (
+    <div className="lq-head">
+      <span className="c-name">
+        {slug ? (
+          <PersonChip slug={slug} userId={comment.authorId}>
+            {comment.authorName ?? "Someone"}
+          </PersonChip>
+        ) : (
+          (comment.authorName ?? "Someone")
+        )}
+      </span>
+      <span className="lq-meta">
+        {role ? <span className="lq-role">{role} · </span> : null}
+        <CommentTime comment={comment} topicHref={topicHref} short />
+        {comment.editedAt && !editing ? (
+          <span title={new Date(comment.editedAt).toLocaleString()}>
+            {" "}
+            · edited
+          </span>
+        ) : null}
+        {comment.hidden ? <span> · hidden</span> : null}
+      </span>
+      {comment.pinnedAt ? (
+        <span className="lq-pin" title={pinTitle}>
+          📌
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 /** The name row + body for a live (non-deleted) comment; the body swaps
  * for the inline editor while editing (edit-in-place, QA 2026-07-29). */
 function CommentBubble({
@@ -104,7 +164,27 @@ function CommentBubble({
   topicHref?: string | null;
 }) {
   const visibilityPill = VISIBILITY_PILLS[comment.visibility];
-  const { pinTitle } = useCommentThread();
+  const { pinTitle, variant } = useCommentThread();
+  if (variant === "quiet") {
+    return (
+      <div className="c-bubble lq-body">
+        <QuietHeader
+          comment={comment}
+          slug={slug}
+          roleLabels={roleLabels}
+          editing={editing}
+          topicHref={topicHref}
+        />
+        <div className="c-text">
+          <CommentText
+            comment={comment}
+            editing={editing}
+            onEditDone={onEditDone}
+          />
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="c-bubble">
       <span className="c-name">
@@ -218,6 +298,37 @@ function ChainBlock({
   depth: number;
   topicHref?: string | null;
 }) {
+  const thread = useCommentThread();
+  if (thread.footComposer) {
+    return depth === 1 ? (
+      <FootBlock
+        comment={comment}
+        replies={replies}
+        canReply={canReply}
+        canModerate={canModerate}
+        viewerId={viewerId}
+        slug={slug}
+        roleLabels={roleLabels}
+        topicHref={topicHref}
+      />
+    ) : replies.length > 0 ? (
+      <div className="replies">
+        {replies.map((r) => (
+          <CommentItem
+            key={r.id}
+            comment={r}
+            canReply={canReply}
+            canModerate={canModerate}
+            viewerId={viewerId}
+            slug={slug}
+            roleLabels={roleLabels}
+            depth={depth + 1}
+            topicHref={topicHref}
+          />
+        ))}
+      </div>
+    ) : null;
+  }
   // Chain parents: every top-level comment, and any forked comment whose
   // sub-chain has started.
   const showTail =
@@ -258,6 +369,206 @@ function ChainBlock({
   );
 }
 
+/** Live (non-deleted) messages under a comment, at any depth. */
+function countReplies(comment: FeedComment): number {
+  return (comment.replies ?? []).reduce(
+    (n, r) => n + (r.deleted ? 0 : 1) + countReplies(r),
+    0,
+  );
+}
+
+/** Messages with no Reply of their own (a tombstone, or past the
+ * reply-depth-guard): their ?reply= deep links focus the foot box. */
+function footFocusIds(comment: FeedComment, depth: number): string[] {
+  return (comment.replies ?? []).flatMap((r) => [
+    ...(r.deleted || depth + 1 >= COMMENT_TREE_DEPTH ? [r.id] : []),
+    ...footFocusIds(r, depth + 1),
+  ]);
+}
+
+/** A thread without chain tails (the adapter's `footComposer` — the
+ * Lounge's quiet thread, Ed 2026-10-02): the root's replies under an
+ * "n replies" head, nested as deep as they go (the ordinary reply-indent
+ * per level), and ONE foot composer answering the root — instead of a
+ * chain-tail composer ending every chain. */
+function FootBlock({
+  comment,
+  replies,
+  canReply,
+  canModerate,
+  viewerId,
+  slug,
+  roleLabels,
+  topicHref,
+}: {
+  comment: FeedComment;
+  replies: FeedComment[];
+  canReply: boolean;
+  canModerate: boolean;
+  viewerId: string | null;
+  slug?: string;
+  roleLabels?: RoleLabels;
+  topicHref?: string | null;
+}) {
+  if (replies.length === 0 && !canReply) return null;
+  const n = countReplies(comment);
+  return (
+    <div className="lq-replies">
+      {n > 0 ? (
+        <div className="lq-count">
+          {n} {n === 1 ? "reply" : "replies"}
+        </div>
+      ) : null}
+      {replies.map((r) => (
+        <CommentItem
+          key={r.id}
+          comment={r}
+          canReply={canReply}
+          canModerate={canModerate}
+          viewerId={viewerId}
+          slug={slug}
+          roleLabels={roleLabels}
+          depth={2}
+          topicHref={topicHref}
+        />
+      ))}
+      {canReply ? (
+        <ChainTailComposer
+          foot
+          parentId={comment.id}
+          mentionSlug={mentionSlugFor(comment, slug)}
+          focusIds={[comment.id, ...footFocusIds(comment, 1)]}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+type ItemProps = {
+  comment: FeedComment;
+  canReply: boolean;
+  canModerate: boolean;
+  viewerId: string | null;
+  slug?: string;
+  roleLabels?: RoleLabels;
+  /** 1-based nesting level, counted from the thread roots. */
+  depth: number;
+  topicHref?: string | null;
+  /** The viewer authored the topic: Pin/Unpin on top-level comments
+   * (#258). */
+  canPin?: boolean;
+};
+
+/** Focus a conversation's foot composer (an opening post's Reply). */
+function focusFoot(rootId: string) {
+  document
+    .getElementById(footComposerId(rootId))
+    ?.querySelector("textarea")
+    ?.focus();
+}
+
+/** The quiet message's own block — text, then ONE action row (Ed's quiet
+ * thread, 2026-10-02) instead of bubble + react row + action words.
+ * Reply nests under any message the reply-depth-guard allows; with a
+ * foot composer the opening post's Reply goes to it rather than opening
+ * a second box for the same post. Wrapped in .lq-msg, the hover/focus
+ * target for a reply's floating toolbar. */
+function QuietMessage({
+  comment,
+  canReply,
+  canModerate,
+  viewerId,
+  slug,
+  roleLabels,
+  depth,
+  topicHref,
+  canPin = false,
+}: ItemProps) {
+  const thread = useCommentThread();
+  // Reopen the inline editor for an interrupted edit (comment-draft-store).
+  const [editing, setEditing] = useState(() =>
+    hasDraft(draftKey.edit(comment.id)),
+  );
+  if (comment.deleted) {
+    return (
+      <div className="lq-msg">
+        <div className="c-bubble lq-body">
+          <span className="c-text faint" style={{ fontStyle: "italic" }}>
+            This comment was deleted by its author.
+          </span>
+        </div>
+      </div>
+    );
+  }
+  const toFoot = thread.footComposer === true && depth === 1;
+  const replyable = toFoot || (depth >= 2 && depth < COMMENT_TREE_DEPTH);
+  return (
+    <div className="lq-msg">
+      <CommentBubble
+        comment={comment}
+        slug={slug}
+        roleLabels={roleLabels}
+        editing={editing}
+        onEditDone={() => setEditing(false)}
+        topicHref={topicHref}
+      />
+      <CommentActions
+        commentId={comment.id}
+        canReply={canReply && replyable}
+        canModerate={canModerate}
+        hidden={comment.hidden}
+        isOwn={viewerId != null && viewerId === comment.authorId}
+        onEdit={() => setEditing(true)}
+        canPin={canPin && depth === 1}
+        pinned={comment.pinnedAt != null}
+        mentionSlug={mentionSlugFor(comment, slug)}
+        chips={thread.renderFooter?.(comment, "chips")}
+        react={thread.renderFooter?.(comment, "add")}
+        onReply={toFoot ? () => focusFoot(comment.id) : undefined}
+      />
+    </div>
+  );
+}
+
+/** A message in the quiet variant, with its nested replies. */
+function QuietCommentItem(props: ItemProps) {
+  const { comment, depth } = props;
+  const level = depth === 1 ? "lq-root" : "lq-reply-item";
+  return (
+    <div
+      id={`comment-${comment.id}`}
+      className={`comment ${level}${comment.hidden ? " hidden" : ""}`}
+    >
+      <CommentAvatar comment={comment} slug={props.slug} />
+      <div className="comment-main">
+        <QuietMessage {...props} />
+        <ChainBlock
+          comment={comment}
+          replies={comment.replies ?? []}
+          canReply={props.canReply}
+          canModerate={props.canModerate}
+          viewerId={props.viewerId}
+          slug={props.slug}
+          roleLabels={props.roleLabels}
+          depth={depth}
+          topicHref={props.topicHref}
+        />
+      </div>
+    </div>
+  );
+}
+
+/** A comment and its replies: the quiet variant (the Lounge) or today's
+ * bubbles (topic threads). */
+function CommentItem(props: ItemProps) {
+  const thread = useCommentThread();
+  return thread.variant === "quiet" ? (
+    <QuietCommentItem {...props} />
+  ) : (
+    <BubbleCommentItem {...props} />
+  );
+}
+
 /**
  * Dialogue-first threading (2026-08-13): a comment's children render as a
  * linear chain (oldest first) ending in a chain-tail-composer that
@@ -265,7 +576,7 @@ function ChainBlock({
  * (root-attach), so chains don't deepen. Reply on a chain message is the
  * rarer fork gesture, opening a sub-chain beside the main line.
  */
-function CommentItem({
+function BubbleCommentItem({
   comment,
   canReply,
   canModerate,

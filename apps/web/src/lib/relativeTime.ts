@@ -22,3 +22,28 @@ export function relativeTime(iso: string, now: number = Date.now()): string {
   }
   return "just now";
 }
+
+const SHORT: Record<string, string> = {
+  year: "y",
+  month: "mo",
+  week: "w",
+  day: "d",
+  hour: "h",
+  minute: "m",
+};
+
+/** The compact form — "9h", "2d", "3w", "now" — for the Lounge's quiet
+ * thread (Ed, 2026-10-02), where the time sits in a muted run after the
+ * name ("Faculty · 9h"). Past times only; a future one reads "now". */
+export function shortRelativeTime(
+  iso: string,
+  now: number = Date.now(),
+): string {
+  const then = Date.parse(iso);
+  if (Number.isNaN(then)) return "";
+  const seconds = Math.round((now - then) / 1000);
+  for (const { unit, seconds: size } of UNITS) {
+    if (seconds >= size) return `${Math.floor(seconds / size)}${SHORT[unit]}`;
+  }
+  return "now";
+}
