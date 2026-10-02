@@ -5,9 +5,40 @@ import { useState } from "react";
 
 import { ComposerRow } from "@/components/ComposerRow";
 import { GrowingTextarea } from "@/components/GrowingTextarea";
+import { ForumMentionTextarea } from "@/components/MentionTextarea";
 import { draftKey, hasDraft, useDraft } from "@/lib/commentDrafts";
 import { nounTitle, useCommentThread } from "@/lib/commentThreadAdapter";
 import { useGqlAction } from "@/lib/useGqlAction";
+
+function ReplyTextarea({
+  body,
+  onChange,
+  mentionSlug,
+}: {
+  body: string;
+  onChange(value: string): void;
+  mentionSlug?: string;
+}) {
+  if (mentionSlug) {
+    return (
+      <ForumMentionTextarea
+        mentionSlug={mentionSlug}
+        value={body}
+        onChange={onChange}
+        placeholder="Write a reply… (@ to mention)"
+        ariaLabel="Reply"
+      />
+    );
+  }
+  return (
+    <GrowingTextarea
+      value={body}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder="Write a reply…"
+      aria-label="Reply"
+    />
+  );
+}
 
 export function CommentActions({
   commentId,
@@ -18,6 +49,7 @@ export function CommentActions({
   onEdit,
   canPin = false,
   pinned = false,
+  mentionSlug,
 }: {
   commentId: string;
   canReply: boolean;
@@ -30,6 +62,8 @@ export function CommentActions({
    * shows Pin/Unpin (#258). */
   canPin?: boolean;
   pinned?: boolean;
+  /** Timetable slug — enables @mention autocomplete for public replies. */
+  mentionSlug?: string;
 }) {
   // ?reply= deep links focus a chain-tail composer (dialogue-first
   // threading, 2026-08-13) — this composer only opens from its button.
@@ -146,11 +180,10 @@ export function CommentActions({
       {open ? (
         <ComposerRow className="inline-form-nested">
           <form onSubmit={reply} className="inline-form">
-            <GrowingTextarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              placeholder="Write a reply…"
-              aria-label="Reply"
+            <ReplyTextarea
+              body={body}
+              onChange={setBody}
+              mentionSlug={mentionSlug}
             />
             <button
               className="btn btn-primary btn-send"

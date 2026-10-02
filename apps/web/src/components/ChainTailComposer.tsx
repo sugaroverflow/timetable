@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 
 import { ComposerRow } from "@/components/ComposerRow";
 import { GrowingTextarea } from "@/components/GrowingTextarea";
+import { ForumMentionTextarea } from "@/components/MentionTextarea";
 import { draftKey, useDraft } from "@/lib/commentDrafts";
 import { useCommentThread } from "@/lib/commentThreadAdapter";
 import { useGqlAction } from "@/lib/useGqlAction";
@@ -24,11 +25,14 @@ import { useGqlAction } from "@/lib/useGqlAction";
 export function ChainTailComposer({
   parentId,
   focusIds,
+  mentionSlug,
 }: {
   /** The comment new messages attach to (the chain's parent). */
   parentId: string;
   /** Comment ids whose ?reply= deep links should focus this composer. */
   focusIds: string[];
+  /** Timetable slug — enables @mention autocomplete for public replies. */
+  mentionSlug?: string;
 }) {
   const { run, busy } = useGqlAction();
   const thread = useCommentThread();
@@ -66,13 +70,24 @@ export function ChainTailComposer({
   return (
     <ComposerRow className="inline-form-nested tail-composer">
       <form onSubmit={submit} className="inline-form">
-        <GrowingTextarea
-          ref={textareaRef}
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          placeholder="Continue this thread…"
-          aria-label="Continue this thread"
-        />
+        {mentionSlug ? (
+          <ForumMentionTextarea
+            mentionSlug={mentionSlug}
+            textareaRef={textareaRef}
+            value={body}
+            onChange={setBody}
+            placeholder="Continue this thread… (@ to mention)"
+            ariaLabel="Continue this thread"
+          />
+        ) : (
+          <GrowingTextarea
+            ref={textareaRef}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder="Continue this thread…"
+            aria-label="Continue this thread"
+          />
+        )}
         <button
           className="btn btn-primary btn-send"
           type="submit"
