@@ -4,12 +4,35 @@ import { useRef, useState } from "react";
 
 import { GrowingTextarea } from "@/components/GrowingTextarea";
 import { clientGql } from "@/lib/clientGraphql";
+import { useCommentThread } from "@/lib/commentThreadAdapter";
 
 export type MentionCandidate = { name: string | null; slug: string | null };
 
+/** A forum member as the picker loads them: enough to decide whether
+ * they belong in the list at all. */
+export type MentionPerson = MentionCandidate & {
+  roles: readonly string[];
+  deactivatedAt: string | null;
+};
+
 const PEOPLE_QUERY = `query MentionPeople($s: String!) {
-  timetablePeople: forumPeople(idOrSlug: $s) { name slug }
+  timetablePeople: forumPeople(idOrSlug: $s) { name slug roles deactivatedAt }
 }`;
+
+/** Who the picker offers. Never a deactivated member (member-deactivation:
+ * only admins are even sent them, and a mention of one notifies nobody);
+ * and, where the thread names roles (the {host} Lounge), only people
+ * holding one of them — so a reply in a hosts-only room never suggests an
+ * elector the room is closed to. */
+export function mentionCandidates(
+  people: readonly MentionPerson[],
+  roles?: readonly string[],
+): MentionCandidate[] {
+  return people
+    .filter((p) => !p.deactivatedAt)
+    .filter((p) => !roles || p.roles.some((r) => roles.includes(r)))
+    .map(({ name, slug }) => ({ name, slug }));
+}
 
 // The in-progress "@handle" immediately before the caret, if any.
 const ACTIVE_MENTION_RE = /(?:^|[^A-Za-z0-9_@])@([a-z0-9-]*)$/i;
@@ -153,26 +176,29 @@ export function MentionTextarea({
   );
 }
 
-/** Mention textarea backed by the timetable's visible member list. Candidates
- * load on first focus so closed reply composers do not add feed-page queries. */
+/** Mention textarea backed by the forum's visible member list. Candidates
+ * load on first focus so closed reply composers do not add feed-page queries.
+ * The surrounding comment thread (comment-thread-adapter) may narrow the
+ * list to `mentionRoles`. */
 export function ForumMentionTextarea({
   mentionSlug,
   ...props
 }: Omit<React.ComponentProps<typeof MentionTextarea>, "candidates"> & {
   mentionSlug: string;
 }) {
-  const [candidates, setCandidates] = useState<MentionCandidate[]>([]);
+  const { mentionRoles } = useCommentThread();
+  const [people, setPeople] = useState<MentionPerson[]>([]);
   const [loadedCandidates, setLoadedCandidates] = useState(false);
 
   async function loadCandidates() {
     if (loadedCandidates) return;
     setLoadedCandidates(true);
     try {
-      const data = await clientGql<{ timetablePeople: MentionCandidate[] }>(
+      const data = await clientGql<{ timetablePeople: MentionPerson[] }>(
         PEOPLE_QUERY,
         { s: mentionSlug },
       );
-      setCandidates(data.timetablePeople ?? []);
+      setPeople(data.timetablePeople ?? []);
     } catch {
       // Autocomplete is a convenience; a hand-typed @slug still resolves.
     }
@@ -180,7 +206,10 @@ export function ForumMentionTextarea({
 
   return (
     <div style={{ flex: 1 }} onFocus={loadCandidates}>
-      <MentionTextarea {...props} candidates={candidates} />
+      <MentionTextarea
+        {...props}
+        candidates={mentionCandidates(people, mentionRoles)}
+      />
     </div>
   );
 }

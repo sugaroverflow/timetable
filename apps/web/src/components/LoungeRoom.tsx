@@ -3,6 +3,8 @@
 import { Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { LOUNGE_ROLES } from "@timetable/shared";
+
 import { CollapsibleTopicBody } from "@/components/CollapsibleTopicBody";
 import { CommentList } from "@/components/CommentList";
 import { EmptyState } from "@/components/EmptyState";
@@ -238,6 +240,8 @@ function useLoungeAdapter(
       pinTitle: "Pinned by an admin",
       routerRefresh: false,
       onChanged: reload,
+      // A reply's @ picker offers only people who can read the room.
+      mentionRoles: LOUNGE_ROLES,
       renderBody: (c) => {
         const post = posts.get(c.id);
         return post?.bodyHtml ? (

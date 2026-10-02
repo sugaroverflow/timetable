@@ -183,6 +183,16 @@ function CommentAvatar({
   );
 }
 
+/** The forum slug that switches on the @mention picker in this comment's
+ * reply boxes — public threads only (#354): a host-only or drafting reply
+ * shouldn't suggest people who can't read it. */
+function mentionSlugFor(
+  comment: FeedComment,
+  slug: string | undefined,
+): string | undefined {
+  return comment.visibility === "public" ? slug : undefined;
+}
+
 /** A comment's chain: its children as a linear dialogue (oldest first),
  * ending in the chain-tail-composer. New messages attach to the PARENT
  * comment (root-attach), so chains don't deepen; the tail only exists
@@ -241,7 +251,7 @@ function ChainBlock({
         <ChainTailComposer
           parentId={comment.id}
           focusIds={tailFocusIds}
-          mentionSlug={comment.visibility === "public" ? slug : undefined}
+          mentionSlug={mentionSlugFor(comment, slug)}
         />
       ) : null}
     </div>
@@ -327,7 +337,7 @@ function CommentItem({
             // Pin = the topic author's curation gesture, roots only (#258).
             canPin={canPin && depth === 1}
             pinned={comment.pinnedAt != null}
-            mentionSlug={comment.visibility === "public" ? slug : undefined}
+            mentionSlug={mentionSlugFor(comment, slug)}
           />
         )}
         <ChainBlock

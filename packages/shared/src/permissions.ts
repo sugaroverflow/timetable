@@ -144,6 +144,15 @@ export function canSeeHostOnly(viewer: Viewer): boolean {
   return isHost(viewer.roles) || isAdmin(viewer.roles);
 }
 
+/** The roles that can ever be in the {host} Lounge — canUseLounge's rule
+ * as data, for the queries and pickers that filter people by it (Lounge
+ * @mentions resolve only to them; the reply picker offers only them). */
+export const LOUNGE_ROLES = [
+  "owner",
+  "admin",
+  "host",
+] as const satisfies readonly Role[];
+
 /** The {host} Lounge (docs/host-lounge-plan.md, 2026-09-30): owner, admins
  * and hosts. Electors never; deactivated members resolve to no roles, so
  * they fall out for free. Whether the forum has the Lounge switched on is

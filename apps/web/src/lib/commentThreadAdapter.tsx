@@ -33,6 +33,9 @@ export type CommentThreadAdapter = {
   renderEditor?: (comment: FeedComment, onDone: () => void) => ReactNode;
   /** Under the bubble, above the actions (the Lounge's reacts). */
   renderFooter?: (comment: FeedComment) => ReactNode;
+  /** The @mention picker offers only people holding one of these roles
+   * (the Lounge: whoever can read the room). Unset: every member. */
+  mentionRoles?: readonly string[];
 };
 
 export const TOPIC_COMMENTS: CommentThreadAdapter = {
