@@ -45,5 +45,6 @@ packages/db/drizzle/meta/_journal.json.bak
 
 # local agent state (shared agent config IS committed: .claude/settings.json)
 .claude/*
+!.claude/skills/
 !.claude/settings.json
 prototype.html
