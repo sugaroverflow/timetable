@@ -1,5 +1,7 @@
 "use client";
 
+import { handleSubmitShortcut } from "@/lib/submitShortcut";
+
 /** Grow the box to fit its content; never shrink (so a manual drag-resize
  * is respected). border-box height = scrollHeight + the 2px of borders. */
 function fit(el: HTMLTextAreaElement) {
@@ -14,10 +16,16 @@ function fit(el: HTMLTextAreaElement) {
  * as content wraps — on input while typing, and on mount for prefilled
  * bodies (editing a long comment). Drag-resize still works and is never
  * shrunk back.
+ *
+ * submit-shortcut (#361): Ctrl/⌘+Enter presses the surrounding form's send
+ * button — every comment composer is this box in a form, so they all get
+ * it here, once. A caller's own onKeyDown runs first and can claim the key
+ * with preventDefault (the @mention picker does for Enter while it's open).
  */
 export function GrowingTextarea({
   ref,
   onInput,
+  onKeyDown,
   ...rest
 }: React.ComponentProps<"textarea">) {
   const attach = (el: HTMLTextAreaElement | null) => {
@@ -29,6 +37,10 @@ export function GrowingTextarea({
     <textarea
       {...rest}
       ref={attach}
+      onKeyDown={(e) => {
+        onKeyDown?.(e);
+        if (!e.defaultPrevented) handleSubmitShortcut(e);
+      }}
       onInput={(e) => {
         fit(e.currentTarget);
         onInput?.(e);

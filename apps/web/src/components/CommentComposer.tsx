@@ -6,6 +6,7 @@ import { ComposerRow } from "@/components/ComposerRow";
 import { GrowingTextarea } from "@/components/GrowingTextarea";
 import { ForumMentionTextarea } from "@/components/MentionTextarea";
 import { draftKey, useDraft } from "@/lib/commentDrafts";
+import { SUBMIT_SHORTCUT_ARIA } from "@/lib/submitShortcut";
 import { useGqlAction } from "@/lib/useGqlAction";
 
 import { useCommentsOpen } from "./CommentsOpenScope";
@@ -154,6 +155,7 @@ export function CommentComposer({
         )}
         <button
           className="btn btn-primary btn-send"
+          aria-keyshortcuts={SUBMIT_SHORTCUT_ARIA}
           type="submit"
           disabled={busy}
           aria-label={scopeLabel ? `Post ${scopeLabel} note` : "Post comment"}

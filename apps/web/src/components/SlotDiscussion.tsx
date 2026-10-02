@@ -5,6 +5,7 @@ import { Send } from "lucide-react";
 
 import { clientGql } from "@/lib/clientGraphql";
 import { clearDraft, draftKey, hasDraft, useDraft } from "@/lib/commentDrafts";
+import { SUBMIT_SHORTCUT_ARIA } from "@/lib/submitShortcut";
 import type { RoleLabels } from "@/lib/timetableSettings";
 import { useGqlAction } from "@/lib/useGqlAction";
 
@@ -166,6 +167,7 @@ function SlotCommentEditor({
       />
       <button
         className="btn btn-primary btn-send"
+        aria-keyshortcuts={SUBMIT_SHORTCUT_ARIA}
         type="submit"
         disabled={busy}
         aria-label="Save comment"
@@ -368,6 +370,7 @@ export function DiscussionPanel({
             />
             <button
               className="btn btn-primary btn-send"
+              aria-keyshortcuts={SUBMIT_SHORTCUT_ARIA}
               type="submit"
               disabled={busy}
               aria-label="Send message"

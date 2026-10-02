@@ -8,6 +8,7 @@ import { ImageUploadField } from "@/components/ImageUploadField";
 import { RichTextEditor } from "@/components/RichTextEditor";
 import type { ManagedTopic } from "@/lib/feedTypes";
 import { useStoredDraft } from "@/lib/formDrafts";
+import { SUBMIT_SHORTCUT_ARIA } from "@/lib/submitShortcut";
 import { topicPath } from "@/lib/topicPath";
 import { useGqlAction } from "@/lib/useGqlAction";
 
@@ -122,6 +123,7 @@ export function TopicEditForm({
       <div className="field">
         <label htmlFor={`topic-edit-body-${topic.id}`}>Description</label>
         <RichTextEditor
+          submitOnShortcut
           value={body}
           onChange={(next) => patch({ body: next })}
           minHeight={280}
@@ -132,6 +134,7 @@ export function TopicEditForm({
         <button
           className="btn btn-primary"
           type="submit"
+          aria-keyshortcuts={SUBMIT_SHORTCUT_ARIA}
           disabled={busy || uploadingCover}
         >
           {uploadingCover ? "Uploading…" : busy ? "Saving…" : "Save changes"}
