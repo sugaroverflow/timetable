@@ -89,3 +89,41 @@ signed into. The look was checked by rendering `LoungeRoom` with fixture
 data in jsdom and screenshotting that markup with the app's
 `tokens.css` + `globals.css` in headless Chromium (light/dark, 900px with
 a hovered reply, 390px touch).
+
+## QA round 1 (Ed, dev, 2026-10-02)
+
+"A strange gap under the top post": ~60px between the opening post's
+one-line body and its action row; and with no reaction chips the row
+started a few px right of the text.
+
+**Measured cause** (fixture `LoungeRoom` rendered in jsdom, the app's
+`tokens.css` + `globals.css` in headless Chromium, `getBoundingClientRect`
+/ `getComputedStyle` on every box): the opening post's Markdown
+(`CollapsibleTopicBody` inside `.lounge-opening`) sits inside `.c-text`,
+whose `white-space: pre-wrap` is meant for plain-text replies.
+markdown-it ends every block with a newline (`<p>This is pretty nice</p>\n`),
+and under pre-wrap that whitespace-only text node renders as its own
+23px line. So under a one-line body: the `<p>`'s 15px bottom margin +
+a 23px blank line + the row's 6px = 44px, where 6 was meant. The same
+newlines also put a blank line between every pair of paragraphs, and on
+a folded long body the hidden paragraphs' newlines still rendered —
+123px of blank space above Show more. No min-height, stack gap, or
+leftover `.c-bubble` box was involved (`.lq-body` measured zero
+padding/margin).
+
+**Fix** (Lounge only, scoped under `.lounge-conversation`):
+`.lounge-opening` gets `white-space: normal`, and when the body stands
+alone (no Show more pill) its last block's bottom margin goes. Text →
+action row is now 6px, matching the replies' text → chips; paragraph
+spacing is the ordinary 15px; text → Show more pill is 7px folded and
+expanded.
+
+**Row alignment**: with no chips the row opens on the ghost add-react
+button, whose icon sits inside the button's 6px padding (6.5px inset
+measured, on the opening post and on touch reply rows). The first
+`.lq-tools` in a row now hangs that padding into the gutter
+(`margin-left: -6px`), so the icon lands on the text column (0.5px off)
+like a chip's edge does. The floating hover toolbar is unaffected.
+
+Topic threads were screenshotted before/after in the same harness
+(light/dark, 1200px and 390px touch): byte-identical PNGs.
