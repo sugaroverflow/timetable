@@ -89,7 +89,7 @@ Codex/agent workflows are separate from the app runtime.
 - Clerk sign-in and sign-up routes
 - signed-in app shell: topbar with the current timetable's identity and a
   per-user light/dark toggle; left sidebar — a slide-in drawer on mobile —
-  with section nav, a "Report a bug" link, and the timetable switcher (with
+  with section nav, "Report a bug" and "Source code" links, and the timetable switcher (with
   visibility pills) in its footer
 - topic feed with infinite scroll, sort controls (the four heart
   normalisations, latest comments, latest created, latest updated —
