@@ -1,5 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
-import { Flag, Heart } from "lucide-react";
+import { CodeXml, Flag, Heart } from "lucide-react";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
@@ -460,7 +460,8 @@ export default async function TimetableLayout({
           ) : null}
 
           {/* Sidebar foot, one item per line (QA 2026-07-28): visibility,
-              switcher, appearance, report a bug. The plain-English
+              switcher, appearance, report a bug, source code (#366, from
+              #360 — always this repository, never a fork). The plain-English
               visibility line replaced the too-terse pill (QA 2026-07-27);
               the forum name lives in the topbar. */}
           <div className="sidebar-foot">
@@ -472,12 +473,20 @@ export default async function TimetableLayout({
             ) : null}
             <ThemeToggle />
             <a
-              className="sidebar-bug-link faint"
+              className="sidebar-foot-link faint"
               href="https://github.com/sugaroverflow/timetable/issues/new"
               target="_blank"
               rel="noopener noreferrer"
             >
               <Flag size={14} aria-hidden /> Report a bug
+            </a>
+            <a
+              className="sidebar-foot-link faint"
+              href="https://github.com/sugaroverflow/timetable"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <CodeXml size={14} aria-hidden /> Source code
             </a>
           </div>
         </Sidebar>
