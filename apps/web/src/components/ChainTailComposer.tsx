@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 
 import { ComposerRow } from "@/components/ComposerRow";
 import { GrowingTextarea } from "@/components/GrowingTextarea";
+import { ForumMentionTextarea } from "@/components/MentionTextarea";
 import { draftKey, useDraft } from "@/lib/commentDrafts";
 import { useCommentThread } from "@/lib/commentThreadAdapter";
 import { useGqlAction } from "@/lib/useGqlAction";
@@ -29,6 +30,7 @@ export function ChainTailComposer({
   parentId,
   focusIds,
   foot = false,
+  mentionSlug,
 }: {
   /** The comment new messages attach to (the chain's parent). */
   parentId: string;
@@ -36,6 +38,8 @@ export function ChainTailComposer({
   focusIds: string[];
   /** Render as the conversation's foot "Reply…" box (the Lounge). */
   foot?: boolean;
+  /** Timetable slug — enables @mention autocomplete for public replies. */
+  mentionSlug?: string;
 }) {
   const { run, busy } = useGqlAction();
   const thread = useCommentThread();
@@ -72,19 +76,39 @@ export function ChainTailComposer({
 
   return (
     <ComposerRow
-      className={
-        foot ? "foot-composer" : "inline-form-nested tail-composer"
-      }
+      className={foot ? "foot-composer" : "inline-form-nested tail-composer"}
     >
-      <form onSubmit={submit} className="inline-form">
-        <GrowingTextarea
-          ref={textareaRef}
-          id={foot ? footComposerId(parentId) : undefined}
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          placeholder={foot ? "Reply…" : "Continue this thread…"}
-          aria-label={foot ? "Reply to this conversation" : "Continue this thread"}
-        />
+      <form
+        onSubmit={submit}
+        className="inline-form"
+        id={foot ? footComposerId(parentId) : undefined}
+      >
+        {mentionSlug ? (
+          <ForumMentionTextarea
+            mentionSlug={mentionSlug}
+            textareaRef={textareaRef}
+            value={body}
+            onChange={setBody}
+            placeholder={
+              foot
+                ? "Reply… (@ to mention)"
+                : "Continue this thread… (@ to mention)"
+            }
+            ariaLabel={
+              foot ? "Reply to this conversation" : "Continue this thread"
+            }
+          />
+        ) : (
+          <GrowingTextarea
+            ref={textareaRef}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder={foot ? "Reply…" : "Continue this thread…"}
+            aria-label={
+              foot ? "Reply to this conversation" : "Continue this thread"
+            }
+          />
+        )}
         <button
           className="btn btn-primary btn-send"
           type="submit"
@@ -99,7 +123,7 @@ export function ChainTailComposer({
   );
 }
 
-/** The foot composer's textarea id — "Reply" on an opening post focuses
+/** The foot composer's form id — "Reply" on an opening post focuses
  * it rather than opening a second box that answers the same post. */
 export function footComposerId(parentId: string): string {
   return `thread-foot-${parentId}`;

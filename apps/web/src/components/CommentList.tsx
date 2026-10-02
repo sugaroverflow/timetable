@@ -262,6 +262,16 @@ function CommentAvatar({
   );
 }
 
+/** The forum slug that switches on the @mention picker in this comment's
+ * reply boxes — public threads only (#354): a host-only or drafting reply
+ * shouldn't suggest people who can't read it. */
+function mentionSlugFor(
+  comment: FeedComment,
+  slug: string | undefined,
+): string | undefined {
+  return comment.visibility === "public" ? slug : undefined;
+}
+
 /** A comment's chain: its children as a linear dialogue (oldest first),
  * ending in the chain-tail-composer. New messages attach to the PARENT
  * comment (root-attach), so chains don't deepen; the tail only exists
@@ -348,7 +358,11 @@ function ChainBlock({
         />
       ))}
       {showTail ? (
-        <ChainTailComposer parentId={comment.id} focusIds={tailFocusIds} />
+        <ChainTailComposer
+          parentId={comment.id}
+          focusIds={tailFocusIds}
+          mentionSlug={mentionSlugFor(comment, slug)}
+        />
       ) : null}
     </div>
   );
@@ -421,6 +435,7 @@ function FootBlock({
         <ChainTailComposer
           foot
           parentId={comment.id}
+          mentionSlug={mentionSlugFor(comment, slug)}
           focusIds={[comment.id, ...footFocusIds(comment, 1)]}
         />
       ) : null}
@@ -511,11 +526,16 @@ function CommentItem({
                 onEdit={() => setEditing(true)}
                 canPin={canPin && depth === 1}
                 pinned={comment.pinnedAt != null}
+                mentionSlug={mentionSlugFor(comment, slug)}
                 chips={thread.renderFooter?.(comment, "chips")}
                 react={thread.renderFooter?.(comment, "add")}
                 onReply={
                   toFoot
-                    ? () => document.getElementById(footComposerId(comment.id))?.focus()
+                    ? () =>
+                        document
+                          .getElementById(footComposerId(comment.id))
+                          ?.querySelector("textarea")
+                          ?.focus()
                     : undefined
                 }
               />
@@ -576,6 +596,7 @@ function CommentItem({
             // Pin = the topic author's curation gesture, roots only (#258).
             canPin={canPin && depth === 1}
             pinned={comment.pinnedAt != null}
+            mentionSlug={mentionSlugFor(comment, slug)}
           />
         )}
         <ChainBlock

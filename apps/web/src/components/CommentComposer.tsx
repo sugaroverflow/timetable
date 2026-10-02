@@ -1,15 +1,10 @@
 "use client";
 
 import { Send } from "lucide-react";
-import { useState } from "react";
 
 import { ComposerRow } from "@/components/ComposerRow";
 import { GrowingTextarea } from "@/components/GrowingTextarea";
-import {
-  MentionTextarea,
-  type MentionCandidate,
-} from "@/components/MentionTextarea";
-import { clientGql } from "@/lib/clientGraphql";
+import { ForumMentionTextarea } from "@/components/MentionTextarea";
 import { draftKey, useDraft } from "@/lib/commentDrafts";
 import { useGqlAction } from "@/lib/useGqlAction";
 
@@ -17,10 +12,6 @@ import { useCommentsOpen } from "./CommentsOpenScope";
 
 const MUTATION = `mutation AddComment($id: String!, $body: String!, $visibility: String) {
   addComment(topicId: $id, body: $body, visibility: $visibility) { id }
-}`;
-
-const PEOPLE_QUERY = `query MentionPeople($s: String!) {
-  timetablePeople: forumPeople(idOrSlug: $s) { name slug }
 }`;
 
 /** Placeholder + success toast: explicit overrides win, else derived from
@@ -97,23 +88,6 @@ export function CommentComposer({
   const [body, setBody, clearBody] = useDraft(
     draftKey.comment(topicId, visibility),
   );
-  const mentionsEnabled = visibility === "public" && Boolean(mentionSlug);
-  const [candidates, setCandidates] = useState<MentionCandidate[]>([]);
-  const [loadedCandidates, setLoadedCandidates] = useState(false);
-
-  async function loadCandidates() {
-    if (loadedCandidates || !mentionSlug) return;
-    setLoadedCandidates(true);
-    try {
-      const data = await clientGql<{ timetablePeople: MentionCandidate[] }>(
-        PEOPLE_QUERY,
-        { s: mentionSlug },
-      );
-      setCandidates(data.timetablePeople ?? []);
-    } catch {
-      // Autocomplete is a convenience; a hand-typed @slug still resolves.
-    }
-  }
   const scopeLabel =
     visibility === "host_only"
       ? `${hostLabel}-only`
@@ -158,18 +132,16 @@ export function CommentComposer({
     // the composer aligns with posted comments (QA 2026-08-10).
     <ComposerRow>
       <form onSubmit={submit} className="inline-form">
-        {mentionsEnabled ? (
-          <div style={{ flex: 1 }} onFocus={loadCandidates}>
-            <MentionTextarea
-              value={body}
-              onChange={setBody}
-              candidates={candidates}
-              placeholder={copy.mentionPlaceholder}
-              ariaLabel="Comment"
-              dataTopicComposer={topicId}
-              onUnhandledKeyDown={keyHandler}
-            />
-          </div>
+        {visibility === "public" && mentionSlug ? (
+          <ForumMentionTextarea
+            mentionSlug={mentionSlug}
+            value={body}
+            onChange={setBody}
+            placeholder={copy.mentionPlaceholder}
+            ariaLabel="Comment"
+            dataTopicComposer={topicId}
+            onUnhandledKeyDown={keyHandler}
+          />
         ) : (
           <GrowingTextarea
             value={body}

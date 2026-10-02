@@ -16,7 +16,11 @@ import {
 
 import { alias } from "drizzle-orm/pg-core";
 
-import { parseMentionHandles, type Role } from "@timetable/shared";
+import {
+  LOUNGE_ROLES as SHARED_LOUNGE_ROLES,
+  parseMentionHandles,
+  type Role,
+} from "@timetable/shared";
 
 import {
   db,
@@ -42,7 +46,7 @@ import { logActivity } from "./activity";
  */
 
 /** Roles that can ever be in the Lounge — mentions resolve only to them. */
-const LOUNGE_ROLES: Role[] = ["host", "admin", "owner"];
+const LOUNGE_ROLES: Role[] = [...SHARED_LOUNGE_ROLES];
 
 export async function getLoungeComment(
   id: string,

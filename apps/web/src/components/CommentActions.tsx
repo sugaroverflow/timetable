@@ -7,9 +7,44 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { ComposerRow } from "@/components/ComposerRow";
 import { GrowingTextarea } from "@/components/GrowingTextarea";
+import { ForumMentionTextarea } from "@/components/MentionTextarea";
 import { draftKey, hasDraft, useDraft } from "@/lib/commentDrafts";
 import { nounTitle, useCommentThread } from "@/lib/commentThreadAdapter";
 import { useGqlAction } from "@/lib/useGqlAction";
+
+function ReplyTextarea({
+  body,
+  onChange,
+  mentionSlug,
+  textareaRef,
+}: {
+  body: string;
+  onChange(value: string): void;
+  mentionSlug?: string;
+  textareaRef?: React.RefObject<HTMLTextAreaElement | null>;
+}) {
+  if (mentionSlug) {
+    return (
+      <ForumMentionTextarea
+        mentionSlug={mentionSlug}
+        textareaRef={textareaRef}
+        value={body}
+        onChange={onChange}
+        placeholder="Write a reply… (@ to mention)"
+        ariaLabel="Reply"
+      />
+    );
+  }
+  return (
+    <GrowingTextarea
+      ref={textareaRef}
+      value={body}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder="Write a reply…"
+      aria-label="Reply"
+    />
+  );
+}
 
 export function CommentActions({
   commentId,
@@ -23,6 +58,7 @@ export function CommentActions({
   chips,
   react,
   onReply,
+  mentionSlug,
 }: {
   commentId: string;
   canReply: boolean;
@@ -43,6 +79,8 @@ export function CommentActions({
   /** Replaces opening the inline box — an opening post's Reply focuses
    * the conversation's foot composer instead. */
   onReply?: () => void;
+  /** Timetable slug — enables @mention autocomplete for public replies. */
+  mentionSlug?: string;
 }) {
   // ?reply= deep links focus a chain-tail composer (dialogue-first
   // threading, 2026-08-13) — this composer only opens from its button.
@@ -140,12 +178,11 @@ export function CommentActions({
   const replyForm = open ? (
     <ComposerRow className="inline-form-nested">
       <form onSubmit={reply} className="inline-form">
-        <GrowingTextarea
-          ref={replyBox}
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          placeholder="Write a reply…"
-          aria-label="Reply"
+        <ReplyTextarea
+          body={body}
+          onChange={setBody}
+          mentionSlug={mentionSlug}
+          textareaRef={replyBox}
         />
         <button
           className="btn btn-primary btn-send"

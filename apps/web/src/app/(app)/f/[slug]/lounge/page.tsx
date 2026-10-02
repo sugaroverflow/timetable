@@ -62,6 +62,7 @@ export default async function LoungePage({
         initial={room.lounge}
         focusId={focusId}
         hostLabel={roleLabel(settings.roleLabels, "host")}
+        adminLabel={roleLabel(settings.roleLabels, "admin")}
         viewerId={forum.me.id}
         isAdmin={isAdmin(forum.timetable.viewerRoles as Role[])}
         roleLabels={settings.roleLabels}

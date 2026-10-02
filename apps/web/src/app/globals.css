@@ -3006,7 +3006,21 @@ a.queue-btn-back:hover {
   gap: var(--space-3);
 }
 
-/* The round "+" (Ed): beside the heading on desktop, floating on phones. */
+.lounge-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+/* "Hosts and admins only" under the title (quiet thread, 2026-10-02). */
+.lounge-who {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+/* New conversation: a "+ New conversation" pill beside the heading on
+   desktop (quiet thread, 2026-10-02), the round "+" floating on phones. */
 .lounge-new,
 .lounge-fab {
   display: inline-flex;
@@ -3019,9 +3033,12 @@ a.queue-btn-back:hover {
   cursor: pointer;
 }
 .lounge-new {
-  width: 36px;
   height: 36px;
+  padding: 0 14px 0 12px;
+  gap: 6px;
   flex: none;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
 }
 .lounge-new:hover,
 .lounge-fab:hover {
@@ -3031,32 +3048,269 @@ a.queue-btn-back:hover {
   display: none;
 }
 
+/* ---- The quiet thread (Ed's option A, 2026-10-02) — Lounge only. The
+   thread components render it when the Lounge adapter sets
+   `variant: "quiet"`; every rule here is scoped to .lounge-conversation
+   so topic threads keep their bubbles. */
 .lounge-conversation {
-  padding: 14px 16px;
+  padding: 20px 24px;
 }
-/* Ed, QA 2026-09-30: each conversation is its own card, so the thread's
-   top rule, the bubble's fit-to-text width and the first-level reply
-   indent (which set a topic's comments apart from the topic above them)
-   have nothing to separate here. */
 .lounge-conversation .comments {
   margin: 0;
   border-top: none;
   padding-top: 0;
 }
-/* The opening post always spans the card. */
-.lounge-conversation .comments > .comment > .comment-main > .c-bubble {
-  width: 100%;
+/* No bubble: the body sits on the card. Keeps the .c-bubble class so the
+   :target ring and the hidden fade still find it. */
+.lounge-conversation .c-bubble.lq-body {
+  background: none;
+  border-radius: var(--radius-xs);
+  padding: 0;
+  width: auto;
+  display: block;
 }
-/* First-level replies line up under the opening post's avatar: no rule,
-   no step — the 36px pulls them back across the avatar column (26px
-   .avatar-sm + 10px .comment gap). Deeper forks keep the usual indent. */
-.lounge-conversation .comments > .comment > .comment-main > .replies {
-  margin-left: -36px;
-  padding-left: 0;
-  border-left: none;
+.lounge-conversation .lq-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 6px;
+}
+.lounge-conversation .lq-meta {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+.lounge-conversation .lq-meta .c-time {
+  margin-left: 0;
+  font-size: inherit;
+  color: inherit;
+}
+.lounge-conversation .lq-pin {
+  font-size: var(--text-2xs);
+}
+.lounge-conversation .lq-msg {
+  position: relative;
+}
+
+/* The opening post leads: 36px avatar, 15px name and body. */
+.lounge-conversation .lq-root {
+  gap: var(--space-3);
+}
+.lounge-conversation .lq-root > .avatar,
+.lounge-conversation .lq-root > a > .avatar,
+.lounge-conversation .lq-root > * > .avatar {
+  width: 36px;
+  height: 36px;
+  margin-top: 0;
+  font-size: var(--text-sm);
+}
+.lounge-conversation .lq-root > .comment-main > .lq-msg .lq-head .c-name {
+  font-size: var(--text-md);
+}
+.lounge-conversation .lq-root > .comment-main > .lq-msg .lq-head .lq-meta {
+  font-size: var(--text-sm);
+}
+.lounge-conversation .lq-root > .comment-main > .lq-msg > .lq-body > .c-text {
+  font-size: var(--text-md);
+  line-height: 1.55;
+  margin-top: var(--space-1);
 }
 .lounge-opening .topic-body {
-  margin: 2px 0 0;
+  margin: 0;
+}
+
+/* Replies are quieter: 24px avatar, 13px name, 14px body. */
+.lounge-conversation .lq-reply-item > .avatar,
+.lounge-conversation .lq-reply-item > * > .avatar {
+  width: 24px;
+  height: 24px;
+  margin-top: 0;
+  font-size: var(--text-2xs);
+}
+.lounge-conversation .lq-reply-item > .comment-main > .lq-msg .lq-head .c-name {
+  font-size: var(--text-sm);
+}
+.lounge-conversation
+  .lq-reply-item
+  > .comment-main
+  > .lq-msg
+  > .lq-body
+  > .c-text {
+  font-size: var(--text-base);
+  line-height: var(--lh-base);
+  margin-top: 0;
+}
+
+/* The replies block: under the opening post's text column, with a top
+   rule and a quiet count. Deeper levels keep the ordinary reply-indent
+   (.replies: 6px + 2px rule). */
+.lounge-conversation .lq-replies {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.lounge-conversation .lq-count {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: var(--fw-semibold);
+}
+
+/* ONE action row: reaction chips + add, Reply, ⋯. */
+.lounge-conversation .lq-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: 6px;
+}
+.lounge-conversation .lq-actions .lounge-reactions {
+  margin: 0;
+}
+.lounge-conversation .lq-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.lounge-conversation .lq-tools button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: none;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.lounge-conversation .lq-tools button:hover,
+.lounge-conversation .lq-tools button[data-popup-open] {
+  background: var(--wash);
+  color: var(--ink);
+}
+.lounge-conversation .lq-tools button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+/* Words on the opening post's row; the reply icon only in a floating
+   toolbar. */
+.lounge-conversation .lq-reply-icon {
+  display: none;
+}
+.lq-menu {
+  min-width: 140px;
+}
+.lq-menu .tt-menu-item {
+  cursor: pointer;
+}
+.lq-menu .tt-menu-item[data-highlighted] {
+  background: var(--wash);
+}
+
+/* Replies on devices with hover: the row's tools float as a small
+   toolbar at the reply's top-right, shown on hover and while focus is
+   inside (so Tab reaches them — opacity, not display, keeps them in the
+   tab order). Existing chips stay in place under the text. */
+@media (hover: hover) {
+  .lounge-conversation .lq-reply-item > .comment-main > .lq-msg > .lq-actions {
+    margin-top: 0;
+  }
+  .lounge-conversation
+    .lq-reply-item
+    > .comment-main
+    > .lq-msg
+    > .lq-actions
+    .lounge-reactions {
+    margin-top: 6px;
+  }
+  .lounge-conversation
+    .lq-reply-item
+    > .comment-main
+    > .lq-msg
+    > .lq-actions
+    > .lq-tools {
+    position: absolute;
+    top: -14px;
+    right: 8px;
+    gap: 2px;
+    padding: 2px;
+    background: var(--card);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow);
+    opacity: 0;
+    pointer-events: none;
+  }
+  .lounge-conversation
+    .lq-reply-item
+    > .comment-main
+    > .lq-msg:hover
+    > .lq-actions
+    > .lq-tools,
+  .lounge-conversation
+    .lq-reply-item
+    > .comment-main
+    > .lq-msg:focus-within
+    > .lq-actions
+    > .lq-tools,
+  .lounge-conversation
+    .lq-reply-item
+    > .comment-main
+    > .lq-msg
+    > .lq-actions
+    > .lq-tools:has([data-popup-open]) {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .lounge-conversation
+    .lq-reply-item
+    > .comment-main
+    > .lq-msg
+    > .lq-actions
+    .lq-reply-label {
+    display: none;
+  }
+  .lounge-conversation
+    .lq-reply-item
+    > .comment-main
+    > .lq-msg
+    > .lq-actions
+    .lq-reply-icon {
+    display: inline;
+  }
+  .lounge-conversation .lq-reply-item > .comment-main > .lq-msg:hover {
+    background: var(--wash);
+    border-radius: var(--radius-xs);
+    box-shadow: 0 0 0 6px var(--wash);
+  }
+}
+
+/* The ONE foot "Reply…" box: a pill with the viewer's 24px avatar. */
+.lounge-conversation .foot-composer {
+  align-items: flex-start;
+}
+.lounge-conversation .foot-composer > .avatar {
+  width: 24px;
+  height: 24px;
+  margin-top: 6px;
+  font-size: var(--text-2xs);
+}
+.lounge-conversation .foot-composer textarea {
+  height: 36px;
+  min-height: 36px;
+  border-radius: 18px;
+  padding: 7px 14px;
+  font-size: var(--text-base);
+  background: var(--bg);
+}
+.lounge-conversation .foot-composer .btn-send {
+  transform: scale(0.85);
 }
 
 .lounge-composer {

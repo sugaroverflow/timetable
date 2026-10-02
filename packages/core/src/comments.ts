@@ -42,6 +42,9 @@ async function recordMentions(comment: Comment): Promise<void> {
       and(
         eq(timetableMemberships.timetableId, topic.timetableId),
         inArray(timetableMemberships.slug, handles),
+        // A deactivated member is suspended (member-deactivation): a
+        // mention notifies nobody, as in recordLoungeMentions.
+        isNull(timetableMemberships.deactivatedAt),
       ),
     );
 

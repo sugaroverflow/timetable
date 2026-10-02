@@ -19,12 +19,15 @@ import {
   canSeeContactDetails,
   canSeePersonProfile,
   canTouchSlotSession,
+  canUseLounge,
   canUseQueue,
   isCalendarEnabled,
   isProfilePublic,
+  LOUNGE_ROLES,
   ownsTopicAsHost,
   type Viewer,
 } from "./permissions";
+import { ROLES, type Role } from "./roles";
 
 const MEMBER: Viewer = { userId: "u1", roles: ["elector"] };
 const SIGNED_IN_GUEST: Viewer = { userId: "u2", roles: [] };
@@ -120,6 +123,16 @@ describe("canUseQueue", () => {
     expect(canUseQueue({ userId: "u", roles: ["admin"] })).toBe(true);
     expect(canUseQueue(SIGNED_IN_GUEST)).toBe(false);
     expect(canUseQueue(ANONYMOUS)).toBe(false);
+  });
+});
+
+describe("LOUNGE_ROLES", () => {
+  it("is exactly the roles canUseLounge lets in", () => {
+    for (const role of ROLES) {
+      expect((LOUNGE_ROLES as readonly Role[]).includes(role)).toBe(
+        canUseLounge({ userId: "u", roles: [role] }),
+      );
+    }
   });
 });
 
