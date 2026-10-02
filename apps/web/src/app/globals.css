@@ -469,7 +469,7 @@ textarea {
   display: block;
 }
 /* Sidebar foot, one item per line (QA 2026-07-28): visibility line,
-   forum switcher, theme toggle, bug link — all quiet, text-xs utility
+   forum switcher, theme toggle, bug + source-code links — all quiet, text-xs utility
    furniture. */
 .sidebar-foot {
   border-top: 1px solid var(--line);
@@ -494,7 +494,7 @@ textarea {
      wash bleeds left harmlessly (QA 2026-07-29). */
   margin-left: -9px;
 }
-.sidebar-bug-link {
+.sidebar-foot-link {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -520,7 +520,7 @@ textarea {
 .nav-badge-quiet {
   background: var(--muted);
 }
-.sidebar-bug-link:hover {
+.sidebar-foot-link:hover {
   text-decoration: underline;
 }
 .topbar-hamburger {
