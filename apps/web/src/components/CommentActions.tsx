@@ -46,20 +46,7 @@ function ReplyTextarea({
   );
 }
 
-export function CommentActions({
-  commentId,
-  canReply,
-  canModerate,
-  hidden,
-  isOwn = false,
-  onEdit,
-  canPin = false,
-  pinned = false,
-  chips,
-  react,
-  onReply,
-  mentionSlug,
-}: {
+type ActionProps = {
   commentId: string;
   canReply: boolean;
   canModerate: boolean;
@@ -81,9 +68,18 @@ export function CommentActions({
   onReply?: () => void;
   /** Timetable slug — enables @mention autocomplete for public replies. */
   mentionSlug?: string;
-}) {
+};
+
+/** The writes behind a comment's actions, and its inline Reply box's
+ * state. */
+function useCommentActions({
+  commentId,
+  hidden,
+  pinned = false,
+}: Pick<ActionProps, "commentId" | "hidden" | "pinned">) {
   // ?reply= deep links focus a chain-tail composer (dialogue-first
-  // threading, 2026-08-13) — this composer only opens from its button.
+  // threading, 2026-08-13) — in a topic thread this composer only opens
+  // from its button.
   const { run, busy } = useGqlAction();
   // Topic comments by default; the Lounge swaps in its own mutations.
   const thread = useCommentThread();
@@ -101,19 +97,29 @@ export function CommentActions({
   const replyBox = useRef<HTMLTextAreaElement>(null);
   // Quiet threads have no chain tails, so a Reply box opened on purpose
   // (button or deep link) takes the focus a tail would have had.
-  const [focusOnOpen, setFocusOnOpen] = useState(false);
+  const focusOnOpen = useRef(false);
   useEffect(() => {
-    if (!open || !focusOnOpen) return;
+    if (!open || !focusOnOpen.current) return;
+    focusOnOpen.current = false;
     replyBox.current?.focus();
     replyBox.current?.scrollIntoView({ block: "center" });
-    setFocusOnOpen(false);
-  }, [open, focusOnOpen]);
+  }, [open]);
 
   /** Collapsing the box is a discard: it drops the draft, so "a draft
    * exists" always means live unsent text. */
   function toggleReply() {
     if (open) clearBody();
     setOpen((v) => !v);
+  }
+
+  /** Open the box and put the caret in it (quiet threads). */
+  function openFocused() {
+    if (open) {
+      replyBox.current?.focus();
+      return;
+    }
+    focusOnOpen.current = true;
+    setOpen(true);
   }
 
   function reply(e: React.FormEvent) {
@@ -175,19 +181,45 @@ export function CommentActions({
     );
   }
 
-  const replyForm = open ? (
+  return {
+    thread,
+    busy,
+    open,
+    body,
+    setBody,
+    replyBox,
+    toggleReply,
+    openFocused,
+    reply,
+    toggleHidden,
+    togglePinned,
+    remove,
+  };
+}
+
+type ActionState = ReturnType<typeof useCommentActions>;
+
+function ReplyForm({
+  state,
+  mentionSlug,
+}: {
+  state: ActionState;
+  mentionSlug?: string;
+}) {
+  if (!state.open) return null;
+  return (
     <ComposerRow className="inline-form-nested">
-      <form onSubmit={reply} className="inline-form">
+      <form onSubmit={state.reply} className="inline-form">
         <ReplyTextarea
-          body={body}
-          onChange={setBody}
+          body={state.body}
+          onChange={state.setBody}
           mentionSlug={mentionSlug}
-          textareaRef={replyBox}
+          textareaRef={state.replyBox}
         />
         <button
           className="btn btn-primary btn-send"
           type="submit"
-          disabled={busy}
+          disabled={state.busy}
           aria-label="Post reply"
           title="Reply"
         >
@@ -195,123 +227,154 @@ export function CommentActions({
         </button>
       </form>
     </ComposerRow>
-  ) : null;
+  );
+}
 
-  if (thread.variant === "quiet") {
-    // ONE row (Ed's quiet thread, 2026-10-02): reacts, Reply, and the
-    // rest behind ⋯ — the same permissions as the topic row's words.
-    const items: { label: string; act: () => void }[] = [];
-    if (isOwn && onEdit) items.push({ label: "Edit", act: onEdit });
-    if (isOwn) items.push({ label: "Delete", act: remove });
-    if (canModerate) {
-      items.push({ label: hidden ? "Unhide" : "Hide", act: toggleHidden });
-    }
-    if (canPin) {
-      items.push({ label: pinned ? "Unpin" : "Pin", act: togglePinned });
-    }
-    return (
-      <>
-        <div className="lq-actions">
-          {chips}
-          <span className="lq-tools">
-            {react}
-            {canReply ? (
-              <button
-                type="button"
-                className="lq-reply"
-                aria-label="Reply"
-                aria-expanded={onReply ? undefined : open}
-                onClick={
-                  onReply ??
-                  (() => {
-                    if (!open) setFocusOnOpen(true);
-                    toggleReply();
-                  })
-                }
-              >
-                <Reply size={16} aria-hidden className="lq-reply-icon" />
-                <span className="lq-reply-label">Reply</span>
-              </button>
-            ) : null}
-            {items.length > 0 ? (
-              <Menu.Root>
-                <Menu.Trigger
-                  className="lq-more"
-                  aria-label="More actions"
-                  title="More actions"
-                  disabled={busy}
-                >
-                  <MoreHorizontal size={16} aria-hidden />
-                </Menu.Trigger>
-                <Menu.Portal>
-                  <Menu.Positioner
-                    className="tt-switcher-positioner"
-                    side="bottom"
-                    align="end"
-                    sideOffset={4}
-                  >
-                    <Menu.Popup className="tt-switcher-list lq-menu">
-                      {items.map((item) => (
-                        <Menu.Item
-                          key={item.label}
-                          className="tt-menu-item"
-                          onClick={item.act}
-                        >
-                          {item.label}
-                        </Menu.Item>
-                      ))}
-                    </Menu.Popup>
-                  </Menu.Positioner>
-                </Menu.Portal>
-              </Menu.Root>
-            ) : null}
-          </span>
-        </div>
-        {replyForm}
-        {thread.footComposer && canReply && !onReply ? (
-          <ReplyDeepLink
-            commentId={commentId}
-            onHit={() => {
-              setFocusOnOpen(true);
-              setOpen(true);
-            }}
-          />
-        ) : null}
-      </>
-    );
+/** The ⋯ menu's entries: whichever of Edit / Delete / Hide / Pin the
+ * viewer may use — the same permissions as the topic row's words. */
+function menuItems(
+  props: ActionProps,
+  state: ActionState,
+): { label: string; act: () => void }[] {
+  const items: { label: string; act: () => void }[] = [];
+  if (props.isOwn && props.onEdit) {
+    items.push({ label: "Edit", act: props.onEdit });
   }
+  if (props.isOwn) items.push({ label: "Delete", act: state.remove });
+  if (props.canModerate) {
+    const label = props.hidden ? "Unhide" : "Hide";
+    items.push({ label, act: state.toggleHidden });
+  }
+  if (props.canPin) {
+    const label = props.pinned ? "Unpin" : "Pin";
+    items.push({ label, act: state.togglePinned });
+  }
+  return items;
+}
 
+function MoreMenu({
+  items,
+  busy,
+}: {
+  items: { label: string; act: () => void }[];
+  busy: boolean;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <Menu.Root>
+      <Menu.Trigger
+        className="lq-more"
+        aria-label="More actions"
+        title="More actions"
+        disabled={busy}
+      >
+        <MoreHorizontal size={16} aria-hidden />
+      </Menu.Trigger>
+      <Menu.Portal>
+        <Menu.Positioner
+          className="tt-switcher-positioner"
+          side="bottom"
+          align="end"
+          sideOffset={4}
+        >
+          <Menu.Popup className="tt-switcher-list lq-menu">
+            {items.map((item) => (
+              <Menu.Item
+                key={item.label}
+                className="tt-menu-item"
+                onClick={item.act}
+              >
+                {item.label}
+              </Menu.Item>
+            ))}
+          </Menu.Popup>
+        </Menu.Positioner>
+      </Menu.Portal>
+    </Menu.Root>
+  );
+}
+
+/** The quiet variant's ONE row (Ed's quiet thread, 2026-10-02): reaction
+ * chips, then the tools — add-reaction, Reply, ⋯. On replies with hover
+ * the tools float as a toolbar (CSS); the chips stay put. */
+function QuietActions(props: ActionProps & { state: ActionState }) {
+  const { state, canReply, onReply, commentId } = props;
+  const toggle = state.open ? state.toggleReply : state.openFocused;
+  const deepLinkable =
+    state.thread.footComposer === true && canReply && !onReply;
+  return (
+    <>
+      <div className="lq-actions">
+        {props.chips}
+        <span className="lq-tools">
+          {props.react}
+          {canReply ? (
+            <button
+              type="button"
+              className="lq-reply"
+              aria-label="Reply"
+              aria-expanded={onReply ? undefined : state.open}
+              onClick={onReply ?? toggle}
+            >
+              <Reply size={16} aria-hidden className="lq-reply-icon" />
+              <span className="lq-reply-label">Reply</span>
+            </button>
+          ) : null}
+          <MoreMenu items={menuItems(props, state)} busy={state.busy} />
+        </span>
+      </div>
+      <ReplyForm state={state} mentionSlug={props.mentionSlug} />
+      {deepLinkable ? (
+        <ReplyDeepLink commentId={commentId} onHit={state.openFocused} />
+      ) : null}
+    </>
+  );
+}
+
+/** Today's row of action words (topic threads). */
+function ActionWords(props: ActionProps & { state: ActionState }) {
+  const { state, isOwn = false } = props;
+  const { busy } = state;
   return (
     <>
       <div className="comment-actions">
-        {canReply ? (
-          <button type="button" onClick={toggleReply}>
+        {props.canReply ? (
+          <button type="button" onClick={state.toggleReply}>
             Reply
           </button>
         ) : null}
-        {canPin ? (
-          <button type="button" onClick={togglePinned} disabled={busy}>
-            {pinned ? "Unpin" : "Pin"}
+        {props.canPin ? (
+          <button type="button" onClick={state.togglePinned} disabled={busy}>
+            {props.pinned ? "Unpin" : "Pin"}
           </button>
         ) : null}
         {isOwn ? (
-          <button type="button" onClick={onEdit} disabled={busy}>
+          <button type="button" onClick={props.onEdit} disabled={busy}>
             Edit
           </button>
         ) : null}
         {isOwn ? (
-          <button type="button" onClick={remove} disabled={busy}>
+          <button type="button" onClick={state.remove} disabled={busy}>
             Delete
           </button>
         ) : null}
-        {canModerate ? (
-          <button type="button" onClick={toggleHidden} disabled={busy}>
-            {hidden ? "Unhide" : "Hide"}
+        {props.canModerate ? (
+          <button type="button" onClick={state.toggleHidden} disabled={busy}>
+            {props.hidden ? "Unhide" : "Hide"}
           </button>
         ) : null}
       </div>
-      {replyForm}
+      <ReplyForm state={state} mentionSlug={props.mentionSlug} />
     </>
+  );
+}
+
+export function CommentActions(props: ActionProps) {
+  const state = useCommentActions(props);
+  return state.thread.variant === "quiet" ? (
+    <QuietActions {...props} state={state} />
+  ) : (
+    <ActionWords {...props} state={state} />
   );
 }
 

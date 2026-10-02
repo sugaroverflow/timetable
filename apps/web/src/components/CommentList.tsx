@@ -3,18 +3,16 @@
 import Link from "next/link";
 import { useState } from "react";
 
+import { primaryRole, type Role } from "@timetable/shared";
+
 import { draftKey, hasDraft } from "@/lib/commentDrafts";
 import { useCommentThread } from "@/lib/commentThreadAdapter";
 import type { FeedComment } from "@/lib/feedTypes";
 import { COMMENT_TREE_DEPTH } from "@/lib/gqlFragments";
 import { relativeTime } from "@/lib/relativeTime";
-import type { RoleLabels } from "@/lib/timetableSettings";
+import { roleLabel, type RoleLabels } from "@/lib/timetableSettings";
 
 import { Avatar } from "./Avatar";
-import { primaryRole, type Role } from "@timetable/shared";
-
-import { roleLabel } from "@/lib/timetableSettings";
-
 import { ChainTailComposer, footComposerId } from "./ChainTailComposer";
 import { CommentActions } from "./CommentActions";
 import { CommentBody } from "./CommentBody";
@@ -443,6 +441,131 @@ function FootBlock({
   );
 }
 
+type ItemProps = {
+  comment: FeedComment;
+  canReply: boolean;
+  canModerate: boolean;
+  viewerId: string | null;
+  slug?: string;
+  roleLabels?: RoleLabels;
+  /** 1-based nesting level, counted from the thread roots. */
+  depth: number;
+  topicHref?: string | null;
+  /** The viewer authored the topic: Pin/Unpin on top-level comments
+   * (#258). */
+  canPin?: boolean;
+};
+
+/** Focus a conversation's foot composer (an opening post's Reply). */
+function focusFoot(rootId: string) {
+  document
+    .getElementById(footComposerId(rootId))
+    ?.querySelector("textarea")
+    ?.focus();
+}
+
+/** The quiet message's own block — text, then ONE action row (Ed's quiet
+ * thread, 2026-10-02) instead of bubble + react row + action words.
+ * Reply nests under any message the reply-depth-guard allows; with a
+ * foot composer the opening post's Reply goes to it rather than opening
+ * a second box for the same post. Wrapped in .lq-msg, the hover/focus
+ * target for a reply's floating toolbar. */
+function QuietMessage({
+  comment,
+  canReply,
+  canModerate,
+  viewerId,
+  slug,
+  roleLabels,
+  depth,
+  topicHref,
+  canPin = false,
+}: ItemProps) {
+  const thread = useCommentThread();
+  // Reopen the inline editor for an interrupted edit (comment-draft-store).
+  const [editing, setEditing] = useState(() =>
+    hasDraft(draftKey.edit(comment.id)),
+  );
+  if (comment.deleted) {
+    return (
+      <div className="lq-msg">
+        <div className="c-bubble lq-body">
+          <span className="c-text faint" style={{ fontStyle: "italic" }}>
+            This comment was deleted by its author.
+          </span>
+        </div>
+      </div>
+    );
+  }
+  const toFoot = thread.footComposer === true && depth === 1;
+  const replyable = toFoot || (depth >= 2 && depth < COMMENT_TREE_DEPTH);
+  return (
+    <div className="lq-msg">
+      <CommentBubble
+        comment={comment}
+        slug={slug}
+        roleLabels={roleLabels}
+        editing={editing}
+        onEditDone={() => setEditing(false)}
+        topicHref={topicHref}
+      />
+      <CommentActions
+        commentId={comment.id}
+        canReply={canReply && replyable}
+        canModerate={canModerate}
+        hidden={comment.hidden}
+        isOwn={viewerId != null && viewerId === comment.authorId}
+        onEdit={() => setEditing(true)}
+        canPin={canPin && depth === 1}
+        pinned={comment.pinnedAt != null}
+        mentionSlug={mentionSlugFor(comment, slug)}
+        chips={thread.renderFooter?.(comment, "chips")}
+        react={thread.renderFooter?.(comment, "add")}
+        onReply={toFoot ? () => focusFoot(comment.id) : undefined}
+      />
+    </div>
+  );
+}
+
+/** A message in the quiet variant, with its nested replies. */
+function QuietCommentItem(props: ItemProps) {
+  const { comment, depth } = props;
+  const level = depth === 1 ? "lq-root" : "lq-reply-item";
+  return (
+    <div
+      id={`comment-${comment.id}`}
+      className={`comment ${level}${comment.hidden ? " hidden" : ""}`}
+    >
+      <CommentAvatar comment={comment} slug={props.slug} />
+      <div className="comment-main">
+        <QuietMessage {...props} />
+        <ChainBlock
+          comment={comment}
+          replies={comment.replies ?? []}
+          canReply={props.canReply}
+          canModerate={props.canModerate}
+          viewerId={props.viewerId}
+          slug={props.slug}
+          roleLabels={props.roleLabels}
+          depth={depth}
+          topicHref={props.topicHref}
+        />
+      </div>
+    </div>
+  );
+}
+
+/** A comment and its replies: the quiet variant (the Lounge) or today's
+ * bubbles (topic threads). */
+function CommentItem(props: ItemProps) {
+  const thread = useCommentThread();
+  return thread.variant === "quiet" ? (
+    <QuietCommentItem {...props} />
+  ) : (
+    <BubbleCommentItem {...props} />
+  );
+}
+
 /**
  * Dialogue-first threading (2026-08-13): a comment's children render as a
  * linear chain (oldest first) ending in a chain-tail-composer that
@@ -450,7 +573,7 @@ function FootBlock({
  * (root-attach), so chains don't deepen. Reply on a chain message is the
  * rarer fork gesture, opening a sub-chain beside the main line.
  */
-function CommentItem({
+function BubbleCommentItem({
   comment,
   canReply,
   canModerate,
@@ -482,80 +605,6 @@ function CommentItem({
   );
   const isOwn = viewerId != null && viewerId === comment.authorId;
   const thread = useCommentThread();
-
-  if (thread.variant === "quiet") {
-    // One action row instead of bubble + react row + action words (Ed's
-    // quiet thread, 2026-10-02). Reply nests under any message the
-    // reply-depth-guard allows; with a foot composer the opening post's
-    // Reply goes to it rather than opening a second box for the same post.
-    const toFoot = thread.footComposer === true && depth === 1;
-    return (
-      <div
-        id={`comment-${comment.id}`}
-        className={`comment ${depth === 1 ? "lq-root" : "lq-reply-item"}${comment.hidden ? " hidden" : ""}`}
-      >
-        <CommentAvatar comment={comment} slug={slug} />
-        <div className="comment-main">
-          <div className="lq-msg">
-            {comment.deleted ? (
-              <div className="c-bubble lq-body">
-                <span className="c-text faint" style={{ fontStyle: "italic" }}>
-                  This comment was deleted by its author.
-                </span>
-              </div>
-            ) : (
-              <CommentBubble
-                comment={comment}
-                slug={slug}
-                roleLabels={roleLabels}
-                editing={editing}
-                onEditDone={() => setEditing(false)}
-                topicHref={topicHref}
-              />
-            )}
-            {comment.deleted ? null : (
-              <CommentActions
-                commentId={comment.id}
-                canReply={
-                  canReply &&
-                  (toFoot || (depth >= 2 && depth < COMMENT_TREE_DEPTH))
-                }
-                canModerate={canModerate}
-                hidden={comment.hidden}
-                isOwn={isOwn}
-                onEdit={() => setEditing(true)}
-                canPin={canPin && depth === 1}
-                pinned={comment.pinnedAt != null}
-                mentionSlug={mentionSlugFor(comment, slug)}
-                chips={thread.renderFooter?.(comment, "chips")}
-                react={thread.renderFooter?.(comment, "add")}
-                onReply={
-                  toFoot
-                    ? () =>
-                        document
-                          .getElementById(footComposerId(comment.id))
-                          ?.querySelector("textarea")
-                          ?.focus()
-                    : undefined
-                }
-              />
-            )}
-          </div>
-          <ChainBlock
-            comment={comment}
-            replies={replies}
-            canReply={canReply}
-            canModerate={canModerate}
-            viewerId={viewerId}
-            slug={slug}
-            roleLabels={roleLabels}
-            depth={depth}
-            topicHref={topicHref}
-          />
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div

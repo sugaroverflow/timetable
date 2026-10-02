@@ -3116,6 +3116,7 @@ a.queue-btn-back:hover {
 }
 .lounge-opening .topic-body {
   margin: 0;
+  line-height: 1.55;
 }
 
 /* Replies are quieter: 24px avatar, 13px name, 14px body. */
@@ -3304,6 +3305,7 @@ a.queue-btn-back:hover {
 .lounge-conversation .foot-composer textarea {
   height: 36px;
   min-height: 36px;
+  border: 1px solid var(--line-strong);
   border-radius: 18px;
   padding: 7px 14px;
   font-size: var(--text-base);
