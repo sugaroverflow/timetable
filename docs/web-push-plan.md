@@ -2,8 +2,10 @@
 
 Written 2026-10-03. Ed ruled on its four decisions the same day, and this
 version describes the chosen design; §5 lists the rulings and their reasons.
-Plan only when written; §6 records which steps have since been built. Step 0, the installable
-app (#367), is built in PR #376. Source material:
+**Status: every build step (0–7 in §6) is done and on `main`, shipping
+inert until VAPID keys exist; next is step 8, verification on dev.** How
+push works as built is `docs/WEB_PUSH.md`; this plan stays as the record of
+what was decided and why. Source material:
 AndreasThinks's #360 (not merged; Ed, 2026-10-02: "build #360's ideas
 separately ourselves"), the review findings recorded in #368, and the
 installable-app request #367.
