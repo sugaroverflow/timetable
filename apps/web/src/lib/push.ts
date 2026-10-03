@@ -161,6 +161,47 @@ export function applicationServerKey(key: string): Uint8Array<ArrayBuffer> {
   return Uint8Array.from(decoded, (character) => character.charCodeAt(0));
 }
 
+/** The bytes of a server key, whichever form it arrives in: the base64url
+ * string GraphQL `pushPublicKey` returns, or the ArrayBuffer (or view) the
+ * browser keeps in `subscription.options.applicationServerKey`. Comparing
+ * the two forms directly is always "different" — decode both first. Null
+ * when there is no key or it doesn't decode. */
+export function serverKeyBytes(
+  key: string | BufferSource | null | undefined,
+): Uint8Array | null {
+  if (key === null || key === undefined) return null;
+  if (typeof key === "string") {
+    try {
+      return applicationServerKey(key);
+    } catch {
+      return null;
+    }
+  }
+  if (ArrayBuffer.isView(key)) {
+    return new Uint8Array(key.buffer, key.byteOffset, key.byteLength);
+  }
+  return new Uint8Array(key);
+}
+
+/** How a browser subscription's server key compares with ours (#385,
+ * disagreement 1): a subscription made under an older VAPID key is refused
+ * on every send, so it must be replaced, not re-posted.
+ * - "same": made with the current key — reuse it;
+ * - "different": made with another key — stale;
+ * - "unknown": the browser doesn't say (no `options`, or a null key). */
+export type ServerKeyMatch = "same" | "different" | "unknown";
+
+export function compareServerKey(
+  subscription: Pick<PushSubscription, "options">,
+  publicKey: string,
+): ServerKeyMatch {
+  const theirs = serverKeyBytes(subscription.options?.applicationServerKey);
+  const ours = serverKeyBytes(publicKey);
+  if (!theirs || !ours) return "unknown";
+  if (theirs.length !== ours.length) return "different";
+  return theirs.every((byte, i) => byte === ours[i]) ? "same" : "different";
+}
+
 /** What identifies a subscription to the server: its endpoint and payload
  * keys. #379's call 10 — re-send only when one of these changes. */
 export type SubscriptionIdentity = {
@@ -365,6 +406,30 @@ async function sendSubscription(
   throw new PushActionError(reply.error ?? TURN_ON_FAILED);
 }
 
+/** Drop a subscription made under another server key and make a fresh one
+ * with ours. The server's row for the old endpoint is removed too, best
+ * effort: it would otherwise hold one of the 10 device places until its
+ * sends had failed 20 times. */
+async function replaceSubscription(
+  registration: ServiceWorkerRegistration,
+  stale: PushSubscription,
+  publicKey: string,
+): Promise<PushSubscription> {
+  const oldEndpoint = stale.endpoint;
+  await stale.unsubscribe().catch(() => false);
+  const fresh = await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: applicationServerKey(publicKey),
+  });
+  if (fresh.endpoint !== oldEndpoint) {
+    await clientApi("/api/push-subscriptions", {
+      method: "DELETE",
+      body: JSON.stringify({ endpoint: oldEndpoint }),
+    }).catch(() => null);
+  }
+  return fresh;
+}
+
 export const TURN_ON_FAILED = "Couldn't turn alerts on. Please try again.";
 export const TURN_OFF_FAILED = "Couldn't turn alerts off. Please try again.";
 
@@ -375,8 +440,11 @@ let inflight: Promise<PushDeviceState> | null = null;
  * components mounting together run one detection. Re-sends the
  * subscription only when it changed since this page last sent it.
  */
-export function refreshPushDevice(userId: string): Promise<PushDeviceState> {
-  inflight ??= detectDevice(userId)
+export function refreshPushDevice(
+  userId: string,
+  publicKey: string,
+): Promise<PushDeviceState> {
+  inflight ??= detectDevice(userId, publicKey)
     .catch((): PushDeviceState => "off")
     .then((state) => {
       setPushDeviceState(state);
@@ -388,16 +456,51 @@ export function refreshPushDevice(userId: string): Promise<PushDeviceState> {
   return inflight;
 }
 
-async function detectDevice(userId: string): Promise<PushDeviceState> {
+async function detectDevice(
+  userId: string,
+  publicKey: string,
+): Promise<PushDeviceState> {
   const support = detectPushSupport(readEnvironment());
   if (support !== "ready") return support;
 
-  const subscription = await currentSubscription();
-  if (!subscription) return "off";
+  const registration =
+    await navigator.serviceWorker.getRegistration(SERVICE_WORKER_SCOPE);
+  const subscription =
+    (await registration?.pushManager.getSubscription()) ?? null;
+  if (!registration || !subscription) return "off";
   const identity = subscriptionIdentity(subscription.toJSON());
   if (!identity) return "off";
 
   const lastSent = readLastSent(userId);
+
+  // Made under an older server key (the VAPID pair changed): every send to
+  // it is refused, so re-posting it would only start the 20-failure cycle
+  // again. When it is this person's — we sent it, or the server holds it —
+  // and the browser already granted permission (so subscribing can't
+  // prompt), replace it now. Only a definite "different": a browser that
+  // doesn't report the key would otherwise resubscribe on every page view;
+  // Turn on handles that case.
+  if (
+    compareServerKey(subscription, publicKey) === "different" &&
+    Notification.permission === "granted" &&
+    (lastSent !== null || (await serverHasDevice(identity.endpoint)))
+  ) {
+    const fresh = await replaceSubscription(
+      registration,
+      subscription,
+      publicKey,
+    );
+    const result = await sendSubscription(fresh);
+    const freshIdentity = subscriptionIdentity(fresh.toJSON());
+    writeLastSent(
+      userId,
+      result === "ok" && freshIdentity
+        ? await identityFingerprint(freshIdentity)
+        : null,
+    );
+    return result === "ok" ? "on" : "off";
+  }
+
   const fingerprint = await identityFingerprint(identity);
   if (shouldResend(lastSent, fingerprint)) {
     // The browser rotated the endpoint or keys since this person turned
@@ -442,6 +545,18 @@ export async function turnOnPush(
       applicationServerKey: applicationServerKey(publicKey),
     };
     let subscription = await registration.pushManager.getSubscription();
+    // Made under another server key, or the browser can't say which: a
+    // stale one is refused on every send, so replace it rather than re-post
+    // it (#385). This is a click, so "unknown" is replaced too — one fresh
+    // subscription is cheap; a dead one that reads "on" is not.
+    if (subscription && compareServerKey(subscription, publicKey) !== "same") {
+      subscription = await replaceSubscription(
+        registration,
+        subscription,
+        publicKey,
+      );
+      created = subscription;
+    }
     if (!subscription) {
       subscription = await registration.pushManager.subscribe(options);
       created = subscription;

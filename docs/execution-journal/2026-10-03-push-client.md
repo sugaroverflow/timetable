@@ -136,3 +136,33 @@ registers. Step 3 (the sweep sender) was being built at the same time in
   `next/link`.
 - Step 7: `docs/WEB_PUSH.md`, and the glossary entries for alerts-line,
   push-device, install-steps and notifications-chooser.
+
+## Follow-up: a changed server key (#385, disagreement 1)
+
+- **The bug.** `turnOnPush` reused the browser's existing subscription even
+  when it was made under an older VAPID public key. Every send to it was
+  refused, the row went after 20 failures, and Turn on re-posted the same
+  dead subscription. Members had to know to Turn off and then Turn on.
+- **The fix** (`push.ts`). `compareServerKey` decodes both
+  `subscription.options.applicationServerKey` (an ArrayBuffer) and
+  `pushPublicKey` (base64url) to bytes before comparing; comparing the two
+  forms as they arrive always says "different".
+  - **Turn on** replaces anything that isn't a definite match (a different
+    key, or one the browser doesn't report): `unsubscribe()`, subscribe
+    with the current key, best-effort `DELETE` of the old endpoint (so the
+    dead row doesn't hold one of the 10 device places), then post.
+  - **Page load** (`refreshPushDevice` now takes the key) replaces only a
+    definite "different", and only for this person's device (we sent it,
+    or the server holds it) with permission already granted, so it never
+    prompts. An unreported key is left alone on page views, or a browser
+    that never reports it would resubscribe on every page.
+  - #379's re-send rule is unchanged: the fresh subscription's fingerprint
+    is what gets stored, so the next page view matches and posts nothing.
+- **Boot line.** With keys set, the API logs once at boot `[api] Web Push
+  on, key <first 8 chars>…` (or `on (paused)`); with none it logs nothing,
+  as before. `pushBootLine` lives in `push-config.ts` so it is testable;
+  a test checks it never contains the private key in any encoding.
+- So after a key change members just press Turn on again (or open a page,
+  for a device that was on). `docs/WEB_PUSH.md` and OPERATIONS R19 arrive
+  with #385, which hadn't merged when this was written; they still say
+  Turn off, then Turn on.

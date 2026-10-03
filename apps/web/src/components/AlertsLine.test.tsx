@@ -29,7 +29,11 @@ vi.mock("@/lib/clientApi", () => ({
 }));
 
 import { AlertsLine } from "@/components/AlertsLine";
-import { resetPushDeviceForTests } from "@/lib/push";
+import {
+  applicationServerKey,
+  identityFingerprint,
+  resetPushDeviceForTests,
+} from "@/lib/push";
 
 const ENDPOINT = "https://fcm.googleapis.com/fcm/send/device-1";
 const SUBSCRIPTION_JSON = {
@@ -47,12 +51,50 @@ const UA = {
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1",
 };
 
-function subscriptionObject() {
+// Another pair's public key: what a subscription made before a key change
+// is tied to.
+const OLD_PUBLIC_KEY = `B${"Q".repeat(86)}`;
+const FRESH_ENDPOINT = "https://fcm.googleapis.com/fcm/send/device-2";
+
+/** A browser subscription. `serverKey` is what the browser reports in
+ * `options.applicationServerKey`: an ArrayBuffer of that key's bytes, or
+ * null for "not reported"; omitted, there are no options at all. */
+function subscriptionObject({
+  endpoint = ENDPOINT,
+  serverKey,
+}: { endpoint?: string; serverKey?: string | null } = {}) {
+  const json = { ...SUBSCRIPTION_JSON, endpoint };
   return {
-    endpoint: ENDPOINT,
-    toJSON: () => SUBSCRIPTION_JSON,
+    endpoint,
+    toJSON: () => json,
     unsubscribe: mocks.unsubscribe,
+    ...(serverKey === undefined
+      ? {}
+      : {
+          options: {
+            userVisibleOnly: true,
+            applicationServerKey:
+              serverKey === null
+                ? null
+                : applicationServerKey(serverKey).buffer,
+          },
+        }),
   };
+}
+
+/** The fingerprint this page stores after sending `endpoint`. */
+async function sentFingerprint(endpoint: string): Promise<string> {
+  return identityFingerprint({
+    endpoint,
+    p256dh: SUBSCRIPTION_JSON.keys.p256dh,
+    auth: SUBSCRIPTION_JSON.keys.auth,
+  });
+}
+
+function calls(method: string) {
+  return (mocks.clientApi.mock.calls as [string, RequestInit][])
+    .filter(([, init]) => init.method === method)
+    .map(([, init]) => JSON.parse(init.body as string) as { endpoint: string });
 }
 
 /** The browser this test pretends to be. */
@@ -324,5 +366,147 @@ describe("alerts-line: denied and on", () => {
         2,
       ),
     );
+  });
+});
+
+describe("alerts-line: the server key changed (#385)", () => {
+  it("Turn on with a subscription made under the current key: reuses it", async () => {
+    setBrowser({ permission: "granted" });
+    mocks.getSubscription.mockResolvedValue(
+      subscriptionObject({ serverKey: PUBLIC_KEY }),
+    );
+    setup();
+    fireEvent.click(await screen.findByRole("button", { name: "Turn on" }));
+    await screen.findByText(/Alerts are on for this device/);
+    expect(mocks.unsubscribe).not.toHaveBeenCalled();
+    expect(mocks.subscribe).not.toHaveBeenCalled();
+    expect(calls("POST")).toEqual([
+      expect.objectContaining({ endpoint: ENDPOINT }),
+    ]);
+  });
+
+  it("Turn on with a subscription made under an old key: unsubscribes, resubscribes with ours, posts the fresh one", async () => {
+    setBrowser({ permission: "granted" });
+    mocks.getSubscription.mockResolvedValue(
+      subscriptionObject({ serverKey: OLD_PUBLIC_KEY }),
+    );
+    mocks.subscribe.mockResolvedValue(
+      subscriptionObject({ endpoint: FRESH_ENDPOINT, serverKey: PUBLIC_KEY }),
+    );
+    setup();
+    fireEvent.click(await screen.findByRole("button", { name: "Turn on" }));
+    await screen.findByText(/Alerts are on for this device/);
+    expect(mocks.unsubscribe).toHaveBeenCalledTimes(1);
+    expect(mocks.subscribe).toHaveBeenCalledTimes(1);
+    const options = mocks.subscribe.mock.calls[0]![0] as {
+      applicationServerKey: Uint8Array;
+    };
+    expect(Array.from(options.applicationServerKey)).toEqual(
+      Array.from(applicationServerKey(PUBLIC_KEY)),
+    );
+    // The dead row goes; only the fresh subscription is posted.
+    expect(calls("DELETE")).toEqual([{ endpoint: ENDPOINT }]);
+    expect(calls("POST")).toEqual([
+      expect.objectContaining({ endpoint: FRESH_ENDPOINT }),
+    ]);
+    expect(window.localStorage.getItem("topic.push.sent.user-1")).toBe(
+      await sentFingerprint(FRESH_ENDPOINT),
+    );
+  });
+
+  it.each([
+    ["no options", undefined],
+    ["a null key", null],
+  ] as const)(
+    "Turn on with a subscription whose key is unavailable (%s): resubscribes",
+    async (_label, serverKey) => {
+      setBrowser({ permission: "granted" });
+      mocks.getSubscription.mockResolvedValue(
+        subscriptionObject({ serverKey }),
+      );
+      mocks.subscribe.mockResolvedValue(
+        subscriptionObject({ endpoint: FRESH_ENDPOINT, serverKey: PUBLIC_KEY }),
+      );
+      setup();
+      fireEvent.click(await screen.findByRole("button", { name: "Turn on" }));
+      await screen.findByText(/Alerts are on for this device/);
+      expect(mocks.unsubscribe).toHaveBeenCalledTimes(1);
+      expect(mocks.subscribe).toHaveBeenCalledTimes(1);
+      expect(calls("POST")).toEqual([
+        expect.objectContaining({ endpoint: FRESH_ENDPOINT }),
+      ]);
+    },
+  );
+
+  it("page load, on, same key, unchanged: asks the server and re-sends nothing", async () => {
+    setBrowser({ permission: "granted" });
+    window.localStorage.setItem(
+      "topic.push.sent.user-1",
+      await sentFingerprint(ENDPOINT),
+    );
+    mocks.getSubscription.mockResolvedValue(
+      subscriptionObject({ serverKey: PUBLIC_KEY }),
+    );
+    mocks.clientGql.mockResolvedValue({ myPushDeviceEnabled: true });
+    setup();
+    await screen.findByRole("button", { name: "Turn off" });
+    expect(mocks.subscribe).not.toHaveBeenCalled();
+    expect(mocks.unsubscribe).not.toHaveBeenCalled();
+    expect(mocks.clientApi).not.toHaveBeenCalled();
+  });
+
+  it("page load, on, old key: replaces the subscription once and stores the fresh fingerprint", async () => {
+    setBrowser({ permission: "granted" });
+    window.localStorage.setItem(
+      "topic.push.sent.user-1",
+      await sentFingerprint(ENDPOINT),
+    );
+    mocks.getSubscription.mockResolvedValue(
+      subscriptionObject({ serverKey: OLD_PUBLIC_KEY }),
+    );
+    mocks.subscribe.mockResolvedValue(
+      subscriptionObject({ endpoint: FRESH_ENDPOINT, serverKey: PUBLIC_KEY }),
+    );
+    setup();
+    await screen.findByRole("button", { name: "Turn off" });
+    expect(mocks.requestPermission).not.toHaveBeenCalled();
+    expect(mocks.unsubscribe).toHaveBeenCalledTimes(1);
+    expect(mocks.subscribe).toHaveBeenCalledTimes(1);
+    expect(calls("DELETE")).toEqual([{ endpoint: ENDPOINT }]);
+    expect(calls("POST")).toEqual([
+      expect.objectContaining({ endpoint: FRESH_ENDPOINT }),
+    ]);
+    expect(window.localStorage.getItem("topic.push.sent.user-1")).toBe(
+      await sentFingerprint(FRESH_ENDPOINT),
+    );
+  });
+
+  it("page load, old key, but not this person's device: leaves it for Turn on", async () => {
+    setBrowser({ permission: "granted" });
+    mocks.getSubscription.mockResolvedValue(
+      subscriptionObject({ serverKey: OLD_PUBLIC_KEY }),
+    );
+    mocks.clientGql.mockResolvedValue({ myPushDeviceEnabled: false });
+    setup();
+    await screen.findByRole("button", { name: "Turn on" });
+    expect(mocks.subscribe).not.toHaveBeenCalled();
+    expect(mocks.unsubscribe).not.toHaveBeenCalled();
+    expect(mocks.clientApi).not.toHaveBeenCalled();
+  });
+
+  it("page load, key not reported: never resubscribes on a page view", async () => {
+    setBrowser({ permission: "granted" });
+    window.localStorage.setItem(
+      "topic.push.sent.user-1",
+      await sentFingerprint(ENDPOINT),
+    );
+    mocks.getSubscription.mockResolvedValue(
+      subscriptionObject({ serverKey: null }),
+    );
+    mocks.clientGql.mockResolvedValue({ myPushDeviceEnabled: true });
+    setup();
+    await screen.findByRole("button", { name: "Turn off" });
+    expect(mocks.subscribe).not.toHaveBeenCalled();
+    expect(mocks.clientApi).not.toHaveBeenCalled();
   });
 });

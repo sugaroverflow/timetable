@@ -1,6 +1,7 @@
 import { createApiApp } from "./app";
 import { env } from "./env";
 import { structuredLogger } from "./http/request-log";
+import { pushBootLine } from "./push-config";
 import {
   createPushSweeper,
   pushSweepDeps,
@@ -27,6 +28,7 @@ const pushSweep = env.push
       }),
     )
   : null;
+if (env.push) console.log(pushBootLine(env.push));
 
 /**
  * Drain on shutdown (ops R10). App Platform sends SIGTERM on every deploy and

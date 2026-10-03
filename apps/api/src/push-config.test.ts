@@ -3,7 +3,7 @@ import { inspect } from "node:util";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { loadPushConfig, parsePushEnv } from "./push-config";
+import { loadPushConfig, parsePushEnv, pushBootLine } from "./push-config";
 import { vapidTestPair } from "./push-test-keys";
 
 const pair = vapidTestPair;
@@ -241,5 +241,41 @@ describe("Web Push boot rule (plan §3.1)", () => {
         sig,
       ),
     ).toBe(true);
+  });
+});
+
+describe("pushBootLine (#385 open call 2)", () => {
+  it("says push is on, with the public key's first 8 characters only", () => {
+    const source = valid();
+    const config = loadPushConfig(source, { isProd: true })!;
+    const line = pushBootLine(config);
+    expect(line).toBe(
+      `[api] Web Push on, key ${source.VAPID_PUBLIC_KEY.slice(0, 8)}…`,
+    );
+    expect(line).not.toContain(source.VAPID_PUBLIC_KEY.slice(0, 9));
+  });
+
+  it("says when the kill switch is set", () => {
+    const config = loadPushConfig(valid({ PUSH_PAUSED: "true" }), {
+      isProd: true,
+    })!;
+    expect(pushBootLine(config)).toMatch(
+      /^\[api\] Web Push on \(paused\), key /,
+    );
+  });
+
+  it("never contains the private key, in any encoding", () => {
+    for (let i = 0; i < 20; i++) {
+      const source = valid();
+      const line = pushBootLine(loadPushConfig(source, { isProd: true })!);
+      const privateKey = source.VAPID_PRIVATE_KEY;
+      const hex = Buffer.from(privateKey, "base64url").toString("hex");
+      const base64 = Buffer.from(privateKey, "base64url").toString("base64");
+      for (const secret of [privateKey, hex, base64]) {
+        expect(line).not.toContain(secret);
+        // Not even a recognisable piece of it.
+        expect(line).not.toContain(secret.slice(0, 8));
+      }
+    }
   });
 });
