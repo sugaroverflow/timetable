@@ -1,3 +1,5 @@
+import { loadPushConfig } from "./push-config";
+
 function intEnv(name: string, fallback: number): number {
   const raw = process.env[name];
   if (!raw) return fallback;
@@ -74,6 +76,14 @@ if (process.env.SPACES_BUCKET) {
   }
 }
 
+/**
+ * Web Push (VAPID) — docs/web-push-plan.md §3.1. Checked ONCE here: none set
+ * (or all empty) = push off; all three set and valid = on; partial or invalid
+ * = refuse to boot in production, warn and stay off elsewhere. PUSH_PAUSED is
+ * read with them, so flipping it takes a component restart, no deploy.
+ */
+const push = loadPushConfig(process.env, { isProd });
+
 export const env = {
   port: intEnv("API_PORT", 4000),
   webOrigin: listEnv("WEB_ORIGIN", "http://localhost:3000"),
@@ -140,6 +150,12 @@ export const env = {
   graphqlMaxDepth: intEnv("GRAPHQL_MAX_DEPTH", 12),
   graphqlMaxCost: intEnv("GRAPHQL_MAX_COST", 500),
   uploadMaxImageBytes: intEnv("UPLOAD_MAX_IMAGE_BYTES", 5 * 1024 * 1024),
+  /**
+   * Web Push server config, or null when push is off (no VAPID keys). Frozen;
+   * holds the signing key as a KeyObject, never as a string. `paused` is the
+   * PUSH_PAUSED kill switch: the controls stay, the sweep sends nothing.
+   */
+  push,
   /**
    * Emails (lowercased) whose accounts get the global sysadmin dashboard
    * (/admin): every forum, activity counts, owner contact, forum deletion.

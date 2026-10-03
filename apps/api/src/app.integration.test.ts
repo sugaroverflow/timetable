@@ -24,6 +24,9 @@ import * as clerk from "./auth/clerk";
 import * as context from "./context";
 import type { ApiContext } from "./context";
 import * as email from "./email";
+import { env } from "./env";
+import { parsePushEnv } from "./push-config";
+import { vapidTestPair } from "./push-test-keys";
 
 vi.mock("@timetable/core", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@timetable/core")>();
@@ -3820,5 +3823,71 @@ describe("{host} Lounge — hidden and deleted posts", () => {
       expect((await post(baseUrl, REPLY)).errors).toBeUndefined();
       expect(core.replyInLounge).toHaveBeenCalled();
     });
+  });
+});
+
+describe("pushPublicKey (Web Push step 2; plan §2 finding 1)", () => {
+  const QUERY = "{ pushPublicKey }";
+  const original = env.push;
+  afterEach(() => {
+    env.push = original;
+  });
+
+  async function ask(baseUrl: string) {
+    const res = await fetch(`${baseUrl}/graphql`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: QUERY }),
+    });
+    return (await res.json()) as {
+      data?: { pushPublicKey: string | null };
+      errors?: unknown[];
+    };
+  }
+
+  /** A throwaway pair generated per run — never a committed key. */
+  function configure(paused = false) {
+    env.push = parsePushEnv({
+      ...vapidTestPair(),
+      VAPID_SUBJECT: "mailto:push@example.com",
+      PUSH_PAUSED: paused ? "true" : "",
+    }).config;
+    return env.push!.publicKey;
+  }
+
+  it("is null when no VAPID keys are configured (the test env has none)", async () => {
+    expect(original).toBeNull();
+    mockSession("user-1", ["elector"]);
+    await withTestServer(async (baseUrl) => {
+      expect(await ask(baseUrl)).toEqual({ data: { pushPublicKey: null } });
+    });
+  });
+
+  it("returns the key to a signed-in member, paused or not", async () => {
+    for (const paused of [false, true]) {
+      const key = configure(paused);
+      mockSession("user-1", ["elector"]);
+      await withTestServer(async (baseUrl) => {
+        expect(await ask(baseUrl)).toEqual({ data: { pushPublicKey: key } });
+      });
+    }
+  });
+
+  it("is null signed out, under view-as, and for a personal API token", async () => {
+    configure();
+    const previewing = testContext("user-1", ["elector"]);
+    for (const ctx of [
+      testContext(null),
+      {
+        ...previewing,
+        impersonation: { actorId: "admin-1", timetableId: "t-1" },
+      },
+      testContext("user-1", ["elector"], { id: "token-1", scopes: [] }),
+    ]) {
+      vi.mocked(context.buildContext).mockResolvedValue(ctx);
+      await withTestServer(async (baseUrl) => {
+        expect(await ask(baseUrl)).toEqual({ data: { pushPublicKey: null } });
+      });
+    }
   });
 });

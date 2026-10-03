@@ -24,5 +24,6 @@ import "./activity";
 import "./slots";
 import "./dashboard";
 import "./sysadmin";
+import "./push";
 
 export const schema = builder.toSchema();
