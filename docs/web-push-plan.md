@@ -573,7 +573,7 @@ inert until keys exist.
 | 4 | **Service worker + alerts line**. **Built in PR #381 (2026-10-03)** | `sw.js` showing the payload, with the fallback and no-cache header; the alerts line above "What to include" (turn on/off for this device, denied and iPhone explanations); `/notifications` chooser as the fallback target; jsdom tests after `QueueControls.test.tsx` | 5–6 |
 | 5 | **Push column**. **Built in PR #384 (2026-10-03)** | `DigestSettingsForm` becomes a two-column Email/Push list, shown even when the email cadence is Never (the Email column greys out instead), dash for `drafts`; saved through the same mutation | 4–6 |
 | 6 | **"Get Notifications" link**. **Built in PR #383 (2026-10-03)** | sidebar client component with post-hydration detection, the shared install-steps component, store so it hides on subscribe; jsdom tests for each row of the §3.4 table | 2 |
-| 7 | **Docs** | `docs/WEB_PUSH.md` (adapted from #360, with privacy and lock-screen notes); `DEPLOYMENT.md` env table + secrets; `OPERATIONS.md` note (kill switch, key-loss consequence, sweep); `ARCHITECTURE.md`; a CLAUDE.md glossary entry | 2 |
+| 7 | **Docs**. **Built in PR #385 (2026-10-03)** | `docs/WEB_PUSH.md` (adapted from #360, with privacy and lock-screen notes); `DEPLOYMENT.md` env table + secrets; `OPERATIONS.md` note (kill switch, key-loss consequence, sweep); `ARCHITECTURE.md`; a CLAUDE.md glossary entry | 2 |
 | 8 | **Dev verification** (no PR) | the §4 checklist on real devices; iPhone with Ed or a tester | 2–3 |
 
 **Total: about 31–40 builder-hours for push, plus 2–3 for #367.** That is

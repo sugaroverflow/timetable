@@ -102,6 +102,10 @@ Lint covers everything: `apps/web` has its own Next config; the root
 - **Never run `deploy-production.yml` or touch the `topic-prod` (prod) DO app —
   production deploys are human-triggered only.** Same for repo settings,
   rulesets, and DO infrastructure (`doctl`).
+- **Clerk's production instance is on topic.forum** (Ed confirmed,
+  2026-10-03): its Frontend API is `clerk.topic.forum`. Dev and local use
+  the Clerk development instance (`*.clerk.accounts.dev`), so a sign-in
+  quirk seen on dev is not necessarily production's, and vice versa.
 - Never commit secrets. Env shape lives in `.env.example`.
 - **Term-time migration policy (2026-08-21):** while a real programme is
   running, migrations are **additive only** — add columns and tables; never
@@ -589,7 +593,62 @@ Stable names for feature pieces, so instructions can reference them precisely.
   toasts, Lounge FAB/sheet); status bar stays "default" (translucent puts
   white text on the white topbar). Never add maximum-scale/user-scalable.
   On iOS the Home Screen app has its OWN cookies — members sign in once
-  inside it. No service worker yet (push step 4).
+  inside it. It is also what makes iPhone alerts possible: Apple allows
+  web push only in a Home Screen app (iOS 16.4+). The one service worker,
+  `public/sw.js`, is [[web-push]]'s.
+
+- **web-push / push-sweep** — phone/desktop alerts (#368, PRs #376–#384,
+  2026-10-03; `docs/WEB_PUSH.md` is how it works, `docs/web-push-plan.md`
+  why, `docs/OPERATIONS.md` R19 the runbook). INERT until the API has all
+  three `VAPID_*` (`push-config.ts` → `env.push`; partial/invalid refuses
+  to boot in production; all empty = off) — every control gates on GraphQL
+  `pushPublicKey` being non-null, never show one without it. A device is
+  a `push_subscriptions` row keyed to the USER (covers every forum on
+  that device); the endpoint + keys are a capability — never logged,
+  never in a URL, never returned to the web app (`myPushDeviceEnabled`
+  answers a boolean). Delivery is the **push-sweep**: `sweepPush`
+  (`apps/api/src/push-sweep.ts`) once a minute inside the API claims the
+  window `(swept_until, now() − 10 s]` (advisory lock + compare-and-set,
+  `claimPushSweepWindow` in core `pushEvents.ts`, capped 10 min back),
+  reads events once, decides per recipient (`pushAudience.ts`), and sends
+  with no DB connection held — AT-MOST-ONCE by choice (a crash loses a
+  minute, never buzzes twice). Event code paths are untouched; a new kind
+  of event that should alert is a new reader in `pushEvents.ts`, never a
+  send from the mutation. Every reader re-checks visibility per recipient
+  (membership active, forum readable, thread visibility, `canReadLounge`,
+  calendar on, read-past); a deactivated member is SKIPPED, never
+  unsubscribed. `PUSH_PAUSED` is read at boot only; the sweep still
+  advances while paused, so unpausing releases no backlog. Losing or
+  rotating the VAPID key breaks every subscription.
+- **push-kinds** — `packages/shared/src/push.ts`: a Push switch per
+  `DIGEST_KINDS` row, stored per forum in `digestSettings.push`, read
+  through `isPushKindEnabled` → `PUSH_KIND_DEFAULTS` (aimed-at-you on,
+  broadcast off; no forum-defaults layer — a forum can't switch a phone
+  on). Audiences are the digest's (`digestKindApplies`). `drafts` is
+  `PUSH_EVENTLESS_KINDS` (a dash, never alerts); the sent-back-notice
+  alerts with no switch. The **push-column** (`DigestSettingsForm`'s
+  `pushKinds`, Ed 2026-10-03) shows them as Email | Push, even at email
+  cadence Never, under the title "Notification settings"; saved through
+  `pushKindsJson`, which REPLACES the set and is strict.
+- **alerts-line** — `components/AlertsLine.tsx` (#381): the one line
+  above "What to include" on a forum's Notifications page (`#alerts`)
+  that turns alerts on/off for THIS device. Same gate as the push-column
+  (`pushPublicKey` non-null and no view-as cookie). Permission is asked
+  only inside the Turn on click (`turnOnPush` in `lib/push.ts`, its first
+  await); Turn off deletes the row AND unsubscribes the browser. States
+  come from the shared **push-device** store (`usePushDevice`, server
+  snapshot "unknown", detection after hydration): off / on / denied /
+  unsupported / ios-tab, the last showing **install-steps**
+  (`components/InstallSteps.tsx`, one text shared with the sidebar).
+  Carries the lock-screen sentence: alerts show who, where and the first
+  line, and some lock screens show them too.
+- **get-notifications-link** — `components/GetNotificationsLink.tsx`
+  (#383): "Get Notifications" in the forum sidebar foot, shown ONLY where
+  alerts are possible and not on for this device — a `next/link` to
+  `/f/<slug>/notifications#alerts` when push works here (installed iPhone
+  app included), a popover with install-steps in an iPhone/iPad browser
+  tab, nothing when on/denied/unsupported/no key/view-as. Reads the
+  push-device store, so it vanishes the moment alerts come on.
 
 ## Gotchas (learned the hard way)
 
