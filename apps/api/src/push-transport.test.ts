@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({ request: vi.fn() }));
 vi.mock("node:https", () => ({ request: mocks.request }));
 
 import { parsePushEnv, type PushConfig } from "./push-config";
+import { padTo32, vapidTestPair } from "./push-test-keys";
 import {
   encryptPushPayload,
   parseRetryAfter,
@@ -87,11 +88,8 @@ function decryptAsBrowser(
 
 /** A fresh, throwaway VAPID pair per test run — never a committed key. */
 function testConfig(): PushConfig {
-  const pair = createECDH("prime256v1");
-  pair.generateKeys();
   const { config } = parsePushEnv({
-    VAPID_PUBLIC_KEY: pair.getPublicKey().toString("base64url"),
-    VAPID_PRIVATE_KEY: pair.getPrivateKey().toString("base64url"),
+    ...vapidTestPair(),
     VAPID_SUBJECT: "mailto:push@example.com",
   });
   if (!config) throw new Error("test config did not parse");
@@ -109,7 +107,7 @@ function testSubscription(endpoint = "https://fcm.googleapis.com/fcm/send/d") {
       p256dh: ua.getPublicKey().toString("base64url"),
       auth: auth.toString("base64url"),
     },
-    uaPrivate: ua.getPrivateKey(),
+    uaPrivate: padTo32(ua.getPrivateKey()),
     auth,
   };
 }

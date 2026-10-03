@@ -1,4 +1,3 @@
-import { createECDH } from "node:crypto";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
@@ -27,6 +26,7 @@ import type { ApiContext } from "./context";
 import * as email from "./email";
 import { env } from "./env";
 import { parsePushEnv } from "./push-config";
+import { vapidTestPair } from "./push-test-keys";
 
 vi.mock("@timetable/core", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@timetable/core")>();
@@ -3847,11 +3847,8 @@ describe("pushPublicKey (Web Push step 2; plan §2 finding 1)", () => {
 
   /** A throwaway pair generated per run — never a committed key. */
   function configure(paused = false) {
-    const pair = createECDH("prime256v1");
-    pair.generateKeys();
     env.push = parsePushEnv({
-      VAPID_PUBLIC_KEY: pair.getPublicKey().toString("base64url"),
-      VAPID_PRIVATE_KEY: pair.getPrivateKey().toString("base64url"),
+      ...vapidTestPair(),
       VAPID_SUBJECT: "mailto:push@example.com",
       PUSH_PAUSED: paused ? "true" : "",
     }).config;

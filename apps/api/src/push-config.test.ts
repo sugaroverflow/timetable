@@ -1,19 +1,12 @@
-import { createECDH } from "node:crypto";
+import { createECDH, createPublicKey, sign, verify } from "node:crypto";
 import { inspect } from "node:util";
 
 import { describe, expect, it, vi } from "vitest";
 
 import { loadPushConfig, parsePushEnv } from "./push-config";
+import { vapidTestPair } from "./push-test-keys";
 
-/** A throwaway pair generated per run — never a committed key. */
-function pair() {
-  const ecdh = createECDH("prime256v1");
-  ecdh.generateKeys();
-  return {
-    VAPID_PUBLIC_KEY: ecdh.getPublicKey().toString("base64url"),
-    VAPID_PRIVATE_KEY: ecdh.getPrivateKey().toString("base64url"),
-  };
-}
+const pair = vapidTestPair;
 
 function valid(extra: Record<string, string> = {}) {
   return { ...pair(), VAPID_SUBJECT: "mailto:push@example.com", ...extra };
@@ -123,9 +116,14 @@ describe("Web Push boot rule (plan §3.1)", () => {
       /VAPID_PUBLIC_KEY must be base64url/,
     ],
     [
-      "a private key of the wrong length",
-      valid({ VAPID_PRIVATE_KEY: "AAAA" }),
+      "a private key longer than 32 bytes",
+      valid({ VAPID_PRIVATE_KEY: Buffer.alloc(33, 1).toString("base64url") }),
       /VAPID_PRIVATE_KEY must be base64url of 32 bytes/,
+    ],
+    [
+      "a short private key that pads to zero",
+      valid({ VAPID_PRIVATE_KEY: "AAAA" }),
+      /VAPID_PRIVATE_KEY is not a P-256 key/,
     ],
     [
       "a zero private key",
@@ -197,5 +195,51 @@ describe("Web Push boot rule (plan §3.1)", () => {
         expect.stringMatching(/PUSH_PAUSED has an unrecognised value/),
       );
     });
+  });
+
+  it("accepts a private key whose leading zero byte was dropped (31 bytes)", () => {
+    // Deterministic: a fixed scalar (a test constant, nobody's key) whose
+    // first byte is 0x00, given the way getPrivateKey() hands it out.
+    const scalar = Buffer.from(`00${"11".repeat(31)}`, "hex");
+    const ecdh = createECDH("prime256v1");
+    ecdh.setPrivateKey(scalar);
+    const short = scalar.subarray(1); // what getPrivateKey() hands out
+    expect(short).toHaveLength(31);
+    const { config, problem } = parsePushEnv({
+      VAPID_PUBLIC_KEY: ecdh.getPublicKey().toString("base64url"),
+      VAPID_PRIVATE_KEY: short.toString("base64url"),
+      VAPID_SUBJECT: "mailto:push@example.com",
+    });
+    expect(problem).toBeNull();
+    expect(
+      Buffer.from(
+        config!.signingKey.export({ format: "jwk" }).d!,
+        "base64url",
+      ).equals(scalar),
+    ).toBe(true);
+    // And it signs a JWT that verifies against the public key.
+    const sig = sign("sha256", Buffer.from("x"), {
+      key: config!.signingKey,
+      dsaEncoding: "ieee-p1363",
+    });
+    expect(
+      verify(
+        "sha256",
+        Buffer.from("x"),
+        {
+          key: createPublicKey({
+            format: "jwk",
+            key: {
+              kty: "EC",
+              crv: "P-256",
+              x: ecdh.getPublicKey().subarray(1, 33).toString("base64url"),
+              y: ecdh.getPublicKey().subarray(33).toString("base64url"),
+            },
+          }),
+          dsaEncoding: "ieee-p1363",
+        },
+        sig,
+      ),
+    ).toBe(true);
   });
 });

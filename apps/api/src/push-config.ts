@@ -55,6 +55,20 @@ function subjectProblem(subject: string): string | null {
   return "VAPID_SUBJECT must start with mailto: or https://";
 }
 
+/**
+ * The P-256 scalar as exactly 32 bytes. Node's `ECDH#getPrivateKey()` (and
+ * other generators) drop leading zero bytes, so about one key in 256 comes
+ * out as 31 bytes (rarer still, shorter): left-pad those with zeros. Empty
+ * or longer than 32 is refused; whether it is a valid scalar is checked by
+ * `setPrivateKey`, and the public-key derivation still catches a wrong pair.
+ */
+export function padPrivateKey(bytes: Buffer | null): Buffer | null {
+  if (!bytes || bytes.length === 0 || bytes.length > 32) return null;
+  return bytes.length === 32
+    ? bytes
+    : Buffer.concat([Buffer.alloc(32 - bytes.length), bytes]);
+}
+
 type KeyCheck =
   | { ok: true; publicKey: string; signingKey: KeyObject }
   | { ok: false; problem: string };
@@ -71,8 +85,8 @@ function checkKeyPair(publicRaw: string, privateRaw: string): KeyCheck {
         "VAPID_PUBLIC_KEY must be base64url of a 65-byte uncompressed P-256 point",
     };
   }
-  const privateBytes = decodeBase64url(privateRaw);
-  if (!privateBytes || privateBytes.length !== 32) {
+  const privateBytes = padPrivateKey(decodeBase64url(privateRaw));
+  if (!privateBytes) {
     return {
       ok: false,
       problem: "VAPID_PRIVATE_KEY must be base64url of 32 bytes",

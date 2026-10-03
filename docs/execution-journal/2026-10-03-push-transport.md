@@ -107,6 +107,24 @@ need step 1, so it doesn't touch `packages/db`, `packages/shared` or
   GitHub variable. Setting it in the console still works as an immediate
   lever until the next deploy.
 
+- **`getPrivateKey()` drops leading zero bytes.** Node's
+  `ECDH#getPrivateKey()` returns the P-256 scalar without its leading zero
+  bytes, so about one key in 256 comes out as 31 bytes. The first CI run
+  failed on exactly that. The boot rule had demanded exactly 32 bytes, so
+  1 key in 256 from `generate-vapid.mjs`, the script Ed will use, would
+  have been refused at boot. The fix has three parts:
+  - The boot rule left-pads any decoded private key of 1–32 bytes to 32
+    (`padPrivateKey`). It still refuses an empty key, one longer than 32
+    bytes, or one that isn't a valid scalar, and the derivation check still
+    catches a wrong pair.
+  - The script left-pads before encoding, so its keys are canonical.
+  - The test helpers share `push-test-keys.ts`, which pads.
+
+  A deterministic test parses a 31-byte key whose 0x00 byte was dropped and
+  signs with it. 20 back-to-back runs of the push tests passed, as did 3000
+  unpadded keys straight from `getPrivateKey()` (8 of them short) and 200
+  runs of the script.
+
 ## Left for after step 1
 
 - The subscribe and unsubscribe REST routes, with the `pushSubscribe`

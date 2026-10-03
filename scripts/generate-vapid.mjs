@@ -13,7 +13,12 @@ const pair = createECDH("prime256v1");
 pair.generateKeys();
 
 console.log(`VAPID_PUBLIC_KEY=${pair.getPublicKey().toString("base64url")}`);
-console.log(`VAPID_PRIVATE_KEY=${pair.getPrivateKey().toString("base64url")}`);
+// getPrivateKey() drops leading zero bytes (about one key in 256 is 31
+// bytes), so left-pad to the canonical 32 before encoding.
+const privateKey = Buffer.alloc(32);
+const scalar = pair.getPrivateKey();
+scalar.copy(privateKey, 32 - scalar.length);
+console.log(`VAPID_PRIVATE_KEY=${privateKey.toString("base64url")}`);
 console.error(
   [
     "",
