@@ -7,8 +7,7 @@ import {
 } from "@timetable/core";
 import {
   canModerate,
-  canUseLounge,
-  isLoungeEnabled,
+  canReadLounge,
   type TimetableSettings,
   type Viewer,
 } from "@timetable/shared";
@@ -163,10 +162,10 @@ function seesLounge(
   },
   userId: string,
 ): boolean {
-  return (
-    isLoungeEnabled(readable.timetable.settings ?? {}) &&
-    canUseLounge({ userId, roles: readable.roles })
-  );
+  return canReadLounge(readable.timetable.settings ?? {}, {
+    userId,
+    roles: readable.roles,
+  });
 }
 
 // ---------------------------------------------------------------------------

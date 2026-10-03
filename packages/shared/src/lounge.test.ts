@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { normalizeReaction } from "./lounge";
-import { canUseLounge } from "./permissions";
+import { canReadLounge, canUseLounge } from "./permissions";
 import { isLoungeEnabled, digestKindApplies } from "./settings";
 
 describe("normalizeReaction", () => {
@@ -59,5 +59,17 @@ describe("Lounge settings", () => {
     expect(digestKindApplies("lounge", ["host"])).toBe(true);
     expect(digestKindApplies("lounge", ["admin"])).toBe(true);
     expect(digestKindApplies("lounge", ["elector"])).toBe(false);
+  });
+});
+
+describe("canReadLounge", () => {
+  const on = { lounge: { enabled: true } };
+  it("needs the room switched on AND a host or admin", () => {
+    expect(canReadLounge(on, { userId: "u", roles: ["host"] })).toBe(true);
+    expect(canReadLounge(on, { userId: "u", roles: ["owner"] })).toBe(true);
+    expect(canReadLounge(on, { userId: "u", roles: ["elector"] })).toBe(false);
+    // Deactivated members resolve to no roles.
+    expect(canReadLounge(on, { userId: "u", roles: [] })).toBe(false);
+    expect(canReadLounge({}, { userId: "u", roles: ["admin"] })).toBe(false);
   });
 });

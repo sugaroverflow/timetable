@@ -6,7 +6,11 @@ import {
   type Privacy,
   type Role,
 } from "./roles";
-import type { ConfirmPolicy, TimetableSettings } from "./settings";
+import {
+  isLoungeEnabled,
+  type ConfirmPolicy,
+  type TimetableSettings,
+} from "./settings";
 
 /**
  * The acting user evaluated in the context of a single timetable. `userId` is
@@ -161,6 +165,16 @@ export function canUseLounge(viewer: Viewer): boolean {
   return (
     isAuthenticated(viewer) && (isHost(viewer.roles) || isAdmin(viewer.roles))
   );
+}
+
+/** Whether this viewer reads this forum's {host} Lounge: the room is
+ * switched on AND they may use it. The one gate every Lounge reader shares —
+ * the GraphQL notifications resolvers and the push sweep (#368). */
+export function canReadLounge(
+  settings: TimetableSettings,
+  viewer: Viewer,
+): boolean {
+  return isLoungeEnabled(settings) && canUseLounge(viewer);
 }
 
 /** Per-slot discussion threads on the calendar (2026-08-14): open to every
