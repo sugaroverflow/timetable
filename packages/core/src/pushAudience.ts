@@ -169,41 +169,56 @@ export function canReadPushThread(
   return true;
 }
 
-/** The send-time visibility gate for one message (plan §1, the per-recipient
+type MessageOf<K extends PushMessage["type"]> = Extract<
+  PushMessage,
+  { type: K }
+>;
+
+const hiddenUnless = (ok: boolean): PushSkipReason | null =>
+  ok ? null : "thread-hidden";
+
+/** The send-time visibility gate per message (plan §1, the per-recipient
  * checks after membership and forum readability). */
-function gate(message: PushMessage, viewer: Viewer, forum: PushForum) {
-  switch (message.type) {
-    case "comment":
-      return canReadPushThread(viewer, message.topic, message.visibility)
-        ? null
-        : ("thread-hidden" as const);
-    case "lounge":
-      // The GraphQL resolver's gate (`seesLounge`): the room is on and the
-      // viewer is a host or admin.
-      return canReadLounge(forum.settings, viewer)
-        ? null
-        : ("lounge-closed" as const);
-    case "session":
-    case "slotRelease":
-      if (!isCalendarEnabled(forum.settings)) return "calendar-off" as const;
-      return message.type === "session" &&
-        !canReadPushThread(viewer, message.topic, "public")
-        ? ("thread-hidden" as const)
-        : null;
-    case "heart":
-    case "newTopic":
-      return canReadPushThread(viewer, message.topic, "public")
-        ? null
-        : ("thread-hidden" as const);
-    case "ready":
-    case "sentBack":
-      // A draft: its host and admins only.
-      return canEditTopic(viewer, message.topic.hostId)
-        ? null
-        : ("thread-hidden" as const);
-    case "newMember":
-      return isAdmin(viewer.roles) ? null : ("thread-hidden" as const);
-  }
+const GATES: {
+  [K in PushMessage["type"]]: (
+    m: MessageOf<K>,
+    viewer: Viewer,
+    forum: PushForum,
+  ) => PushSkipReason | null;
+} = {
+  comment: (m, viewer) =>
+    hiddenUnless(canReadPushThread(viewer, m.topic, m.visibility)),
+  // The GraphQL resolver's gate: the room is on and the viewer is a host
+  // or admin.
+  lounge: (_m, viewer, forum) =>
+    canReadLounge(forum.settings, viewer) ? null : "lounge-closed",
+  session: (m, viewer, forum) =>
+    isCalendarEnabled(forum.settings)
+      ? hiddenUnless(canReadPushThread(viewer, m.topic, "public"))
+      : "calendar-off",
+  slotRelease: (_m, _viewer, forum) =>
+    isCalendarEnabled(forum.settings) ? null : "calendar-off",
+  heart: (m, viewer) =>
+    hiddenUnless(canReadPushThread(viewer, m.topic, "public")),
+  newTopic: (m, viewer) =>
+    hiddenUnless(canReadPushThread(viewer, m.topic, "public")),
+  // A draft: its host and admins only.
+  ready: (m, viewer) => hiddenUnless(canEditTopic(viewer, m.topic.hostId)),
+  sentBack: (m, viewer) => hiddenUnless(canEditTopic(viewer, m.topic.hostId)),
+  newMember: (_m, viewer) => hiddenUnless(isAdmin(viewer.roles)),
+};
+
+function gate(
+  message: PushMessage,
+  viewer: Viewer,
+  forum: PushForum,
+): PushSkipReason | null {
+  const check = GATES[message.type] as (
+    m: PushMessage,
+    viewer: Viewer,
+    forum: PushForum,
+  ) => PushSkipReason | null;
+  return check(message, viewer, forum);
 }
 
 /** The person's read mark for the thread, when it has one. */
@@ -310,114 +325,129 @@ function hostLabel(forum: PushForum): string {
 
 const someone = (who: string | null) => who?.trim() || "Someone";
 
+type PayloadOptions = { multiForum: boolean; viewerIsAdmin: boolean };
+
+const SESSION_LEAD = {
+  confirm: "Session confirmed:",
+  clear: "Session cleared:",
+  pencil: "Can you make it?",
+} as const;
+
+/** Per message: who / where / first line, the link and the per-thread tag.
+ * `suffix` is the forum name for people in more than one forum. */
+const PAYLOADS: {
+  [K in PushMessage["type"]]: (
+    m: MessageOf<K>,
+    forum: PushForum,
+    suffix: string | null,
+    options: PayloadOptions,
+  ) => PushPayload;
+} = {
+  comment: (m, forum, suffix, options) => {
+    const slug = forum.slug;
+    const tab = TAB_FOR_VISIBILITY[m.visibility];
+    const base =
+      topicHref(slug, m.topic) ??
+      // A slug-less draft: where the notifications pane sends it.
+      (options.viewerIsAdmin ? `/f/${slug}/pending` : `/f/${slug}/my-topics`);
+    return {
+      title: pushTitle({
+        who: someone(m.who),
+        where: m.topic.title,
+        forum: suffix,
+      }),
+      body: pushBodyLine(m.body),
+      url: `${base}?tab=${tab}&topic=${m.topic.id}#comment-${m.commentId}`,
+      tag: `topic:${m.topic.id}:${tab}`,
+    };
+  },
+  lounge: (m, forum, suffix) => ({
+    title: pushTitle({
+      who: someone(m.who),
+      where: `${hostLabel(forum)} Lounge`,
+      forum: suffix,
+    }),
+    body: pushBodyLine(m.body, { markdown: m.isRoot }),
+    url: `/f/${forum.slug}/lounge?c=${m.rootId}&reply=${m.commentId}#comment-${m.commentId}`,
+    tag: `lounge:${m.rootId}`,
+  }),
+  session: (m, forum, suffix) => {
+    const when = pushWhen(m.startsAt);
+    return {
+      title: withForum(`${SESSION_LEAD[m.action]} ${m.topic.title}`, suffix),
+      body: m.location ? `${when} · ${m.location}` : when,
+      url: `/f/${forum.slug}/calendar`,
+      tag: `topic:${m.topic.id}:sessions`,
+    };
+  },
+  heart: (m, forum, suffix) => ({
+    title: withForum(
+      `A new ${m.gesture === "heart" ? "❤️" : "💙"} on ${m.topic.title}`,
+      suffix,
+    ),
+    body: "",
+    url:
+      topicHref(forum.slug, m.topic) ??
+      myTopicsCard(forum.slug, m.topic.id, "comments"),
+    tag: `topic:${m.topic.id}:${m.gesture}`,
+  }),
+  newTopic: (m, forum, suffix) => ({
+    title: withForum(`${someone(m.who)} published a topic`, suffix),
+    body: pushBodyLine(m.topic.title),
+    url: topicHref(forum.slug, m.topic) ?? `/f/${forum.slug}/topics`,
+    tag: `topic:${m.topic.id}:new`,
+  }),
+  ready: (m, forum, suffix) => ({
+    title: withForum(`${someone(m.who)} marked a topic ready`, suffix),
+    body: pushBodyLine(m.topic.title),
+    url: `/f/${forum.slug}/pending`,
+    tag: `topic:${m.topic.id}:ready`,
+  }),
+  sentBack: (m, forum, suffix) => ({
+    title: withForum(
+      `${someone(m.who)} moved your topic back to drafting`,
+      suffix,
+    ),
+    body: pushBodyLine(m.topic.title),
+    // The drafting tab must be named: an unvisited pane isn't in the page.
+    url: myTopicsCard(forum.slug, m.topic.id, "admin"),
+    tag: `topic:${m.topic.id}:admin`,
+  }),
+  slotRelease: (m, forum, suffix) => ({
+    title: withForum("New dates on the calendar", suffix),
+    body:
+      m.count === 1
+        ? pushWhen(m.firstStartsAt)
+        : `${m.count} new dates from ${pushWhen(m.firstStartsAt)}`,
+    url: `/f/${forum.slug}/calendar`,
+    tag: `calendar:${forum.id}`,
+  }),
+  newMember: (m, forum) => ({
+    title: `${someone(m.who)} joined ${forum.name}`,
+    body: "",
+    url: `/f/${forum.slug}/people`,
+    tag: `members:${forum.id}`,
+  }),
+};
+
 /** Who / where / first line, the link and the per-thread tag. */
 export function buildPushPayload(
   candidate: PushCandidate,
   forum: PushForum,
-  options: { multiForum: boolean; viewerIsAdmin: boolean },
+  options: PayloadOptions,
 ): PushPayload {
-  const slug = forum.slug;
-  const suffix = options.multiForum ? forum.name : null;
-  const m = candidate.message;
-  switch (m.type) {
-    case "comment": {
-      const tab = TAB_FOR_VISIBILITY[m.visibility];
-      const base =
-        topicHref(slug, m.topic) ??
-        // A slug-less draft: where the notifications pane sends it.
-        (options.viewerIsAdmin ? `/f/${slug}/pending` : `/f/${slug}/my-topics`);
-      return {
-        title: pushTitle({
-          who: someone(m.who),
-          where: m.topic.title,
-          forum: suffix,
-        }),
-        body: pushBodyLine(m.body),
-        url: `${base}?tab=${tab}&topic=${m.topic.id}#comment-${m.commentId}`,
-        tag: `topic:${m.topic.id}:${tab}`,
-      };
-    }
-    case "lounge":
-      return {
-        title: pushTitle({
-          who: someone(m.who),
-          where: `${hostLabel(forum)} Lounge`,
-          forum: suffix,
-        }),
-        body: pushBodyLine(m.body, { markdown: m.isRoot }),
-        url: `/f/${slug}/lounge?c=${m.rootId}&reply=${m.commentId}#comment-${m.commentId}`,
-        tag: `lounge:${m.rootId}`,
-      };
-    case "session": {
-      const lead =
-        m.action === "confirm"
-          ? "Session confirmed"
-          : m.action === "clear"
-            ? "Session cleared"
-            : "Can you make it?";
-      const when = pushWhen(m.startsAt);
-      return {
-        title: withForum(`${lead}: ${m.topic.title}`, suffix),
-        body: m.location ? `${when} · ${m.location}` : when,
-        url: `/f/${slug}/calendar`,
-        tag: `topic:${m.topic.id}:sessions`,
-      };
-    }
-    case "heart":
-      return {
-        title: withForum(
-          `A new ${m.gesture === "heart" ? "❤️" : "💙"} on ${m.topic.title}`,
-          suffix,
-        ),
-        body: "",
-        url:
-          topicHref(slug, m.topic) ??
-          myTopicsCard(slug, m.topic.id, "comments"),
-        tag: `topic:${m.topic.id}:${m.gesture}`,
-      };
-    case "newTopic":
-      return {
-        title: withForum(`${someone(m.who)} published a topic`, suffix),
-        body: pushBodyLine(m.topic.title),
-        url: topicHref(slug, m.topic) ?? `/f/${slug}/topics`,
-        tag: `topic:${m.topic.id}:new`,
-      };
-    case "ready":
-      return {
-        title: withForum(`${someone(m.who)} marked a topic ready`, suffix),
-        body: pushBodyLine(m.topic.title),
-        url: `/f/${slug}/pending`,
-        tag: `topic:${m.topic.id}:ready`,
-      };
-    case "sentBack":
-      return {
-        title: withForum(
-          `${someone(m.who)} moved your topic back to drafting`,
-          suffix,
-        ),
-        body: pushBodyLine(m.topic.title),
-        // The drafting tab must be named: an unvisited pane isn't in the page.
-        url: myTopicsCard(slug, m.topic.id, "admin"),
-        tag: `topic:${m.topic.id}:admin`,
-      };
-    case "slotRelease":
-      return {
-        title: withForum("New dates on the calendar", suffix),
-        body:
-          m.count === 1
-            ? pushWhen(m.firstStartsAt)
-            : `${m.count} new dates from ${pushWhen(m.firstStartsAt)}`,
-        url: `/f/${slug}/calendar`,
-        tag: `calendar:${forum.id}`,
-      };
-    case "newMember":
-      return {
-        title: `${someone(m.who)} joined ${forum.name}`,
-        body: "",
-        url: `/f/${slug}/people`,
-        tag: `members:${forum.id}`,
-      };
-  }
+  const build = PAYLOADS[candidate.message.type] as (
+    m: PushMessage,
+    forum: PushForum,
+    suffix: string | null,
+    options: PayloadOptions,
+  ) => PushPayload;
+  return build(
+    candidate.message,
+    forum,
+    options.multiForum ? forum.name : null,
+    options,
+  );
 }
 
 function withForum(title: string, forum: string | null): string {

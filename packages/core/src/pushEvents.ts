@@ -196,9 +196,49 @@ class CandidateSet {
       existing.kinds.push(kind);
   }
 
+  addAll(
+    userIds: Iterable<string>,
+    base: Omit<PushCandidate, "userId" | "kinds">,
+    kind: DigestKind,
+    skip: (userId: string) => boolean = () => false,
+  ): void {
+    for (const u of userIds) if (!skip(u)) this.add(u, base, kind);
+  }
+
   list(): PushCandidate[] {
     return [...this.byKey.values()];
   }
+}
+
+/** user ids grouped by a key (comment id, topic id). */
+function groupUsers<T extends { userId: string }>(
+  list: readonly T[],
+  key: (t: T) => string,
+): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+  for (const item of list) {
+    const k = key(item);
+    map.set(k, [...(map.get(k) ?? []), item.userId]);
+  }
+  return map;
+}
+
+/** Everyone who ❤️'d / 💙'd these topics, by topic. */
+async function loadFollowers(topicIds: string[]) {
+  const [heartRows, hostHeartRows] = await Promise.all([
+    db
+      .select({ topicId: hearts.topicId, userId: hearts.userId })
+      .from(hearts)
+      .where(inArray(hearts.topicId, topicIds)),
+    db
+      .select({ topicId: hostHearts.topicId, userId: hostHearts.userId })
+      .from(hostHearts)
+      .where(inArray(hostHearts.topicId, topicIds)),
+  ]);
+  return {
+    hearters: groupUsers(heartRows, (h) => h.topicId),
+    hostHearters: groupUsers(hostHeartRows, (h) => h.topicId),
+  };
 }
 
 const hostMembers = alias(timetableMemberships, "push_host_members");
@@ -323,7 +363,7 @@ async function topicCommentCandidates(
   const parentIds = [
     ...new Set(rows.map((r) => r.parentId).filter((p): p is string => !!p)),
   ];
-  const [chains, mentions, heartRows, hostHeartRows] = await Promise.all([
+  const [chains, mentions, followers] = await Promise.all([
     chainMembers(comments, parentIds),
     db
       .select({
@@ -332,72 +372,85 @@ async function topicCommentCandidates(
       })
       .from(commentMentions)
       .where(inArray(commentMentions.commentId, ids)),
-    db
-      .select({ topicId: hearts.topicId, userId: hearts.userId })
-      .from(hearts)
-      .where(inArray(hearts.topicId, topicIds)),
-    db
-      .select({ topicId: hostHearts.topicId, userId: hostHearts.userId })
-      .from(hostHearts)
-      .where(inArray(hostHearts.topicId, topicIds)),
+    loadFollowers(topicIds),
   ]);
-  const group = <T extends { userId: string }>(
-    list: T[],
-    key: (t: T) => string,
-  ) => {
-    const map = new Map<string, string[]>();
-    for (const item of list) {
-      const k = key(item);
-      map.set(k, [...(map.get(k) ?? []), item.userId]);
-    }
-    return map;
+  const audience: CommentAudience = {
+    chains,
+    mentioned: groupUsers(mentions, (m) => m.commentId),
+    ...followers,
   };
-  const mentioned = group(mentions, (m) => m.commentId);
-  const hearters = group(heartRows, (h) => h.topicId);
-  const hostHearters = group(hostHeartRows, (h) => h.topicId);
+  for (const r of rows) addCommentRecipients(out, r, audience);
+}
 
-  for (const r of rows) {
-    const visibility = r.visibility as PushCommentVisibility;
-    const base = {
-      eventKey: `comment:${r.id}`,
-      timetableId: r.topicTimetableId,
-      at: r.createdAt,
-      actorId: r.authorId,
-      message: {
-        type: "comment",
-        commentId: r.id,
-        visibility,
-        topic: topicRef(r),
-        who: r.who,
-        body: r.body,
-      } satisfies PushMessage,
-    };
-    const chain = r.parentId
-      ? (chains.get(r.parentId) ?? new Set())
-      : new Set();
-    const host = r.topicHostId;
-    // Covered by the host's own-topic switch or the chain switch.
-    const covered = (u: string) => u === host || chain.has(u);
+type CommentAudience = {
+  chains: Map<string, Set<string>>;
+  mentioned: Map<string, string[]>;
+  hearters: Map<string, string[]>;
+  hostHearters: Map<string, string[]>;
+};
 
-    out.add(host, base, "comments");
-    for (const u of chain) out.add(u as string, base, "replies");
-    for (const u of mentioned.get(r.id) ?? [])
-      if (!covered(u)) out.add(u, base, "mentions");
-    if (visibility === "public") {
-      for (const u of hearters.get(r.topicId) ?? [])
-        if (!covered(u)) out.add(u, base, "commentsHearted");
-    }
-    const hostThreadOn = isHostCommentsEnabled(
-      (r.settings as TimetableSettings | null) ?? {},
+/** One comment's recipients by the kind map (see topicCommentCandidates). */
+function addCommentRecipients(
+  out: CandidateSet,
+  r: {
+    id: string;
+    parentId: string | null;
+    authorId: string;
+    visibility: string;
+    body: string;
+    createdAt: Date;
+    who: string | null;
+    settings: unknown;
+    topicId: string;
+    topicTitle: string;
+    topicSlug: string | null;
+    topicHostId: string;
+    topicStatus: string;
+    topicTimetableId: string;
+    hostSlug: string | null;
+  },
+  audience: CommentAudience,
+): void {
+  const visibility = r.visibility as PushCommentVisibility;
+  const base = {
+    eventKey: `comment:${r.id}`,
+    timetableId: r.topicTimetableId,
+    at: r.createdAt,
+    actorId: r.authorId,
+    message: {
+      type: "comment",
+      commentId: r.id,
+      visibility,
+      topic: topicRef(r),
+      who: r.who,
+      body: r.body,
+    } satisfies PushMessage,
+  };
+  const chain = (r.parentId && audience.chains.get(r.parentId)) || new Set();
+  const host = r.topicHostId;
+  // Covered by the host's own-topic switch or the chain switch.
+  const covered = (u: string) => u === host || chain.has(u);
+  const hostThreadOn = isHostCommentsEnabled(
+    (r.settings as TimetableSettings | null) ?? {},
+  );
+
+  out.add(host, base, "comments");
+  out.addAll(chain as Set<string>, base, "replies");
+  out.addAll(audience.mentioned.get(r.id) ?? [], base, "mentions", covered);
+  if (visibility === "public")
+    out.addAll(
+      audience.hearters.get(r.topicId) ?? [],
+      base,
+      "commentsHearted",
+      covered,
     );
-    if (
-      visibility === "public" ||
-      (visibility === "host_only" && hostThreadOn)
-    ) {
-      for (const u of hostHearters.get(r.topicId) ?? [])
-        if (!covered(u)) out.add(u, base, "commentsHostHearted");
-    }
-  }
+  if (visibility === "public" || (visibility === "host_only" && hostThreadOn))
+    out.addAll(
+      audience.hostHearters.get(r.topicId) ?? [],
+      base,
+      "commentsHostHearted",
+      covered,
+    );
 }
 
 /** Lounge posts (the lounge row), mirroring `listLoungeNotifications` and
@@ -523,52 +576,67 @@ async function sessionCandidates(
       ),
     );
   if (rows.length === 0) return;
-  const topicIds = [...new Set(rows.map((r) => r.topicId))];
-  const [heartRows, hostHeartRows] = await Promise.all([
-    db
-      .select({ topicId: hearts.topicId, userId: hearts.userId })
-      .from(hearts)
-      .where(inArray(hearts.topicId, topicIds)),
-    db
-      .select({ topicId: hostHearts.topicId, userId: hostHearts.userId })
-      .from(hostHearts)
-      .where(inArray(hostHearts.topicId, topicIds)),
+  const { hearters, hostHearters } = await loadFollowers([
+    ...new Set(rows.map((r) => r.topicId)),
   ]);
   for (const r of rows) {
-    const payload = (r.payload ?? {}) as ActivityPayload;
-    const startsAt = payload.startsAt ? new Date(payload.startsAt) : null;
-    if (!startsAt || Number.isNaN(startsAt.getTime())) continue;
-    const action =
-      r.action === "slot.confirm"
-        ? "confirm"
-        : r.action === "slot.clear"
-          ? "clear"
-          : "pencil";
-    const base = {
-      eventKey: `activity:${r.id}`,
-      timetableId: r.topicTimetableId,
-      at: r.createdAt,
-      actorId: r.actorId,
-      message: {
-        type: "session",
-        action,
-        topic: topicRef(r),
-        startsAt,
-        location: payload.location ?? null,
-      } satisfies PushMessage,
-    };
-    for (const h of heartRows)
-      if (h.topicId === r.topicId)
-        out.add(
-          h.userId,
-          base,
-          action === "pencil" ? "availabilityAsks" : "sessions",
-        );
-    if (action !== "pencil")
-      for (const h of hostHeartRows)
-        if (h.topicId === r.topicId)
-          out.add(h.userId, base, "sessionsHostHearted");
+    const base = sessionEvent(r);
+    if (!base) continue;
+    const pencil = base.message.action === "pencil";
+    out.addAll(
+      hearters.get(r.topicId) ?? [],
+      base,
+      pencil ? "availabilityAsks" : "sessions",
+    );
+    if (!pencil)
+      out.addAll(
+        hostHearters.get(r.topicId) ?? [],
+        base,
+        "sessionsHostHearted",
+      );
   }
+}
+
+const SESSION_ACTIONS = {
+  "slot.confirm": "confirm",
+  "slot.clear": "clear",
+  "slot.pencil": "pencil",
+} as const;
+
+/** A `slot.*` log row as a session event, or null when it carries no
+ * usable start time. */
+function sessionEvent(r: {
+  id: string;
+  action: string;
+  actorId: string | null;
+  payload: unknown;
+  createdAt: Date;
+  topicId: string;
+  topicTitle: string;
+  topicSlug: string | null;
+  topicHostId: string;
+  topicStatus: string;
+  topicTimetableId: string;
+  hostSlug: string | null;
+}) {
+  const payload = (r.payload ?? {}) as ActivityPayload;
+  const startsAt = payload.startsAt ? new Date(payload.startsAt) : null;
+  if (!startsAt || Number.isNaN(startsAt.getTime())) return null;
+  const action =
+    SESSION_ACTIONS[r.action as keyof typeof SESSION_ACTIONS] ?? "pencil";
+  return {
+    eventKey: `activity:${r.id}`,
+    timetableId: r.topicTimetableId,
+    at: r.createdAt,
+    actorId: r.actorId,
+    message: {
+      type: "session" as const,
+      action,
+      topic: topicRef(r),
+      startsAt,
+      location: payload.location ?? null,
+    },
+  };
 }
 
 /** ❤️s and 💙s given to your topic, from the `heart_events` LEDGER (never
@@ -703,41 +771,56 @@ async function topicEventCandidates(
     subscribers,
   );
   for (const r of rows) {
-    const topic = topicRef(r);
     const base = {
       eventKey: `activity:${r.id}`,
       timetableId: r.topicTimetableId,
       at: r.createdAt,
       actorId: r.actorId,
     };
-    if (r.action === "topic.unready") {
-      if (r.topicStatus !== "submitted" || r.actorId === r.topicHostId)
-        continue;
-      out.add(
-        r.topicHostId,
-        { ...base, message: { type: "sentBack", who: r.who, topic } },
-        null,
-      );
-      continue;
-    }
+    const topic = topicRef(r);
     const forumMembers = members.filter(
       (m) => m.timetableId === r.topicTimetableId && m.userId !== r.topicHostId,
     );
-    if (r.action === "topic.publish") {
-      if (!topic.published) continue;
-      const message: PushMessage = { type: "newTopic", who: r.hostName, topic };
-      for (const m of forumMembers) {
-        out.add(m.userId, { ...base, message }, "newTopics");
-        out.add(m.userId, { ...base, message }, "newTopicsHost");
-      }
-    } else {
-      if (r.topicStatus !== "submitted" || !r.readyAt) continue;
-      const message: PushMessage = { type: "ready", who: r.hostName, topic };
-      for (const m of forumMembers)
-        if (isAdminRoles(m.roles))
-          out.add(m.userId, { ...base, message }, "pendingReview");
+    const isDraft = r.topicStatus === "submitted";
+    if (r.action === "topic.unready") {
+      // The host's own flip writes the same event.
+      if (isDraft && r.actorId !== r.topicHostId)
+        out.add(
+          r.topicHostId,
+          { ...base, message: { type: "sentBack", who: r.who, topic } },
+          null,
+        );
+    } else if (r.action === "topic.publish") {
+      if (topic.published)
+        addToMembers(
+          out,
+          forumMembers,
+          { ...base, message: { type: "newTopic", who: r.hostName, topic } },
+          ["newTopics", "newTopicsHost"],
+        );
+    } else if (isDraft && r.readyAt) {
+      addToMembers(
+        out,
+        forumMembers.filter((m) => isAdminRoles(m.roles)),
+        { ...base, message: { type: "ready", who: r.hostName, topic } },
+        ["pendingReview"],
+      );
     }
   }
+}
+
+function addToMembers(
+  out: CandidateSet,
+  members: readonly { userId: string }[],
+  base: Omit<PushCandidate, "userId" | "kinds">,
+  kinds: DigestKind[],
+): void {
+  for (const kind of kinds)
+    out.addAll(
+      members.map((m) => m.userId),
+      base,
+      kind,
+    );
 }
 
 /** Future slots released in the window, one alert per forum, to hosts and

@@ -119,34 +119,47 @@ export function planDeviceSends(
   const byUser = new Map<string, PushAlert[]>();
   for (const a of alerts)
     byUser.set(a.userId, [...(byUser.get(a.userId) ?? []), a]);
+  return targets.flatMap((target) =>
+    deviceSends(target, byUser.get(target.userId) ?? [], perDevice),
+  );
+}
 
-  const sends: PushDeviceSend[] = [];
-  for (const target of targets) {
-    const mine = (byUser.get(target.userId) ?? []).filter(
-      // Events from before this device subscribed never alert on it.
-      (a) => a.at > target.createdAt,
-    );
-    if (mine.length === 0) continue;
-    const byTag = new Map<string, PushAlert>();
-    for (const a of mine) {
-      const held = byTag.get(a.payload.tag);
-      if (!held || a.at > held.at) byTag.set(a.payload.tag, a);
-    }
-    const ordered = [...byTag.values()].sort(
-      (a, b) =>
-        Number(b.urgency === "high") - Number(a.urgency === "high") ||
-        b.at.getTime() - a.at.getTime(),
-    );
-    for (const a of ordered.slice(0, perDevice))
-      sends.push({ target, payload: a.payload, urgency: a.urgency });
-    const rest = ordered.slice(perDevice);
-    if (rest.length > 0)
-      sends.push({
-        target,
-        payload: overflowPayload(rest),
-        urgency: rest.some((a) => a.urgency === "high") ? "high" : "normal",
-      });
+/** The newest alert per thread tag. */
+function newestPerTag(alerts: readonly PushAlert[]): PushAlert[] {
+  const byTag = new Map<string, PushAlert>();
+  for (const a of alerts) {
+    const held = byTag.get(a.payload.tag);
+    if (!held || a.at > held.at) byTag.set(a.payload.tag, a);
   }
+  return [...byTag.values()];
+}
+
+/** Aimed-at-you (high urgency) first, then newest first. */
+function byPriority(a: PushAlert, b: PushAlert): number {
+  return (
+    Number(b.urgency === "high") - Number(a.urgency === "high") ||
+    b.at.getTime() - a.at.getTime()
+  );
+}
+
+function deviceSends(
+  target: PushTarget,
+  alerts: readonly PushAlert[],
+  perDevice: number,
+): PushDeviceSend[] {
+  // Events from before this device subscribed never alert on it.
+  const fresh = alerts.filter((a) => a.at > target.createdAt);
+  const ordered = newestPerTag(fresh).sort(byPriority);
+  const sends: PushDeviceSend[] = ordered
+    .slice(0, perDevice)
+    .map((a) => ({ target, payload: a.payload, urgency: a.urgency }));
+  const rest = ordered.slice(perDevice);
+  if (rest.length > 0)
+    sends.push({
+      target,
+      payload: overflowPayload(rest),
+      urgency: rest.some((a) => a.urgency === "high") ? "high" : "normal",
+    });
   return sends;
 }
 
