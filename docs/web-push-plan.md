@@ -2,7 +2,8 @@
 
 Written 2026-10-03. Ed ruled on its four decisions the same day, and this
 version describes the chosen design; §5 lists the rulings and their reasons.
-Plan only: no code has been written for this yet. Source material:
+Plan only: no push code has been written yet. Step 0, the installable
+app (#367), is built in PR #376. Source material:
 AndreasThinks's #360 (not merged; Ed, 2026-10-02: "build #360's ideas
 separately ourselves"), the review findings recorded in #368, and the
 installable-app request #367.
@@ -406,9 +407,9 @@ Apple allows web push **only for a web app installed on the Home Screen**
 (iOS/iPadOS 16.4+), and only when opened from that icon. A browser tab
 cannot subscribe at all. So:
 
-- **#367 ships first.** Its manifest (`name: "Topic"`, `display:
-  "standalone"`, 192/512 icons) is what makes "Add to Home Screen" produce a
-  real app. Push without #367 works on Android, Windows and Mac, but never
+- **#367 ships first** (PR #376; glossary: installable-app). Its manifest
+  (`name: "Topic"`, `display: "standalone"`, 192/512 icons) is what makes
+  "Add to Home Screen" produce a real app. Push without #367 works on Android, Windows and Mac, but never
   on iPhone.
 - **Installed is a separate browser profile.** The Home Screen app has its
   own storage and its own Clerk sign-in. Members sign in once inside the
@@ -563,7 +564,7 @@ inert until keys exist.
 
 | # | PR | Contents | Hours |
 |---|---|---|---|
-| 0 | **#367 installable app** (prerequisite, its own issue) | manifest, 192/512 icons, Apple touch icon and meta | 2–3 |
+| 0 | **#367 installable app** (prerequisite, its own issue). **Built in PR #376 (2026-10-03)** | manifest, 192/512 icons, Apple touch icon and meta | 2–3 |
 | 1 | **Push data + kind defaults** | migration (next number): `push_subscriptions` per user with `p256dh`/`auth`, and `push_sweep_state`; core `managePush` with the endpoint lock and per-user device cap; shared `PUSH_KIND_DEFAULTS`, `isPushKindEnabled`, `PUSH_EVENTLESS_KINDS`, payload trimming, with tests; core tests via `@timetable/core`, `rootDir` untouched | 4–5 |
 | 2 | **API config, transport, encryption, routes** | `env.ts` VAPID boot rule and `PUSH_PAUSED`; `push-transport.ts` with RFC 8291 payload encryption and the Edge host; subscribe/unsubscribe routes with the `pushSubscribe` action limit; GraphQL `pushPublicKey`, this user's device list, and `push` kinds on `updateMyForumDigestSettings`; spec, workflow and `.env.example` entries | 5–7 |
 | 3 | **Sweep sender** | `sweepPush` with the claimed window (advisory lock, compare-and-set, 10 s lag, 10 min cap), event readers, the kind map, per-recipient visibility checks, payload building, per-device grouping and overflow, limiter, result recording; boot timer and SIGTERM drain; tests for double-claim, overlap, deactivated, hidden thread, Lounge gate, gone, `PUSH_PAUSED` | 7–9 |

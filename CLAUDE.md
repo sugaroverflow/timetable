@@ -572,6 +572,25 @@ Stable names for feature pieces, so instructions can reference them precisely.
   still runs first, so a deep restore briefly shows the top and then
   jumps; fixing that would mean owning `scrollRestoration` app-wide.
 
+- **installable-app** — `app/manifest.ts` (from `lib/appManifest.ts`) +
+  the PNGs in `apps/web/public/` + `appleWebApp`/`viewport` in the root
+  layout (#367, 2026-10-03; step 0 of `docs/web-push-plan.md`): ONE
+  standalone app named "Topic" for every forum, `start_url /timetables`
+  (the landing resolver), never per-forum branding. Icons are 📚 drawn
+  from the vendored Twemoji SVG (CC-BY 4.0) by
+  `scripts/generate-app-icons.mjs` — run by hand, commit the PNGs. The
+  manifest's colours COPY `--card`/`--bg` (a manifest can't read CSS
+  variables; `appManifest.test.ts` fails on drift). Forum layouts that
+  override `icons` must keep `apple: APPLE_TOUCH_ICON` (metadata merges
+  shallowly). The proxy matcher skips `.webmanifest` and `.png`, so no
+  host redirect, Clerk or CSP touches them; the CSP names
+  `manifest-src 'self'`. `viewport-fit=cover`, so anything pinned to a
+  screen edge pads by `env(safe-area-inset-*)` (topbar, gutters, drawer,
+  toasts, Lounge FAB/sheet); status bar stays "default" (translucent puts
+  white text on the white topbar). Never add maximum-scale/user-scalable.
+  On iOS the Home Screen app has its OWN cookies — members sign in once
+  inside it. No service worker yet (push step 4).
+
 ## Gotchas (learned the hard way)
 
 - **In-page jump links must be `next/link`, never a bare `<a href="#…">`**
