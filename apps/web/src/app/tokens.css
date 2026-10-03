@@ -210,6 +210,11 @@
   --text-h2: 27px;
   --text-h3: 22px;
 
+  /* Editable fields on touch devices never compute below this: iOS Safari
+     zooms the page in when it focuses a field under 16px (Ed, QA
+     2026-10-03). Applied in globals.css, "Touch: no zoom on focus". */
+  --text-field-touch: var(--text-lg);
+
   /* --- Typography: weights --- */
   --fw-normal: 400;
   --fw-medium: 500;

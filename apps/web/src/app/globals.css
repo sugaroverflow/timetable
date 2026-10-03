@@ -3512,3 +3512,52 @@ a.queue-btn-back:hover {
   max-width: 100%;
   height: auto;
 }
+
+/* Touch: no zoom on focus (Ed, QA 2026-10-03 — tapping the Lounge's
+   "Reply…" box on an iPhone zoomed the page in, which then scrolled
+   sideways). iOS Safari zooms whenever it focuses a text field whose
+   computed font-size is under 16px, and every field here was 12–15px.
+   So on touch devices every editable field computes to
+   --text-field-touch (16px). `(hover: none) and (pointer: coarse)` rather
+   than the iOS-only `@supports (-webkit-touch-callout: none)` hook: it is
+   the same "primary input is a finger" test the hover-only blocks above
+   use, it covers iOS whatever browser wraps WebKit, and test browsers can
+   emulate it; a desktop (mouse or trackpad) never matches, so desktop
+   typography is unchanged. !important because per-surface sizes
+   (.tail-composer, .lounge-conversation .foot-composer, .feed-search,
+   .feed-toolbar, .cal-pencil-select, the reassign select's inline style,
+   the editor's .tiptap) must all lose — a stylesheet !important also
+   beats an inline style. Never fix this with maximum-scale=1 or
+   user-scalable=no in the viewport: that takes pinch-zoom away. */
+@media (hover: none) and (pointer: coarse) {
+  input:not([type]),
+  input[type="text"],
+  input[type="search"],
+  input[type="email"],
+  input[type="url"],
+  input[type="tel"],
+  input[type="number"],
+  input[type="password"],
+  input[type="date"],
+  input[type="time"],
+  input[type="datetime-local"],
+  textarea,
+  select,
+  [contenteditable]:not([contenteditable="false"]) {
+    font-size: var(--text-field-touch) !important;
+  }
+  /* Keep the composers' one-line height: 16px × 1.25 = 20px, the same
+     line box as desktop's 14px × 1.4, so GrowingTextarea doesn't grow a
+     resting box and the send button stays level with it. */
+  .inline-form textarea {
+    line-height: 1.25;
+  }
+  /* …and the bigger placeholder ("Add a comment… (@ to mention)") must
+     not wrap on a phone-width card, or the empty box rests two lines
+     tall: one line, ellipsised. */
+  .inline-form textarea::placeholder {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
