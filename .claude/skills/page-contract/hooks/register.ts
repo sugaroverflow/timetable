@@ -8,7 +8,9 @@ import { checkWrite, isPage } from './check'
 //  2. A coordinator's lastActive is stamped at the end of every turn that did work.
 //  3. Answers of the coordinator's project left without handledAt are named to it, at most hourly.
 //  4. A coordinator other than dev-ops's is told when dev-ops main moves, so it re-reads the rules.
-// The session counts as a coordinator once it writes coordinators/<project> on the page.
+// The session counts as a coordinator once it writes coordinators/<project> on the page, or, after a
+// restart has wiped what the mod knew, once its own session link is found in coordinators/<project>
+// (2026-10-03: dev-ops and Topic both stopped being stamped after a restart, and Ed got a false nudge).
 
 type Doc = Record<string, unknown>
 type Write = { op: string; collection?: unknown; doc_id?: unknown; data?: unknown; file_path?: unknown }
@@ -23,6 +25,9 @@ let worked = false      // this turn made a tool call of its own
 let inside = false      // the mod's own tool calls, which are neither work nor checked twice
 let remindedAt = 0
 let rulesSha = ''
+let touched = false     // this turn used the page
+let lookedAt = 0        // when the mod last looked for this session's own link on the page
+const LOOK_EVERY_MS = 60 * 60e3
 
 const iso = (ms: number) => new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z')
 
@@ -44,6 +49,8 @@ export const register: Register = on => {
     worked = true
     const a = e as unknown as { action: string; url?: string; collection?: string; doc_id?: string; data?: Doc; file_path?: string; writes?: Write[] }
     if (!isPage(a.url)) return next(e)
+    touched = true
+    if (!pageUrl) pageUrl = a.url as string
     const now = await $.clock.now()
     const writes: Write[] = a.action === 'batch' ? (a.writes ?? []) : [{ op: a.action, collection: a.collection, doc_id: a.doc_id, data: a.data, file_path: a.file_path }]
     const why: string[] = []
@@ -73,6 +80,7 @@ export const register: Register = on => {
 
   on('turn.start', async ($, e, next) => {
     worked = false
+    touched = false
     if (project && project !== 'dev-ops') {
       try {
         const r = await $.process.run(['git', 'ls-remote', RULES_REPO, 'refs/heads/main'], { timeoutMs: 15000 })
@@ -88,10 +96,22 @@ export const register: Register = on => {
 
   on('turn.complete', async ($, e, next) => {
     const done = await next(e)
-    if (!project || !pageUrl || !worked || (e as { agentId?: string }).agentId) return done
+    if (!pageUrl || !worked || (e as { agentId?: string }).agentId) return done
     inside = true
     try {
       const now = await $.clock.now()
+      // 1. A session that used the page but has not told the mod its project (a restart wipes it):
+      // find this session's own link among the coordinators, at most hourly.
+      if (!project && touched && now - lookedAt > LOOK_EVERY_MS) {
+        lookedAt = now
+        const mine = String(await $.env.get('CLAUDE_CODE_REMOTE_SESSION_ID') ?? '').replace(/^(cse|session)_/, '')
+        if (mine) {
+          const list = await $.tool.call({ tool: 'ArtifactData', action: 'list', url: pageUrl, collection: 'coordinators' } as never)
+          const hit = docsOf((list as { text?: string }).text).find(d => String(d.data.sessionUrl ?? '').endsWith('session_' + mine))
+          if (hit) project = hit.id
+        }
+      }
+      if (!project) return done
       // 2. lastActive, pinned to the version just read.
       const got = await $.tool.call({ tool: 'ArtifactData', action: 'get', url: pageUrl, collection: 'coordinators', doc_id: project } as never)
       const me = docsOf((got as { text?: string }).text).find(d => d.id === project)

@@ -106,3 +106,38 @@ test('at the end of a turn that did work, the coordinator\'s lastActive is stamp
   const stamp = seen.find(a => a.action === 'update' && (a.data as Record<string, unknown>)?.lastActive === '2026-10-02T14:00:00Z')
   expect(stamp?.if_version).toBe(7)
 })
+
+test('after a restart, a coordinator is found by its own session link and its lastActive is stamped', async ($, on) => {
+  mock.clock(on, { now: Date.parse('2026-10-03T01:30:00Z') })
+  mock.env(on, { CLAUDE_CODE_REMOTE_SESSION_ID: 'cse_01SFYjPigdVEgvyXT9D3kouX' })
+  const seen: Array<Record<string, unknown>> = []
+  on('tool.call', { tool: 'ArtifactData' }, (_$, e) => {
+    const a = e as unknown as Record<string, unknown>
+    seen.push(a)
+    if (a.action === 'list') return { result: { ok: true }, text: '=== BEGIN\n{"id":"draft","data":{"sessionUrl":"https://claude.ai/code/session_01ESrCoay3NmbeGP3oGtFyXr"},"version":3}\n{"id":"topic","data":{"sessionUrl":"https://claude.ai/code/session_01SFYjPigdVEgvyXT9D3kouX"},"version":4}\n=== END' } as never
+    if (a.action === 'get') return { result: { ok: true }, text: '=== BEGIN\n{"id":"topic","data":{"lastActive":"2026-10-02T20:10:40Z"},"version":49}\n=== END' } as never
+    return { result: { ok: true }, text: '' } as never
+  })
+  on('turn.complete', (_$, e) => ({ text: (e as { answer: string }).answer }))
+  // A turn that only reads the page: no write to coordinators/<project> to learn from.
+  await call($, { action: 'query', collection: 'questions', query: { where: [['project', '==', 'topic']] } })
+  await $.turn.complete({ answer: 'done', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' } as never)
+  const stamp = seen.find(a => a.action === 'update' && a.doc_id === 'topic' && (a.data as Record<string, unknown>)?.lastActive === '2026-10-03T01:30:00Z')
+  expect(stamp?.if_version).toBe(49)
+})
+
+test('a session whose link is not on the page is never stamped', async ($, on) => {
+  mock.clock(on, { now: Date.parse('2026-10-03T01:30:00Z') })
+  mock.env(on, { CLAUDE_CODE_REMOTE_SESSION_ID: 'cse_01Builder000000000000000' })
+  const seen: Array<Record<string, unknown>> = []
+  on('tool.call', { tool: 'ArtifactData' }, (_$, e) => {
+    const a = e as unknown as Record<string, unknown>
+    seen.push(a)
+    if (a.action === 'list') return { result: { ok: true }, text: '=== BEGIN\n{"id":"topic","data":{"sessionUrl":"https://claude.ai/code/session_01SFYjPigdVEgvyXT9D3kouX"},"version":4}\n=== END' } as never
+    return { result: { ok: true }, text: '' } as never
+  })
+  on('turn.complete', (_$, e) => ({ text: (e as { answer: string }).answer }))
+  await call($, { action: 'get', collection: 'questions', doc_id: 'topic-q-1' })
+  await $.turn.complete({ answer: 'done', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' } as never)
+  expect(seen.some(a => a.action === 'update')).toBe(false)
+})
