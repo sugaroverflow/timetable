@@ -533,6 +533,33 @@ textarea {
 .sidebar-foot-link:hover {
   text-decoration: underline;
 }
+/* get-notifications-link (#368, plan §3.4): on an iPhone/iPad tab the
+   sidebar link is a popover trigger — a button dressed as its neighbours. */
+.sidebar-foot-button {
+  padding: 0;
+  border: none;
+  background: transparent;
+  line-height: inherit;
+}
+/* Above the mobile drawer (z-modal + 1) the link sits in. */
+.get-notifications-positioner {
+  z-index: calc(var(--z-modal) + 2);
+}
+.get-notifications-popup {
+  max-width: min(320px, calc(100vw - 32px));
+  padding: var(--space-3);
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-pop);
+}
+.get-notifications-title {
+  margin: 0;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-bold);
+}
 .topbar-hamburger {
   display: none;
   border: none;

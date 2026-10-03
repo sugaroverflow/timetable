@@ -13,6 +13,7 @@ import {
   type Role,
 } from "@timetable/shared";
 
+import { GetNotificationsLink } from "@/components/GetNotificationsLink";
 import { NavLink } from "@/components/NavLink";
 import { Sidebar } from "@/components/Sidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -112,6 +113,8 @@ const UNREAD_QUERY = `
     topicQueue(idOrSlug: $s) { neverSeenCount }
     moderationQueue(idOrSlug: $s) { id readyAt }
     loungeUnread(idOrSlug: $s)
+    me { id }
+    pushPublicKey
   }
 `;
 
@@ -143,6 +146,10 @@ async function loadSwitcherAndUnread(
   queueNeverSeen: number;
   pendingCount: number;
   loungeUnread: boolean;
+  /** Web Push (#368): null without keys or under view-as — then the "Get
+   * Notifications" link never renders. Members only, like the badges. */
+  pushPublicKey: string | null;
+  viewerId: string | null;
 }> {
   if (!isAuthed)
     return {
@@ -151,6 +158,8 @@ async function loadSwitcherAndUnread(
       queueNeverSeen: 0,
       pendingCount: 0,
       loungeUnread: false,
+      pushPublicKey: null,
+      viewerId: null,
     };
   const [mine, unreadData] = await Promise.all([
     getMyTimetables(),
@@ -160,12 +169,16 @@ async function loadSwitcherAndUnread(
           topicQueue: { neverSeenCount: number } | null;
           moderationQueue: { id: string; readyAt: string | null }[];
           loungeUnread: boolean;
+          me: { id: string } | null;
+          pushPublicKey: string | null;
         }>(UNREAD_QUERY, { s: slug })
       : Promise.resolve({
           notificationsUnread: 0,
           topicQueue: null,
           moderationQueue: [],
           loungeUnread: false,
+          me: null,
+          pushPublicKey: null,
         }),
   ]);
   const switcherItems = mine.map((t) => {
@@ -188,6 +201,8 @@ async function loadSwitcherAndUnread(
     pendingCount:
       unreadData.moderationQueue?.filter((t) => t.readyAt).length ?? 0,
     loungeUnread: unreadData.loungeUnread ?? false,
+    pushPublicKey: unreadData.pushPublicKey ?? null,
+    viewerId: unreadData.me?.id ?? null,
   };
 }
 
@@ -406,8 +421,15 @@ export default async function TimetableLayout({
   const { previewUserId, previewName } = await loadPreview(slug);
   const settings = parseTimetableSettings(timetable.settings);
   const base = `/f/${slug}`;
-  const { switcherItems, unread, queueNeverSeen, pendingCount, loungeUnread } =
-    await loadSwitcherAndUnread(isAuthed, isMember, slug);
+  const {
+    switcherItems,
+    unread,
+    queueNeverSeen,
+    pendingCount,
+    loungeUnread,
+    pushPublicKey,
+    viewerId,
+  } = await loadSwitcherAndUnread(isAuthed, isMember, slug);
 
   const themeCss = buildThemeCss(settings);
 
@@ -463,7 +485,10 @@ export default async function TimetableLayout({
           ) : null}
 
           {/* Sidebar foot, one item per line (QA 2026-07-28): visibility,
-              switcher, appearance, report a bug, source code (#366, from
+              switcher, appearance, Get Notifications (#368 step 6 — only
+              where alerts are possible and not yet on for this device;
+              nothing at all without push keys or under view-as), report a
+              bug, source code (#366, from
               #360 — always this repository, never a fork). The plain-English
               visibility line replaced the too-terse pill (QA 2026-07-27);
               the forum name lives in the topbar. */}
@@ -475,6 +500,12 @@ export default async function TimetableLayout({
               <TimetableSwitcher items={switcherItems} currentSlug={slug} />
             ) : null}
             <ThemeToggle />
+            <GetNotificationsLink
+              slug={slug}
+              pushPublicKey={pushPublicKey}
+              viewerId={viewerId}
+              preview={previewUserId !== null}
+            />
             <a
               className="sidebar-foot-link faint"
               href="https://github.com/sugaroverflow/timetable/issues/new"
