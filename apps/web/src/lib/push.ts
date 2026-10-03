@@ -345,6 +345,17 @@ async function currentSubscription(): Promise<PushSubscription | null> {
   return (await registration?.pushManager.getSubscription()) ?? null;
 }
 
+/** The worker's registration and its subscription, or null without one. */
+async function currentRegistrationAndSubscription(): Promise<{
+  registration: ServiceWorkerRegistration;
+  subscription: PushSubscription;
+} | null> {
+  const registration =
+    await navigator.serviceWorker.getRegistration(SERVICE_WORKER_SCOPE);
+  const subscription = await registration?.pushManager.getSubscription();
+  return registration && subscription ? { registration, subscription } : null;
+}
+
 const SENT_KEY_PREFIX = "topic.push.sent.";
 
 /** What this page last sent the server for this person on this device, so
@@ -456,6 +467,42 @@ export function refreshPushDevice(
   return inflight;
 }
 
+/**
+ * Page load, a subscription made under an older server key (the VAPID pair
+ * changed): every send to it is refused, so re-posting it would only start
+ * the 20-failure cycle again. When it is this person's — we sent it, or the
+ * server holds it — and the browser already granted permission (so
+ * subscribing can't prompt), replace it now and return the new state.
+ * Only a definite "different": a browser that doesn't report the key would
+ * otherwise resubscribe on every page view; Turn on handles that case.
+ * Null means nothing was stale and detection carries on.
+ */
+async function replaceStaleOnLoad(
+  userId: string,
+  publicKey: string,
+  registration: ServiceWorkerRegistration,
+  subscription: PushSubscription,
+  lastSent: string | null,
+): Promise<PushDeviceState | null> {
+  if (compareServerKey(subscription, publicKey) !== "different") return null;
+  if (Notification.permission !== "granted") return null;
+  if (lastSent === null && !(await serverHasDevice(subscription.endpoint))) {
+    return null;
+  }
+  const fresh = await replaceSubscription(
+    registration,
+    subscription,
+    publicKey,
+  );
+  const result = await sendSubscription(fresh);
+  const identity = subscriptionIdentity(fresh.toJSON());
+  writeLastSent(
+    userId,
+    result === "ok" && identity ? await identityFingerprint(identity) : null,
+  );
+  return result === "ok" ? "on" : "off";
+}
+
 async function detectDevice(
   userId: string,
   publicKey: string,
@@ -463,44 +510,34 @@ async function detectDevice(
   const support = detectPushSupport(readEnvironment());
   if (support !== "ready") return support;
 
-  const registration =
-    await navigator.serviceWorker.getRegistration(SERVICE_WORKER_SCOPE);
-  const subscription =
-    (await registration?.pushManager.getSubscription()) ?? null;
-  if (!registration || !subscription) return "off";
+  const current = await currentRegistrationAndSubscription();
+  if (!current) return "off";
+  const { registration, subscription } = current;
   const identity = subscriptionIdentity(subscription.toJSON());
   if (!identity) return "off";
 
   const lastSent = readLastSent(userId);
 
-  // Made under an older server key (the VAPID pair changed): every send to
-  // it is refused, so re-posting it would only start the 20-failure cycle
-  // again. When it is this person's — we sent it, or the server holds it —
-  // and the browser already granted permission (so subscribing can't
-  // prompt), replace it now. Only a definite "different": a browser that
-  // doesn't report the key would otherwise resubscribe on every page view;
-  // Turn on handles that case.
-  if (
-    compareServerKey(subscription, publicKey) === "different" &&
-    Notification.permission === "granted" &&
-    (lastSent !== null || (await serverHasDevice(identity.endpoint)))
-  ) {
-    const fresh = await replaceSubscription(
+  return (
+    (await replaceStaleOnLoad(
+      userId,
+      publicKey,
       registration,
       subscription,
-      publicKey,
-    );
-    const result = await sendSubscription(fresh);
-    const freshIdentity = subscriptionIdentity(fresh.toJSON());
-    writeLastSent(
-      userId,
-      result === "ok" && freshIdentity
-        ? await identityFingerprint(freshIdentity)
-        : null,
-    );
-    return result === "ok" ? "on" : "off";
-  }
+      lastSent,
+    )) ?? (await reconcileDevice(userId, subscription, identity, lastSent))
+  );
+}
 
+/** The subscription is made under the current key (or the browser doesn't
+ * say): re-send it if it rotated since we last sent it, otherwise ask the
+ * server whether it is on. */
+async function reconcileDevice(
+  userId: string,
+  subscription: PushSubscription,
+  identity: SubscriptionIdentity,
+  lastSent: string | null,
+): Promise<PushDeviceState> {
   const fingerprint = await identityFingerprint(identity);
   if (shouldResend(lastSent, fingerprint)) {
     // The browser rotated the endpoint or keys since this person turned
