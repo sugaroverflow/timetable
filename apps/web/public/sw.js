@@ -30,7 +30,6 @@ function isSafePath(url) {
     url.startsWith("/") &&
     !url.startsWith("//") &&
     !url.includes("\\") &&
-    // eslint-disable-next-line no-control-regex
     !/[\u0000-\u001f\u007f]/.test(url) &&
     url.length <= 1024
   );

@@ -173,7 +173,9 @@ describe("alerts-line", () => {
     expect(mocks.register).not.toHaveBeenCalled();
     expect(mocks.subscribe).not.toHaveBeenCalled();
   });
+});
 
+describe("alerts-line: turning on", () => {
   it("Turn on: asks permission on the click, subscribes, posts, then offers Turn off", async () => {
     setBrowser();
     setup();
@@ -244,7 +246,9 @@ describe("alerts-line", () => {
     expect(mocks.subscribe).not.toHaveBeenCalled();
     expect(mocks.clientApi).not.toHaveBeenCalled();
   });
+});
 
+describe("alerts-line: denied and on", () => {
   it("denied: explains how to unblock, and never re-prompts", async () => {
     setBrowser({ permission: "denied" });
     setup();

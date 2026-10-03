@@ -116,40 +116,41 @@ export function detectPushSupport(env: PushEnvironment): PushSupport {
   return "ready";
 }
 
+/** Browser and system names, first match wins — so Edge and Samsung come
+ * before the Chrome they also claim to be, and Chrome before Safari. */
+const BROWSERS: [RegExp, string][] = [
+  [/Edg(e|A|iOS)?\//, "Edge"],
+  [/SamsungBrowser\//, "Samsung Internet"],
+  [/(Firefox|FxiOS)\//, "Firefox"],
+  [/(Chrome|CriOS|Chromium)\//, "Chrome"],
+  [/Safari\//, "Safari"],
+];
+const SYSTEMS: [RegExp, string][] = [
+  [/iPhone|iPod/, "iPhone"],
+  [/iPad/, "iPad"],
+  [/Android/, "Android"],
+  [/CrOS/, "ChromeOS"],
+  [/Windows/, "Windows"],
+  [/Macintosh|Mac OS X/, "Mac"],
+  [/Linux/, "Linux"],
+];
+
+function firstMatch(table: [RegExp, string][], ua: string): string | null {
+  return table.find(([re]) => re.test(ua))?.[1] ?? null;
+}
+
 /** A short device name for the device list ("Chrome on Android") — never
  * the raw user agent. Null when nothing is recognised. */
 export function deviceLabel(
   env: Pick<PushEnvironment, "userAgent" | "platform" | "maxTouchPoints">,
 ): string | null {
-  const ua = env.userAgent;
-  const browser = /Edg(e|A|iOS)?\//.test(ua)
-    ? "Edge"
-    : /SamsungBrowser\//.test(ua)
-      ? "Samsung Internet"
-      : /(Firefox|FxiOS)\//.test(ua)
-        ? "Firefox"
-        : /(Chrome|CriOS|Chromium)\//.test(ua)
-          ? "Chrome"
-          : /Safari\//.test(ua)
-            ? "Safari"
-            : null;
-  const os = /iPhone|iPod/.test(ua)
-    ? "iPhone"
-    : /iPad/.test(ua) || isIOSDevice(env)
+  const browser = firstMatch(BROWSERS, env.userAgent);
+  const system =
+    isIOSDevice(env) && !/iPhone|iPod/.test(env.userAgent)
       ? "iPad"
-      : /Android/.test(ua)
-        ? "Android"
-        : /CrOS/.test(ua)
-          ? "ChromeOS"
-          : /Windows/.test(ua)
-            ? "Windows"
-            : /Macintosh|Mac OS X/.test(ua)
-              ? "Mac"
-              : /Linux/.test(ua)
-                ? "Linux"
-                : null;
-  if (browser && os) return `${browser} on ${os}`;
-  return browser ?? os;
+      : firstMatch(SYSTEMS, env.userAgent);
+  if (browser && system) return `${browser} on ${system}`;
+  return browser ?? system;
 }
 
 /** The VAPID public key (base64url) as the bytes `subscribe()` wants. */
