@@ -7,7 +7,10 @@ import { ActivityRoleFilter } from "@/components/ActivityRoleFilter";
 import { ActorFilter } from "@/components/ActorFilter";
 import { AlertsLine } from "@/components/AlertsLine";
 import { Avatar } from "@/components/Avatar";
-import { DigestSettingsForm } from "@/components/DigestSettingsForm";
+import {
+  DigestSettingsForm,
+  parseViewerPushKinds,
+} from "@/components/DigestSettingsForm";
 import { EmptyState } from "@/components/EmptyState";
 import { MarkNotificationsSeen } from "@/components/MarkNotificationsSeen";
 import { PersonChip } from "@/components/PersonChip";
@@ -53,6 +56,8 @@ type Data = {
     viewerRoles: string[];
     settings: string;
     viewerDigestSettings: string;
+    /** push-column (#368 step 5): effective Push switches, JSON. */
+    viewerPushKinds: string;
   } | null;
   me: { id: string; notificationSettings: string } | null;
   notifications: Notification[];
@@ -63,7 +68,9 @@ type Data = {
 
 const QUERY = `
   query Notifications($s: String!) {
-    timetable: forum(idOrSlug: $s) { viewerRoles settings viewerDigestSettings }
+    timetable: forum(idOrSlug: $s) {
+      viewerRoles settings viewerDigestSettings viewerPushKinds
+    }
     me { id notificationSettings }
     pushPublicKey
     notifications(idOrSlug: $s) {
@@ -243,6 +250,9 @@ function DigestCard({
 }) {
   if (!data.me) return null;
   const settings = parseTimetableSettings(data.timetable?.settings);
+  // Push is available only with keys and outside a preview — the alerts
+  // line and the Push column share this one gate (plan §2, finding 1).
+  const pushAvailable = Boolean(data.pushPublicKey) && !preview;
   return (
     <DigestSettingsForm
       slug={slug}
@@ -253,8 +263,13 @@ function DigestCard({
       forumDefaults={settings.digestKindDefaults ?? {}}
       roles={data.timetable?.viewerRoles ?? []}
       roleLabels={settings.roleLabels}
+      pushKinds={
+        pushAvailable
+          ? parseViewerPushKinds(data.timetable?.viewerPushKinds)
+          : null
+      }
       alerts={
-        data.pushPublicKey && !preview ? (
+        pushAvailable && data.pushPublicKey ? (
           <AlertsLine
             pushPublicKey={data.pushPublicKey}
             viewerId={data.me.id}

@@ -3041,6 +3041,72 @@ a.queue-btn-back:hover {
   color: var(--red-ink);
 }
 
+/* push-column (Web Push step 5, #368): "What to include" as an Email |
+   Push table on the Notifications page, shown only while push is
+   available. The two switch columns are as narrow as a switch, so the
+   label column keeps the room and the table fits a 360px phone with no
+   horizontal scroll; labels wrap, switches never squeeze. */
+.kind-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 12px;
+  font-size: var(--text-sm);
+}
+.kind-table th,
+.kind-table td {
+  padding: 4px 0;
+  vertical-align: top;
+}
+.kind-table thead th {
+  padding-bottom: 8px;
+  vertical-align: bottom;
+}
+.kind-table-what {
+  text-align: left;
+}
+.kind-table th.kind-table-col {
+  width: 1%;
+  padding-left: 12px;
+  text-align: center;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+  font-weight: var(--fw-semibold);
+  color: var(--muted);
+}
+.kind-table-col-off {
+  opacity: 0.5;
+}
+.kind-table-label {
+  text-align: left;
+  font-weight: normal;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.kind-table-na .kind-table-label {
+  opacity: 0.45;
+}
+.kind-table td.kind-table-cell {
+  padding-left: 12px;
+  text-align: center;
+}
+.kind-table-cell .ui-switch-row {
+  display: inline-flex;
+}
+.kind-table-dash {
+  display: inline-block;
+  width: 38px;
+  line-height: 24px;
+  color: var(--faint);
+}
+.kind-table-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 /* install-steps (#368, plan §3.4): the iPhone/iPad Add to Home Screen
    steps — shared by the alerts line and the sidebar link. */
 .install-steps {
