@@ -1,6 +1,11 @@
 import { createApiApp } from "./app";
 import { env } from "./env";
 import { structuredLogger } from "./http/request-log";
+import {
+  createPushSweeper,
+  pushSweepDeps,
+  startPushSweepTimer,
+} from "./push-sweep";
 
 const log = structuredLogger("server");
 
@@ -10,6 +15,18 @@ const server = app.listen(env.port, () => {
   console.log(`[api] listening on http://localhost:${env.port}`);
   console.log(`[api] GraphQL  http://localhost:${env.port}/graphql`);
 });
+
+/** The Web Push sweep (docs/web-push-plan.md §3.2): once a minute, only
+ * when VAPID keys are configured — without them nothing starts. While
+ * PUSH_PAUSED it still advances its window and sends nothing. */
+const pushSweep = env.push
+  ? startPushSweepTimer(
+      createPushSweeper(pushSweepDeps(env.push), {
+        info: (msg) => log.info(msg),
+        error: (msg, err) => log.error(msg, err),
+      }),
+    )
+  : null;
 
 /**
  * Drain on shutdown (ops R10). App Platform sends SIGTERM on every deploy and
@@ -35,13 +52,20 @@ function shutdown(signal: NodeJS.Signals): void {
   }, SHUTDOWN_GRACE_MS);
   forceExit.unref();
 
+  // The push sweep stops ticking at once; an in-flight sweep (at most a
+  // few 5 s sends behind a limiter of 4) is awaited before exit, so an
+  // ordinary restart loses no claimed alerts. The grace timer still caps it.
+  const sweepDone = pushSweep ? pushSweep.stop() : Promise.resolve();
+
   server.close((err) => {
     if (err) {
       log.error("error while closing server", err);
       process.exit(1);
     }
-    log.info("drained cleanly");
-    process.exit(0);
+    void sweepDone.then(() => {
+      log.info("drained cleanly");
+      process.exit(0);
+    });
   });
 }
 
