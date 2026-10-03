@@ -152,6 +152,41 @@ function usablePushKinds(
   );
 }
 
+/** The card's title and intro. With push available the card covers
+ * alerts too, so it is "Notification settings" (Ed, 2026-10-03); without
+ * keys it stays "Email digests", word for word as before push. */
+function CardIntro({ pushAvailable }: { pushAvailable: boolean }) {
+  if (pushAvailable) {
+    return (
+      <>
+        <h2 className="section-title" style={{ marginBottom: 10 }}>
+          Notification settings
+        </h2>
+        <p
+          className="faint"
+          style={{ marginTop: 0, fontSize: "var(--text-xs)" }}
+        >
+          One email with what you haven&rsquo;t seen in this forum — comments on
+          your topics, replies, and new topics — plus alerts on the devices
+          where you turn them on. All of it is your choice per forum.
+        </p>
+      </>
+    );
+  }
+  return (
+    <>
+      <h2 className="section-title" style={{ marginBottom: 10 }}>
+        Email digests
+      </h2>
+      <p className="faint" style={{ marginTop: 0, fontSize: "var(--text-xs)" }}>
+        One email with what you haven&rsquo;t seen in this forum — comments on
+        your topics, replies, and new topics. All of it is your choice per
+        forum.
+      </p>
+    </>
+  );
+}
+
 /** "What to include" before push (and still, wherever push isn't
  * available): one labelled email switch per kind. Unchanged markup — with
  * no keys the form must look exactly as it did. */
@@ -374,14 +409,7 @@ export function DigestSettingsForm({
 
   return (
     <form onSubmit={submit} className="card">
-      <h2 className="section-title" style={{ marginBottom: 10 }}>
-        Email digests
-      </h2>
-      <p className="faint" style={{ marginTop: 0, fontSize: "var(--text-xs)" }}>
-        One email with what you haven&rsquo;t seen in this forum — comments on
-        your topics, replies, and new topics. All of it is your choice per
-        forum.
-      </p>
+      <CardIntro pushAvailable={pushAvailable} />
       <div className="row wrap" style={{ marginBottom: 12 }}>
         <div className="field" style={{ marginBottom: 0 }}>
           <label htmlFor="digest-frequency">How often</label>

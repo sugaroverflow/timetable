@@ -119,6 +119,17 @@ describe("DigestSettingsForm without push (no keys, or a preview)", () => {
     ).toBeTruthy();
   });
 
+  it("keeps the Email digests title and intro, word for word", () => {
+    renderForm({ pushKinds: null });
+    expect(screen.getByRole("heading", { level: 2 }).textContent).toBe(
+      "Email digests",
+    );
+    expect(screen.getByText(/^One email with what you haven/).textContent).toBe(
+      "One email with what you haven\u2019t seen in this forum — comments on your topics, replies, and new topics. All of it is your choice per forum.",
+    );
+    expect(screen.queryByText("Notification settings")).toBeNull();
+  });
+
   it("hides What to include when the cadence is Never, as before", () => {
     renderForm({ forum: NEVER });
     expect(screen.queryByText("What to include")).toBeNull();
@@ -159,6 +170,17 @@ describe("DigestSettingsForm with the Push column", () => {
         .getByRole("switch", { name: "❤️s on your topics: Push" })
         .getAttribute("aria-checked"),
     ).toBe("false");
+  });
+
+  it("is titled Notification settings, its intro covering alerts", () => {
+    renderForm({ pushKinds: DEFAULT_PUSH });
+    expect(screen.getByRole("heading", { level: 2 }).textContent).toBe(
+      "Notification settings",
+    );
+    expect(screen.getByText(/^One email with what you haven/).textContent).toBe(
+      "One email with what you haven\u2019t seen in this forum — comments on your topics, replies, and new topics — plus alerts on the devices where you turn them on. All of it is your choice per forum.",
+    );
+    expect(screen.queryByText("Email digests")).toBeNull();
   });
 
   it("gives drafts a dash, not a Push switch", () => {

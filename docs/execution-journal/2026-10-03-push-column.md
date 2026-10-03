@@ -113,7 +113,10 @@ at Never, and no push.
 
 ## Left open
 
-- The card title stays "Email digests"; the plan doesn't retitle it. It is
-  open call 1 on PR #384.
+- (Since resolved.) The card title: Ed chose **"Notification settings"**
+  while push is available (2026-10-03). Its intro gains "— plus alerts on
+  the devices where you turn them on". Without keys the card stays "Email
+  digests" with its old intro, word for word (`CardIntro`; both titles
+  pinned in the tests).
 - No glossary entry: plan step 7 owns the push docs. The part name is
   **push-column**.
