@@ -247,8 +247,11 @@ export default async function proxy(
 
 export const config = {
   matcher: [
-    // Skip Next internals and static files, run on everything else.
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpg|jpeg|gif|png|svg|ico|webp|woff2?)).*)",
+    // Skip Next internals and static files, run on everything else. The
+    // install manifest (/manifest.webmanifest) and its PNG icons are in
+    // the skip list: the browser fetches them without a session, and no
+    // host redirect, Clerk handshake or CSP applies to them (#367).
+    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpg|jpeg|gif|png|svg|ico|webp|webmanifest|woff2?)).*)",
     "/(api|trpc)(.*)",
   ],
 };

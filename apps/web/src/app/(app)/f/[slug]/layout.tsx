@@ -22,6 +22,7 @@ import {
 } from "@/components/TimetableSwitcher";
 import { UserPreviewExit } from "@/components/UserPreview";
 import { env } from "@/env";
+import { APPLE_TOUCH_ICON } from "@/lib/appManifest";
 import { emojiFavicon } from "@/lib/favicon";
 import { gqlFetch } from "@/lib/graphql";
 import { getMyTimetables } from "@/lib/myTimetables";
@@ -90,7 +91,9 @@ export async function generateMetadata({
   const hasFeed = !["private", "deactivated"].includes(timetable.privacy);
   return {
     title: `${timetable.name} Topics`,
-    ...(icon ? { icons: { icon } } : {}),
+    // Metadata merges shallowly: overriding `icons` drops the root's
+    // `apple`, so carry the one-app Home Screen icon along (#367).
+    ...(icon ? { icons: { icon, apple: APPLE_TOUCH_ICON } } : {}),
     ...(hasFeed
       ? {
           alternates: {

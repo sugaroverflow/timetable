@@ -471,11 +471,24 @@ only. There are no per-PR review apps — dev is where QA happens. Details in
 
 ## Assets
 
-Static README images live in `docs/assets/readme`. The app has no image
-assets of its own: the logo is the 📚 emoji rendered inline (topbar brand
-and landing page) and the favicon is an emoji data URI (`lib/favicon.ts` —
-forums can override it with their own icon emoji). `apps/web/public/` is
-kept (empty) so Next.js serves any future static files from the site root.
+Static README images live in `docs/assets/readme`. The logo is the 📚
+emoji rendered inline (topbar brand and landing page) and the favicon is an
+emoji data URI (`lib/favicon.ts` — forums can override it with their own
+icon emoji). `apps/web/public/` is served from the site root and holds:
+
+- the install icons (installable-app, #367): `icon-192.png`,
+  `icon-512.png`, `icon-maskable-512.png` and `apple-touch-icon.png`, the
+  only raster images the app ships. They are 📚 drawn from the vendored
+  Twemoji SVG in `scripts/assets/` (CC-BY 4.0) by
+  `scripts/generate-app-icons.mjs`, which is run by hand and its output
+  committed;
+- `emojibase/`, the Lounge emoji picker's same-origin data.
+
+The web app manifest is `app/manifest.ts` (`/manifest.webmanifest`), built
+from `lib/appManifest.ts`. It describes one "Topic" app for every forum.
+The proxy's matcher skips `.webmanifest` and the PNGs, so neither the host
+redirects, Clerk nor the CSP touch them. There is no service worker yet;
+the Web Push plan adds one.
 
 ## Architecture Risks
 

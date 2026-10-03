@@ -80,6 +80,9 @@ export function buildCsp(nonce: string): string {
     // Clerk's bot-protection widget (Cloudflare Turnstile) frames itself.
     "frame-src 'self' https://challenges.cloudflare.com",
     "worker-src 'self' blob:",
+    // The install manifest (#367). default-src already covers it; named
+    // explicitly so tightening default-src can't silently break installs.
+    "manifest-src 'self'",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",

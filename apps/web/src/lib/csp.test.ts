@@ -40,6 +40,11 @@ describe("buildCsp", () => {
     expect(csp).toContain("style-src 'self' 'unsafe-inline'");
   });
 
+  it("allows the same-origin install manifest", () => {
+    // installable-app (#367): Add to Home Screen reads /manifest.webmanifest.
+    expect(buildCsp("n")).toContain("manifest-src 'self'");
+  });
+
   it("includes the API origin in connect-src", () => {
     fakeEnv.apiUrl = "https://topic.forum";
     expect(buildCsp("n")).toContain("connect-src 'self' https://topic.forum");
