@@ -818,16 +818,73 @@ async function requirePushUser(req: Request, res: Response) {
   return requireUserCtx(ctx, res);
 }
 
+/** A subscribe body that passed the shape checks, or the 400 to send. */
+type PushSubscribeBody =
+  | {
+      ok: true;
+      endpoint: string;
+      p256dh: string;
+      auth: string;
+      label: string | null;
+    }
+  | { ok: false; error: string };
+
+/** The endpoint must be a known push service (`validPushEndpoint`, the
+ * SSRF allowlist); the keys must decode to a 65-byte P-256 point and a
+ * 16-byte secret (`validPushKeys`). */
+function readPushSubscribeBody(raw: unknown): PushSubscribeBody {
+  const body = (raw ?? {}) as {
+    endpoint?: unknown;
+    keys?: { p256dh?: unknown; auth?: unknown } | null;
+    label?: unknown;
+  };
+  if (!validPushEndpoint(body.endpoint)) {
+    return { ok: false, error: "Invalid push subscription" };
+  }
+  const keys = typeof body.keys === "object" && body.keys ? body.keys : {};
+  if (!validPushKeys(keys.p256dh, keys.auth)) {
+    return { ok: false, error: "Invalid push subscription keys" };
+  }
+  return {
+    ok: true,
+    endpoint: body.endpoint,
+    p256dh: keys.p256dh as string,
+    auth: keys.auth as string,
+    label: typeof body.label === "string" ? body.label : null,
+  };
+}
+
+/** Core's refusals as HTTP: `invalid` → 400; `taken` → 409 (another
+ * account's subscription on this browser — never moved silently; the
+ * client unsubscribes the browser and subscribes afresh, which yields a
+ * new endpoint, see core push.ts); `cap` → 409. */
+const PUSH_SUBSCRIBE_REFUSALS = {
+  invalid: { status: 400, body: { error: "Invalid push subscription" } },
+  taken: {
+    status: 409,
+    body: {
+      error: "Alerts on this browser belong to another account",
+      reason: "taken",
+    },
+  },
+  cap: {
+    status: 409,
+    body: {
+      error: `Alerts are already on for ${PUSH_DEVICE_CAP} devices — turn them off on one first`,
+      reason: "cap",
+    },
+  },
+} as const;
+
 /**
  * POST /api/push-subscriptions
  * Turn alerts on for THIS device, or refresh its keys (browsers rotate
  * them). Body: `PushSubscription.toJSON()` — `{ endpoint, keys: { p256dh,
  * auth } }` — plus an optional short `label` ("Chrome on Android").
- * After the shared checks: the endpoint must be a known push service
- * (`validPushEndpoint`, the SSRF allowlist), the keys must decode to a
- * 65-byte P-256 point and a 16-byte secret, then the `pushSubscribe`
- * action limit, then core. Responds with the device as its owner sees it
- * (id, label, dates) — never the endpoint or keys.
+ * After the shared checks: the body's shape (`readPushSubscribeBody`),
+ * then the `pushSubscribe` action limit, then core. Responds with the
+ * device as its owner sees it (id, label, dates) — never the endpoint or
+ * keys. 201 for a new device, 200 for a refresh.
  */
 restRouter.post(
   "/push-subscriptions",
@@ -835,46 +892,18 @@ restRouter.post(
     const user = await requirePushUser(req, res);
     if (!user) return;
 
-    const body = (req.body ?? {}) as {
-      endpoint?: unknown;
-      keys?: { p256dh?: unknown; auth?: unknown } | null;
-      label?: unknown;
-    };
-    if (!validPushEndpoint(body.endpoint)) {
-      res.status(400).json({ error: "Invalid push subscription" });
-      return;
-    }
-    const keys =
-      typeof body.keys === "object" && body.keys !== null ? body.keys : {};
-    if (!validPushKeys(keys.p256dh, keys.auth)) {
-      res.status(400).json({ error: "Invalid push subscription keys" });
+    const input = readPushSubscribeBody(req.body);
+    if (!input.ok) {
+      res.status(400).json({ error: input.error });
       return;
     }
     if (!(await enforceActionLimit(res, user.id, "pushSubscribe"))) return;
 
-    const result = await subscribePush(user.id, {
-      endpoint: body.endpoint,
-      p256dh: keys.p256dh as string,
-      auth: keys.auth as string,
-      label: typeof body.label === "string" ? body.label : null,
-    });
+    const { ok: _ok, ...subscription } = input;
+    const result = await subscribePush(user.id, subscription);
     if (!result.ok) {
-      if (result.reason === "invalid") {
-        res.status(400).json({ error: "Invalid push subscription" });
-      } else if (result.reason === "taken") {
-        // Another account's subscription on this browser. Never moved
-        // silently; the client unsubscribes the browser and subscribes
-        // afresh, which yields a new endpoint (core push.ts).
-        res.status(409).json({
-          error: "Alerts on this browser belong to another account",
-          reason: "taken",
-        });
-      } else {
-        res.status(409).json({
-          error: `Alerts are already on for ${PUSH_DEVICE_CAP} devices — turn them off on one first`,
-          reason: "cap",
-        });
-      }
+      const refusal = PUSH_SUBSCRIBE_REFUSALS[result.reason];
+      res.status(refusal.status).json(refusal.body);
       return;
     }
     const { device } = result;
