@@ -122,3 +122,15 @@ as plan §1 asks; `graphql/activity.ts` now calls it.
 - No index was added: `comments`, `lounge_comments` and `timeslots` have
   no `created_at` index, so those range reads scan. At this cohort's size
   that is milliseconds a minute; an additive index is the fix if it grows.
+
+## Follow-up: the database tests now run in CI
+
+Ed took open call 1(b) on #380. `ci.yml`'s `verify` job has a new last
+step, "Database tests (push sweep)", that runs after "Apply migrations":
+`npx vitest run src/push-sweep.db.test.ts` in `apps/api` with
+`PUSH_SWEEP_DB_TEST=1`, using the job's `DATABASE_URL` / `DATABASE_SSL`
+against the CI Postgres service. `npm run test` still skips the file, because it runs
+before the tables exist. It is the only opt-in DB test in the repo, so the
+step names it directly. A generic `*.db.test.ts` step would still need each
+file's own opt-in variable. The next such file should get a step of its
+own, or turn this one into a shared `DB_TEST=1` flag.
