@@ -1,11 +1,16 @@
 import { ClerkProvider } from "@clerk/nextjs";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 
 import "./tokens.css";
 import "./globals.css";
 
 import { e2eTestMode, env } from "@/env";
+import {
+  APP_THEME_COLOR,
+  APP_THEME_COLOR_DARK,
+  APPLE_TOUCH_ICON,
+} from "@/lib/appManifest";
 import { emojiFavicon } from "@/lib/favicon";
 
 export const metadata: Metadata = {
@@ -17,7 +22,30 @@ export const metadata: Metadata = {
   // Config-based (not app/icon.tsx) so forum layouts can override the
   // favicon with the forum's own icon — file-convention icons always win
   // over nested metadata.
-  icons: { icon: emojiFavicon("📚") },
+  // `apple` is the iOS Home Screen icon (installable-app, #367); forum
+  // layouts that override `icon` must carry it along.
+  icons: { icon: emojiFavicon("📚"), apple: APPLE_TOUCH_ICON },
+  // installable-app (#367): iOS reads these when someone adds Topic to the
+  // Home Screen. Next emits `mobile-web-app-capable` for `capable`; the
+  // apple- spelling is added below for iOS before 16.4, which predates
+  // reading `display: standalone` from the manifest. "default" keeps the
+  // status bar opaque with dark text — "black-translucent" would draw the
+  // page under white status-bar text, unreadable on the light topbar.
+  appleWebApp: { capable: true, title: "Topic", statusBarStyle: "default" },
+  other: { "apple-mobile-web-app-capable": "yes" },
+};
+
+// viewport-fit=cover lets the installed app use the whole screen; the
+// topbar, page gutters, drawer and toasts pad themselves by
+// env(safe-area-inset-*) in globals.css. Zoom stays untouched — never add
+// maximumScale/userScalable. theme-color matches the topbar's surface in
+// each scheme (the manifest carries the light one).
+export const viewport: Viewport = {
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: APP_THEME_COLOR },
+    { media: "(prefers-color-scheme: dark)", color: APP_THEME_COLOR_DARK },
+  ],
 };
 
 // Clerk's prebuilt UI (sign-in/sign-up cards, the account modal) themed to
