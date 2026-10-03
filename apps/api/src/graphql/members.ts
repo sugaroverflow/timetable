@@ -16,7 +16,11 @@ import {
   canSeeContactDetails,
   canSeePersonProfile,
   DIGEST_KINDS,
+  isPushEventlessKind,
+  PUSH_KIND_DEFAULTS,
+  type DigestKind,
   type DigestKinds,
+  type PushKinds,
   type Privacy,
   type Role as SharedRole,
   type Viewer,
@@ -28,6 +32,7 @@ import { isSysadmin } from "../auth/sysadmin";
 import { builder } from "./builder";
 import {
   assertOptionalHttpUrl,
+  badRequest,
   capLength,
   forbidden,
   loadTimetableAndViewer,
@@ -289,6 +294,44 @@ export function parseDigestKinds(
   return kinds;
 }
 
+/** Per-forum Push switches (#368, step 2b): a JSON {kind: boolean} object,
+ * stored as `digestSettings.push`. Like `kindsJson` the parsed object
+ * REPLACES the stored push set (the Push column always sends every switch)
+ * and never touches the email `kinds`. Unlike `kindsJson` it is strict —
+ * the column is new, so there is no old client to tolerate: malformed
+ * JSON, a non-boolean, an unknown kind, or an eventless kind (`drafts`,
+ * which has no moment to alert on, plan §1) is a BAD_REQUEST rather than
+ * a silent drop. Absent or empty argument: undefined (leave stored). */
+export function parsePushKinds(
+  raw: string | null | undefined,
+): PushKinds | undefined {
+  if (!raw) return undefined;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    badRequest("pushKindsJson must be a JSON object");
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    badRequest("pushKindsJson must be a JSON object");
+  }
+  const kinds: PushKinds = {};
+  for (const [key, value] of Object.entries(parsed)) {
+    if (!Object.hasOwn(PUSH_KIND_DEFAULTS, key)) {
+      badRequest(`Unknown push kind: ${key.slice(0, 40)}`);
+    }
+    const kind = key as DigestKind;
+    if (isPushEventlessKind(kind)) {
+      badRequest(`${kind} has no push alerts`);
+    }
+    if (typeof value !== "boolean") {
+      badRequest(`Push switch ${kind} must be true or false`);
+    }
+    kinds[kind] = value;
+  }
+  return kinds;
+}
+
 builder.mutationFields((t) => ({
   /** Audit trail for the view-as-user preview (QA #59 round 3): called
    * as the admin enters the preview, before the cookie applies. The
@@ -429,7 +472,9 @@ builder.mutationFields((t) => ({
   /** Update the viewer's PER-FORUM digest settings (2026-08-11) — the
    * digest is one email per forum, so on/off, cadence, AND the kind
    * switches are all membership settings. Absent args leave their stored
-   * value; kindsJson (a {kind: boolean} object) replaces the stored set. */
+   * value; kindsJson (a {kind: boolean} object) replaces the stored set,
+   * and pushKindsJson (the same shape, #368) replaces the stored Push set
+   * without touching the email switches — see parsePushKinds. */
   updateMyForumDigestSettings: t.field({
     type: "Boolean",
     args: {
@@ -440,6 +485,9 @@ builder.mutationFields((t) => ({
       /** Weekly send day, 0 = Sunday … 6 = Saturday (UTC). */
       weekday: t.arg.int({ required: false }),
       kindsJson: t.arg.string({ required: false }),
+      /** Push switches for this forum, {kind: boolean}; read back
+       * resolved through `Forum.viewerPushKinds`. */
+      pushKindsJson: t.arg.string({ required: false }),
     },
     resolve: async (_p, args, ctx) => {
       const { user, readable } = await loadTimetableAndViewer(
@@ -449,11 +497,13 @@ builder.mutationFields((t) => ({
       const frequency = validDigestFrequency(args.frequency);
       const weekday = validDigestWeekday(args.weekday);
       const kinds = parseDigestKinds(args.kindsJson);
+      const push = parsePushKinds(args.pushKindsJson);
       return updateMembershipDigestSettings(readable.timetable.id, user.id, {
         ...(args.enabled != null ? { enabled: args.enabled } : {}),
         ...(frequency ? { frequency } : {}),
         ...(weekday != null ? { weekday } : {}),
         ...(kinds ? { kinds } : {}),
+        ...(push ? { push } : {}),
       });
     },
   }),

@@ -11,7 +11,13 @@ import {
   type WeightedHeartEntry,
 } from "@timetable/core";
 import type { Timetable } from "@timetable/db";
-import { isCalendarEnabled } from "@timetable/shared";
+import {
+  isCalendarEnabled,
+  isPushEventlessKind,
+  isPushKindEnabled,
+  PUSH_KIND_DEFAULTS,
+  type DigestKind,
+} from "@timetable/shared";
 
 import { builder } from "./builder";
 
@@ -72,6 +78,27 @@ export const TimetableType = builder
               ? await getMembershipDigestSettings(tt.id, ctx.user.id)
               : {},
           ),
+      }),
+      /** The viewer's EFFECTIVE per-forum Push switches (#368, step 2b) as
+       * JSON {kind: boolean}: every kind that can push (the eventless
+       * `drafts` is left out — its Push cell is a dash), each resolved
+       * through `isPushKindEnabled` (stored `digestSettings.push`, else
+       * `PUSH_KIND_DEFAULTS`). So the Push column shows what will actually
+       * alert without knowing the defaults. Anonymous viewers and
+       * non-members read the defaults. Which kinds alert is per forum;
+       * whether a DEVICE gets anything is `myPushDeviceEnabled`. */
+      viewerPushKinds: t.string({
+        resolve: async (tt, _args, ctx) => {
+          const stored = ctx.user
+            ? (await getMembershipDigestSettings(tt.id, ctx.user.id)).push
+            : undefined;
+          const resolved: Partial<Record<DigestKind, boolean>> = {};
+          for (const kind of Object.keys(PUSH_KIND_DEFAULTS) as DigestKind[]) {
+            if (isPushEventlessKind(kind)) continue;
+            resolved[kind] = isPushKindEnabled(stored, kind);
+          }
+          return JSON.stringify(resolved);
+        },
       }),
       /** The viewer's own membership profile here; null for anonymous
        * viewers and non-members. */
