@@ -35,6 +35,8 @@ import {
   recordDigestSend,
   removeMembership,
   setMemberRoles,
+  subscribePush,
+  unsubscribePush,
   updateUserEmail,
 } from "@timetable/core";
 import {
@@ -49,6 +51,7 @@ import {
   isLoungeEnabled,
   normalizeEmail,
   officeHoursLabel,
+  PUSH_DEVICE_CAP,
   updateMemberEmailSchema,
   updateMemberRolesSchema,
   type Role,
@@ -56,6 +59,7 @@ import {
 } from "@timetable/shared";
 
 import { buildAtomFeed } from "../atom";
+import { extractApiToken } from "../auth/api-token";
 import {
   createSignInTicket,
   getOrCreateClerkUser,
@@ -82,6 +86,7 @@ import {
 } from "../http/request-log";
 import { buildIcs } from "../ics";
 import { renderMarkdown } from "../markdown";
+import { validPushEndpoint, validPushKeys } from "../push-transport";
 import {
   createSignedUpload,
   isUploadPurpose,
@@ -759,6 +764,155 @@ restRouter.post(
       contentType: body.contentType,
       size: body.size,
     });
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// Web Push devices (docs/web-push-plan.md, #368, step 2b). Per USER, not per
+// forum: a subscription is a device, and turning alerts on covers every
+// forum on it. Which kinds alert is per forum (`pushKindsJson` on
+// updateMyForumDigestSettings).
+//
+// The endpoint and keys are a capability — with our VAPID key they put text
+// on that screen — so they travel only in the request BODY (never the URL,
+// which the request log records), are never logged, and are never echoed
+// back. Core re-throws database errors sanitised for the same reason.
+// ---------------------------------------------------------------------------
+
+/**
+ * The checks both device routes open with, in order: 503 while push is off
+ * (no VAPID keys — the web app hides every control then, so this only meets
+ * a stale tab or a script); then refuse an admin's view-as preview (it must
+ * not subscribe the previewed person, nor quietly the admin's own device)
+ * and personal API tokens (scripts have no device); then 401 when signed
+ * out. REST never accepts a token or honours x-view-as anyway
+ * (`contextFromRequest`); both are refused by name so that stays true if
+ * either rule ever loosens. Returns the user, or null after an error.
+ */
+async function requirePushUser(req: Request, res: Response) {
+  if (!env.push) {
+    res.status(503).json({ error: "Alerts are not available here" });
+    return null;
+  }
+  if (req.headers["x-view-as"]) {
+    res.status(403).json({ error: "Alerts can't be changed in a preview" });
+    return null;
+  }
+  if (extractApiToken(req.headers.authorization)) {
+    res
+      .status(403)
+      .json({ error: "Alerts can only be changed from a signed-in browser" });
+    return null;
+  }
+  const ctx = await contextFromRequest(req);
+  if (ctx.impersonation) {
+    res.status(403).json({ error: "Alerts can't be changed in a preview" });
+    return null;
+  }
+  if (ctx.apiToken) {
+    res
+      .status(403)
+      .json({ error: "Alerts can only be changed from a signed-in browser" });
+    return null;
+  }
+  return requireUserCtx(ctx, res);
+}
+
+/**
+ * POST /api/push-subscriptions
+ * Turn alerts on for THIS device, or refresh its keys (browsers rotate
+ * them). Body: `PushSubscription.toJSON()` — `{ endpoint, keys: { p256dh,
+ * auth } }` — plus an optional short `label` ("Chrome on Android").
+ * After the shared checks: the endpoint must be a known push service
+ * (`validPushEndpoint`, the SSRF allowlist), the keys must decode to a
+ * 65-byte P-256 point and a 16-byte secret, then the `pushSubscribe`
+ * action limit, then core. Responds with the device as its owner sees it
+ * (id, label, dates) — never the endpoint or keys.
+ */
+restRouter.post(
+  "/push-subscriptions",
+  h(async (req, res) => {
+    const user = await requirePushUser(req, res);
+    if (!user) return;
+
+    const body = (req.body ?? {}) as {
+      endpoint?: unknown;
+      keys?: { p256dh?: unknown; auth?: unknown } | null;
+      label?: unknown;
+    };
+    if (!validPushEndpoint(body.endpoint)) {
+      res.status(400).json({ error: "Invalid push subscription" });
+      return;
+    }
+    const keys =
+      typeof body.keys === "object" && body.keys !== null ? body.keys : {};
+    if (!validPushKeys(keys.p256dh, keys.auth)) {
+      res.status(400).json({ error: "Invalid push subscription keys" });
+      return;
+    }
+    if (!(await enforceActionLimit(res, user.id, "pushSubscribe"))) return;
+
+    const result = await subscribePush(user.id, {
+      endpoint: body.endpoint,
+      p256dh: keys.p256dh as string,
+      auth: keys.auth as string,
+      label: typeof body.label === "string" ? body.label : null,
+    });
+    if (!result.ok) {
+      if (result.reason === "invalid") {
+        res.status(400).json({ error: "Invalid push subscription" });
+      } else if (result.reason === "taken") {
+        // Another account's subscription on this browser. Never moved
+        // silently; the client unsubscribes the browser and subscribes
+        // afresh, which yields a new endpoint (core push.ts).
+        res.status(409).json({
+          error: "Alerts on this browser belong to another account",
+          reason: "taken",
+        });
+      } else {
+        res.status(409).json({
+          error: `Alerts are already on for ${PUSH_DEVICE_CAP} devices — turn them off on one first`,
+          reason: "cap",
+        });
+      }
+      return;
+    }
+    const { device } = result;
+    res.status(result.created ? 201 : 200).json({
+      subscribed: true,
+      created: result.created,
+      device: {
+        id: device.id,
+        label: device.label,
+        createdAt: device.createdAt.toISOString(),
+        lastSentAt: device.lastSentAt?.toISOString() ?? null,
+      },
+    });
+  }),
+);
+
+/**
+ * DELETE /api/push-subscriptions
+ * Turn alerts off for THIS device. Body: `{ endpoint }`. Removes only the
+ * caller's own row for that endpoint; other devices are untouched. No
+ * allowlist check, so a device is always removable even if a push service
+ * ever leaves the allowlist, and no action limit (deleting your own row
+ * costs nothing; the per-IP limiter still applies). Idempotent:
+ * `{ unsubscribed: false }` when there was nothing to remove.
+ */
+restRouter.delete(
+  "/push-subscriptions",
+  h(async (req, res) => {
+    const user = await requirePushUser(req, res);
+    if (!user) return;
+
+    const endpoint = (req.body as { endpoint?: unknown } | undefined)?.endpoint;
+    if (typeof endpoint !== "string" || !endpoint) {
+      res.status(400).json({ error: "Invalid push subscription" });
+      return;
+    }
+    const removed = await unsubscribePush(user.id, endpoint);
+    res.json({ unsubscribed: removed });
   }),
 );
 
