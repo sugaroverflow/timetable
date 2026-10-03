@@ -113,6 +113,17 @@ services:
       - { key: SPACES_PUBLIC_BASE_URL, scope: RUN_TIME }
       - { key: SPACES_KEY, value: "${SPACES_KEY}", scope: RUN_TIME, type: SECRET }
       - { key: SPACES_SECRET, value: "${SPACES_SECRET}", scope: RUN_TIME, type: SECRET }
+      # Web Push (docs/web-push-plan.md §3.1). Secrets from the GitHub
+      # Environment "production" via deploy-production.yml; an unset secret
+      # expands to "" and push stays off (the API treats empty as unset),
+      # while a partial or invalid set makes the API refuse to boot.
+      # PUSH_PAUSED=true is the kill switch (controls stay, nothing is sent).
+      # It is a GitHub environment VARIABLE so a pause survives the next
+      # deploy, which rewrites this spec and drops any console-only value.
+      - { key: VAPID_PUBLIC_KEY, value: "${VAPID_PUBLIC_KEY}", scope: RUN_TIME, type: SECRET }
+      - { key: VAPID_PRIVATE_KEY, value: "${VAPID_PRIVATE_KEY}", scope: RUN_TIME, type: SECRET }
+      - { key: VAPID_SUBJECT, value: "${VAPID_SUBJECT}", scope: RUN_TIME, type: SECRET }
+      - { key: PUSH_PAUSED, value: "${PUSH_PAUSED}", scope: RUN_TIME }
 
   # Web — Next.js (build then start). 1 GB so `next build` has headroom.
   - name: web
