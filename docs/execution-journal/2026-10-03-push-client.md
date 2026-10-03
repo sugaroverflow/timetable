@@ -166,3 +166,7 @@ registers. Step 3 (the sweep sender) was being built at the same time in
   for a device that was on). `docs/WEB_PUSH.md` and OPERATIONS R19 arrive
   with #385, which hadn't merged when this was written; they still say
   Turn off, then Turn on.
+- After #385 merged (20c1de9) main was merged into this branch, and
+  `WEB_PUSH.md` §11/boot rule and OPERATIONS R19 now say members just
+  press Turn on again (a device that was on recovers on its next page view)
+  and list the boot line.
