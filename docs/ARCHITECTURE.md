@@ -427,6 +427,19 @@ Core tables:
   carry `root_id`. Reactions are one row per post+person+emoji. Read
   mark: `timetable_memberships.lounge_seen_at`; digest click-to-read:
   `digest_sends.lounge_shown_until` — up to the newest post the card showed)
+- `push_subscriptions` / `push_sweep_state` (Web Push, 2026-10-03,
+  migration 0045, `docs/web-push-plan.md`): one row per DEVICE a user has
+  switched alerts on for — keyed to the user, not a membership, so one
+  switch covers every forum on that device; the endpoint is unique (one
+  account per browser subscription, moved only by an explicit
+  unsubscribe/resubscribe — core `subscribePush`), with the browser's
+  `p256dh`/`auth` payload keys, an optional device `label`, `last_sent_at`
+  and `failure_count`. Endpoint + keys are a capability: never logged,
+  never sent to the web app. `push_sweep_state` is the once-a-minute
+  sender's one-row cursor (`id = 1`, seeded by the migration). Which kinds
+  alert is per forum, in `digestSettings.push` (below), read through
+  shared `isPushKindEnabled` / `PUSH_KIND_DEFAULTS`. Inert until the API
+  has VAPID keys.
 
 Notable columns: `timetables.settings` is a JSON blob holding role labels,
 theme (colours, fonts, dark palette), icon/cover URLs, digest defaults, the
@@ -443,7 +456,8 @@ signal on a submitted topic (null = still drafting; the Pending page and
 sidebar badge filter on it, unpublishing clears it); memberships carry
 `lastSeenFeedAt` and
 `lastSeenNotificationsAt` watermarks, `inviteSentAt` (null = added by an
-admin but never invited), the per-forum `digestSettings` JSON +
+admin but never invited), the per-forum `digestSettings` JSON (its
+optional `push` map holds the per-forum Web Push kind switches) +
 `lastDigestAt` send watermark (2026-08-11, falling back to the user-level
 equivalents), and `queueRoundStartedAt`. A membership with `inviteSentAt`
 null AND both seen-watermarks null is a pre-created account whose owner

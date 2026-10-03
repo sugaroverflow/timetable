@@ -162,6 +162,12 @@ export type MembershipDigestSettings = {
   /** Weekly only: day to send on, 0 = Sunday … 6 = Saturday (UTC). */
   weekday?: number;
   kinds?: DigestKinds;
+  /** Web Push switches for this forum (#368, 2026-10-03): one per digest
+   * kind, independent of the email ones above. Absent kinds read through
+   * `PUSH_KIND_DEFAULTS` via `isPushKindEnabled` (push.ts) — never read
+   * this map directly. Whether a DEVICE receives anything is its own
+   * subscription; these only choose what alerts in this forum. */
+  push?: DigestKinds;
 };
 
 export type EffectiveDigestSettings = {
