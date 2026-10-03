@@ -193,3 +193,13 @@ export function loadPushConfig(
   }
   return config;
 }
+
+/**
+ * The one boot line when push is on (#385 open call 2): whether the kill
+ * switch is set, and the public key's first 8 characters — enough to tell
+ * which pair an environment booted with, and never the private key, which
+ * isn't a string here anyway. When push is off nothing is logged.
+ */
+export function pushBootLine(config: PushConfig): string {
+  return `[api] Web Push on${config.paused ? " (paused)" : ""}, key ${config.publicKey.slice(0, 8)}…`;
+}

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   applicationServerKey,
+  compareServerKey,
   detectPushSupport,
   deviceLabel,
   getPushDeviceState,
@@ -10,6 +11,7 @@ import {
   iosVersion,
   isIOSDevice,
   resetPushDeviceForTests,
+  serverKeyBytes,
   setPushDeviceState,
   shouldResend,
   subscribePushDevice,
@@ -216,6 +218,59 @@ describe("applicationServerKey", () => {
       .replace(/\//g, "_")
       .replace(/=+$/, "");
     expect(Array.from(applicationServerKey(key))).toEqual(Array.from(bytes));
+  });
+});
+
+describe("the server key a subscription was made with (#385)", () => {
+  // Two well-formed 65-byte keys, base64url as GraphQL returns them.
+  const OURS = Buffer.from(
+    new Uint8Array(65).fill(0xfb).fill(4, 0, 1),
+  ).toString("base64url");
+  const OLD = Buffer.from(new Uint8Array(65).fill(0x11).fill(4, 0, 1)).toString(
+    "base64url",
+  );
+  const withKey = (key: BufferSource | null | undefined) =>
+    ({
+      options: { applicationServerKey: key, userVisibleOnly: true },
+    }) as unknown as PushSubscription;
+
+  it("decodes both forms to the same bytes", () => {
+    const fromString = serverKeyBytes(OURS)!;
+    const fromBuffer = serverKeyBytes(applicationServerKey(OURS).buffer)!;
+    expect(Array.from(fromBuffer)).toEqual(Array.from(fromString));
+    expect(fromString).toHaveLength(65);
+    expect(serverKeyBytes(null)).toBeNull();
+    expect(serverKeyBytes(undefined)).toBeNull();
+    expect(serverKeyBytes("not base64url!")).toBeNull();
+  });
+
+  it("same key, as the ArrayBuffer the browser keeps: same", () => {
+    // The trap: the browser's ArrayBuffer never === the string.
+    expect(
+      compareServerKey(withKey(applicationServerKey(OURS).buffer), OURS),
+    ).toBe("same");
+  });
+
+  it("same key, as a typed-array view: same", () => {
+    const padded = new Uint8Array(70);
+    padded.set(applicationServerKey(OURS), 3);
+    expect(compareServerKey(withKey(padded.subarray(3, 68)), OURS)).toBe(
+      "same",
+    );
+  });
+
+  it("a key from another pair: different", () => {
+    expect(
+      compareServerKey(withKey(applicationServerKey(OLD).buffer), OURS),
+    ).toBe("different");
+    expect(compareServerKey(withKey(new ArrayBuffer(10)), OURS)).toBe(
+      "different",
+    );
+  });
+
+  it("no key, or no options at all: unknown", () => {
+    expect(compareServerKey(withKey(null), OURS)).toBe("unknown");
+    expect(compareServerKey({} as PushSubscription, OURS)).toBe("unknown");
   });
 });
 

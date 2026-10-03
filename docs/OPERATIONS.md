@@ -315,9 +315,11 @@ start. Subscriptions stay in `push_subscriptions` and work again if the
 **Losing a key.** Each browser subscription is bound to the public key it was
 made with. A new key pair (because the private key was lost, or rotated)
 silently breaks **every** existing subscription: sends are refused, each
-device's row is deleted after its 20th failed send, and every member has to
-**Turn off, then Turn on** again on every device (Turn on alone reuses the
-browser's old-key subscription; see `docs/WEB_PUSH.md` §11). Keep a private
+device's row is deleted after its 20th failed send. Members **just press
+Turn on again**, and a device that was on recovers by itself on its next
+page view: the client sees the subscription was made with another key and
+resubscribes (see `docs/WEB_PUSH.md` §11). Devices nobody opens stay silent
+until then. Keep a private
 copy of the production private key in a password manager and never rotate
 casually. A partial or invalid set of the three values makes the API **refuse
 to boot in production** (the previous deployment stays live and
@@ -330,13 +332,16 @@ to boot in production** (the previous deployment stays live and
   on a run that sent something;
 - `[push] sweep failed` plus an error **name** — a run that threw (the next
   minute tries again; that window is not retried);
+- at boot, when push is on: `[api] Web Push on, key <first 8 chars>…`, or
+  `[api] Web Push on (paused), key …` — one line, the public key's prefix
+  only (it tells you which pair booted); nothing when push is off;
 - at boot, outside production only: `[api] … — Web Push is off` for a bad key
   set, and `[api] PUSH_PAUSED has an unrecognised value; treating it as
   paused`. In production a bad set is a boot failure naming the variables.
 
 It never logs endpoints, keys, user ids or alert text. An idle run, a paused
-run and a run that lost the lock to another instance log **nothing**, and
-there is no "push is on" line at boot.
+run and a run that lost the lock to another instance log **nothing**; the
+boot line above is the only sign of life without database access.
 
 **Is it running?**
 

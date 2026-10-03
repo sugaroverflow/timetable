@@ -404,7 +404,11 @@ once from `env.ts`):
 
 - none set, or all empty/whitespace → push off, silently (a missing secret
   expands to `""` in the spec, and that must not take the API down);
-- all three set and valid → `env.push`, push on;
+- all three set and valid → `env.push`, push on, and the API logs one
+  line at boot: `[api] Web Push on, key <first 8 chars>…`, or `[api] Web
+  Push on (paused), key …` while `PUSH_PAUSED` is set (`pushBootLine`; the
+  public key's first 8 characters say which pair booted, the private key is
+  never in it). Push off logs nothing;
 - partial or invalid → in **production the API refuses to boot** with a
   message naming the variables, never values (DigitalOcean keeps the
   previous deployment and `DEPLOYMENT_FAILED` emails Ed); elsewhere it warns
@@ -432,12 +436,16 @@ with, so after a new pair:
   typically 403), counted as a failure, and the row is deleted at its 20th
   failed send (only devices that had alerts to send accrue failures; quiet
   ones linger harmlessly until then);
-- until its row goes, the alerts line still reads "Alerts are on" on that
-  device, because the server still holds the endpoint;
-- **every member must Turn off, then Turn on, on every device.** Turn on
-  alone is not enough: `turnOnPush` reuses the browser's existing
-  subscription, which is still bound to the old key (recorded in
-  `docs/execution-journal/2026-10-03-push-docs.md`).
+- **a device that was on recovers by itself on its next page view**: the
+  client compares the subscription's `options.applicationServerKey` with
+  `pushPublicKey` (as bytes), and on a mismatch it unsubscribes, subscribes
+  with the new key (no prompt: permission is already granted), deletes the
+  old row and posts the fresh one (`compareServerKey` / `replaceStaleOnLoad`
+  in `apps/web/src/lib/push.ts`, PR #386);
+- **anyone else just presses Turn on again**: Turn on replaces any
+  subscription not made with the current key. A device nobody opens Topic
+  on stays silent, and its row is deleted at its 20th refused send (or
+  sooner, when the client replaces it).
 
 So: **generate each pair once, keep a private copy of the production
 private key in a password manager, and never rotate casually.** A leaked

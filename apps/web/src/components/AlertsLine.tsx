@@ -37,8 +37,8 @@ export function AlertsLine({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    void refreshPushDevice(viewerId);
-  }, [viewerId]);
+    void refreshPushDevice(viewerId, pushPublicKey);
+  }, [viewerId, pushPublicKey]);
 
   function turnOn() {
     setError(null);

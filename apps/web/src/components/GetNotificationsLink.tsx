@@ -41,17 +41,27 @@ export function GetNotificationsLink({
   preview: boolean;
 }) {
   if (!pushPublicKey || !viewerId || preview) return null;
-  return <DeviceLink slug={slug} viewerId={viewerId} />;
+  return (
+    <DeviceLink slug={slug} viewerId={viewerId} pushPublicKey={pushPublicKey} />
+  );
 }
 
-function DeviceLink({ slug, viewerId }: { slug: string; viewerId: string }) {
+function DeviceLink({
+  slug,
+  viewerId,
+  pushPublicKey,
+}: {
+  slug: string;
+  viewerId: string;
+  pushPublicKey: string;
+}) {
   const state = usePushDevice();
 
   // After hydration only: the server and the first client render are both
   // "unknown" → nothing. Shared with the alerts line (one detection).
   useEffect(() => {
-    void refreshPushDevice(viewerId);
-  }, [viewerId]);
+    void refreshPushDevice(viewerId, pushPublicKey);
+  }, [viewerId, pushPublicKey]);
 
   if (state === "off") {
     return (
