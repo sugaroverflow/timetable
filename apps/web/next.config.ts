@@ -11,6 +11,14 @@ const config: NextConfig = {
   // needs nonce propagation through the proxy; tracked separately.
   async headers() {
     return [
+      // The push service worker (#368 step 4) must never be served from a
+      // cache: a browser checks it for updates, and a stale copy would keep
+      // showing alerts the old way. Its scope is "/" because it lives at
+      // the root, so no Service-Worker-Allowed header is needed.
+      {
+        source: "/sw.js",
+        headers: [{ key: "Cache-Control", value: "no-cache" }],
+      },
       {
         source: "/:path*",
         headers: [

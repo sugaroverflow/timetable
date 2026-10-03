@@ -250,7 +250,10 @@ export const config = {
     // Skip Next internals and static files, run on everything else. The
     // install manifest (/manifest.webmanifest) and its PNG icons are in
     // the skip list: the browser fetches them without a session, and no
-    // host redirect, Clerk handshake or CSP applies to them (#367).
+    // host redirect, Clerk handshake or CSP applies to them (#367). The
+    // push service worker /sw.js is skipped by the `js` rule the same way
+    // (#368): it's a static file, and the page CSP's `worker-src 'self'`
+    // is what allows registering it.
     "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpg|jpeg|gif|png|svg|ico|webp|webmanifest|woff2?)).*)",
     "/(api|trpc)(.*)",
   ],

@@ -100,6 +100,7 @@ export function DigestSettingsForm({
   forumDefaults,
   roles,
   roleLabels,
+  alerts,
 }: {
   slug: string;
   /** The user's stored global settings — the fallback layer. */
@@ -112,6 +113,10 @@ export function DigestSettingsForm({
   roles: string[];
   /** The forum's custom role labels — role words in switch labels/tags. */
   roleLabels?: RoleLabels;
+  /** alerts-line (Web Push, #368): this device's alerts on/off, shown
+   * above "What to include" whatever the email cadence. The page passes
+   * it only when push is configured and not in a view-as preview. */
+  alerts?: React.ReactNode;
 }) {
   const { run, busy } = useGqlAction();
   const admin = roles.includes("admin") || roles.includes("owner");
@@ -209,6 +214,7 @@ export function DigestSettingsForm({
           </div>
         ) : null}
       </div>
+      {alerts}
       {cadence !== "never" ? (
         <div className="stack" style={{ gap: 8, marginBottom: 12 }}>
           <strong className="field-heading">What to include</strong>
