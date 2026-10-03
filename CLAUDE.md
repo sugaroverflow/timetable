@@ -594,6 +594,10 @@ Stable names for feature pieces, so instructions can reference them precisely.
   old one; `refresh` accepts a function of the result for exactly this.
   Any future mutation that can change the current page's address needs
   the same treatment.
+- **Editable fields must be ≥16px on touch devices or iOS Safari zooms on
+  focus** (2026-10-03). The "Touch: no zoom on focus" block at the foot of
+  `globals.css` enforces it with `--text-field-touch`; never "fix" it with
+  `maximum-scale`/`user-scalable=no` (kills pinch-zoom).
 - Postgres `ALTER TYPE … ADD VALUE` can't run inside a transaction — Drizzle
   migrations must **recreate the enum** instead (see migrations 0013/0014).
 - "Draft" means THREE things — never blanket-delete or rename "draft"
