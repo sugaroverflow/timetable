@@ -92,3 +92,12 @@ jobs:
 
       - name: Apply migrations
         run: npm run db:migrate
+
+      # Opt-in database tests: they need the tables, so they run here, after
+      # the migrations, instead of in `npm run test` above (where they skip).
+      # The push sweep's claim, readers and result statements (#380).
+      - name: Database tests (push sweep)
+        working-directory: apps/api
+        env:
+          PUSH_SWEEP_DB_TEST: "1"
+        run: npx vitest run src/push-sweep.db.test.ts
