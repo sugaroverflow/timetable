@@ -182,7 +182,7 @@ Note: the repository is **public**, so GitHub Actions artifacts are publicly
 downloadable. A dump therefore _cannot_ be stored as an artifact — it needs a
 private bucket.
 
-### R9 — Production and dev deploy by different mechanisms · **NEEDS ED** (task 5)
+### R9 — Production and dev deploy by different mechanisms · **NEEDS ED** (task 14)
 
 Dev runs a pre-built Docker image from the registry (`app.dev.yaml`:
 `registry_type: DOCR`). Production builds from source on the box —
@@ -191,8 +191,13 @@ Dev runs a pre-built Docker image from the registry (`app.dev.yaml`:
 Two consequences: the artefact QA'd on dev is not the artefact production runs;
 and a `next build` that passes in CI can still run out of memory on a 1 GB App
 Platform box — as a **deploy-time** failure, at the exact moment you are trying
-to ship a fix. Production has never been deployed. The first one exercises this
-path, the Clerk production instance, and its DNS, all at once.
+to ship a fix.
+
+_Updated 2026-10-03:_ this entry used to say production had never been
+deployed. It has, many times: `deploy-production.yml` has run successfully
+since 2026-06-23 and `topic-prod` serves `topic.forum`, so the source-build
+path, the Clerk production instance and its DNS are all exercised. What
+remains is the artefact mismatch above; the fix is task 14.
 
 ### R10 — Single instance, no graceful shutdown · **PARTLY DONE**
 
@@ -226,11 +231,17 @@ textbook spam trigger, and institutional Exchange/Outlook is the hardest
 audience there is. This fails _silently_: Resend reports success, nobody
 receives anything, and engagement mysteriously never happens.
 
-### R14 — Clerk is a hard dependency with no degraded mode · **NEEDS ED** (task 5)
+### R14 — Clerk is a hard dependency with no degraded mode · **ACCEPTED**
 
-Clerk down or misconfigured means nobody signs in and nothing works. The
-production Clerk instance — separate keys, domains and DNS — has never been
-exercised.
+Clerk down or misconfigured means nobody signs in and nothing works. There is
+still no fallback, and none is planned.
+
+_Updated 2026-10-03:_ this entry used to say the production Clerk instance had
+never been exercised. It has: it is live on `topic.forum` (Ed confirmed,
+2026-10-03), with its Frontend API on `clerk.topic.forum`; dev and local use
+the development instance (`*.clerk.accounts.dev`). The remaining open lead is
+iPhone Safari sign-outs, possibly from Safari treating `clerk.topic.forum`'s
+cookie as third-party (PR #376's FINAL, open call 6; unverified).
 
 ### R15 — Account and access single points of failure · **NEEDS ED** (tasks 6, 7)
 
@@ -267,6 +278,82 @@ The probe also confirmed the SSR concentration described in R1: those 30 page
 loads did not touch the probing client's own rate-limit bucket at all, because
 their GraphQL calls arrive from the web container's address.
 
+### R19 — Web Push: kill switch, keys, and the sweep · **DONE** (runbook)
+
+Alerts (#368, `docs/WEB_PUSH.md`) are sent by a once-a-minute sweep inside the
+API. It is **off in an environment until its three `VAPID_*` secrets exist**
+(GitHub environments `timetable-dev` / `production`) and a deploy has picked
+them up. Things to know when it misbehaves:
+
+**Pausing it (`PUSH_PAUSED`).** `true` stops all sending; the controls stay,
+and the sweep keeps advancing its cursor, so unpausing releases no backlog.
+The API reads the value **only at boot** (`env.push.paused`), so a change takes
+effect only when a new api process starts. Two levers:
+
+- **Durable (the normal way):** GitHub → Settings → Environments →
+  `timetable-dev` or `production` → Variables → set `PUSH_PAUSED` to `true`
+  (or `false` / delete it to resume), then deploy. Dev: any merge to `main`,
+  or a manual `Deploy Dev` run. Production: Ed runs `deploy-production.yml`
+  (agents never deploy production). The deploy workflows template
+  `vars.PUSH_PAUSED` into the spec, so the value survives every later deploy.
+- **Immediate, temporary:** DigitalOcean console → the app → the **api**
+  component → Settings → Environment Variables → set `PUSH_PAUSED` → Save.
+  DigitalOcean rolls the change out by redeploying the app with the new value
+  (no GitHub workflow runs; allow a few minutes, as for any deployment). The
+  **next deploy from the spec overwrites it** with the GitHub variable's value
+  (an unset variable becomes `""`, which means "running"), and dev deploys on
+  every merge. So set the GitHub variable as well, or the pause silently ends.
+
+A value other than `true`/`1`/`false`/`0`/empty also pauses, with a boot
+warning (fail-safe for a mistyped kill switch).
+
+**Turning it off altogether.** Delete the three `VAPID_*` secrets and deploy:
+the controls disappear, subscribe/unsubscribe answer 503, the sweep doesn't
+start. Subscriptions stay in `push_subscriptions` and work again if the
+**same** keys come back.
+
+**Losing a key.** Each browser subscription is bound to the public key it was
+made with. A new key pair (because the private key was lost, or rotated)
+silently breaks **every** existing subscription: sends are refused, each
+device's row is deleted after its 20th failed send, and every member has to
+**Turn off, then Turn on** again on every device (Turn on alone reuses the
+browser's old-key subscription; see `docs/WEB_PUSH.md` §11). Keep a private
+copy of the production private key in a password manager and never rotate
+casually. A partial or invalid set of the three values makes the API **refuse
+to boot in production** (the previous deployment stays live and
+`DEPLOYMENT_FAILED` emails Ed); an all-empty set is simply "off".
+
+**What the sweep logs** (structured JSON from the `server` logger, message in
+`args`):
+
+- `[push] sweep: <n> alerts, <n> sends, <n> ok, <n> gone, <n> failed` — only
+  on a run that sent something;
+- `[push] sweep failed` plus an error **name** — a run that threw (the next
+  minute tries again; that window is not retried);
+- at boot, outside production only: `[api] … — Web Push is off` for a bad key
+  set, and `[api] PUSH_PAUSED has an unrecognised value; treating it as
+  paused`. In production a bad set is a boot failure naming the variables.
+
+It never logs endpoints, keys, user ids or alert text. An idle run, a paused
+run and a run that lost the lock to another instance log **nothing**, and
+there is no "push is on" line at boot.
+
+**Is it running?**
+
+1. **Keys loaded:** a signed-in member sees "Alerts on this device" on a
+   forum's Notifications page (or `query { pushPublicKey }` is non-null for
+   them). Null means no keys, a bad set outside production, or a view-as
+   preview.
+2. **The cursor moves:** on the environment's database,
+   `select swept_until, updated_at, now() - swept_until as behind from push_sweep_state;`
+   `behind` should stay between about 10 and 70 seconds. Older than a couple
+   of minutes with keys present means the timer isn't running or every run is
+   failing (look for `[push] sweep failed`). The cursor also moves while
+   paused, so check `PUSH_PAUSED` separately.
+3. **Devices are being reached:** `select count(*), max(last_sent_at),
+   max(failure_count) from push_subscriptions;` A rising `failure_count`
+   everywhere suggests a key mismatch or a push-service outage.
+
 ---
 
 ## Priority queue for what remains
@@ -286,9 +373,9 @@ Ordered by (likelihood × blast radius) ÷ effort. Everything here needs Ed.
 4. **Rehearse a database restore (R8).** Restore a backup into a scratch
    database and confirm the data is there. Once. Before it is needed. A backup
    never restored is not a backup.
-5. **Do the first production deploy now, on a quiet day (R9, R14).** It
-   exercises the source-build path, the Clerk production instance and its DNS
-   simultaneously. Doing that under pressure is how launches fail.
+5. ~~**Do the first production deploy now, on a quiet day (R9, R14).**~~
+   Done: production has deployed regularly since 2026-06-23, on the Clerk
+   production instance at `topic.forum`.
 6. **Check domain auto-renew and the card behind it (R15).**
 7. **Print the 2FA recovery codes** for GitHub, DigitalOcean, Clerk, Resend and
    the registrar (R15).
@@ -376,6 +463,9 @@ deploy.
 - Digests did not arrive → check the `Run Digests` workflow run, then Resend's
   dashboard for quota and bounces. The job is resumable: re-dispatch it and
   already-sent forums will not re-send.
+- Phone/desktop alerts misbehaving (not arriving, or arriving when they
+  shouldn't) → R19: pause with `PUSH_PAUSED`, then check the sweep's cursor
+  and logs.
 
 ### 6. DNS, domain, TLS
 

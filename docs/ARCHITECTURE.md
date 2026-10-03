@@ -64,6 +64,7 @@ flowchart LR
   email[Resend or console]
   cron[GitHub Actions scheduler]
   cal[Calendar app]
+  pushsvc[Browser push services]
 
   browser <-->|session| clerk
   browser --> web
@@ -76,6 +77,8 @@ flowchart LR
   api --> email
   cron -->|POST /api/jobs/digests| api
   cal -->|GET .ics| api
+  api -->|encrypted Web Push, once a minute| pushsvc
+  pushsvc -->|alert| browser
 ```
 
 The product runtime has no autonomous agents or AI orchestration. Build-time
@@ -123,6 +126,12 @@ Codex/agent workflows are separate from the app runtime.
 - notifications pane (comments on your topics, replies to you, @mentions,
   and session pencilled/confirmed/cleared changes on topics you ❤️'d;
   unread badge)
+- per-forum Notifications page settings card: the email digest cadence and
+  "What to include"; with Web Push configured it becomes "Notification
+  settings", with the alerts line (this device on/off) above an Email | Push
+  table. A "Get Notifications" link in the sidebar foot leads there (or, in
+  an iPhone browser tab, shows the Home Screen steps); `/notifications` is
+  the forum chooser an alert's fallback opens. See "Web Push" below
 - People page (role-grouped members, bios, admin editing; admins get an
   add-person card plus per-member invite state and a View as → Send invite →
   Edit profile action stack)
@@ -206,6 +215,8 @@ REST routes currently include:
 | `GET /api/forums/:idOrSlug/export` | Read-only, role-filtered JSON export of everything the viewer can read (calendar included when enabled) |
 | `DELETE /api/forums/:id` | Delete a forum (sysadmin dashboard) |
 | `POST /api/uploads` | Signed direct browser uploads to S3-compatible storage |
+| `POST /api/push-subscriptions` | Turn Web Push on for this device (per user, not per forum; endpoint in the body, never the URL); `pushSubscribe` action limit |
+| `DELETE /api/push-subscriptions` | Turn Web Push off for this device (only the caller's own row) |
 | `GET /health` | Health check |
 
 Legacy `/api/timetables/:idOrSlug/{calendar.ics,feed.atom}` URLs 301-redirect
@@ -259,6 +270,11 @@ Main queries include:
 - `myIcsToken`
 - `forumRouteByDomain`
 - `forumByDomain`
+- `pushPublicKey` / `myPushDeviceEnabled(endpoint)` / `myPushDevices`
+  (Web Push: the VAPID public key, or null when push is off, signed out,
+  under view-as or for a personal token; whether THIS device is on; this
+  user's devices, never with endpoints), and `Forum.viewerPushKinds` (the
+  resolved per-forum Push switches, JSON)
 
 The `dashboard` query accepts optional host and elector-activity filters for
 host/admin planning views.
@@ -282,8 +298,9 @@ Main mutations cover:
 - public and host-only comments (the host-only thread is a forum option,
   `settings.hostComments.enabled`, default on)
 - comment hiding
-- profile and notification settings; admin member-bio editing
-  (`updateMemberBio`)
+- profile and notification settings, including the per-forum Push
+  switches (`updateMyForumDigestSettings(pushKindsJson:)`); admin
+  member-bio editing (`updateMemberBio`)
 - timetable profile and settings, including validated theme JSON
 - seen watermarks: feed and notifications (`markFeedSeen`,
   `markNotificationsSeen`), per-topic comments-seen on engagement
@@ -501,8 +518,44 @@ icon emoji). `apps/web/public/` is served from the site root and holds:
 The web app manifest is `app/manifest.ts` (`/manifest.webmanifest`), built
 from `lib/appManifest.ts`. It describes one "Topic" app for every forum.
 The proxy's matcher skips `.webmanifest` and the PNGs, so neither the host
-redirects, Clerk nor the CSP touch them. There is no service worker yet;
-the Web Push plan adds one.
+redirects, Clerk nor the CSP touch them. The only service worker is
+`public/sw.js`, Web Push's (below), registered only when a member turns
+alerts on.
+
+## Web Push
+
+Phone and desktop alerts (#368, 2026-10-03). How it works and why:
+`docs/WEB_PUSH.md`; the decisions: `docs/web-push-plan.md`; operations:
+`docs/OPERATIONS.md` R19. Everything is inert until the API has VAPID keys.
+
+| Piece | Where |
+|---|---|
+| Tables `push_subscriptions` (one row per device, keyed to the user) and `push_sweep_state` (the sweep's one-row cursor) | `packages/db/src/schema/push.ts`, migration `0045_web_push.sql` |
+| Per-forum Push switches | `digestSettings.push` on the membership (no column) |
+| Kind defaults, eventless kinds, urgency, alert-text trimming, payload shape and URL safety, device limits | `packages/shared/src/push.ts` |
+| `canReadLounge` (shared by GraphQL `seesLounge` and the sweep) | `packages/shared/src/permissions.ts` |
+| Device rows: subscribe (endpoint + user advisory locks, 10-device cap), unsubscribe, list | `packages/core/src/push.ts` |
+| The sweep's database half: window claim (advisory lock + compare-and-set), event readers, recipient context, result recording | `packages/core/src/pushEvents.ts` |
+| The sweep's decisions: per-recipient visibility, switch and audience, read-past; alert wording and links | `packages/core/src/pushAudience.ts` |
+| Boot rule for `VAPID_*` and `PUSH_PAUSED` (`env.push`) | `apps/api/src/push-config.ts`, called from `env.ts` |
+| RFC 8291 payload encryption, RFC 8292 VAPID JWT, push-service allowlist, `sendPush` | `apps/api/src/push-transport.ts` (`node:crypto`, no library) |
+| The once-a-minute sweep, per-device plan, send limiter, timer | `apps/api/src/push-sweep.ts`; started and drained in `apps/api/src/index.ts` |
+| Subscribe/unsubscribe routes; `pushSubscribe` limit | `apps/api/src/rest/router.ts`; `apps/api/src/http/action-limits.ts` |
+| GraphQL `pushPublicKey`, `myPushDeviceEnabled`, `myPushDevices`; `viewerPushKinds` / `pushKindsJson` | `apps/api/src/graphql/push.ts`; `graphql/members.ts`, `graphql/types.ts` |
+| Service worker (shows the payload, opens the item; no fetch handler, no cache) | `apps/web/public/sw.js`, `no-cache` header in `apps/web/next.config.ts` |
+| Device detection, turn on/off, the shared push-device store | `apps/web/src/lib/push.ts` |
+| The alerts line; the Push column | `components/AlertsLine.tsx`; `components/DigestSettingsForm.tsx` (`pushKinds`), on `app/(app)/f/[slug]/notifications/page.tsx` |
+| The "Get Notifications" sidebar link; the shared iPhone install steps | `components/GetNotificationsLink.tsx` (in `app/(app)/f/[slug]/layout.tsx`); `components/InstallSteps.tsx` |
+| The fallback forum chooser | `app/(app)/notifications/page.tsx` |
+| Key generation | `scripts/generate-vapid.mjs` |
+
+Delivery runs inside the API process: no new component, scheduler or
+outbound rule. Each minute one run (Postgres advisory lock + compare-and-set
+on the cursor, safe across instances) claims the window `(swept_until,
+now() − 10 s]`, reads what happened once for everybody, decides per
+recipient, and sends with no database connection held. It is at-most-once:
+a crash mid-send loses that minute's alerts rather than sending any twice.
+The event code paths are untouched; the sweep only reads.
 
 ## Architecture Risks
 
