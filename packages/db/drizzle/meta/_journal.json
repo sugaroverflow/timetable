@@ -316,6 +316,13 @@
       "when": 1790784770495,
       "tag": "0044_lounge",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1790993801435,
+      "tag": "0045_web_push",
+      "breakpoints": true
     }
   ]
 }
