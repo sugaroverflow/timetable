@@ -60,12 +60,15 @@ private key doesn't need keeping: losing it only means turning alerts on
 again on dev. Dev lets us test on real phones before production, so it is
 worth doing in the same sitting if you can.
 
-## Rather not?
+## Why only the owner
 
-If you'd prefer not to handle this, you could instead give Ed (@edsaperia)
-the **Admin** role on this repository (Settings → Collaborators and teams),
-and he'll do it himself. Either way, just comment on this PR when it's done
-and we'll take it from there.
+This is a personal-account repository. On those, GitHub gives collaborators
+write access at most (there is no Admin role to grant), and only the owner
+can add **environment** secrets. Collaborators can add repository secrets,
+but those would give dev and production the same key pair; environment
+secrets keep a separate pair for each.
+
+When the keys are in, a comment on this PR is all we need.
 
 ## Afterwards (for us, not you)
 
