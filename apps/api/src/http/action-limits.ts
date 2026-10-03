@@ -39,6 +39,11 @@ export const ACTION_LIMITS = {
   /** Signed upload URLs. Objects are public-read and never garbage
    * collected, so cap how fast one account can mint them. */
   upload: { windowMs: 60 * 60_000, max: 60 },
+  /** Web Push device subscribes (docs/web-push-plan.md §2 finding 5). The
+   * per-user device cap (PUSH_DEVICE_CAP) bounds how many rows one account
+   * holds; this bounds how fast it churns them. The client re-sends its
+   * subscription when the browser rotates keys, never on every page view. */
+  pushSubscribe: { windowMs: 60 * 60_000, max: 30 },
 } as const;
 
 export type LimitedAction = keyof typeof ACTION_LIMITS;
@@ -52,6 +57,7 @@ const BLOCKED_MESSAGES: Record<LimitedAction, string> = {
   invite: "Too many invites sent recently",
   forum: "You're creating forums too quickly",
   upload: "You're uploading too quickly",
+  pushSubscribe: "You're turning alerts on too often",
 };
 
 export type ActionDecision = { allowed: boolean; retryAfterSeconds: number };

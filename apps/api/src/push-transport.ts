@@ -201,6 +201,24 @@ export function encryptPushPayload(
   return Buffer.concat([header, asPublic, ciphertext]);
 }
 
+/**
+ * Whether a subscription's payload keys are ones we can encrypt to: `p256dh`
+ * decodes to a 65-byte uncompressed point ON the P-256 curve and `auth` to
+ * 16 bytes. The subscribe route checks this before storing a device, so a
+ * row the sweep could never encrypt for is refused up front. Implemented as
+ * a trial encryption of an empty payload — the exact checks a send makes.
+ */
+export function validPushKeys(p256dh: unknown, auth: unknown): boolean {
+  if (typeof p256dh !== "string" || typeof auth !== "string") return false;
+  if (p256dh.length > 128 || auth.length > 64) return false;
+  try {
+    encryptPushPayload("", { p256dh, auth });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // RFC 8292 VAPID
 // ---------------------------------------------------------------------------
