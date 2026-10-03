@@ -45,6 +45,14 @@ describe("buildCsp", () => {
     expect(buildCsp("n")).toContain("manifest-src 'self'");
   });
 
+  it("allows registering the same-origin push service worker", () => {
+    // Web Push step 4 (#368): lib/push.ts registers /sw.js.
+    const worker = buildCsp("n")
+      .split("; ")
+      .find((d) => d.startsWith("worker-src "));
+    expect(worker?.split(" ")).toContain("'self'");
+  });
+
   it("includes the API origin in connect-src", () => {
     fakeEnv.apiUrl = "https://topic.forum";
     expect(buildCsp("n")).toContain("connect-src 'self' https://topic.forum");

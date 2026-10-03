@@ -1,9 +1,11 @@
+import { cookies } from "next/headers";
 import Link from "next/link";
 
 import { isAdmin, type Role } from "@timetable/shared";
 
 import { ActivityRoleFilter } from "@/components/ActivityRoleFilter";
 import { ActorFilter } from "@/components/ActorFilter";
+import { AlertsLine } from "@/components/AlertsLine";
 import { Avatar } from "@/components/Avatar";
 import { DigestSettingsForm } from "@/components/DigestSettingsForm";
 import { EmptyState } from "@/components/EmptyState";
@@ -17,6 +19,7 @@ import {
   roleLabel,
 } from "@/lib/timetableSettings";
 import { topicPath } from "@/lib/topicPath";
+import { parseViewAs, VIEW_AS_COOKIE } from "@/lib/userPreview";
 
 type Notification = {
   commentId: string;
@@ -51,14 +54,18 @@ type Data = {
     settings: string;
     viewerDigestSettings: string;
   } | null;
-  me: { notificationSettings: string } | null;
+  me: { id: string; notificationSettings: string } | null;
   notifications: Notification[];
+  /** Web Push (#368): null when push isn't configured, signed out, or in
+   * a view-as preview — and then no alerts control renders. */
+  pushPublicKey: string | null;
 };
 
 const QUERY = `
   query Notifications($s: String!) {
     timetable: forum(idOrSlug: $s) { viewerRoles settings viewerDigestSettings }
-    me { notificationSettings }
+    me { id notificationSettings }
+    pushPublicKey
     notifications(idOrSlug: $s) {
       commentId kind authorId authorName authorImage authorRoles body
       visibility createdAt topicId topicTitle topicSlug topicHostSlug
@@ -223,7 +230,17 @@ function NotificationCard({
  * the kind switches are this forum's; the user's stored globals are the
  * display fallback for untouched memberships. Roles drive which switches
  * show (round 2); the forum's configured defaults fill untouched ones. */
-function DigestCard({ slug, data }: { slug: string; data: Data }) {
+function DigestCard({
+  slug,
+  data,
+  preview,
+}: {
+  slug: string;
+  data: Data;
+  /** In an admin's view-as preview: no device controls (the API already
+   * withholds the key there; this is the belt to its braces). */
+  preview: boolean;
+}) {
   if (!data.me) return null;
   const settings = parseTimetableSettings(data.timetable?.settings);
   return (
@@ -236,6 +253,14 @@ function DigestCard({ slug, data }: { slug: string; data: Data }) {
       forumDefaults={settings.digestKindDefaults ?? {}}
       roles={data.timetable?.viewerRoles ?? []}
       roleLabels={settings.roleLabels}
+      alerts={
+        data.pushPublicKey && !preview ? (
+          <AlertsLine
+            pushPublicKey={data.pushPublicKey}
+            viewerId={data.me.id}
+          />
+        ) : null
+      }
     />
   );
 }
@@ -254,6 +279,8 @@ export default async function NotificationsPage({
   const { slug } = await params;
   const { actor = "", role = "" } = await searchParams;
   const data = await gqlFetch<Data>(QUERY, { s: slug });
+  const preview =
+    parseViewAs((await cookies()).get(VIEW_AS_COOKIE)?.value, slug) !== null;
 
   const viewerRoles = data.timetable?.viewerRoles ?? [];
   if (viewerRoles.length === 0) {
@@ -291,7 +318,7 @@ export default async function NotificationsPage({
       <h3 className="section-title">Settings</h3>
       {/* Email digest preferences live with the notifications they gate
           (QA 2026-07-28 — moved off the profile page). */}
-      <DigestCard slug={slug} data={data} />
+      <DigestCard slug={slug} data={data} preview={preview} />
 
       <h3 className="section-title">Notifications</h3>
       {data.notifications.length > 0 ? (

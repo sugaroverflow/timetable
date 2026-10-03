@@ -2999,6 +2999,67 @@ a.queue-btn-back:hover {
   font-size: var(--text-sm);
 }
 
+/* alerts-line (Web Push step 4, #368): "Alerts on this device: Turn on"
+   above "What to include" on the Notifications page. One plain line, its
+   action a text button; `#alerts` is the sidebar link's jump target, so it
+   clears the sticky topbar like the My Topics cards do. */
+.alerts-line {
+  margin-bottom: var(--space-3);
+  scroll-margin-top: calc(var(--topbar-h, 55px) + 14px);
+}
+.alerts-line:empty {
+  margin-bottom: 0;
+}
+.alerts-line-text {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+.alerts-line-action {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--primary);
+  font: inherit;
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.alerts-line-action:hover:not(:disabled) {
+  text-decoration: underline;
+}
+.alerts-line-action:disabled {
+  color: var(--muted);
+  cursor: default;
+}
+.alerts-line-note {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  color: var(--faint);
+}
+.alerts-line-error {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  color: var(--red-ink);
+}
+
+/* install-steps (#368, plan §3.4): the iPhone/iPad Add to Home Screen
+   steps — shared by the alerts line and the sidebar link. */
+.install-steps {
+  font-size: var(--text-sm);
+}
+.install-steps p {
+  margin: var(--space-1) 0;
+}
+.install-steps ol {
+  margin: 0;
+  padding-left: 20px;
+}
+.install-steps li {
+  margin: 2px 0;
+}
+.install-steps-icon {
+  vertical-align: -2px;
+}
+
 /* ---------------------------------------------------------------------
    {host} Lounge (docs/host-lounge-plan.md, 2026-09-30)
    --------------------------------------------------------------------- */
