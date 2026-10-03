@@ -1,96 +1,179 @@
 # Web Push — plan (#368)
 
-Written 2026-10-03 for Ed to decide from. Plan only: no code has been
-written for this yet. Source material: AndreasThinks's #360 (not merged; Ed,
-2026-10-02: "build #360's ideas separately ourselves"), the review findings
-recorded in #368, and the installable-app request #367.
+Written 2026-10-03. Ed ruled on its four decisions the same day, and this
+version describes the chosen design; §5 lists the rulings and their reasons.
+Plan only: no code has been written for this yet. Source material:
+AndreasThinks's #360 (not merged; Ed, 2026-10-02: "build #360's ideas
+separately ourselves"), the review findings recorded in #368, and the
+installable-app request #367.
 
-**In one paragraph.** Members can switch on phone/desktop alerts, per forum,
-on each device they choose. An alert says only "Topic — You have new
-activity"; tapping it opens their notifications. An alert fires for exactly
-what already raises the unread badge on the Notifications page. Delivery
-happens **inside the API, seconds after the event**: the request that posts
-a comment flags the recipients' devices, and the API sends the alert just
-after replying. A one-minute sweep in the same process catches anything the
-fast path missed. There is no new server, no scheduler, and no monthly cost.
-Ed's part is to create two key pairs (dev and production), add them as
-GitHub environment secrets, and answer the four questions in §5.
+**In one paragraph.** Members can switch on phone/desktop alerts on each
+device they choose. An alert says who, where, and the first line of what
+they wrote — "Joshua Becker in Faculty Lounge: but we have infinitely
+nesting…" — and tapping it opens that comment or conversation. What alerts
+is chosen per forum in the existing "What to include" list on the
+Notifications page, which gains a **Push** column beside **Email**: things
+aimed at you are on by default, broadcast news is off. The content travels
+as an encrypted Web Push payload that Apple and Google can't read. Delivery
+is a **once-a-minute sweep inside the API**, so an alert takes up to about a
+minute; there is no new server, no scheduler, and no monthly cost. A
+**"Get Notifications"** sidebar link appears wherever alerts are possible but
+not yet set up on this device, and on an iPhone it shows the Add to Home
+Screen steps. Ed's part is to create two key pairs (dev and production),
+add them as GitHub environment secrets, deploy production, and test on an
+iPhone.
 
 ---
 
-## 1. What members would get
+## 1. What members get
 
 ### In their words
 
-- On a forum's **Notifications** page there is a card: "Get an alert on this
-  device when something needs you." One button: **Turn on alerts**. The
-  browser asks for permission then, and never on page load.
-- The switch is **per forum and per device**. Turning it on on a phone does
-  not turn it on on a laptop. Turning it on for one forum does not turn it on
-  for another. Turning it off on this device leaves other devices alone.
-- When something happens, the device shows a notification titled **Topic**
-  that reads **"You have new activity."** It shows nothing else.
-- Tapping it opens Topic. Someone in one forum lands on that forum's
-  Notifications page. Someone in several forums gets a short "which forum?"
-  list. In both cases they sign in first if needed.
-- Several things in a row produce one notification, not a stream. All alerts
-  share a single tag, so a new alert replaces the old one, and each device
-  gets at most one buzz every two minutes.
-- Email digests and the in-app pane are unchanged. Turning alerts on doesn't
-  change them, and changing them doesn't affect alerts.
-- **iPhone/iPad:** the card appears only once Topic is installed on the Home
-  Screen (#367; see §3.4). Until then it explains how to install.
+- On a forum's **Notifications** page, the "What to include" list has two
+  columns of switches: **Email** and **Push**. Every kind row has both,
+  except the one kind with no push event (below).
+- Above the list, one line covers **this device**: "Alerts on this device:
+  **Turn on**". The browser asks for permission then, and never on page
+  load. Once on, it reads "Alerts are on for this device · Turn off".
+- The two halves are separate on purpose:
+  - **The kind switches are per forum.** They live on the membership like
+    the digest switches, so "replies in my threads" can be on in one forum
+    and off in another. They follow you to every device.
+  - **The device subscription is per device.** Turning alerts on on a phone
+    covers all your forums on that phone, and doesn't touch your laptop.
+    Turning it off on this device leaves other devices alone.
+- An alert reads **"Joshua Becker in Faculty Lounge"** with the first line
+  of the message beneath it, trimmed to about 100 characters. Tapping it
+  opens the thing itself: the comment's permalink, or the Lounge
+  conversation. They sign in first if needed.
+- A burst in one thread replaces the earlier alert for that thread rather
+  than stacking. Different threads stack, up to three per minute per device;
+  beyond that, one "and n more in {forum}" alert opens the forum's
+  Notifications page.
+- Email digests and the in-app pane are unchanged. The Email column is the
+  existing digest switch set; the Push column is new and independent.
+- A **"Get Notifications"** link sits in the forum sidebar wherever alerts
+  are possible but not yet on for this device (§3.4). On an iPhone or iPad
+  browser tab it shows how to add Topic to the Home Screen, which Apple
+  requires before alerts can work.
 
-### Which events alert: the badge rule
+### What an alert looks like
 
-**An alert fires when the unread badge on the Notifications page would go
-up.** The pane is built by `listNotifications` in
-`packages/core/src/notifications.ts`, and the sender asks that same function.
-So alerts can never drift from what the pane shows.
+The server builds three fields per alert, plus a tag:
 
-| Pane entry (`NotificationItem.kind`) | What happened | Alerts? |
+| Field | Built from | Example |
 |---|---|---|
-| `comment` | someone commented on your topic, in any thread you can see (public, {host}-only, drafting) | yes |
-| `reply` | someone replied to your comment | yes |
-| `mention` | someone @mentioned you in a topic comment or reply | yes |
-| `session_pencilled` / `session_confirmed` / `session_cleared` | a session was pencilled, confirmed or cleared on a topic you ❤️'d | yes, only while the forum's calendar is on |
-| `sent_back_to_drafting` | an admin moved your ready draft back to drafting (sent-back-notice) | yes |
-| `lounge_reply` / `lounge_mention` | a reply to your {host} Lounge post, or a Lounge post that @mentions you | **Ed's decision 1** (recommended: yes) |
+| `title` | who + where: the actor's display name in this forum, "in", then the topic title or the forum's Lounge name. People in more than one forum also get " · {forum name}". | `Joshua Becker in Faculty Lounge` |
+| `body` | the first non-empty line of the message as plain text (Markdown stripped for Lounge opening posts and topic bodies), trimmed at a word boundary to about 100 characters with "…" | `but we have infinitely nesting…` |
+| `url` | the same link the notifications pane builds for that item: topic permalink with `?tab=` naming the tab and `#comment-<id>`, or the Lounge conversation with `?reply=` | `/f/newspeak-2026/lounge?reply=…` |
+| `tag` | one per thread (`topic:<id>:<tab>` or `lounge:<rootId>`), so a later alert in the same thread replaces the earlier one | `lounge:9f3c…` |
 
-What never alerts: your own actions; hidden or deleted comments; anything in
-a forum where you are deactivated or no longer a member; anything older than
-the moment you switched alerts on; anything you have already seen in the
-pane, because the `lastSeenNotificationsAt` watermark counts.
+Kinds without a quoted message use the same shape with fixed wording, for
+example `Session confirmed: Housing policy` / `Tue 14 Oct, 18:00 · Room 2`,
+or `Ada Lovelace published a topic` / the topic's title. Every alert names
+one forum and one item. That is why the old one-forum shortcut on
+`/notifications` is gone: the tap goes straight to the item.
+
+**What the service worker shows.** `sw.js` parses the payload, checks that
+`url` is a same-origin path (starts with `/`, not `//`), and calls
+`showNotification(title, { body, tag, renotify: true, icon, badge, data: {
+url } })`. On click it focuses an open Topic window and navigates it, or
+opens a new one. If the payload is missing or fails validation, it shows
+the fixed "Topic — You have new activity" and opens `/notifications`, which
+keeps #360's forum chooser for exactly this fallback.
+
+### Which events alert: the kind map
+
+Each row of `DIGEST_KINDS` (`packages/shared/src/settings.ts`) gets a push
+counterpart with its own default, in a new `PUSH_KIND_DEFAULTS` beside
+`DIGEST_KIND_DEFAULTS`. The audience rules (`DIGEST_KIND_AUDIENCE`,
+`digestKindApplies`) are shared: a row hidden from you for email is hidden
+for push too.
+
+**On by default: things aimed at you.**
+
+| Kind (row label) | Push event | Alert |
+|---|---|---|
+| `comments` — Comments on your topics | a comment on your topic in any thread you can see (public, {host}-only, drafting) | who in {topic}: first line |
+| `replies` — New comments in threads you're part of | a comment whose parent is yours, or a new comment in a chain you're part of (`loadChainScope` in `digests.ts`) | who in {topic}: first line |
+| `mentions` — Comments that @mention you | a topic comment that @mentions you | who in {topic}: first line |
+| `lounge` — Lounge row | a reply to your Lounge post or in a chain you're part of, or a Lounge post that @mentions you. **New conversations don't push**: they are broadcast, and stay in the digest and the nav dot | who in {Lounge name}: first line |
+| `sessions` — Upcoming sessions for topics you ❤️'d | a session confirmed or cleared on a topic you ❤️'d (`slot.confirm` / `slot.clear` activity), while the forum's calendar is on | Session confirmed: {topic} / date · room |
+| `sessionsHostHearted` — …topics you 💙'd | the same, for 💙 | same |
+| `availabilityAsks` — "Can you make it?" asks | a session pencilled on a topic you ❤️'d (`slot.pencil`), while the calendar is on | Can you make it? {topic} / date |
+
+**Off by default: broadcast news.**
+
+| Kind | Push event | Alert |
+|---|---|---|
+| `commentsHearted`, `commentsHostHearted` — comments on topics you ❤️'d/💙'd | a public comment on such a topic | who in {topic}: first line |
+| `hearts`, `hostHearts` — ❤️s / 💙s on your topics | a ❤️ or 💙 given to your topic (`heart_events` ledger, filtered by the active-member-filter) | A new ❤️ on {topic} (no name: who ❤️'d is not shown in this form elsewhere) |
+| `newTopics`, `newTopicsHost` — newly published topics | a topic published (`topic.publish`) | who published a topic / {title} |
+| `pendingReview` — topics ready to review | a host switches a draft to ready (`readyAt` set) | {host} marked a topic ready / {title} |
+| `slotReleases` — new calendar dates | slots released on the calendar | New dates on the calendar / count and range |
+| `newMembers` — new members joining | a membership created | {name} joined {forum} |
+| `drafts` — draft reminders | **none** (see below) | — |
+
+**The kind with no push event.** `drafts` is a reminder about drafts left
+unpublished, computed when the digest runs. Nothing *happens* at a moment,
+so there is nothing to alert on. Its Push cell shows a dash, not a switch.
+`sessions` is close to this in the digest (an upcoming-sessions list), but
+it has a real event in confirm/clear, so it keeps a switch.
+
+**Switch-less admin overrides.** The digest always carries the sent-back
+notice (`topic.unready` by an admin, sent-back-notice) with no switch. Push
+does the same: while alerts are on for the device, "{admin} moved your topic
+back to drafting" alerts in every forum, opening the My Topics card with the
+drafting tab.
+
+**Kind defaults the plan filled in.** Ed named the on and off groups; the
+rows he didn't name were placed by the same test, aimed at you or broadcast:
+`availabilityAsks` and `sessionsHostHearted` on (they are your sessions),
+`commentsHearted`, `commentsHostHearted`, `newTopicsHost` and
+`pendingReview` off. Flipping any default is a one-line change in
+`PUSH_KIND_DEFAULTS`.
+
+**What never alerts:** your own actions; hidden or deleted comments;
+anything in a forum where you are deactivated or no longer a member; events
+from before the device subscribed; a thread you have already read past (its
+`comment_seen` or `loungeSeenAt` mark is newer than the event, for example
+because you were reading it live).
+
+### What is on screen, and who can see it
+
+Alerts now carry content, so three things matter.
+
+1. **In transit, nobody but the device can read it.** Web Push payloads are
+   encrypted to the browser's own keys (RFC 8291, `aes128gcm`). Google,
+   Apple, Mozilla and Microsoft relay the bytes but can't decrypt them; they
+   see only the size, timing and endpoint.
+2. **On the device, the lock screen decides.** Ed accepted this trade-off.
+   iPhones hide notification text on a locked phone by default (Show
+   Previews: When Unlocked). Many Android phones and all desktops show it,
+   including on a screen being shared in a meeting. The `docs/WEB_PUSH.md`
+   page and the Notifications page's alerts line say so in one sentence.
+3. **The server checks visibility per recipient at send time.** Drafting
+   threads, {host}-only comments and the Lounge can now appear on screens,
+   so before building each alert the sweep re-checks, for that person in
+   that forum:
+   - the membership exists and is not deactivated;
+   - the forum is readable to them (private forums);
+   - the comment is not hidden or deleted;
+   - the thread's visibility is one they can read (`admin_only` drafting:
+     the topic's host and admins; {host}-only: hosts and admins);
+   - Lounge items: `canUseLounge` + `isLoungeEnabled`, the same gate the
+     GraphQL resolver uses (`seesLounge` in `apps/api/src/graphql/activity.ts`,
+     lifted into shared so both call it);
+   - session kinds: the forum's calendar is on.
+
+   The one window left is between send and display: an alert delivered just
+   before someone is removed still shows on their device. The push TTL
+   (below) bounds how long a queued one can wait.
 
 **A change from #360.** #360 alerted only for public threads on published
-topics. That would have dropped the drafting-thread and sent-back alerts,
-which are the ones hosts most need. The restriction existed to keep content
-private. Because alerts carry no content (see the next section), the
-restriction isn't needed. The badge rule replaces it.
-
-### Why alerts carry no content
-
-Notifications appear on **lock screens**, in notification centres, on
-watches, and on screens being shared in a meeting. Anyone near the device
-can read them without unlocking it. Topic holds content that must not leak
-that way: drafting threads, {host}-only comments, the Lounge, private
-forums, and names of people in all of these.
-
-So the push itself is **empty**: a data-less push with no payload. The
-service worker always shows the same fixed sentence, and the content
-appears only after the person opens Topic and signs in. This has three
-further benefits:
-
-- No payload encryption library is needed. #360 signs with Node's own
-  crypto.
-- Nothing private passes through Google's, Apple's, Mozilla's or
-  Microsoft's push servers.
-- An alert queued just before someone was removed from a forum reveals
-  nothing, because opening it still checks access.
-
-The cost is a vaguer alert: it doesn't say who or which forum. A later
-version could add the forum name as an opt-in, but this plan doesn't
-propose it.
+topics, to keep content private while sending none. Per-recipient checks
+replace that restriction, so the drafting-thread and sent-back alerts, which
+hosts most need, are in.
 
 ---
 
@@ -100,20 +183,20 @@ Fetch with `git fetch origin pull/360/head:pr-360`. Bring over only the push
 files. #360 also carries a forum guide page, a source-code link in the
 sidebar, and CLAUDE.md/README edits. Those are separate ideas and stay out.
 
-### Reuse largely as-is
+### Reuse, with changes
 
 | #360 file | Keep | Change |
 |---|---|---|
-| `packages/db/src/schema/push.ts`, `drizzle/0045_web_push.sql` | the `push_subscriptions` table: membership FK with cascade on removal, endpoint, unique (membership, endpoint) | **regenerate** with the next free migration number (0045 today; main ends at 0044, check `ls packages/db/drizzle` at build time). Add `pending_at`, `claimed_at` and `last_sent_at` (all nullable timestamptz) and an index on `pending_at`. Additive only (R11). |
-| `apps/web/public/sw.js` | no fetch handler, no cache, fixed text, fixed same-origin click target, ignores any payload | none |
-| `apps/api/src/push-transport.ts` | `validPushEndpoint` (host allowlist, HTTPS, no port/credentials/fragment); `vapidAuthorization` (RFC 8292 ES256 via `node:crypto`); `sendPush` (empty POST, `TTL: 300`, 5 s deadline, never logs the endpoint, 404/410 → `gone`) | see Edge and boot-time checks below |
-| `packages/core/src/push.ts` `managePush` | advisory-lock endpoint ownership (a shared browser can't be silently moved to another account); 10-device cap per membership; sanitised errors (Drizzle messages can carry the endpoint) | add the action limit (below) |
-| `packages/shared/src/push.ts` | n/a | **replace** `pushTopicCandidates` with the badge rule: count entries newer than the watermark, and drop session kinds when the calendar is off |
-| `apps/web/src/components/PushSettings.tsx`, `lib/push.ts` | permission only on click, iOS-not-installed detection (including iPads that report as Macs), "denied" explained without re-prompting, hidden in admin previews | hide when unconfigured (below); copy says ❤️/forum per CLAUDE.md naming |
-| `apps/web/src/app/(app)/notifications/page.tsx` | authenticated "choose a forum" landing | one-forum shortcut (below); alias the query back to internal names (`timetable: forum`) per CLAUDE.md |
+| `packages/db/src/schema/push.ts`, `drizzle/0045_web_push.sql` | the `push_subscriptions` table and unique endpoint | **regenerate** with the next free migration number (0045 today; main ends at 0044, check `ls packages/db/drizzle` at build time). Key it to the **user**, not the membership (FK to users, cascade on user delete), because the subscription is per device. Add `p256dh` and `auth` (the browser's payload keys, needed to encrypt), `last_sent_at` and `failure_count`. Add the one-row `push_sweep_state` table (§3.2). Additive only (R11). |
+| `apps/web/public/sw.js` | no fetch handler, no cache, same-origin click target | **show the payload** as in §1, with the fixed-text fallback |
+| `apps/api/src/push-transport.ts` | `validPushEndpoint` (host allowlist, HTTPS, no port/credentials/fragment); `vapidAuthorization` (RFC 8292 ES256 via `node:crypto`); `sendPush` (5 s deadline, never logs the endpoint, 404/410 → `gone`) | add **payload encryption** (RFC 8291 `aes128gcm`: ECDH P-256 + HKDF + AES-128-GCM, all in `node:crypto`, no new dependency), tested against the RFC's worked example. `TTL: 3600`. `Urgency: high` for on-by-default kinds, `normal` for the rest. Payload kept under 3 KB (the limit is 4 KB). Edge host (below). |
+| `packages/core/src/push.ts` `managePush` | advisory-lock endpoint ownership (a shared browser can't be silently moved to another account); sanitised errors (Drizzle messages can carry the endpoint) | the 10-device cap is **per user**; store `p256dh`/`auth`; action limit (below) |
+| `packages/shared/src/push.ts` | n/a | **replace** `pushTopicCandidates` with `PUSH_KIND_DEFAULTS`, `isPushKindEnabled` and `PUSH_EVENTLESS_KINDS = ["drafts"]`, tested like `settings.test.ts` |
+| `apps/web/src/components/PushSettings.tsx`, `lib/push.ts` | permission only on click; iOS-not-installed detection (including iPads that report as Macs); "denied" explained without re-prompting; hidden in admin previews | becomes the **alerts line** above the "What to include" list in `DigestSettingsForm`, hidden when unconfigured; `lib/push.ts`'s detection is shared with the sidebar link (§3.4) |
+| `apps/web/src/app/(app)/notifications/page.tsx` | the authenticated "choose a forum" landing | only the service worker's fallback target now, so no one-forum shortcut; alias the query back to internal names (`timetable: forum`) per CLAUDE.md |
 | `apps/web/next.config.ts` | `no-cache` header on `/sw.js` | none |
-| `docs/WEB_PUSH.md` | browser limitations, privacy, verification steps | rewrite the scope, operational-limits and setup sections to match this plan |
-| tests (`push-transport.test.ts`, `push-send.test.ts`, `PushSettings.test.tsx`, `lib/push.test.ts`, `shared/push.test.ts`) | most cases | move the core tests (below) |
+| `docs/WEB_PUSH.md` | browser limitations, verification steps | rewrite scope, privacy (payload, lock screen) and setup to match this plan |
+| tests (`push-transport.test.ts`, `push-send.test.ts`, `PushSettings.test.tsx`, `lib/push.test.ts`, `shared/push.test.ts`) | most cases | move the core tests (below); add encryption, payload and visibility cases |
 
 `apps/web/src/app/manifest.ts` and the icons belong to **#367** and ship in
 that PR. One note for it: #360's `start_url` is `/timetables`, which is
@@ -121,68 +204,50 @@ right because it is the signed-in home.
 
 ### Change: the review findings from #368
 
-1. **Never show an unconfigured card.** `PushSettings` renders nothing when
-   the GraphQL `pushPublicKey` field is null. #360 showed the card and then
-   failed with a 503 on Enable. `pushPublicKey` already returns null when the
-   keys are missing or during view-as. Keep that, and gate the card on it.
+1. **Never show an unconfigured control.** The alerts line, the Push
+   column and the sidebar link render nothing when the GraphQL
+   `pushPublicKey` field is null. #360 showed the card and then failed with
+   a 503 on Enable. `pushPublicKey` already returns null when the keys are
+   missing or during view-as. Keep that, and gate all three on it.
 2. **Deactivation pauses and never deletes.** #360's `deliverOne` deletes
    the subscription when `member.deactivatedAt` is set. That is wrong because
-   member-deactivation is reversible. Instead:
-   - the sender **skips** deactivated memberships and leaves their rows;
-   - `reactivateMembership` in `packages/core/src/members.ts` stamps
-     `last_checked_at = now()` on that membership's subscriptions, so the
-     first alert after reactivation doesn't replay the time away. This
-     mirrors how reactivation stamps `lastDigestAt`.
-
-   Removal still cascades through the FK, which is correct: re-joining
-   needs a fresh opt-in.
+   member-deactivation is reversible, and now also because the subscription
+   belongs to the device, not the forum. The sweep **skips** deactivated
+   memberships. Events during the deactivation are passed over at the time,
+   so reactivation replays nothing, with no stamp needed.
 3. **No HTTP send inside a database transaction.** #360's `deliverOne`
    holds `SELECT … FOR UPDATE` open across `send()`, which is up to 5 s per
-   device with a pool of 10 connections (R17). Replace it with
-   **claim → commit → send → update**:
-   - claim with `UPDATE push_subscriptions SET claimed_at = now() WHERE id =
-     … AND (claimed_at IS NULL OR claimed_at < now() - interval '2 minutes')
-     RETURNING …` (one statement, no open transaction);
-   - send with no connection held;
-   - then a second statement sets `last_sent_at` / `last_checked_at`,
-     clears `pending_at` and `claimed_at`, or deletes on `gone`.
+   device with a pool of 10 connections (R17). The sweep (§3.2) claims its
+   work in one short transaction, commits, and only then sends, with no
+   connection held.
 4. **Edge.** Accept Microsoft's push service. In `validPushEndpoint`, add
    `host.endsWith(".notify.windows.com")` alongside `.push.apple.com`.
    Suffix match on the full label, so `evilnotify.windows.com` fails. Test
-   both cases. Edge is common on institutional Windows machines, so
-   refusing it would be a visible gap.
+   both cases. Edge is common on institutional Windows machines.
 5. **Rate limit on subscribe.** Add `pushSubscribe: { windowMs: 60 *
    60_000, max: 30 }` to `ACTION_LIMITS` in `apps/api/src/http/action-limits.ts`,
    with a `BLOCKED_MESSAGES` entry, and check it in the subscribe route
-   before `managePush`. The 10-device cap limits how many rows a member can
-   hold. The rate limit limits how fast they can churn them.
+   before `managePush`. The device cap limits how many rows a member holds;
+   the rate limit limits how fast they churn them.
 6. **Key check once at boot.** #360's `pushConfig()` re-derives and compares
-   the key pair on every call, including on each send. Move validation into
-   `apps/api/src/env.ts` next to the `SPACES_*` block and expose a frozen
-   `env.push` (or null). §3.1 has the rule.
+   the key pair on every call. Move validation into `apps/api/src/env.ts`
+   next to the `SPACES_*` block and expose a frozen `env.push` (or null).
+   §3.1 has the rule.
 7. **Package boundaries.** #360 widened `apps/api/tsconfig.json` `rootDir`
    to `../..` so an api test could import core's source by relative path.
    Revert that. `push-core.test.ts` imports from `@timetable/core` like the
-   rest of api's tests. Pure logic, like the badge rule, sits in
+   rest of api's tests. Pure logic (kind defaults, payload trimming) sits in
    `packages/shared` with its own vitest file.
-8. **One-forum shortcut.** `/notifications` redirects straight to
-   `/f/<slug>/notifications` when `myForums` has exactly one entry. Keep the
-   chooser for two or more. With none, go to `/timetables`.
-9. **Lounge.** `listNotifications` only includes Lounge kinds when
-   `opts.lounge` is true. The sender passes the same gate the GraphQL
-   resolver uses, `seesLounge` in `apps/api/src/graphql/activity.ts` (shared
-   `canUseLounge` + `isLoungeEnabled`), evaluated at send time. Lift that
-   helper into core or shared so the resolver and the sender share it. If
-   Ed answers no to decision 1, pass `lounge: false`.
+8. **Lounge.** Covered by its own row in the kind list and by the
+   send-time Lounge gate in §1.
 
 ### Replace: the sender
 
 #360's `deliverPush` walks **20 devices per run**, oldest first, and
 re-reads each one's notification list. With a scheduler calling it every few
 minutes, an alert at 100 devices can take **25+ minutes** (#368). §3.2
-replaces this with an event-driven sender. `deliverOne`'s re-checks are
-kept: membership, deactivation, forum readability, calendar on/off, and the
-pane watermark.
+replaces it with an event sweep that reads what happened once per minute
+and fans out to the devices that want it.
 
 ---
 
@@ -194,11 +259,14 @@ pane watermark.
 push services. When someone turns alerts on, their browser receives our
 public key and locks the subscription to it. From then on, Google, Apple,
 Mozilla and Microsoft accept a push for that subscription only when it is
-signed with our private key. A leaked private key would let someone else
-send our members empty "You have new activity" buzzes, but no content,
-because there is none. Losing or **rotating** the key silently breaks every
-existing subscription, and everyone would have to turn alerts on again.
-**Generate each key once per environment and never rotate it casually.**
+signed with our private key. The private key alone reaches nobody: sending
+also needs each subscription's endpoint and payload keys, which live only in
+our database. Together they would let someone show arbitrary text on
+members' devices, so the database's push columns are as sensitive as the
+key, and neither is ever logged. Losing or **rotating** the key silently
+breaks every existing subscription, and everyone would have to turn alerts
+on again. **Generate each key once per environment and never rotate it
+casually.**
 
 There are three values per environment:
 
@@ -230,8 +298,9 @@ GraphQL `pushPublicKey`.
 
 **The boot-time rule** (in `env.ts`, once):
 
-- **None set** → push is off. The card is hidden, subscribe returns 503, and
-  the sender is idle. This is the default everywhere until Ed adds keys.
+- **None set** → push is off. The alerts line, Push column and sidebar link
+  are hidden, subscribe returns 503, and the sweep is idle. This is the
+  default everywhere until Ed adds keys.
 - **All three set and valid** → push is on. "Valid" means the subject is
   `mailto:`/`https://`, both keys decode to the right lengths, and the
   public key is derived from the private key.
@@ -245,155 +314,131 @@ GraphQL `pushPublicKey`.
   SPACES rule bit this way (PR #72). So if all three are empty, push is
   off, with no error.
 
-One extra env var, `PUSH_PAUSED=true`, works as a **kill switch**: the card
-stays, but nothing is sent. Ed can set it in the DO console on the api
-component. It takes effect on the component restart with no deploy, the
+One extra env var, `PUSH_PAUSED=true`, works as a **kill switch**: the
+controls stay, the sweep keeps advancing its cursor, and nothing is sent, so
+unpausing doesn't release a backlog. Ed can set it in the DO console on the
+api component. It takes effect on the component restart with no deploy, the
 same lever as `RATE_LIMIT_MAX` in the incident runbook.
 
-### 3.2 The sender schedule
+### 3.2 Delivery: a once-a-minute sweep inside the API
 
-The question is what makes the API send an alert after someone posts.
-Today's context: one API instance (`instance_count: 1`, R10), a 0.5 GB box,
-a 10-connection database pool (R17), and a cohort of tens to low hundreds.
+Context: one API instance (`instance_count: 1`, R10), a 0.5 GB box, a
+10-connection database pool (R17), and a cohort of tens to low hundreds.
+Ed chose a sweep over sending inline at the event: alerts take up to about
+a minute, nothing new runs anywhere, and it costs nothing. The event code
+paths (`addComment`, the Lounge writes, slot mutations, `setTopicReady`)
+are **not touched**.
 
-| | Typical delay | Reliability | Cost | Notes |
-|---|---|---|---|---|
-| **(a) DO App Platform scheduled job** | 1–2 min (cron granularity + a container cold start per run) | good; DO runs it, not GitHub | each run boots a container billed per second. At once a minute it is close to an always-on extra instance (≈$5/month at the smallest size) | Newer App Platform specs accept a job with a cron schedule (`kind: SCHEDULED`). **Not verified from this session.** Confirm against the current DO app-spec reference before relying on it. The job would POST `/api/jobs/push` with `CRON_SECRET` or run a script against the DB. That adds a fourth component to both specs and to the deploy workflows. |
-| **(b) In-process interval timer in the API** | ≤ 60 s | as reliable as the API itself. It stops when the API is down, but alerts are pointless then anyway, and it restarts with the process | $0 | simple at one instance. **At `instance_count: 2`** both instances tick: claim-by-UPDATE (§2 item 3) stops a device getting two sends, and a `pg_try_advisory_lock` around each sweep stops both from doing the work. Each deploy restart pauses it briefly. |
-| **(c) GitHub Actions cron** | ≥ 5 min nominal; often 10–30+ min | **poor**: best-effort, drops runs under load, and GitHub disables it after 60 days without commits (R12) | free | The digest already depends on this trigger and it is in OPERATIONS.md's queue as a known weakness. Adding a real-time feature to it would repeat the mistake. |
-| **(d) Inline, at the event** | **seconds** | the fast path is lost if the process dies mid-send; see the outbox below | $0 | no scheduler at all. Assessed below. |
+**The loop.** A `setInterval` started in the API's boot (only when
+`env.push` is set) runs `sweepPush()` every 60 s, and the existing SIGTERM
+drain stops the timer and waits for an in-flight sweep. Each run:
 
-#### (d) assessed properly: sending inline
+1. **Claim a time window.** In one short transaction:
+   - `SELECT pg_try_advisory_xact_lock(<push sweep key>)`. If false,
+     another instance is sweeping: commit and return.
+   - read `swept_until` from the one-row `push_sweep_state` table;
+   - set the new upper bound `to = now() - interval '10 seconds'`. The lag
+     lets transactions that started before `to` but commit just after it
+     become visible, since rows are stamped with their start time;
+   - if `swept_until` is more than 10 minutes old (first boot, long
+     outage), start from `to - 10 minutes`. Alerts are for now; the pane
+     and digest carry the rest;
+   - `UPDATE push_sweep_state SET swept_until = to WHERE swept_until =
+     <value read>`. Compare-and-set: if it changes zero rows, someone else
+     claimed the window, so return;
+   - commit. The lock is released with the transaction.
+2. **Read what happened in the window** `(from, to]`, once for all
+   recipients: new topic comments, Lounge comments, mentions, `slot.*` and
+   `topic.*` activity events, ❤️/💙 ledger rows, released slots and new
+   memberships. A handful of indexed range queries.
+3. **Work out recipients per event**, by the kind map in §1: host, parent
+   author, chain members, mentioned users, ❤️-ers, and so on. Keep only
+   people with at least one push subscription.
+4. **Filter per recipient:** the kind's Push switch on that membership
+   (`isPushKindEnabled` over `digestSettings.push`, falling back to
+   `PUSH_KIND_DEFAULTS`); the audience rule; the send-time visibility checks
+   in §1; not their own action; subscription `created_at` before the event;
+   thread not already read past.
+5. **Build and send.** Group by device, one alert per thread tag, at most
+   three per device per run plus one "and n more" overflow. Encrypt each
+   payload for the device and send it through a concurrency limiter of 4,
+   each with #360's 5 s deadline, with no database connection held.
+6. **Record results** in one statement per outcome: `last_sent_at` and
+   `failure_count = 0` on success; delete on `gone` (404/410); bump
+   `failure_count` on 429/5xx, deleting at 20 consecutive failures.
 
-**Where the hooks go.** Four places create pane entries:
+**Why nothing is sent twice.**
+- *Overlapping runs on one instance:* an in-process `running` flag makes a
+  tick that starts while the last one is still sending return at once.
+- *Two API instances (R10):* the advisory lock means only one does the work
+  each minute, and the compare-and-set on `swept_until` makes each window
+  belong to exactly one run, lock or not. Both instances run the timer, so
+  if one is down the other carries on.
+- *A crash mid-send* loses at most that minute's unsent alerts, because the
+  window was already claimed. This is at-most-once by choice: a duplicate
+  buzz is worse than a missed one, and the pane and digest are the durable
+  record of what happened. A deploy's SIGTERM drain waits for the sweep, so
+  ordinary restarts lose nothing.
+- Retries for 429/5xx are not re-queued: the next event in that thread
+  alerts as usual.
 
-- `addComment` in `packages/core/src/comments.ts` (comments, replies,
-  @mentions in either);
-- the post and reply writes in `packages/core/src/lounge.ts`;
-- the slot mutations that log `slot.pencil` / `slot.confirm` / `slot.clear`
-  in `apps/api/src/graphql/slots.ts`;
-- the `topic.unready` write in `setTopicReady`
-  (`packages/core/src/topics.ts`), for send-backs.
-
-Each one names its **candidate recipients**, a cheap superset:
-
-- comment: topic host, parent author, mentioned users;
-- Lounge: parent author, mentioned users;
-- session: the topic's ❤️-ers;
-- send-back: the host.
-
-The authoritative "does this person have something new?" check is still
-`listNotifications` at send time. A sloppy candidate list can cause a
-missed alert, but never a wrong one.
-
-**Latency.** Seconds: one database round trip plus one HTTPS POST per
-device, typically well under a second.
-
-**Request time.** Nothing is added that a user waits on. The handler commits
-its own write, sends its response, and only then starts the push work
-(`setImmediate`, not awaited). The one thing done before responding is the
-durable flag, described next.
-
-**Durable outbox vs fire-and-forget.** Pure fire-and-forget loses alerts
-silently when the process restarts mid-send, which happens on every deploy
-at one instance. A full outbox table (one row per event) is more machinery
-than this needs. The middle path costs one indexed statement:
-
-> **The flag is the outbox.** After the event commits, run `UPDATE
-> push_subscriptions SET pending_at = now() WHERE pending_at IS NULL AND
-> membership_id IN (candidates in this forum)`. That is one statement,
-> usually zero to three rows, and a few milliseconds. The async sender then
-> claims and sends those rows. If the process dies first, the flag
-> survives, and the **sweep** picks it up.
-
-This works because the notifications pane is itself the durable record of
-*what* happened. The flag only has to remember *who to check*. Two
-consequences: re-sending is harmless, because the watermark check finds
-nothing new and skips; and a lost flag costs at most one buzz, never data.
-
-**Failure isolation.** Push failures can't fail the request: the work runs
-after the response, inside a try/catch that logs without the endpoint.
-Push-service slowness can't pile up, for three reasons:
-
-- sends go through a small concurrency limiter (4 in flight);
-- each send has #360's 5 s hard deadline;
-- no database connection is held during a send (§2 item 3).
-
-A burst of 30 comments flags at most a few dozen rows. The per-device
-2-minute gap (`last_sent_at`) turns a burst into one buzz, and the sweep
-delivers the leftovers.
-
-**Rate limits.**
-- **Ours:** the comment action limit (12/min/user) already caps how much
-  fan-out one account can trigger. Sends are outbound, so the inbound
-  per-IP limiter isn't involved.
-- **Theirs:** FCM, Mozilla, Apple and WNS allow far more than a forum
-  generates. A 429 or 5xx from them is treated as `retry`: the flag stays,
-  and the sweep tries again in a minute.
-- **The fan-out worst case** is a session confirmed on a topic with 80 ❤️s,
-  which means 80 candidates. Each needs a `listNotifications` check, about
-  four queries. That is around 320 short queries spread over a few seconds
-  behind the limiter, acceptable at this size. If it ever isn't, the first
-  optimisation is a cheap "anything newer than the watermark?" count in
-  place of the full list. `countUnreadNotifications` already exists.
-
-#### Recommendation: (d) + (b), one mechanism
-
-**Send inline, and back it with a one-minute in-process sweep.** Both run
-in the API and call the same `deliverPending()`:
-
-- **Fast path:** the event sets `pending_at` on candidates, and the API sends
-  right after responding. Alerts arrive in seconds.
-- **Sweep:** every 60 s, the API claims rows with `pending_at` older than a
-  minute (missed by a crash or deploy) or that came back `retry`, and sends
-  them. This is a `setInterval` started in the API's boot, stopped in the
-  existing SIGTERM drain, and wrapped in `pg_try_advisory_lock` so a second
-  instance would skip rather than duplicate.
-
-This is (d)'s latency with (b)'s safety net, and nothing outside the API.
-No new DO component, no GitHub cron, and nothing to keep alive when the
-repo goes quiet (R12, R16).
-
-Leave out (a) for now. It is only worth adding if the API ever stops being
-a long-running process. Leave out (c) entirely.
-
-**If `instance_count` becomes 2 (R10):**
-- the fast path runs on whichever instance served the request;
-- the sweep runs on whichever instance takes the advisory lock;
-- claim-by-UPDATE makes each device's send exclusive;
-- the pool budget (R17) still holds, because nothing holds a connection
-  during a send.
+**Cost per run.** At this cohort size: about ten range queries for the
+window, then per-recipient checks only for the few people an event touches.
+The worst case is a session confirmed on a topic with 80 ❤️s, so 80
+recipients each needing a cheap check, spread behind the limiter. Our
+comment action limit (12/min/user) already caps how much fan-out one account
+can trigger. FCM, Mozilla, Apple and WNS allow far more than a forum
+generates.
 
 ### 3.3 Nothing else changes on the infrastructure side
 
-- **No DNS, CDN or object storage changes.** `/sw.js` is a static file from
-  the web component.
+- **No new component, DNS, CDN or object storage changes.** `/sw.js` is a
+  static file from the web component, and the sweep lives in the API.
 - **CSP:** the service worker is same-origin. The browser contacts the push
   service itself, not the page, so `connect-src` needs nothing new. Verify
   on dev all the same.
 - **No new outbound firewall rules.** The API already makes outbound HTTPS
   calls (to Resend and Clerk).
 
-### 3.4 iOS and the installable app (#367)
+### 3.4 iOS, the installable app (#367) and the "Get Notifications" link
 
 Apple allows web push **only for a web app installed on the Home Screen**
-(iOS/iPadOS 16.4+), and only when opened from that icon. A Safari tab
+(iOS/iPadOS 16.4+), and only when opened from that icon. A browser tab
 cannot subscribe at all. So:
 
 - **#367 ships first.** Its manifest (`name: "Topic"`, `display:
   "standalone"`, 192/512 icons) is what makes "Add to Home Screen" produce a
   real app. Push without #367 works on Android, Windows and Mac, but never
   on iPhone.
-- **The card adapts.** In Safari on iPhone, `lib/push.ts`'s detection
-  replaces the button with short instructions: "Share → Add to Home Screen,
-  then open Topic from your Home Screen and turn alerts on here." Opened
-  from the installed icon, the normal button appears.
 - **Installed is a separate browser profile.** The Home Screen app has its
-  own storage and its own Clerk sign-in. Members will need to sign in once
-  inside the installed app, and the docs and card copy should say so.
-- **Whether to nudge people to install**, beyond the push card, is
-  decision 3.
+  own storage and its own Clerk sign-in. Members sign in once inside the
+  installed app, and the install steps say so.
 - **Desktop Safari** (macOS 13+) and **Android** need no installation.
+
+**The "Get Notifications" sidebar link.** A client component in the forum
+sidebar (`apps/web/src/app/(app)/f/[slug]/layout.tsx`), shown only where
+alerts are possible and not yet set up on this device:
+
+| This device | Link | Opens |
+|---|---|---|
+| iPhone/iPad, in a browser tab (not running as the installed app) | shown | the "Add to Home Screen" steps: Share → Add to Home Screen, open Topic from the icon, sign in, turn alerts on |
+| a browser that supports push (including the installed iPhone app), no subscription for this device yet | shown | the Notifications page's alerts line (`/f/<slug>/notifications#alerts`, via `next/link`) |
+| alerts already on for this device | hidden | — |
+| push impossible: no `PushManager`/service worker, iOS before 16.4, permission denied, push not configured (`pushPublicKey` null), or an admin view-as preview | hidden | — |
+
+The install steps are the same text the alerts line shows on an iPhone tab,
+from one shared component, so there is one explanation in two places: the
+sidebar and where alerts are offered.
+
+**Detected after hydration.** The server and the first client render both
+output nothing. A `useEffect` then reads `navigator.standalone` /
+`matchMedia("(display-mode: standalone)")`, the iOS check from
+`lib/push.ts` (iPads that report as Macs included), `"PushManager" in
+window`, `Notification.permission`, and
+`registration.pushManager.getSubscription()` matched against the server's
+list for this user. Only then does the link appear, so there is no
+hydration mismatch. Turning alerts on or off updates it through a small
+module-level store, so it disappears without a reload.
 
 ---
 
@@ -402,23 +447,31 @@ cannot subscribe at all. So:
 ### Order of events
 
 1. **Builder PRs land on `main`** (§6). Everything ships **inert**: with no
-   keys, the card is hidden and the sender idles. So nothing changes for
-   anyone when this reaches dev or production.
-2. **Ed creates the dev key pair and adds the dev secrets** (see "Ed's part"
-   below).
+   keys, the alerts line, Push column and sidebar link are hidden and the
+   sweep idles. So nothing changes for anyone when this reaches dev or
+   production.
+2. **Ed creates the dev key pair and adds the dev secrets** (see "What only
+   Ed can do" below).
 3. **Next dev deploy** (any merge, or a manual `Deploy Dev` run) picks the
    keys up. A builder then verifies on dev:
+   - the sidebar link appears, opens the alerts line, and disappears once
+     alerts are on;
    - opt in on Android Chrome, desktop Chrome/Firefox/Edge, and macOS Safari;
-   - a second seeded user posts a qualifying comment, and the alert arrives
-     in seconds;
-   - lock the screen and check it shows only the fixed text;
-   - tap → the one-forum shortcut lands on the forum's Notifications page;
-   - deactivate, comment, see no alert; reactivate, and the backlog does
-     not replay;
-   - remove the membership, and the row is gone;
-   - set `PUSH_PAUSED`, comment, see no alert.
-4. **iPhone check on dev** needs a real iPhone with Topic installed. Ed's
-   own phone, or a tester's.
+   - a second seeded user replies to a comment; the alert arrives within
+     about a minute with who, where and the first line, and tapping it
+     opens that comment;
+   - a Lounge reply and a drafting-thread comment alert their audience and
+     no one else; an elector with Push on for `comments` gets nothing from
+     a drafting thread;
+   - switch a kind's Push off in one forum; it stops there and not in a
+     second forum;
+   - lock the screen on Android and note what shows;
+   - deactivate, comment, see no alert; reactivate, and nothing replays;
+   - set `PUSH_PAUSED`, comment, see no alert; unset it, and no backlog
+     arrives.
+4. **iPhone check on dev** needs a real iPhone: the sidebar link shows the
+   install steps in Safari, the installed app subscribes, an alert arrives,
+   and the locked screen hides its text by default.
 5. **Ed creates the production key pair, adds the production secrets, and
    runs `deploy-production.yml` himself** (agents never deploy production).
 6. Optionally, Ed tells members in the next digest or in person.
@@ -429,18 +482,19 @@ cannot subscribe at all. So:
   means the feature exists.
 - **Per environment, paused:** `PUSH_PAUSED=true` on the api component in
   the DO console. Subscriptions are kept and resume when unset.
-- **Per environment, gone:** remove the secrets and redeploy. The card
-  disappears. Subscriptions stay in the database, harmless, and work again
+- **Per environment, gone:** remove the secrets and redeploy. The controls
+  disappear. Subscriptions stay in the database, harmless, and work again
   if the *same* keys come back.
-- **Per person:** each member's own switch, per forum and device.
+- **Per person:** each member's own device switch, and the Push column per
+  forum.
 - **No per-forum admin switch in v1.** Nothing is pushed unless a person
-  asks for it on their own device, so there is nothing for an admin to
-  protect members from. A Forum Settings toggle is easy to add later if a
-  forum wants alerts unavailable altogether.
+  asks for it on their own device. A Forum Settings toggle is easy to add
+  later if a forum wants alerts unavailable altogether.
 
-### Ed's part (only he has repo-settings and DigitalOcean access)
+### What only Ed can do
 
-Agents never touch repo settings, GitHub secrets, or DO infrastructure.
+Agents never touch repo settings, GitHub secrets, or DO infrastructure, and
+never deploy production.
 
 1. **Generate two key pairs**, one for dev and one for production. Run this
    on your own machine in the repo:
@@ -457,59 +511,47 @@ Agents never touch repo settings, GitHub secrets, or DO infrastructure.
 3. **Keep a private copy** of the production private key in your password
    manager. Losing it means everyone has to re-enable alerts.
 4. **Deploy production** when ready, by running `deploy-production.yml`.
-5. **Test on an iPhone** once on dev.
+5. **Test on an iPhone** once on dev (step 4 above).
 
 ### Migration
 
-One new table, `push_subscriptions`, plus its index. It is **additive only**
-(R11): nothing existing is altered, so a code rollback leaves a harmless
-unused table. Take the next free number at build time (0045 today).
+Two new tables, `push_subscriptions` (with its unique endpoint and a user
+index) and the one-row `push_sweep_state`. The push kind switches need no
+column: they are a new optional `push` field inside the membership's
+existing `digestSettings` jsonb (`MembershipDigestSettings` in shared),
+read through `PUSH_KIND_DEFAULTS` when absent. **Additive only** (R11):
+nothing existing is altered, so a code rollback leaves harmless unused
+tables. Take the next free number at build time (0045 today).
 
 ---
 
-## 5. Decisions for Ed
+## 5. Decisions (Ed, 2026-10-03)
 
-Recommended option first in each.
-
-1. **Lounge alerts.** Lounge replies and @mentions already appear in the
-   pane and raise the badge for hosts and admins. Alerts carry no content,
-   so nothing about the Lounge leaks.
-   - **(A) Include them under the same switch** (recommended): no extra UI,
-     and alerts match the badge.
-   - (B) Leave them out: one line of code, but the badge and alerts
-     disagree for hosts.
-   - (C) A separate Lounge alerts toggle: about +2 builder-hours, and a
-     second switch to explain.
-2. **Delivery approach.**
-   - **(A) Inline at the event, plus a one-minute sweep inside the API**
-     (recommended): alerts in seconds, $0, no scheduler to keep alive.
-   - (B) Sweep only, inside the API: up to a minute's delay, $0, slightly
-     less code.
-   - (C) A DigitalOcean scheduled job: 1–2 min delay, about $5/month, a new
-     component in both app specs, and spec support still to be confirmed.
-   - (D) A GitHub Actions cron: 5–30+ min delay, free, unreliable (R12).
-     Not recommended.
-3. **Prompting iPhone users to install.** iPhones need Topic on the Home
-   Screen before alerts work (#367).
-   - **(A) Explain it only on the alerts card**, where push is offered
-     (recommended): no new UI, and people who want alerts find out exactly
-     when they need to.
-   - (B) Also show a dismissible "Install Topic" banner to iPhone Safari
-     visitors: about +3 builder-hours, and it reaches more people, but it
-     nags everyone, including people who don't want alerts.
-   - (C) Don't mention it: zero cost, but iPhone users see a card that does
-     nothing.
-4. **Opt-in granularity.**
-   - **(A) Per forum, per device**, as in #360 (recommended): the switch
-     lives on each forum's Notifications page, membership is the privacy
-     boundary, and members of one forum (most people) see no difference.
-   - (B) One switch per device covering all your forums: simpler for
-     multi-forum people, but forums joined later need a rule (auto-include
-     or not), and the switch needs a home outside any forum. About +2
-     builder-hours.
-   - (C) Per forum, one switch for all your devices: devices still have to
-     subscribe one by one in the browser, so this is confusing and not
-     recommended.
+1. **Alerts show who, where and the first line** ("Joshua Becker in Faculty
+   Lounge: but we have infinitely nesting…"), as an encrypted payload, and
+   tapping opens the item itself. Reason: a bare "You have new activity" is
+   too vague to act on. Encryption keeps it from Apple and Google, and Ed
+   accepted the lock-screen trade-off (hidden by default on iPhone, often
+   shown on Android and desktop), with visibility checked per recipient at
+   send time. About +2–3 builder-hours.
+2. **Settings are a Push column beside Email** in the existing "What to
+   include" list, with targeted kinds on and broadcast kinds off by default,
+   a line above the list to turn alerts on for this device, kind switches
+   per forum and the subscription per device. Reason: one familiar list
+   instead of a second settings surface, and each kind can be pushed or
+   emailed independently. The Lounge row replaces the separate Lounge
+   alerts question. About +4–6 builder-hours.
+3. **Delivery is a once-a-minute sweep inside the API**, not inline sending.
+   Reason: up to a minute is fast enough, nothing new runs anywhere, it
+   costs nothing, and the event code paths stay untouched. Overlap and
+   second-instance safety come from an in-process flag, a Postgres advisory
+   lock, and a compare-and-set on the sweep cursor.
+4. **iPhone users get a "Get Notifications" sidebar link plus the
+   explanation where alerts are offered.** It shows only where alerts are
+   possible and not set up on this device, and is detected after
+   hydration. Reason: people find out without a banner nagging everyone,
+   and the link vanishes once it has done its job. Depends on #367. About
+   +2 builder-hours.
 
 ---
 
@@ -522,15 +564,20 @@ inert until keys exist.
 | # | PR | Contents | Hours |
 |---|---|---|---|
 | 0 | **#367 installable app** (prerequisite, its own issue) | manifest, 192/512 icons, Apple touch icon and meta | 2–3 |
-| 1 | **Push data + subscribe** | migration (next number) + `schema/push.ts`; core `managePush` with the advisory locks and device cap; shared badge-rule helper with tests; reactivation stamp in `members.ts`; core tests via `@timetable/core`, with `rootDir` untouched | 4–5 |
-| 2 | **API config + transport + routes** | `env.ts` VAPID boot rule and `PUSH_PAUSED`; `push-transport.ts` with the Edge host added; `POST /api/forums/:slug/push-subscriptions` with the `pushSubscribe` action limit; GraphQL `pushPublicKey` + `myPushEnabled`; spec, workflow and `.env.example` entries (inert without secrets) | 4–5 |
-| 3 | **Sender** | `pending_at` flagging at the four event sites; `deliverPending` (claim → commit → send → update, 4-way limiter, 2-min per-device gap, Lounge gate per decision 1); 60 s sweep with advisory lock, started at boot and stopped in the SIGTERM drain; tests for skip-when-deactivated, retry, gone, double-claim | 6–8 |
-| 4 | **Web** | `sw.js` + no-cache header; `PushSettings` card on `/f/[slug]/notifications`, hidden when unconfigured, iOS copy per decision 3; `/notifications` chooser with the one-forum shortcut; jsdom tests after `QueueControls.test.tsx` | 5–6 |
-| 5 | **Docs** | `docs/WEB_PUSH.md` (adapted from #360); `DEPLOYMENT.md` env table + secrets; `OPERATIONS.md` note (kill switch, key-loss consequence); `ARCHITECTURE.md`; a CLAUDE.md glossary entry | 2 |
-| 6 | **Dev verification** (no PR) | the §4 checklist on real devices; iPhone with Ed or a tester | 2–3 |
+| 1 | **Push data + kind defaults** | migration (next number): `push_subscriptions` per user with `p256dh`/`auth`, and `push_sweep_state`; core `managePush` with the endpoint lock and per-user device cap; shared `PUSH_KIND_DEFAULTS`, `isPushKindEnabled`, `PUSH_EVENTLESS_KINDS`, payload trimming, with tests; core tests via `@timetable/core`, `rootDir` untouched | 4–5 |
+| 2 | **API config, transport, encryption, routes** | `env.ts` VAPID boot rule and `PUSH_PAUSED`; `push-transport.ts` with RFC 8291 payload encryption and the Edge host; subscribe/unsubscribe routes with the `pushSubscribe` action limit; GraphQL `pushPublicKey`, this user's device list, and `push` kinds on `updateMyForumDigestSettings`; spec, workflow and `.env.example` entries | 5–7 |
+| 3 | **Sweep sender** | `sweepPush` with the claimed window (advisory lock, compare-and-set, 10 s lag, 10 min cap), event readers, the kind map, per-recipient visibility checks, payload building, per-device grouping and overflow, limiter, result recording; boot timer and SIGTERM drain; tests for double-claim, overlap, deactivated, hidden thread, Lounge gate, gone, `PUSH_PAUSED` | 7–9 |
+| 4 | **Service worker + alerts line** | `sw.js` showing the payload, with the fallback and no-cache header; the alerts line above "What to include" (turn on/off for this device, denied and iPhone explanations); `/notifications` chooser as the fallback target; jsdom tests after `QueueControls.test.tsx` | 5–6 |
+| 5 | **Push column** | `DigestSettingsForm` becomes a two-column Email/Push list, shown even when the email cadence is Never (the Email column greys out instead), dash for `drafts`; saved through the same mutation | 4–6 |
+| 6 | **"Get Notifications" link** | sidebar client component with post-hydration detection, the shared install-steps component, store so it hides on subscribe; jsdom tests for each row of the §3.4 table | 2 |
+| 7 | **Docs** | `docs/WEB_PUSH.md` (adapted from #360, with privacy and lock-screen notes); `DEPLOYMENT.md` env table + secrets; `OPERATIONS.md` note (kill switch, key-loss consequence, sweep); `ARCHITECTURE.md`; a CLAUDE.md glossary entry | 2 |
+| 8 | **Dev verification** (no PR) | the §4 checklist on real devices; iPhone with Ed or a tester | 2–3 |
 
-**Total: about 23–29 builder-hours for push, plus 2–3 for #367.** Decisions
-1(C), 3(B) or 4(B) each add the hours noted against them.
+**Total: about 31–40 builder-hours for push, plus 2–3 for #367.** That is
+the earlier 23–29 plus Ed's rulings: +2–3 for alert content, +4–6 for the
+Push column and +2 for the sidebar link. Dropping the inline path roughly
+pays for the sweep's event readers, so the sender stays at its earlier size.
 
 Steps 1 and 2 can be built in parallel. Step 3 needs both. Step 4 needs
-step 2's GraphQL fields. Step 5 can trail step 4 by a day.
+step 2. Step 5 needs steps 1 and 4. Step 6 needs step 4 and #367. Step 7
+can trail by a day.
