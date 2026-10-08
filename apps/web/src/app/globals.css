@@ -422,6 +422,11 @@ textarea {
 .shell-content {
   min-width: 0;
 }
+/* My Topics has another grid inside the shell. Let its content shrink so
+   single-line comment previews truncate instead of widening every card. */
+.my-topics-content {
+  min-width: 0;
+}
 .topic-body {
   overflow-wrap: anywhere;
 }
