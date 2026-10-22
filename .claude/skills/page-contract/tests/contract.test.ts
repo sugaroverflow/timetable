@@ -141,3 +141,44 @@ test('a session whose link is not on the page is never stamped', async ($, on) =
   await $.turn.complete({ answer: 'done', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' } as never)
   expect(seen.some(a => a.action === 'update')).toBe(false)
 })
+
+test('after a restart, a turn that never touched the page still finds the coordinator and stamps it (admit, 2026-10-04 to 10-21)', async ($, on) => {
+  mock.clock(on, { now: Date.parse('2026-10-22T16:00:00Z') })
+  mock.env(on, { CLAUDE_CODE_REMOTE_SESSION_ID: 'cse_01VPkrCuL6Ych9eNkhvd7pyw' })
+  const seen: Array<Record<string, unknown>> = []
+  on('tool.call', { tool: 'ArtifactData' }, (_$, e) => {
+    const a = e as unknown as Record<string, unknown>
+    seen.push(a)
+    if (a.action === 'list') return { result: { ok: true }, text: '=== BEGIN\n{"id":"admit","data":{"sessionUrl":"https://claude.ai/code/session_01VPkrCuL6Ych9eNkhvd7pyw"},"version":5}\n=== END' } as never
+    if (a.action === 'get') return { result: { ok: true }, text: '=== BEGIN\n{"id":"admit","data":{"lastActive":"2026-10-21T09:00:00Z"},"version":80}\n=== END' } as never
+    return { result: { ok: true }, text: '' } as never
+  })
+  on('tool.call', { tool: 'ReadNotifications' }, () => ({ result: {}, text: '0 notifications remain queued.' } as never))
+  on('turn.complete', (_$, e) => ({ text: (e as { answer: string }).answer }))
+  await $.tool.call({ tool: 'ReadNotifications' } as never)
+  await $.turn.complete({ answer: 'done', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' } as never)
+  const stamp = seen.find(a => a.action === 'update' && a.doc_id === 'admit' && (a.data as Record<string, unknown>)?.lastActive === '2026-10-22T16:00:00Z')
+  expect(stamp?.if_version).toBe(80)
+})
+
+test('a page-comment wake is told whose wake thread it came on (Topic, 2026-10-05)', async ($, on) => {
+  mock.clock(on, { now: Date.parse('2026-10-22T16:00:00Z') })
+  on('tool.call', { tool: 'ArtifactData' }, (_$, e) => {
+    const a = e as unknown as Record<string, unknown>
+    if (a.action === 'list' && a.collection === 'wake') return { result: { ok: true }, text: '=== BEGIN\n{"id":"draft","data":{"threadId":"863e3254-546c-4998-ad9d-0fb15d5198ea"},"version":3}\n{"id":"topic","data":{"threadId":"ab7a8cdb-633f-4e87-a0e2-50e889e5f8d1"},"version":1}\n=== END' } as never
+    return { result: { ok: true }, text: '' } as never
+  })
+  const wake = (thread: string) => `<webhook-payload>\n    {"slug":"77dc0e00-9f35-45ee-af49-0632428ebbf5","event":"comment","version":"1","thread":"${thread}","emitted_at":"2026-10-22T15:59:00Z"}\n</webhook-payload>`
+  let text = wake('ab7a8cdb-633f-4e87-a0e2-50e889e5f8d1')
+  on('tool.call', { tool: 'ReadNotifications' }, () => ({ result: {}, text } as never))
+  // The session coordinates draft: it says so by writing coordinators/draft.
+  await call($, { action: 'update', collection: 'coordinators', doc_id: 'draft', data: { lastActive: now() }, if_version: 6 })
+  const other = await $.tool.call({ tool: 'ReadNotifications' } as never) as { context?: string[] }
+  expect(String(other.context)).toContain("ab7a8cdb-633f-4e87-a0e2-50e889e5f8d1 is topic's wake thread: not draft's")
+  text = wake('863e3254-546c-4998-ad9d-0fb15d5198ea')
+  const mine = await $.tool.call({ tool: 'ReadNotifications' } as never) as { context?: string[] }
+  expect(String(mine.context)).toContain("is draft's wake thread: yours, read it")
+  text = 'Input for dev-ops from ae: nothing about the page here.'
+  const plain = await $.tool.call({ tool: 'ReadNotifications' } as never) as { context?: string[] }
+  expect(plain.context?.length ?? 0).toBe(0)
+})
