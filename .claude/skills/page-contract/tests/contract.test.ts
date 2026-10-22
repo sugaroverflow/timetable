@@ -178,6 +178,10 @@ test('a page-comment wake is told whose wake thread it came on (Topic, 2026-10-0
   text = wake('863e3254-546c-4998-ad9d-0fb15d5198ea')
   const mine = await $.tool.call({ tool: 'ReadNotifications' } as never) as { context?: string[] }
   expect(String(mine.context)).toContain("is draft's wake thread: yours, read it")
+  // A thread started a moment ago is not in the collection yet: never called nobody's (draft, 2026-10-22 16:54).
+  text = wake('e5162121-72b5-46ea-b640-1659724ff076')
+  const fresh = await $.tool.call({ tool: 'ReadNotifications' } as never) as { context?: string[] }
+  expect(String(fresh.context)).toContain('re-read wake/draft before treating it as not yours')
   text = 'Input for dev-ops from ae: nothing about the page here.'
   const plain = await $.tool.call({ tool: 'ReadNotifications' } as never) as { context?: string[] }
   expect(plain.context?.length ?? 0).toBe(0)

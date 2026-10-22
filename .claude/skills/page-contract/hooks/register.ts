@@ -34,7 +34,7 @@ let lookedAt = 0        // when the mod last looked for this session's own link 
 const LOOK_EVERY_MS = 60 * 60e3
 let threads: Record<string, string> = {}   // wake thread id → project, from the page's wake collection
 let threadsAt = 0
-const THREADS_EVERY_MS = 10 * 60e3
+const THREADS_EVERY_MS = 60e3   // an unknown thread is looked up again after a minute: a new wake thread is written a moment after its first comment
 
 const iso = (ms: number) => new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z')
 
@@ -97,7 +97,7 @@ export const register: Register = on => {
       }
       const lines = ids.map(id => {
         const p = threads[id]
-        if (!p) return `thread ${id} is no project's wake thread on Ed's page`
+        if (!p) return `thread ${id} is not in the page's wake collection yet; a coordinator starting a new wake thread writes it there a moment after its first comment, so ${project ? `re-read wake/${project}` : 'check the collection'} before treating it as not yours`
         return `thread ${id} is ${p}'s wake thread` + (!project ? '' : p === project ? ': yours, read it' : `: not ${project}'s`)
       })
       return { ...r, context: [...(r.context ?? []), `page-contract: page comments in this read, by the page's wake collection: ${lines.join('; ')}.`] } as typeof r
