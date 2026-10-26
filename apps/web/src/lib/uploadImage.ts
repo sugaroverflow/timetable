@@ -119,37 +119,40 @@ function canvasBlob(
  * encode WebP). GIFs pass through — re-encoding would drop the
  * animation — as does anything the browser can't decode.
  */
-export async function shrinkImage(
-  file: File,
-): Promise<Blob & { name: string }> {
-  const named = (blob: Blob, name: string) =>
-    Object.assign(blob, { name }) as Blob & { name: string };
-  if (file.type === "image/gif") return named(file, file.name);
+export async function shrinkImage(file: File): Promise<File> {
+  // File.name is read-only; preserve originals and name encoded copies
+  // through the File constructor instead of assigning to that property.
+  if (file.type === "image/gif") return file;
   let bitmap: ImageBitmap;
   try {
     bitmap = await createImageBitmap(file);
   } catch {
-    return named(file, file.name);
+    return file;
   }
   const size = shrunkSize(bitmap.width, bitmap.height, file.size);
   if (!size) {
     bitmap.close();
-    return named(file, file.name);
+    return file;
   }
   const canvas = document.createElement("canvas");
   canvas.width = size.width;
   canvas.height = size.height;
   const ctx = canvas.getContext("2d");
-  if (!ctx) return named(file, file.name);
+  if (!ctx) {
+    bitmap.close();
+    return file;
+  }
   ctx.drawImage(bitmap, 0, 0, size.width, size.height);
   bitmap.close();
   const webp = await canvasBlob(canvas, "image/webp");
-  if (webp && webp.type === "image/webp") return named(webp, "image.webp");
+  if (webp && webp.type === "image/webp") {
+    return new File([webp], "image.webp", { type: webp.type });
+  }
   // No WebP encoder (older Safari): JPEG on white, so transparency doesn't
   // turn black.
   ctx.globalCompositeOperation = "destination-over";
   ctx.fillStyle = "#fff";
   ctx.fillRect(0, 0, size.width, size.height);
   const jpeg = await canvasBlob(canvas, "image/jpeg");
-  return jpeg ? named(jpeg, "image.jpg") : named(file, file.name);
+  return jpeg ? new File([jpeg], "image.jpg", { type: jpeg.type }) : file;
 }
