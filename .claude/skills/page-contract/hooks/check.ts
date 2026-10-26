@@ -1,9 +1,12 @@
-// The questions page's data contract (claude/QUESTIONS-PAGE.md in edsaperia/dev-ops), as code.
+// The questions page's data contract (claude/QUESTIONS-PAGE.md in dev-ops), as code.
 // Pure functions: given a write and the time, the reasons it breaks the contract ([] when it holds).
 
-// The page: its claude.ai link and its artifact id. Writes to any other artifact are not checked.
-export const PAGE_IDS = ['FoSoRQxMVh8cZocFpMP6KW', '77dc0e00-9f35-45ee-af49-0632428ebbf5']
-export const isPage = (url: unknown) => typeof url === 'string' && PAGE_IDS.some(id => url.includes(id))
+// The page: its claude.ai link's id and its artifact's uuid, from the environment variable
+// QUESTIONS_PAGE_IDS ("<link id>,<uuid>"; the owner's values are in owner/PAGE.md). No ids, no page:
+// nothing is checked. Writes to any other artifact are not checked.
+export const pageIds = (raw: unknown): string[] =>
+  typeof raw === 'string' ? raw.split(',').map(s => s.trim()).filter(Boolean) : []
+export const isPage = (url: unknown, ids: readonly string[]) => typeof url === 'string' && ids.some(id => url.includes(id))
 
 // A time may run ahead of this host's clock by this much (clock skew), never more.
 const SKEW_MS = 2 * 60e3
@@ -36,15 +39,15 @@ export function checkQuestion(d: Doc, now: number, whole: boolean): string[] {
   const why: string[] = []
   const kind = d.kind
   if (kind !== undefined && kind !== 'question' && kind !== 'update' && kind !== 'task')
-    why.push(`kind ${JSON.stringify(kind)} is not "question", "update" or "task" (a decision taken on Ed's behalf is an "update"; a builder's FINAL is an "update")`)
+    why.push(`kind ${JSON.stringify(kind)} is not "question", "update" or "task" (a decision taken on the owner's behalf is an "update"; a builder's FINAL is an "update")`)
   if (d.status !== undefined && !['open', 'answered', 'withdrawn'].includes(d.status as string))
     why.push(`status ${JSON.stringify(d.status)} is not "open", "answered" or "withdrawn"`)
   if (whole) {
-    if (d.status === undefined) why.push('status is missing: a new item is written with "status": "open", or Ed never sees it')
+    if (d.status === undefined) why.push('status is missing: a new item is written with "status": "open", or the owner never sees it')
     if (!isStr(d.title) || !d.title) why.push('title is missing (a string: the item in one line)')
-    if (!isStr(d.context)) why.push(isStr(d.body) ? 'the text goes in "context", not "body"' : 'context is missing (a string: what Ed needs to answer from his phone)')
+    if (!isStr(d.context)) why.push(isStr(d.body) ? 'the text goes in "context", not "body"' : 'context is missing (a string: what the owner needs to answer from their phone)')
     if (!isStr(d.project) || !d.project) why.push('project is missing')
-    if (!isStr(d.askedBy)) why.push('askedBy is missing (e.g. "draft coordinator (cloud)", "builder (PR #12)")')
+    if (!isStr(d.askedBy)) why.push('askedBy is missing (e.g. "<project> coordinator (cloud)", "builder (PR #12)")')
     if (d.asked === undefined) why.push(`asked is missing${d.createdAt !== undefined ? ' ("asked", not "createdAt")' : ''}: write the real clock, now ${new Date(now).toISOString()}`)
   } else {
     if (d.title !== undefined && (!isStr(d.title) || !d.title)) why.push('title must be a non-empty string')
