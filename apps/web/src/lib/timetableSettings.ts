@@ -4,6 +4,7 @@ import {
   THEME_FONT_KEYS,
   type MembershipDigestSettings,
   type NotificationSettings,
+  type PushKinds,
   type RoleLabels,
   type ThemeSettings,
   type TimetableSettings,
@@ -47,6 +48,26 @@ export function parseMembershipDigestSettings(
   if (!raw) return {};
   try {
     return JSON.parse(raw) as MembershipDigestSettings;
+  } catch {
+    return {};
+  }
+}
+
+/** Parse `Forum.viewerPushKinds` (#379): the viewer's EFFECTIVE Push
+ * switches as JSON {kind: boolean}, `drafts` left out. Unreadable JSON
+ * reads as {} — every switch then shows its default. Lives here, not in
+ * the "use client" DigestSettingsForm, because the notifications page
+ * calls it on the server: a client module's exports can only be rendered
+ * or passed as props there, and calling one throws (prod, 2026-10-26). */
+export function parseViewerPushKinds(
+  raw: string | null | undefined,
+): PushKinds {
+  if (!raw) return {};
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as PushKinds)
+      : {};
   } catch {
     return {};
   }
