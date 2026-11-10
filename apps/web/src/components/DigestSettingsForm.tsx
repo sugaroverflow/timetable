@@ -108,23 +108,6 @@ export function taggedKindLabel(kind: DigestKind, labels?: RoleLabels): string {
 
 type Cadence = "never" | "daily" | "weekly";
 
-/** Parse `Forum.viewerPushKinds` (#379): the viewer's EFFECTIVE Push
- * switches as JSON {kind: boolean}, `drafts` left out. Unreadable JSON
- * reads as {} — every switch then shows its default. */
-export function parseViewerPushKinds(
-  raw: string | null | undefined,
-): PushKinds {
-  if (!raw) return {};
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      ? (parsed as PushKinds)
-      : {};
-  } catch {
-    return {};
-  }
-}
-
 /** One switch per digest kind, from a predicate. */
 function switchMap(
   enabled: (kind: DigestKind) => boolean,

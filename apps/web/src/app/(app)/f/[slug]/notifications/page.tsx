@@ -7,10 +7,7 @@ import { ActivityRoleFilter } from "@/components/ActivityRoleFilter";
 import { ActorFilter } from "@/components/ActorFilter";
 import { AlertsLine } from "@/components/AlertsLine";
 import { Avatar } from "@/components/Avatar";
-import {
-  DigestSettingsForm,
-  parseViewerPushKinds,
-} from "@/components/DigestSettingsForm";
+import { DigestSettingsForm } from "@/components/DigestSettingsForm";
 import { EmptyState } from "@/components/EmptyState";
 import { MarkNotificationsSeen } from "@/components/MarkNotificationsSeen";
 import { PersonChip } from "@/components/PersonChip";
@@ -19,6 +16,7 @@ import {
   parseDigestSettings,
   parseMembershipDigestSettings,
   parseTimetableSettings,
+  parseViewerPushKinds,
   roleLabel,
 } from "@/lib/timetableSettings";
 import { topicPath } from "@/lib/topicPath";

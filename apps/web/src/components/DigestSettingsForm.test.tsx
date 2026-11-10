@@ -29,10 +29,8 @@ vi.mock("@/components/Toast", () => ({
   useToast: () => ({ toast: mocks.toast, toastError: mocks.toastError }),
 }));
 
-import {
-  DigestSettingsForm,
-  parseViewerPushKinds,
-} from "@/components/DigestSettingsForm";
+import { DigestSettingsForm } from "@/components/DigestSettingsForm";
+import { parseViewerPushKinds } from "@/lib/timetableSettings";
 
 /** What the API's `viewerPushKinds` resolves for an untouched membership:
  * the defaults, `drafts` left out (#379). */
