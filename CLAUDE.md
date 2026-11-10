@@ -102,6 +102,18 @@ Lint covers everything: `apps/web` has its own Next config; the root
 - **Never run `deploy-production.yml` or touch the `topic-prod` (prod) DO app —
   production deploys are human-triggered only.** Same for repo settings,
   rulesets, and DO infrastructure (`doctl`).
+- **Reading production is allowed; changing it is not** (Ed, 2026-11-10).
+  Cloud sessions hold two read-only credentials, injected by the network
+  proxy so no agent ever sees their values: an `app:read` DigitalOcean token
+  for `api.digitalocean.com`, and Ed's personal Topic API token (no write
+  scopes) for `topic.forum`. Use them to diagnose: runtime logs via
+  `GET /v2/apps/<id>/logs?type=RUN&component_name=web|api` (its `live_url`
+  host must be on the environment's allowlist), and a page's own GraphQL
+  query run as Ed. GET requests only, nothing that creates, changes,
+  redeploys or deletes. A Next.js `ERROR <digest>` page is a pointer: search
+  the web component's log for the digest to find the real error. The token
+  never receives `pushPublicKey`, so push-only rendering can't be reproduced
+  through it.
 - **Clerk's production instance is on topic.forum** (Ed confirmed,
   2026-10-03): its Frontend API is `clerk.topic.forum`. Dev and local use
   the Clerk development instance (`*.clerk.accounts.dev`), so a sign-in
